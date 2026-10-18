@@ -247,7 +247,7 @@ export const RESOURCES = {
     permissions: ['read', 'update'],
     audit: { entity: 'organization' },
     nav: {
-      label: 'Organization',
+      label: 'Workspace',
       href: '/dashboard/settings/organization',
       icon: 'Settings',
       section: 'settings',

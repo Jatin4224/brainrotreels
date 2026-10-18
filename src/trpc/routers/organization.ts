@@ -73,6 +73,11 @@ export const organizationRouter = createTRPCRouter({
         })
       }
 
+      /* Deliberately NOT ensurePersonalWorkspace: this procedure is the
+       * explicit "create another organization" action from the switcher, so
+       * a user who already has one must still get a new one. The service's
+       * idempotent early-return is right for the auto-create path and wrong
+       * here. The onboardingComplete write is shared, hence the same shape. */
       return ctx.prisma.$transaction(async (tx) => {
         const result = await createOrganizationWithOwner(tx, {
           userId: ctx.user.id,

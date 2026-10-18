@@ -4,7 +4,7 @@ Tick a phase and add a dated note — what was built, and anything deferred — 
 checks pass. If a check was deferred rather than met, say so explicitly; a tick that is not true is
 worse than an empty box.
 
-- [ ] Phase 00: Foundations and seams
+- [x] Phase 00: Foundations and seams — 2026-10-18
 - [ ] Phase 01: Timeline document
 - [ ] Phase 02: Media assets and storage
 - [ ] Phase 03: Render core
@@ -33,3 +33,29 @@ These cannot be unblocked by writing code. Settle each before its phase starts.
       (Phase 11).
 
 ## Notes
+
+### Phase 00 — 2026-10-18
+
+Built: npm/CI/Vitest (91 tests), registry cleanup + `period`, Zod public env, jobs seam
+(Inngest) + `hello`, storage seam (R2) + key convention, slot-based `DataTable` (+ both
+existing screens migrated), periodic usage windows, personal-workspace auto-create, and
+the post-signup plan step.
+
+**Verified end to end:** a fresh signup with zero memberships reaches `/dashboard` through
+one redirect, with `Jatin's workspace` created and owner membership set; a second visit
+redirects zero times. Inngest ran `hello/requested` to `Completed` against the dev server.
+Both eslint provider fences were probed with throwaway violations and rejected.
+
+**Deferred, needs you:**
+- `npx prisma migrate dev --name member_unique_and_indexes` — schema is updated and the
+  diff is just two indexes; checked for duplicate `(organizationId, userId)` pairs first
+  and found none.
+- The R2 round-trip. Adapter, keys and tests are in; the smoke test needs a real bucket
+  and the five `R2_*` variables. Also still needs the lifecycle rule deleting `tmp/` after
+  24 hours — the key convention assumes it and nothing in code enforces it.
+- Visual review of the two migrated list screens. They were `Card` + `divide-y` rows and
+  are now real tables, so the look changed.
+
+**Corrected along the way:** the two `as Route` lint errors were NOT removable — `Route` is
+generated into `.next/types` by the build, so `tsc --noEmit` and eslint both lie about them
+without it. CI now runs `npm run build` first for exactly this reason.

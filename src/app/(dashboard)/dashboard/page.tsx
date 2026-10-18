@@ -21,6 +21,7 @@
 import type { Metadata } from 'next'
 
 import { ContentLayout } from '@/components/global/page-header'
+import { PlanSetupCard } from '@/components/global/plan-setup-card'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 
 export const metadata: Metadata = {
@@ -30,6 +31,9 @@ export const metadata: Metadata = {
 export default function DashboardHomePage() {
   return (
     <ContentLayout title="Dashboard">
+      {/* POST_SIGNUP_PLAN_STEP — the plan choice that used to be step two of
+          onboarding. Renders nothing once dismissed or on a paid plan. */}
+      <PlanSetupCard />
       <Card>
         <CardHeader>
           <CardTitle>Welcome</CardTitle>
@@ -39,7 +43,7 @@ export default function DashboardHomePage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="text-sm text-muted-foreground">
-          Use the sidebar to manage your team, organization settings, and billing.
+          Use the sidebar to manage your workspace, team and billing.
         </CardContent>
       </Card>
     </ContentLayout>
