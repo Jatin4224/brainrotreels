@@ -48,6 +48,7 @@ import {
 } from '@/lib/resources'
 import { getAuthAdapter, type AdapterTier } from '@/lib/adapters'
 import { getUsageMetrics } from '@/services/usage.service'
+import { effectiveUsage } from './usage-period'
 import { PLAN_ORDER, type PlanKey } from '@/lib/config/plans'
 
 type FeatureGateCheckResult = {
@@ -131,7 +132,13 @@ const getAllUsageMetrics = cache(async (organizationId: string) => {
 
   const entries = LIMIT_RESOURCE_KEYS.map((resourceKey): [LimitResourceKey, UsageMetricsData] => {
     const metric = metrics.find((m) => m.featureKey === resourceKey)
-    const currentUsage = metric?.currentUsage ?? 0
+    /* PERIODIC_USAGE — see checkFeatureGate. The UI must agree with the
+     * server's gate, so the same staleness rule is applied here. */
+    const currentUsage = effectiveUsage(
+      resourceKey,
+      metric?.currentUsage ?? 0,
+      metric?.lastResetAt,
+    )
     const limit = getResourceLimitForPlan(resourceKey, tier.tier)
     const isUnlimited = !Number.isFinite(limit)
 
@@ -245,7 +252,15 @@ export async function checkFeatureGate(
   if (!Number.isFinite(limit)) return { allowed: true, plan: tier.tier, upgradeMessage }
 
   const metrics = await getUsageMetrics(organizationId, resourceKey)
-  const currentUsage = metrics?.currentUsage ?? 0
+  /* PERIODIC_USAGE: a counter from a closed window reads as zero. The
+   * usage.reset cron tidies the rows, but the gate must be correct whether or
+   * not it has run — a stalled cron would otherwise leave every customer on a
+   * permanently exhausted quota. */
+  const currentUsage = effectiveUsage(
+    resourceKey,
+    metrics?.currentUsage ?? 0,
+    metrics?.lastResetAt,
+  )
 
   if (currentUsage + incrementBy > limit) {
     return {

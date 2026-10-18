@@ -89,12 +89,14 @@ The rate limiter is Upstash-backed. Three limiters ship out of the box.
 
 `apiLimiter` (100 per 10s sliding window) runs at two points:
 
-- `src/proxy.ts` ingress for `/api/trpc/*` — broad per-IP cap.
+- `src/app/api/trpc/[trpc]/route.ts` — IP-keyed, checked before auth resolves, returning a 429 with rate-limit headers.
 - `baseProcedure` in the tRPC layer — keyed by user ID if known, else by `ip:<getClientIp>`.
 
 ### Auth limiter
 
-`authLimiter` (10 per 60s) runs at the proxy for `POST /api/auth/*`. Tight on purpose — brute force and credential stuffing protection.
+`authLimiter` (10 per 60s) runs in the POST branch of `src/app/api/auth/[...all]/route.ts`, checked before Better Auth is even imported. Tight on purpose — brute force and credential stuffing protection.
+
+> **Not the proxy.** Earlier revisions of this page and of `src/lib/rate-limit.ts` both said limiting happened at `src/proxy.ts` ingress. It never has — `src/proxy.ts` only short-circuits static paths, redirects `/sign-up` when registration is closed, and stamps `x-pathname` / `x-hostname`.
 
 ### Per-resource overrides
 
@@ -131,7 +133,7 @@ Platform-injected headers come first because the edge rewrites them. The last en
 
 ### Rate-limit headers
 
-`buildRateLimitHeaders(result)` emits IETF-draft `RateLimit-*` headers plus `Retry-After` on a block. The proxy uses them on 429. The tRPC error path puts the same data inside `cause` (the structured `RATE_LIMITED` error) so clients can render a precise retry timer.
+`buildRateLimitHeaders(result)` emits IETF-draft `RateLimit-*` headers plus `Retry-After` on a block. The tRPC and auth route handlers attach them to their 429 responses. The tRPC error path puts the same data inside `cause` (the structured `RATE_LIMITED` error) so clients can render a precise retry timer.
 
 ## Redis is not a query cache
 

@@ -19,9 +19,18 @@
  *        checkRateLimit fails open; rate limiting is a guardrail, not the only
  *        line of defense, and refusing all traffic on a Redis outage is almost
  *        always worse than letting more requests through.
- * WHERE: Consumed by src/proxy.ts (apiLimiter, authLimiter), procedure factory
- *        for per-resource overrides via RESOURCES[x].rateLimit, and
- *        src/lib/request-forensics.ts (getClientIp).
+ * WHERE: apiLimiter is applied in `baseProcedure`
+ *        (src/trpc/procedures/protected.ts) and again, IP-keyed before auth,
+ *        in src/app/api/trpc/[trpc]/route.ts. authLimiter is applied in the
+ *        POST branch of src/app/api/auth/[...all]/route.ts. Per-resource
+ *        overrides come from RESOURCES[x].rateLimit via the procedure factory.
+ *        getClientIp lives in src/lib/request-forensics.ts.
+ *
+ *        NOT src/proxy.ts. Earlier revisions of this file and
+ *        docs/06-audit-and-rate-limit.md both said limiting happened at proxy
+ *        ingress; it never has. src/proxy.ts only short-circuits static paths,
+ *        redirects /sign-up when registration is closed, and stamps
+ *        x-pathname / x-hostname.
  */
 
 /* Upstash-backed rate limiting. Redis is OPTIONAL — when unconfigured every
@@ -73,9 +82,11 @@ function buildLimiter(
  * SOURCE OF TRUTH KEYWORDS: apiLimiter
  *
  * WHAT:  Global API rate limiter (100 / 10s sliding window).
- * WHY:   Per-IP cap for general API traffic — broad guardrail, not a per-route
- *        check; per-resource overrides live on RESOURCES[x].rateLimit.
- * WHERE: Applied at src/proxy.ts ingress.
+ * WHY:   Broad guardrail for general API traffic, not a per-route check;
+ *        per-resource overrides live on RESOURCES[x].rateLimit.
+ * WHERE: `baseProcedure` (keyed by user id, falling back to IP) and
+ *        src/app/api/trpc/[trpc]/route.ts (IP-keyed, before auth resolves).
+ *        Not the proxy — see the file header.
  */
 export const apiLimiter = buildLimiter('rl:api', 100, '10 s')
 
@@ -85,7 +96,8 @@ export const apiLimiter = buildLimiter('rl:api', 100, '10 s')
  * WHAT:  Tight IP-keyed rate limiter (10 / 60s) for auth endpoints.
  * WHY:   Brute-force and credential-stuffing protection — far stricter than
  *        the general apiLimiter.
- * WHERE: Applied at src/proxy.ts for /api/auth/* routes.
+ * WHERE: The POST branch of src/app/api/auth/[...all]/route.ts, checked before
+ *        Better Auth is even imported. Not the proxy — see the file header.
  */
 /* Tight, IP-keyed: brute-force / credential stuffing. */
 export const authLimiter = buildLimiter('rl:auth', 10, '60 s')

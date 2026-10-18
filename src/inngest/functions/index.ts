@@ -20,5 +20,6 @@
  */
 
 import { helloFunction } from './hello'
+import { usageResetFunction } from './usage-reset'
 
-export const INNGEST_FUNCTIONS = [helloFunction]
+export const INNGEST_FUNCTIONS = [helloFunction, usageResetFunction]

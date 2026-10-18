@@ -211,6 +211,14 @@ model Member {
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  /// One membership per (organization, user). Every create site already guards
+  /// with a findFirst, but those are check-then-act with nothing behind them:
+  /// two concurrent invitation accepts can both pass the check. Better Auth's
+  /// own organization endpoints also write this table through prismaAdapter,
+  /// outside those guards entirely. The constraint is what actually makes the
+  /// rule true — note it turns a previously-silent duplicate into a P2002.
+  @@unique([organizationId, userId])
+  @@index([userId])
   @@map("member")
 }
 
