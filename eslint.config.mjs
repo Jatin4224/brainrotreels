@@ -69,6 +69,11 @@ const eslintConfig = defineConfig([
               message:
                 'PROVIDER_ISOLATION: import the Inngest SDK only inside src/lib/adapters/jobs/inngest/**, src/inngest/** or src/app/api/inngest/**. Elsewhere, use enqueue() from @/lib/adapters/jobs.',
             },
+            {
+              group: ['@aws-sdk/*', '@aws-sdk/**'],
+              message:
+                'PROVIDER_ISOLATION: import the S3/R2 SDK only inside src/lib/adapters/storage/r2/**. Elsewhere, use getStorageAdapter() from @/lib/adapters/storage — and build keys with the helpers there, never by hand.',
+            },
           ],
         },
       ],
@@ -97,6 +102,9 @@ const eslintConfig = defineConfig([
       'src/lib/adapters/jobs/inngest/**/*.ts',
       'src/inngest/**/*.ts',
       'src/app/api/inngest/**',
+      // Storage seam. Only the R2 folder may speak S3; keys.ts stays pure and
+      // SDK-free so it can be imported (and unit tested) anywhere.
+      'src/lib/adapters/storage/r2/**/*.ts',
     ],
     rules: {
       'no-restricted-imports': [
