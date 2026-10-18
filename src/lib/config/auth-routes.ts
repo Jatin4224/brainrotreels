@@ -130,9 +130,16 @@ export function resolveAuthCallback(raw: string | string[] | undefined): Route |
   /* Protocol-relative: browsers read both as "another origin". */
   if (value.startsWith('//') || value.startsWith('/\\')) return null
 
-  /* The `Route | null` return annotation is the boundary — a runtime value
-   * cannot be checked against the route tree. No cast is needed to cross it. */
-  return value
+  /* The cast is the honest boundary of TYPED_ROUTE_GUARANTEE: `Route` is a
+   * literal union generated into .next/types by `next build`, and a value read
+   * at runtime cannot be checked against it.
+   *
+   * NECESSARY_DESPITE_LINT: eslint reports this as an unnecessary assertion
+   * whenever .next/types is absent or stale, because `Route` degrades to
+   * `string` and the cast looks redundant. It is not — `next build` fails
+   * without it. Trust the build over the rule here; see the eslint override
+   * for this file. */
+  return value as Route
 }
 
 /**

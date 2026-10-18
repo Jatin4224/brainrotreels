@@ -44,6 +44,15 @@ jobs:
       - name: Generate Prisma client
         run: npm run db:generate
 
+      # Must run BEFORE typecheck and lint. `typedRoutes: true` means `Route`
+      # is a literal union generated into .next/types by the build; without it
+      # `Route` degrades to `string`, `tsc --noEmit` passes code the build
+      # rejects, and eslint reports necessary `as Route` casts as redundant.
+      # Removing one on that advice breaks `next build` — which is exactly how
+      # this step came to exist.
+      - name: Build
+        run: npm run build
+
       - name: Typecheck
         run: npm run typecheck
 
