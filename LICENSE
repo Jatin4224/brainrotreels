@@ -1,0 +1,180 @@
+ARCHITECTURAL GUARDRAIL COMMUNITY LICENSE v1.1
+Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
+
+This is a commercial license, not an open source one. We own this codebase
+("the Software"); you're getting the right to build with it. Plain English,
+no surprises — if anything here is unclear, just ask.
+
+
+WHO CAN USE IT
+
+You have a license if you've completed at least 30 consecutive days of paid
+membership in the AI Era community (https://www.skool.com/ai-era), or you
+bought Architectural Guardrail directly from us. Otherwise you have no rights
+to this code, however you got hold of it, and you should delete it.
+
+Once you've completed that first paid month, the version you have is yours
+permanently. You don't need to stay subscribed to keep using it. You're just
+not entitled to future versions, updates, fixes, or support — those come with
+an active membership at the time we release them.
+
+
+WHAT YOU CAN DO
+
+Build anything you want. Unlimited products, SaaS you charge for, client and
+agency work, internal tools. Modify it, rewrite it, swap out the stack, deploy
+it anywhere. Sell a business you built on it (the buyer needs their own
+license to keep developing the code; we take no equity and no cut). Put
+employees and contractors on it, under NDA, with you responsible for them.
+
+No attribution needed. Build your own brand.
+
+
+WHAT YOU CAN'T DO
+
+Give the Software away. That's the whole of it, but specifically: don't sell,
+sublicense, publish, or distribute it or any substantial part of it; don't put
+it in a public repo or share it on Discord, Telegram, forums, or file hosts;
+don't repackage it as a template, starter kit, or course asset; don't release
+it for free; don't teach others to rebuild it through tutorials, courses, or
+"how it's built" content; don't use the name "Architectural Guardrail" in
+anything your customers see; don't strip the copyright headers; and don't let
+anyone without a license see the source.
+
+Shipping a product built on this to your users is fine and expected. Handing
+someone the code is not.
+
+
+OPEN SOURCING YOUR OWN PRODUCT
+
+We're not against open source. You can open source a product you built on this,
+as long as what you publish is your product and not our system. The test is
+simple: if someone could clone your repo and have a working copy of
+Architectural Guardrail, you've redistributed our codebase — no matter what
+license you attached or what you named it.
+
+So you can't publish the Software (or a substantial part of it) under MIT,
+Apache, GPL, or anything else; can't publish something that presents itself as
+Architectural Guardrail or borrows the name; can't publish this codebase with
+the branding swapped; and can't split it across repos to get around this.
+
+Putting an open source license on code you don't own doesn't make it open
+source. Not sure if something crosses the line? Ask us first.
+
+
+KEEPING IT PRIVATE
+
+Private repos, real access controls, NDAs for anyone you let in. You're fully
+responsible for everyone you give access to. If it leaks, tell us immediately.
+
+
+OWNERSHIP
+
+We own the Software. Your license is non-exclusive and non-transferable — it
+can't be resold or shared with a partner or co-founder, who'd need their own.
+We may license this to any number of other people.
+
+What you build on top is yours: your features, your product, your business.
+But since the result is built on our code, this license still governs the
+whole of it.
+
+
+NO REFUNDS, NO CHARGEBACKS
+
+All sales are final. Once you have the code you have the intellectual
+property, so refunds aren't possible. You can cancel your membership anytime,
+but periods already paid for aren't refunded.
+
+Requesting a refund, filing a chargeback, or reversing the payment that made
+you eligible is itself a violation of this license. Your license is void
+immediately and permanently, you lose all rights to the Software, and you must
+delete every copy. A later membership won't restore it.
+
+You also owe us 30% of the reversed amount as liquidated damages for the
+administrative and recovery costs a reversal creates, on top of any chargeback
+fees, processing costs, and collection or legal costs we incur. We may process
+that automatically.
+
+
+TERMINATION
+
+We can terminate your license if you break these terms — leaking or
+redistributing the code, teaching others to build it, using our name on your
+product, or requesting a refund or chargeback. We can't revoke it just because
+we changed our minds. On termination, stop using the Software and delete your
+copies, with no refund.
+
+
+NO WARRANTY, NO LIABILITY
+
+THE SOFTWARE IS PROVIDED "AS IS" AND "AS AVAILABLE", WITHOUT WARRANTY OR
+CONDITION OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE
+WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE, AND
+NON-INFRINGEMENT.
+
+IN NO EVENT SHALL WEB PRODIGIES LLC, OR ITS OFFICERS, MEMBERS, EMPLOYEES,
+AGENTS, OR AFFILIATES, BE LIABLE FOR ANY CLAIM, DAMAGES, LOSS, OR OTHER
+LIABILITY OF ANY KIND, WHETHER IN AN ACTION OF CONTRACT, TORT (INCLUDING
+NEGLIGENCE), STRICT LIABILITY, OR OTHERWISE, ARISING FROM, OUT OF, OR IN
+CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. THIS
+APPLIES WHATEVER THE CAUSE — INCLUDING WITHOUT LIMITATION ANY BUG, DEFECT,
+VULNERABILITY, OUTAGE, DATA LOSS, OR SECURITY FAILURE IN CODE WE WROTE, IN ANY
+UPDATE OR RELEASE WE PUBLISH, OR IN ANY THIRD-PARTY DEPENDENCY, PACKAGE, OR
+SERVICE THE SOFTWARE REFERENCES — AND APPLIES EVEN IF WE HAVE BEEN ADVISED OF
+THE POSSIBILITY OF SUCH DAMAGES.
+
+You use the Software entirely at your own risk, and you are responsible for
+everything you do with it. You decide what to install, what to update to, and
+what to ship; reviewing that before it reaches your users is your job, not ours.
+
+You will indemnify, defend, and hold harmless Web Prodigies LLC and its
+officers, members, employees, agents, and affiliates against any claim brought
+against any of us in connection with your use of the Software — including a
+claim that the Software itself was at fault — and will cover the resulting
+damages, costs, and reasonable attorneys' fees.
+
+Nothing here excludes liability that cannot be excluded under applicable law.
+WHERE LIABILITY CANNOT BE EXCLUDED, OUR TOTAL LIABILITY WILL NEVER EXCEED WHAT
+YOU PAID US.
+
+
+THIRD-PARTY COMPONENTS
+
+This license covers only our original work. Dependencies are declared in
+package.json and installed by you from the npm registry under their own
+licenses — we don't redistribute them.
+
+Source files that aren't ours carry no Web Prodigies header. If a file has no
+header, treat it as third-party under its upstream license. That currently
+means the UI primitives generated by the shadcn/ui CLI
+(https://ui.shadcn.com), which are MIT licensed:
+
+  Copyright (c) 2023 shadcn
+
+  Permission is hereby granted, free of charge, to any person obtaining a copy
+  of this software and associated documentation files (the "Software"), to
+  deal in the Software without restriction, including without limitation the
+  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+  sell copies of the Software, and to permit persons to whom the Software is
+  furnished to do so, subject to the following conditions:
+
+  The above copyright notice and this permission notice shall be included in
+  all copies or substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+  IN THE SOFTWARE.
+
+
+DISPUTES
+
+We'll try to work it out in good faith first. If that fails, binding
+arbitration in Virginia, USA — no class actions, no jury trial. Governed by
+Virginia law.
+
+
+Web Prodigies LLC · webprodigies.connect@gmail.com · skool.com/ai-era
