@@ -48,6 +48,23 @@ export interface ResourceLimit {
   upgradeMessage: string
   availableOnFreeTrial: boolean
   unit?: string
+  /**
+   * How the cap is consumed over time.
+   *
+   * Omitted means ABSOLUTE: a standing count of things that currently exist,
+   * released by deleting them. `member` seats and `storage` bytes are both
+   * absolute — resetting either would be a bug, letting a free workspace
+   * invite one person a month forever, or decoupling the byte counter from
+   * the objects actually in R2.
+   *
+   * `'month'` means PERIODIC: the counter refills on a schedule and is never
+   * released by a delete. Only a resource that genuinely accrues — API calls,
+   * renders, generated images — may declare it.
+   *
+   * Absolute is the default precisely because the unsafe direction is the one
+   * that must be typed out deliberately.
+   */
+  period?: 'month'
 }
 
 export interface ResourceFlag {
@@ -189,24 +206,9 @@ export const RESOURCES = {
       availableOnFreeTrial: true,
       /* `unit` is the noun the pricing copy uses — "50,000 API calls". */
       unit: 'API calls',
-    },
-  },
-
-  customDomain: {
-    name: 'Custom Domain',
-    description: 'Map your own domain to your workspace',
-    flag: {
-      perPlan: { free: false, starter: true, pro: true, enterprise: true, portal: true },
-      availableOnFreeTrial: false,
-    },
-  },
-
-  customBranding: {
-    name: 'Custom Branding',
-    description: 'Remove or customize platform branding',
-    flag: {
-      perPlan: { free: false, starter: true, pro: true, enterprise: true, portal: true },
-      availableOnFreeTrial: false,
+      /* The only periodic resource today. The description has always said "per
+       * month"; this is the machine-readable half that usage.reset acts on. */
+      period: 'month',
     },
   },
 
@@ -252,11 +254,6 @@ export const RESOURCES = {
     },
   },
 
-  integrations: {
-    name: 'Integrations',
-    description: 'Connect or disconnect third-party services',
-    permissions: ['read', 'update'],
-  },
 } as const satisfies Record<string, ResourceDefinition>
 
 export type ResourceKey = keyof typeof RESOURCES
