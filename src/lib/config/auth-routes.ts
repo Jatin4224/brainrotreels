@@ -130,7 +130,9 @@ export function resolveAuthCallback(raw: string | string[] | undefined): Route |
   /* Protocol-relative: browsers read both as "another origin". */
   if (value.startsWith('//') || value.startsWith('/\\')) return null
 
-  return value as Route
+  /* The `Route | null` return annotation is the boundary — a runtime value
+   * cannot be checked against the route tree. No cast is needed to cross it. */
+  return value
 }
 
 /**

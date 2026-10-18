@@ -1,0 +1,54 @@
+# SOURCE OF TRUTH KEYWORDS: CI, github actions, typecheck, lint, test, prisma generate
+#
+# WHAT:  Runs typecheck, lint and the unit suite on every push and pull request.
+# WHY:   `prisma generate` must run before typecheck or every `@/generated/prisma`
+#        import is unresolvable — and it needs DATABASE_URL *set*, though not
+#        reachable, because prisma.config.ts declares `datasource.url = env(...)`.
+#        A throwaway literal is therefore correct here: CI never connects to a
+#        database, and wiring a real secret would imply it does.
+#        `npm ci --legacy-peer-deps` matches local install: npm 10's arborist
+#        crashes resolving Vitest's peer set without it.
+# WHERE: GitHub Actions. The same three commands run locally via npm scripts.
+
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    env:
+      # Never connected to. Present only so prisma.config.ts can resolve.
+      DATABASE_URL: 'postgresql://ci:ci@localhost:5432/ci?schema=public'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci --legacy-peer-deps --no-audit --no-fund
+
+      - name: Generate Prisma client
+        run: npm run db:generate
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test

@@ -43,7 +43,7 @@ import type { Route } from 'next'
  */
 export const PORTAL_PATH = (process.env['PORTAL_PATH_PREFIX'] || '/portal') as Route
 
-export const portalRoute = (suffix: string): Route => `${PORTAL_PATH}${suffix}` as Route
+export const portalRoute = (suffix: string): Route => `${PORTAL_PATH}${suffix}`
 
 export const portalConfig = {
   enabled: process.env['PORTAL_ENABLED'] === 'true',
