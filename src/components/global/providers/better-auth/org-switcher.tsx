@@ -109,7 +109,7 @@ export function TeamSwitcher() {
           >
             <DropdownMenuGroup>
               <DropdownMenuLabel className="text-muted-foreground text-xs">
-                Organizations
+                Workspaces
               </DropdownMenuLabel>
               {(organizations ?? []).map((org) => (
                 <DropdownMenuItem
@@ -129,7 +129,7 @@ export function TeamSwitcher() {
               <div className="flex size-6 items-center justify-center rounded-md border bg-transparent">
                 <Plus className="size-4" />
               </div>
-              <span className="text-muted-foreground font-medium">Create organization</span>
+              <span className="text-muted-foreground font-medium">New workspace</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

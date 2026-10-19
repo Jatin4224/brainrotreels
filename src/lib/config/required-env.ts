@@ -201,7 +201,15 @@ export interface OptionalEnvItem extends Omit<OptionalEnvVar, 'keys'> {
   ok: boolean
 }
 
-/* A var counts as set only when it's a non-empty, trimmed string. */
+/* A var counts as set only when it's a non-empty, trimmed string.
+ *
+ * SERVER_ONLY_READ: the computed `process.env[key]` below is correct here and
+ * only here. Next inlines `NEXT_PUBLIC_*` into the CLIENT bundle for literal
+ * accesses only, so a computed read returns undefined in a browser — which
+ * would report every configured key as missing. This module is reached solely
+ * from the root layout and SetupChecklist, both server components, where
+ * process.env is the real object. Render any of it on the client and this
+ * silently inverts; read a value for display through env.public.ts instead. */
 function isSet(key: string): boolean {
   const value = process.env[key]
   return typeof value === 'string' && value.trim().length > 0

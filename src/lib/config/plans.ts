@@ -8,6 +8,14 @@
  * or distribution is prohibited.
  */
 
+import {
+  envBoolean,
+  envInteger,
+  envOptional,
+  envString,
+  publicEnv,
+} from './env.public'
+
 /**
  * SOURCE OF TRUTH KEYWORDS: PLAN_KEYS, PlanKey, PlanDefinition, PLANS,
  *   PLAN_ORDER, BillingInterval, getPlanPriceId, getPlanByPriceId, getNextPlan,
@@ -64,25 +72,13 @@ export interface PlanDefinition {
   }
 }
 
-/* Env readers for the operator-tunable plan attributes. A blank/unset var
- * falls back to the template default, so the app runs out-of-the-box while
- * still letting an operator rename plans, retitle trials, or hide a tier from
- * pricing WITHOUT touching code (matches funnelmods' env-driven plans). */
-function envStr(key: string, fallback: string): string {
-  const value = process.env[key]
-  return value !== undefined && value.trim().length > 0 ? value.trim() : fallback
-}
-function envBool(key: string, fallback: boolean): boolean {
-  const value = process.env[key]
-  if (value === undefined || value.trim().length === 0) return fallback
-  return value.trim() === 'true'
-}
-function envInt(key: string, fallback: number): number {
-  const value = process.env[key]
-  if (value === undefined || value.trim().length === 0) return fallback
-  const parsed = Number.parseInt(value, 10)
-  return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback
-}
+/* Operator-tunable plan attributes come from `publicEnv`, which reads every
+ * NEXT_PUBLIC_* variable LITERALLY — see LITERAL_ENV_READ in env.public.ts.
+ * The helpers below take the VALUE, never the key. This file previously read
+ * `process.env[key]` through a helper, which Next cannot inline into the client
+ * bundle: plan names set in .env were correct on the server and silently fell
+ * back to the template defaults in the browser. Passing a key again would
+ * reintroduce exactly that. */
 
 /**
  * SOURCE OF TRUTH KEYWORDS: PLANS
@@ -96,47 +92,56 @@ function envInt(key: string, fallback: number): number {
  */
 export const PLANS: Record<PlanKey, PlanDefinition> = {
   free: {
-    name: envStr('NEXT_PUBLIC_FREE_NAME', 'Free'),
-    description: envStr('NEXT_PUBLIC_FREE_DESCRIPTION', 'Everything you need to try things out.'),
+    name: envString(publicEnv.NEXT_PUBLIC_FREE_NAME, 'Free'),
+    description: envString(
+      publicEnv.NEXT_PUBLIC_FREE_DESCRIPTION,
+      'Everything you need to try things out.'
+    ),
     icon: 'Package',
-    showPlan: envBool('NEXT_PUBLIC_FREE_SHOW_PLAN', true),
-    trialDays: envInt('NEXT_PUBLIC_FREE_TRIAL_DAYS', 0),
+    showPlan: envBoolean(publicEnv.NEXT_PUBLIC_FREE_SHOW_PLAN, true),
+    trialDays: envInteger(publicEnv.NEXT_PUBLIC_FREE_TRIAL_DAYS, 0),
     stripe: {},
   },
   starter: {
-    name: envStr('NEXT_PUBLIC_STARTER_NAME', 'Starter'),
-    description: envStr('NEXT_PUBLIC_STARTER_DESCRIPTION', 'For a small team getting off the ground.'),
+    name: envString(publicEnv.NEXT_PUBLIC_STARTER_NAME, 'Starter'),
+    description: envString(
+      publicEnv.NEXT_PUBLIC_STARTER_DESCRIPTION,
+      'For a small team getting off the ground.'
+    ),
     icon: 'Rocket',
-    showPlan: envBool('NEXT_PUBLIC_STARTER_SHOW_PLAN', true),
-    trialDays: envInt('NEXT_PUBLIC_STARTER_TRIAL_DAYS', 14),
+    showPlan: envBoolean(publicEnv.NEXT_PUBLIC_STARTER_SHOW_PLAN, true),
+    trialDays: envInteger(publicEnv.NEXT_PUBLIC_STARTER_TRIAL_DAYS, 14),
     stripe: {
-      monthly: process.env['NEXT_PUBLIC_STARTER_PRICE_MONTHLY'],
-      yearly: process.env['NEXT_PUBLIC_STARTER_PRICE_YEARLY'],
+      monthly: envOptional(publicEnv.NEXT_PUBLIC_STARTER_PRICE_MONTHLY),
+      yearly: envOptional(publicEnv.NEXT_PUBLIC_STARTER_PRICE_YEARLY),
     },
   },
   pro: {
-    name: envStr('NEXT_PUBLIC_PRO_NAME', 'Pro'),
-    description: envStr('NEXT_PUBLIC_PRO_DESCRIPTION', 'For teams that need room to grow.'),
+    name: envString(publicEnv.NEXT_PUBLIC_PRO_NAME, 'Pro'),
+    description: envString(
+      publicEnv.NEXT_PUBLIC_PRO_DESCRIPTION,
+      'For teams that need room to grow.'
+    ),
     icon: 'Zap',
-    showPlan: envBool('NEXT_PUBLIC_PRO_SHOW_PLAN', true),
-    trialDays: envInt('NEXT_PUBLIC_PRO_TRIAL_DAYS', 14),
+    showPlan: envBoolean(publicEnv.NEXT_PUBLIC_PRO_SHOW_PLAN, true),
+    trialDays: envInteger(publicEnv.NEXT_PUBLIC_PRO_TRIAL_DAYS, 14),
     stripe: {
-      monthly: process.env['NEXT_PUBLIC_PRO_PRICE_MONTHLY'],
-      yearly: process.env['NEXT_PUBLIC_PRO_PRICE_YEARLY'],
+      monthly: envOptional(publicEnv.NEXT_PUBLIC_PRO_PRICE_MONTHLY),
+      yearly: envOptional(publicEnv.NEXT_PUBLIC_PRO_PRICE_YEARLY),
     },
   },
   enterprise: {
-    name: envStr('NEXT_PUBLIC_ENTERPRISE_NAME', 'Enterprise'),
-    description: envStr(
-      'NEXT_PUBLIC_ENTERPRISE_DESCRIPTION',
+    name: envString(publicEnv.NEXT_PUBLIC_ENTERPRISE_NAME, 'Enterprise'),
+    description: envString(
+      publicEnv.NEXT_PUBLIC_ENTERPRISE_DESCRIPTION,
       'Unlimited scale with everything included.'
     ),
     icon: 'Building',
-    showPlan: envBool('NEXT_PUBLIC_ENTERPRISE_SHOW_PLAN', true),
-    trialDays: envInt('NEXT_PUBLIC_ENTERPRISE_TRIAL_DAYS', 30),
+    showPlan: envBoolean(publicEnv.NEXT_PUBLIC_ENTERPRISE_SHOW_PLAN, true),
+    trialDays: envInteger(publicEnv.NEXT_PUBLIC_ENTERPRISE_TRIAL_DAYS, 30),
     stripe: {
-      monthly: process.env['NEXT_PUBLIC_ENTERPRISE_PRICE_MONTHLY'],
-      yearly: process.env['NEXT_PUBLIC_ENTERPRISE_PRICE_YEARLY'],
+      monthly: envOptional(publicEnv.NEXT_PUBLIC_ENTERPRISE_PRICE_MONTHLY),
+      yearly: envOptional(publicEnv.NEXT_PUBLIC_ENTERPRISE_PRICE_YEARLY),
     },
   },
   /* Hidden platform-admin tier — never sold, never in PLAN_ORDER, not renamable. */

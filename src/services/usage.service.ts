@@ -104,3 +104,35 @@ export async function decrementUsage(
     },
   })
 }
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: resetPeriodicUsage, PERIODIC_USAGE, usage.reset
+ *
+ * WHAT:  Zeroes every periodic counter whose lastResetAt predates the current
+ *        window, and stamps the new window start. Returns the row count.
+ * WHY:   A tidy-up, not the mechanism. Readers already treat a stale counter
+ *        as zero (see effectiveUsage in src/lib/usage-period.ts), so a late or
+ *        missed run cannot over-charge anyone — this keeps the stored numbers
+ *        honest for the admin console and stops rows drifting years behind.
+ *        One updateMany per resource rather than per organization: the work is
+ *        proportional to resources, not tenants, so it stays flat as the
+ *        customer base grows.
+ * WHERE: Called by the usage.reset cron workflow.
+ */
+export async function resetPeriodicUsage(
+  resourceKeys: readonly LimitResourceKey[],
+  periodStart: Date,
+  db: DbClient = prisma
+): Promise<number> {
+  if (resourceKeys.length === 0) return 0
+
+  const result = await db.usageMetrics.updateMany({
+    where: {
+      featureKey: { in: [...resourceKeys] },
+      lastResetAt: { lt: periodStart },
+    },
+    data: { currentUsage: 0, lastResetAt: periodStart, updatedAt: new Date() },
+  })
+
+  return result.count
+}

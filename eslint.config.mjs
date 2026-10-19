@@ -61,6 +61,19 @@ const eslintConfig = defineConfig([
               message:
                 'PROVIDER_ISOLATION: import the Better Auth SDK only inside src/lib/better-auth/**, src/lib/adapters/better-auth/** or src/components/global/providers/better-auth/**. Elsewhere, use getAuthAdapter() from @/lib/adapters.',
             },
+            // The same fence for every NON-auth provider seam. These use their
+            // own selector (src/lib/adapters/select-provider.ts), not the auth
+            // machinery — see that file for why they cannot share it.
+            {
+              group: ['inngest', 'inngest/*', 'inngest/**'],
+              message:
+                'PROVIDER_ISOLATION: import the Inngest SDK only inside src/lib/adapters/jobs/inngest/**, src/inngest/** or src/app/api/inngest/**. Elsewhere, use enqueue() from @/lib/adapters/jobs.',
+            },
+            {
+              group: ['@aws-sdk/*', '@aws-sdk/**'],
+              message:
+                'PROVIDER_ISOLATION: import the S3/R2 SDK only inside src/lib/adapters/storage/r2/**. Elsewhere, use getStorageAdapter() from @/lib/adapters/storage — and build keys with the helpers there, never by hand.',
+            },
           ],
         },
       ],
@@ -83,6 +96,15 @@ const eslintConfig = defineConfig([
       'src/components/global/providers/better-auth/**/*.ts',
       'src/components/global/providers/better-auth/**/*.tsx',
       'src/app/api/auth/**',
+      // Jobs seam. The adapter folder is the translation layer; src/inngest/**
+      // holds workflow definitions, which are written against the engine's own
+      // step API on purpose (see JobsAdapter's WHY); the route serves them.
+      'src/lib/adapters/jobs/inngest/**/*.ts',
+      'src/inngest/**/*.ts',
+      'src/app/api/inngest/**',
+      // Storage seam. Only the R2 folder may speak S3; keys.ts stays pure and
+      // SDK-free so it can be imported (and unit tested) anywhere.
+      'src/lib/adapters/storage/r2/**/*.ts',
     ],
     rules: {
       'no-restricted-imports': [

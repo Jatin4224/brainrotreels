@@ -37,7 +37,11 @@ import { getFeatureGates } from '@/lib/feature-gate'
 import { getServerSession } from '@/lib/adapters/session'
 import { createTRPCContext } from '@/trpc/init'
 import { getQueryClient, trpc } from '@/trpc/server'
-import { AUTH_ROUTES, ROUTES, PORTAL_PATH, isPortalOwnerEmail } from '@/lib/config'
+import { AUTH_ROUTES, ROUTES, PORTAL_PATH, isPortalOwnerEmail, prisma } from '@/lib/config'
+import {
+  ensurePersonalWorkspace,
+  workspaceNameFor,
+} from '@/services/organization.service'
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
 import { AppSidebar } from '@/components/global/sidebar'
 import { PlanOverageBanner } from '@/components/global/plan-overage-banner'
@@ -58,6 +62,45 @@ export default async function DashboardLayout({
     /* A fresh platform-admin owner (no org yet) belongs in /portal, which
      * bootstraps their portal org — not the tenant onboarding flow. */
     if (isPortalOwnerEmail(session.user.email)) redirect(PORTAL_PATH)
+
+    /* PERSONAL_WORKSPACE — a solo creator has no team to name, so one
+     * workspace is created for them rather than asking.
+     *
+     * Here, and not in a Better Auth `databaseHooks.user.create.after`, for
+     * three reasons: AuthAdapter has no onUserCreated seam, so a second
+     * provider would silently never get a workspace; a throw in that hook
+     * aborts sign-up, turning a transient database blip into "registration is
+     * broken"; and it fires for the portal owner too, who must NOT get a
+     * tenant org — a rule this branch already encodes one line above.
+     *
+     * No setActive call: that is a client action, and getActiveOrganization
+     * already falls back to the first membership, so the new workspace is
+     * live immediately. session.activeOrganizationId stays null until the
+     * user first uses the switcher, which is correct for a single workspace.
+     *
+     * On failure fall through to onboarding, which stays reachable as the
+     * recovery path and can report the error properly. */
+    let created = false
+    try {
+      await ensurePersonalWorkspace(prisma, {
+        userId: session.user.id,
+        name: workspaceNameFor(session.user),
+      })
+      created = true
+    } catch (error) {
+      console.error('[dashboard] personal workspace creation failed', error)
+    }
+
+    /* Redirect rather than re-reading the context. `createTRPCContext` and its
+     * membership lookups are React cache()d for the REQUEST, so calling
+     * getActiveOrganization() again here returns the same memoised null that
+     * sent us down this branch — the workspace exists in the database and the
+     * page still bounces to onboarding. A fresh request gets a fresh cache.
+     *
+     * Outside the try on purpose: redirect() signals by throwing, and the
+     * catch above would swallow it. */
+    if (created) redirect(ROUTES.dashboard)
+
     redirect(ROUTES.onboarding)
   }
 

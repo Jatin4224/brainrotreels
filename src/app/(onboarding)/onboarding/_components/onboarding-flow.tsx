@@ -114,7 +114,7 @@ export function OnboardingFlow() {
       await finish(org)
     } catch (err) {
       setBusy(false)
-      setError(err instanceof Error ? err.message : 'Could not create your organization.')
+      setError(err instanceof Error ? err.message : 'Could not create your workspace.')
     }
   }
 
@@ -149,7 +149,7 @@ export function OnboardingFlow() {
         {step === 'details' ? (
           <div className="space-y-6">
             <StepHeading
-              title="Create your organization"
+              title="Create a workspace"
               description="This is your workspace. You can rename it or invite teammates later."
             />
             <Form {...form}>
@@ -159,9 +159,9 @@ export function OnboardingFlow() {
                   name="name"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Organization name</FormLabel>
+                      <FormLabel>Workspace name</FormLabel>
                       <FormControl>
-                        <Input type="text" autoComplete="organization" placeholder="Acme Inc." {...field} />
+                        <Input type="text" autoComplete="organization" placeholder="My workspace" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

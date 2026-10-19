@@ -43,6 +43,10 @@ import type { Route } from 'next'
  */
 export const PORTAL_PATH = (process.env['PORTAL_PATH_PREFIX'] || '/portal') as Route
 
+/* NECESSARY_DESPITE_LINT: see resolveAuthCallback in auth-routes.ts. `Route`
+ * is only a literal union once `next build` has generated .next/types; without
+ * it the assertion reads as redundant and eslint flags it, but the build fails
+ * if it is removed. */
 export const portalRoute = (suffix: string): Route => `${PORTAL_PATH}${suffix}` as Route
 
 export const portalConfig = {

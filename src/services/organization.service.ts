@@ -104,3 +104,80 @@ export async function createOrganizationWithOwner(
 
   return { organizationId, slug }
 }
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: ensurePersonalWorkspace, PERSONAL_WORKSPACE,
+ *   workspaceNameFor, onboardingComplete, auto-create
+ *
+ * WHAT:  Guarantees the user has at least one organization, creating a
+ *        personal workspace if not. Idempotent.
+ * WHY:   PERSONAL_WORKSPACE. protectedProcedure requires an organizationId on
+ *        every call and the dashboard requires an active organization, so a
+ *        user with zero memberships can do nothing at all. For a solo creator
+ *        there is no team to name, and asking them to invent one is friction
+ *        in front of the product. One workspace is created for them and the
+ *        UI never says "organization".
+ *
+ *        Why a service and not the tRPC mutation: the caller is a server
+ *        LAYOUT, which cannot invoke a mutation. The capability guard and the
+ *        onboardingComplete write previously lived in organization.create, so
+ *        they move here and the router calls this too — one definition of
+ *        "a workspace now exists", not two that drift.
+ *
+ *        Idempotency is load-bearing. Two tabs opening /dashboard at once both
+ *        see zero memberships; the member unique constraint
+ *        (organizationId, userId) makes the loser fail rather than duplicate,
+ *        and the re-read below turns that into "already had one".
+ * WHERE: Called by the dashboard layout when a signed-in user has no
+ *        membership, and by organization.createOrganization.
+ */
+export async function ensurePersonalWorkspace(
+  db: DbClient,
+  params: { userId: string; name: string; logo?: string | undefined }
+): Promise<CreateOrganizationResult & { created: boolean }> {
+  const existing = await db.member.findFirst({
+    where: { userId: params.userId },
+    select: { organizationId: true, organization: { select: { slug: true } } },
+    orderBy: { createdAt: 'asc' },
+  })
+
+  if (existing) {
+    return {
+      organizationId: existing.organizationId,
+      slug: existing.organization.slug,
+      created: false,
+    }
+  }
+
+  const result = await createOrganizationWithOwner(db, params)
+
+  await db.user.update({
+    where: { id: params.userId },
+    /* Display-only today — the real onboarding gate is "has a membership"
+     * (see the dashboard layout and protectedProcedure). Kept in step so the
+     * flag never contradicts reality. */
+    data: { onboardingComplete: true },
+  })
+
+  return { ...result, created: true }
+}
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: workspaceNameFor, PERSONAL_WORKSPACE
+ *
+ * WHAT:  A sensible default workspace name for a user who was never asked.
+ * WHY:   `User.name` is non-nullable but can be empty in practice, and an
+ *        email local-part is a better fallback than "Untitled". The name is
+ *        cosmetic — it appears in the switcher and nowhere a customer sees —
+ *        so it only has to be recognisable, and the user can rename it.
+ * WHERE: Used by the dashboard layout when auto-creating.
+ */
+export function workspaceNameFor(user: { name: string; email: string }): string {
+  const trimmed = user.name.trim()
+  if (trimmed.length > 0) return `${trimmed}'s workspace`
+
+  const localPart = user.email.split('@')[0]?.trim()
+  if (localPart !== undefined && localPart.length > 0) return `${localPart}'s workspace`
+
+  return 'My workspace'
+}
