@@ -24,6 +24,7 @@ These docs explain how this boilerplate is shaped and why. The README tells you 
 8. `08-types-and-grep.md` — type rules and how to navigate the code
 9. `09-providers-and-adapters.md` — the provider seam, and how to plug in a new auth/billing provider
 10. `10-phase0.md` — what the product added on top, and the traps it found
+11. `11-phase1.md` — the timeline document: the contract every generator, editor and renderer shares
 
 ## If you only have five minutes
 

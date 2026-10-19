@@ -139,6 +139,103 @@ const eslintConfig = defineConfig([
     },
   },
   {
+    // TIMELINE_PURITY — src/lib/timeline/ is isomorphic: the SAME apply() runs
+    // in the browser editor and on the server, because two implementations
+    // would drift within a month and the symptom would be an editor preview
+    // that disagrees with a paid render. That only holds while the module
+    // imports nothing platform-specific, so the fence is here rather than in a
+    // convention. purity.test.ts asserts the same thing at runtime, because a
+    // lint rule is skippable and this one must not be.
+    files: ['src/lib/timeline/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: [
+                'node:*',
+                'fs',
+                'fs/*',
+                'path',
+                'path/*',
+                'crypto',
+                'os',
+                'child_process',
+                'stream',
+                'stream/*',
+                'buffer',
+                'util',
+                'url',
+                'zlib',
+                'http',
+                'https',
+                'worker_threads',
+                'perf_hooks',
+              ],
+              message:
+                'TIMELINE_PURITY: src/lib/timeline must run unchanged in the browser, so no Node built-ins. Hash with the pure FNV-1a in hash.ts rather than node:crypto.',
+            },
+            {
+              group: ['server-only', 'client-only'],
+              message:
+                'TIMELINE_PURITY: src/lib/timeline runs on BOTH sides. A server-only or client-only marker here breaks the editor or the renderer.',
+            },
+            {
+              group: [
+                '@/generated/prisma',
+                '@/generated/prisma/*',
+                '@prisma/client',
+                '@prisma/client/*',
+                '@/services/*',
+                '@/trpc/*',
+                '@/lib/adapters',
+                '@/lib/adapters/*',
+              ],
+              message:
+                'TIMELINE_PURITY: src/lib/timeline is a pure document module. It takes a document and returns one — it must not reach the database, a procedure or a provider.',
+            },
+            {
+              group: ['react', 'react/*', 'react-dom', 'react-dom/*', 'next', 'next/*'],
+              message:
+                'TIMELINE_PURITY: src/lib/timeline is framework-free. Rendering a document belongs in src/remotion/ or a component, not here.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    // The purity guard has to READ the module's files to prove what they
+    // import, so it is the one file under src/lib/timeline/ that may touch
+    // node:fs. The database and provider fences above still apply — a test is
+    // not a reason to let Prisma into this folder.
+    files: ['src/lib/timeline/**/*.test.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: [
+                '@/generated/prisma',
+                '@/generated/prisma/*',
+                '@prisma/client',
+                '@prisma/client/*',
+                '@/services/*',
+                '@/trpc/*',
+                'server-only',
+                'client-only',
+              ],
+              message:
+                'TIMELINE_PURITY: src/lib/timeline is a pure document module, and its tests prove that. Keep the database and the procedure layer out.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     files: ['src/services/**/*.service.ts'],
     rules: {
       'no-restricted-syntax': [

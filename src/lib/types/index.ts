@@ -16,7 +16,10 @@
  *   cancelInvitationSchema, resendInvitationSchema, createRoleSchema,
  *   updateRoleSchema, deleteRoleSchema, roleNameSchema, permissionStringSchema,
  *   createSubscriptionSchema, upgradeSubscriptionSchema, billingIntervalSchema,
- *   planKeySchema, CreateSubscriptionValues, UpgradeSubscriptionValues
+ *   planKeySchema, CreateSubscriptionValues, UpgradeSubscriptionValues,
+ *   projectKindSchema, projectStatusSchema, aspectRatioSchema, createProjectSchema,
+ *   listProjectsSchema, renameProjectSchema, duplicateProjectSchema,
+ *   jsonValueSchema, JsonValue, CANVAS_BY_ASPECT
  *
  * WHAT:  Barrel re-export for `src/lib/types/*` — the single import surface
  *        for custom (non-Prisma) types and their backing zod schemas.
@@ -43,6 +46,40 @@ export type {
   ForgotPasswordValues,
   ResetPasswordValues,
 } from './auth'
+export { jsonValueSchema, jsonObjectSchema } from './json'
+export type { JsonValue, JsonObject } from './json'
+export {
+  PROJECT_KINDS,
+  PROJECT_STATUSES,
+  ASPECT_RATIOS,
+  CANVAS_BY_ASPECT,
+  PROJECT_PAGE_SIZE,
+  projectKindSchema,
+  projectStatusSchema,
+  aspectRatioSchema,
+  projectTitleSchema,
+  createProjectSchema,
+  listProjectsSchema,
+  getProjectSchema,
+  renameProjectSchema,
+  deleteProjectSchema,
+  duplicateProjectSchema,
+  projectFilterSchema,
+  normalizeProjectFilters,
+  PROJECT_FILTER_ALL,
+  PROJECT_FILTER_DEFAULTS,
+  PROJECT_SEARCH_MAX,
+} from './project'
+export type {
+  ProjectKind,
+  ProjectStatus,
+  AspectRatio,
+  CreateProjectValues,
+  ListProjectsValues,
+  RenameProjectValues,
+  DuplicateProjectValues,
+  ProjectFilterValues,
+} from './project'
 export { createOrganizationSchema, updateOrganizationSettingsSchema } from './organization'
 export type {
   CreateOrganizationValues,

@@ -168,6 +168,35 @@ export const RESOURCES = {
     },
   },
 
+  /* The product's primary noun. `limit` is ABSOLUTE, not periodic — a plan caps
+   * how many projects a workspace HOLDS, so deleting one frees a slot. Adding
+   * `period` here would refill the cap monthly and let a free workspace
+   * accumulate projects forever (see src/lib/usage-period.ts). */
+  projects: {
+    name: 'Projects',
+    description: 'Videos being made in this workspace',
+    permissions: ['create', 'read', 'update', 'delete'],
+    limit: {
+      perPlan: { free: 3, starter: 30, pro: 300, enterprise: 'unlimited', portal: 'unlimited' },
+      upgradeMessage: 'Upgrade to {nextPlan} for more projects',
+      availableOnFreeTrial: true,
+      unit: 'projects',
+    },
+    nav: {
+      label: 'Projects',
+      href: '/dashboard/projects',
+      icon: 'Folder',
+      section: 'main',
+    },
+    audit: {
+      describe: {
+        create: 'Created project {output.title}',
+        update: 'Updated project {output.title}',
+        delete: 'Deleted project {input.id}',
+      },
+    },
+  },
+
   invitation: {
     name: 'Invitations',
     description: 'Send invites and cancel pending invitations',
