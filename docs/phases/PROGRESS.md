@@ -6,7 +6,8 @@ worse than an empty box.
 
 - [x] Phase 00: Foundations and seams — 2026-10-18
 - [x] Phase 01: Timeline document — all checks met; verified end to end 2026-10-19.
-- [ ] Phase 02: Media assets and storage
+- [ ] Phase 02: Media assets and storage — built; **blocked on R2 credentials** for the ingest
+      round-trip. See the note below for exactly which checks are met and which are untested.
 - [ ] Phase 03: Render core
 - [ ] Phase 04: Cloud rendering
 - [ ] Phase 05: Credits and entitlements
@@ -155,3 +156,110 @@ phase's and not a blocker.
   concurrency is Phase 15's.
 - One leftover artifact: the throwaway QA account `qa-phase01-check@example.com` and its
   auto-created workspace. Its projects are deleted; the user and org rows remain.
+
+### Phase 02 — 2026-10-19
+
+Built: the `Asset` / `AssetVariant` models and their migration (applied), the `assets` registry
+entry, `src/lib/types/asset.ts` (the content-type allowlist, the per-plan per-file caps, every
+input schema and the toolbar normalizer), the `media` adapter seam
+(`src/lib/adapters/media/` — contract, provider selector, ffmpeg implementation),
+`src/lib/media/` (the pure `ingest-plan` and the server-only `staging`), `assets.service.ts`,
+the `assets` router, the `asset.ingest` workflow, the reusable `<MediaUpload>` drop zone, the
+reusable `<UsageMeter>`, and `/dashboard/media`. 52 new tests; the suite is 339 and green,
+`tsc --noEmit` and `eslint` are clean, and `next build` succeeds with `/dashboard/media` present.
+
+**Where ffmpeg runs — the decision the phase asked for.** It runs IN THE PROCESS THAT RUNS THE
+WORKFLOW, which therefore has to be a long-lived container (a Node worker serving `/api/inngest`,
+or a dedicated worker image) and **not** a serverless function: an ffmpeg build is larger than a
+serverless bundle, a transcode outlasts a serverless execution budget, and a retried step needs a
+real local disk. Lambda is the right answer for *rendering* in Phase 04 and the wrong one here —
+ingest is many short jobs that want a warm process and a local disk, not one long job that
+parallelises across frames. Recorded in full in `src/lib/adapters/media/types.ts` under
+`FFMPEG_RUNS_IN_A_CONTAINER`, and behind a seam so Phase 04 can revisit it without touching a
+workflow. eslint now confines `node:child_process` to that one folder.
+
+**Decisions worth knowing about, because none of them were in the phase file:**
+
+- **The audit templates are keyed by the PATH VERB, not by the CRUD word.** The phase's registry
+  block keys the upload template `create`, but `writeAuditRow` looks a template up as
+  `describe[pathAction]` — so on `assets.completeUpload` a `create` key resolves to nothing and
+  the audit row ships with no description at all. The keys are `completeUpload`, `update` and
+  `delete`. This compiles either way, which is what makes it worth writing down.
+- **`assets` carries `update` in its permissions**, which the phase's registry block omits while
+  also asking for a rename row action. An action with no permission to gate it is an action every
+  member can take regardless of role. Rename is all it grants.
+- **`createUploadUrl` must be signed with the file's EXACT size.** `signedPutUrl` signs
+  `ContentLength` into the URL, so a URL signed with the plan cap accepts a file of exactly that
+  size and rejects every real upload. The client sends `file.size`; the server checks it against
+  the cap and signs it. Grep `EXACT_CONTENT_LENGTH`.
+- **The per-file cap is NOT the storage quota** and could not live in `RESOURCES`: the registry's
+  `limit` shape is a counter with a usage row behind it, and nothing accumulates for a per-file
+  cap — declaring it there would create a second `storage`-shaped quota the factory would try to
+  gate and bump. It is `UPLOAD_BYTES_PER_PLAN`, and a test asserts it stays BELOW each plan's
+  total storage so one file cannot fill a workspace.
+- **`completeUpload` HEADs the object and charges the quota what the BUCKET reports.** A
+  client-supplied byte count is the number the quota is billed on, so it is exactly the number not
+  to trust. It also doubles as proof the upload actually happened.
+- **The proxy is derived from the vertical master, not from the original.** That pairing is what
+  makes the editor preview and the final render the same framing, which `architecture.md` names as
+  the reason they match. Asserted in `ingest-plan.test.ts`.
+- **Crop vs pad is a property of the MATERIAL.** Backgrounds and generated footage crop (bars
+  behind narration look broken); a customer's own upload and images pad (cropping a third off
+  someone's photo is the worse failure). A full `Record` over `AssetKind`, so a new kind cannot
+  ship without the decision being made. Backgrounds are also muted at ingest; uploads are not.
+- **Moderation writes `skipped`, not `approved`.** Phase 10 makes it real; `approved` would be a
+  claim nothing checked, which every later phase would be entitled to believe.
+- **Delete removes the objects LAST, outside what can roll back.** The worst case is then objects
+  with no row — swept by the cleanup cron, and nothing in the product breaks — rather than a row
+  pointing at objects that are already gone, which renders as a tile that looks fine and 404s.
+  Grep `ORPHAN_OBJECTS_OVER_MISSING_OBJECTS`.
+- **Library rows (`organizationId: null`) are read-only to tenants.** The ownership predicate is
+  "mine OR library", so a plain scoped lookup would let one workspace rename or delete media every
+  other workspace can see. Both writes refuse it explicitly and the row menu is not rendered.
+- **`formatBytes` was extracted out of `resources.ts`** so the pricing copy, the media table and
+  the usage meter cannot round the same number differently on the same screen.
+- **Thumbnails render through a plain `<img>`, not `next/image`.** A signed URL is unique per
+  request and uncacheable, so the optimiser cannot help and would re-fetch every tile on every
+  page view. `images.remotePatterns` was still added for the PUBLIC library objects Phase 11 will
+  serve unsigned — derived from `R2_PUBLIC_URL` and omitted when unset, because an empty hostname
+  is a build error.
+- **The media library polls while anything is `processing`.** Nothing pushes the end of an ingest
+  to the browser, and the interval stops by itself once no visible row is processing.
+
+**Verified end to end (2026-10-19).** Driven in a headless browser against `next dev`, on a
+throwaway account, with `RESEND_API_KEY` unset for that process so **no real email was sent**:
+
+- `/dashboard/media` renders. The sidebar entry appears from `RESOURCES.assets.nav` with no nav
+  wiring. The storage meter reads **"0 B of 100 MB used"** straight from `limit.perPlan`, the drop
+  zone says **"up to 50 MB each"** resolved from the workspace's actual plan, the four tabs come
+  from `ASSET_TABS`, and the empty state renders. Zero console errors on the page itself.
+- The file input's `accept` is exactly the eight allowlisted types, generated from
+  `CONTENT_TYPE_ALLOWLIST`.
+- **Every server-side refusal was probed over tRPC directly, bypassing the client gates:** a
+  200 MB file returns 400 — *"That file is 200 MB. The largest single file on your plan is
+  50 MB"*; an MKV, a 0-byte file and `kind: 'render_output'` are each refused by the schema with
+  the permitted values listed; `completeUpload` against another workspace's key returns **403**,
+  and does so BEFORE it touches storage; and `assets.get` on an unknown id returns **404**, never
+  403, so an id cannot be probed for existence.
+- **A legitimate presign passes the per-file cap and the storage gate** and then fails only on the
+  missing bucket credentials — which is the proof that `GATE_BEFORE_SIGNING` ran and allowed it.
+- `asset.ingest` is registered and served: `/api/inngest` reports 4 functions (the three declared
+  plus the failure handler).
+
+**NOT verified, and this is why the box is unticked — needs R2.** No `R2_*` variables are set in
+`.env`, so nothing can be uploaded and these checks are untested:
+
+- A 16:9 MP4 becoming a `vertical_1080` plus a `proxy_480` and a thumbnail.
+- The storage bar moving on upload and moving back on delete. The counter writes are in place and
+  the gate reads 0 / 100 MB correctly, but no bytes have ever been charged.
+- Signed URLs expiring, and deleting an asset removing every R2 object.
+- A corrupt file marking the asset `failed` with a readable error. The refusal logic is unit-tested
+  (`assertSupportedMedia`, nine cases) but has never run against a real file.
+
+ffmpeg 9.0.2 IS installed and on PATH on this machine, so the ingest path should run as-is the
+moment a bucket is configured. The R2 lifecycle rule deleting `tmp/` after 24 hours is still
+outstanding from Phase 00, and the key convention still assumes it.
+
+**Also deferred:** one throwaway QA account remains — `qa-phase02-media@example.com` and its
+auto-created workspace. It owns no assets and no projects; the user and org rows remain, as
+Phase 01's do.

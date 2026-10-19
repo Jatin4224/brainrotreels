@@ -74,6 +74,18 @@ const eslintConfig = defineConfig([
               message:
                 'PROVIDER_ISOLATION: import the S3/R2 SDK only inside src/lib/adapters/storage/r2/**. Elsewhere, use getStorageAdapter() from @/lib/adapters/storage — and build keys with the helpers there, never by hand.',
             },
+            // Media seam. Spawning a process is the single most dangerous thing
+            // this codebase does — every argument is a potential injection and
+            // every invocation is unbounded CPU — so it is confined to the one
+            // folder that was written for it (ARGV_NEVER_A_SHELL in
+            // src/lib/adapters/media/ffmpeg/binaries.ts). A route or a router
+            // calling ffmpeg directly would also blow its execution budget;
+            // see FFMPEG_RUNS_IN_A_CONTAINER.
+            {
+              group: ['child_process', 'node:child_process'],
+              message:
+                'PROVIDER_ISOLATION: spawn processes only inside src/lib/adapters/media/ffmpeg/**. Elsewhere, use getMediaAdapter() from @/lib/adapters/media — and call it from a workflow step, never from a route or a tRPC handler.',
+            },
           ],
         },
       ],
@@ -105,6 +117,10 @@ const eslintConfig = defineConfig([
       // Storage seam. Only the R2 folder may speak S3; keys.ts stays pure and
       // SDK-free so it can be imported (and unit tested) anywhere.
       'src/lib/adapters/storage/r2/**/*.ts',
+      // Media seam. Only the ffmpeg folder may spawn a process; ingest-plan.ts
+      // stays pure and tool-free so the decisions it makes can be unit tested
+      // without a binary installed.
+      'src/lib/adapters/media/ffmpeg/**/*.ts',
     ],
     rules: {
       'no-restricted-imports': [

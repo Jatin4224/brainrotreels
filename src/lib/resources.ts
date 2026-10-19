@@ -18,7 +18,7 @@
  *   getResourceFromPath, getMutationFeatureMap, isResourceKey,
  *   interpolateAuditDescribe, getOrganizationStatement, getPlanFeatureRows,
  *   PlanFeatureRow, getFeatureCategories, getUpgradeMessage, formatLimitAmount,
- *   formatLimitNoun
+ *   formatLimitNoun, formatBytes
  *
  * WHAT:  Unified registry of every resource concept — permissions, limits, flags,
  *        sidebar nav, audit description templates, rate-limit overrides.
@@ -197,6 +197,62 @@ export const RESOURCES = {
     },
   },
 
+  /**
+   * SOURCE OF TRUTH KEYWORDS: RESOURCES.assets, BYTES_METERED_ON_STORAGE,
+   *   MANUAL_COUNTER_BUMP, assets.completeUpload
+   *
+   * The media library. Declares NO `limit` of its own, deliberately: the thing
+   * a plan caps is bytes, and bytes already have a resource — `storage`. A
+   * resource declares `limit` or `flag`, never both and never a SECOND
+   * resource's quota, so there is no way to say "assets are capped by storage"
+   * in the registry. The consequence is explicit rather than hidden:
+   *
+   * MANUAL_COUNTER_BUMP — because `assets.create` is not a limit path, the
+   * factory's automatic gate and counter do NOT fire for media. The handlers do
+   * it by hand against `storage` (`assets.completeUpload` adds the byte count,
+   * `assets.delete` subtracts it), the same documented pattern
+   * `invitation.create` uses for seats. Grep BYTES_METERED_ON_STORAGE for every
+   * site that implements this.
+   *
+   * `update` is on the permission list although Phase 02's brief omitted it:
+   * the phase also asks for a rename row action, and an action with no
+   * permission to gate it is an action every member can take regardless of
+   * their role. Rename is the only thing it grants — a filename is a label, and
+   * nothing about the bytes is editable.
+   *
+   * The audit templates are keyed by the PATH VERB, not by the CRUD word.
+   * writeAuditRow looks the template up as `describe[pathAction]`
+   * (src/trpc/procedures/protected.ts), so `completeUpload` — the mutation that
+   * actually creates the row — is the key that resolves. Keying it `create`
+   * would compile, read correctly, and silently produce audit rows with no
+   * description at all.
+   */
+  assets: {
+    name: 'Media',
+    description: 'Uploaded and generated media in this workspace',
+    permissions: ['create', 'read', 'update', 'delete'],
+    nav: {
+      label: 'Media',
+      href: '/dashboard/media',
+      icon: 'Library',
+      section: 'main',
+    },
+    audit: {
+      describe: {
+        completeUpload: 'Uploaded {output.filename}',
+        update: 'Renamed asset to {output.filename}',
+        delete: 'Deleted asset {input.id}',
+      },
+    },
+    /* Presigning is cheap but it is also the step that decides whether bytes
+     * may land at all, so it is the one worth a per-resource cap: a client
+     * looping `createUploadUrl` would otherwise hold a drawer full of valid
+     * write URLs for an hour. Generous enough for a real bulk drop of a few
+     * dozen files. */
+    rateLimit: {
+      createUploadUrl: { count: 60, window: '1 m' },
+    },
+  },
   invitation: {
     name: 'Invitations',
     description: 'Send invites and cancel pending invitations',
@@ -627,6 +683,34 @@ export function getPlanFeatureList(plan: PlanKey): string[] {
 const BYTE_UNITS: readonly string[] = ['B', 'KB', 'MB', 'GB', 'TB']
 
 /**
+ * SOURCE OF TRUTH KEYWORDS: formatBytes, BYTE_UNITS, PLAN_FEATURE_COPY
+ *
+ * WHAT:  A byte count as the shortest readable size — "512 KB", "1.4 GB".
+ * WHY:   One implementation for two audiences that must agree. The pricing copy
+ *        renders a plan's storage cap through formatLimitAmount below, and the
+ *        media library renders each file's own size and the usage meter's
+ *        "1.4 GB of 5 GB" — if those round differently, a customer at their cap
+ *        reads two numbers that contradict each other on the same screen.
+ *        Binary units (1024), because that is what the bucket reports and what
+ *        the caps in RESOURCES.storage are written in.
+ * WHERE: formatLimitAmount; the media table and upload UI; <UsageMeter>.
+ */
+export function formatBytes(value: number): string {
+  if (!Number.isFinite(value) || value <= 0) return '0 B'
+
+  let size = value
+  let unitIndex = 0
+  while (size >= 1024 && unitIndex < BYTE_UNITS.length - 1) {
+    size /= 1024
+    unitIndex += 1
+  }
+
+  /* Trim a trailing .0 so 5 GB doesn't render as "5.0 GB". */
+  const rounded = Number.isInteger(size) ? String(size) : size.toFixed(1)
+  return `${rounded} ${BYTE_UNITS[unitIndex]}`
+}
+
+/**
  * SOURCE OF TRUTH KEYWORDS: formatLimitValue
  *
  * WHAT:  Renders one limit as a sentence fragment — "10 seats", "25 GB Storage",
@@ -694,17 +778,8 @@ export function formatLimitAmount(
 ): string {
   if (value === 'unlimited') return 'Unlimited'
 
-  if (limit.unit === 'bytes') {
-    let size = value
-    let unitIndex = 0
-    while (size >= 1024 && unitIndex < BYTE_UNITS.length - 1) {
-      size /= 1024
-      unitIndex += 1
-    }
-    /* Trim a trailing .0 so 5 GB doesn't render as "5.0 GB". */
-    const rounded = Number.isInteger(size) ? String(size) : size.toFixed(1)
-    return `${rounded} ${BYTE_UNITS[unitIndex]}`
-  }
+  /* Shared with the media library and the usage meter — see formatBytes. */
+  if (limit.unit === 'bytes') return formatBytes(value)
 
   return value.toLocaleString('en-US')
 }

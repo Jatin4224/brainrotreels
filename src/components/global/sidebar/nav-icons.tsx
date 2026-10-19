@@ -25,6 +25,7 @@ import {
   CreditCard,
   Folder,
   LayoutDashboard,
+  Library,
   ScrollText,
   Settings,
   Users,
@@ -34,6 +35,9 @@ import {
 /* Keyed by the exact strings used in RESOURCES[*].nav.icon. */
 export const NAV_ICONS: Record<string, LucideIcon> = {
   Folder,
+  /* Media, not Projects. Both are collections, so `Folder` would have read as
+   * the same thing twice in one sidebar section. */
+  Library,
   Users,
   BarChart: BarChart3,
   ScrollText,

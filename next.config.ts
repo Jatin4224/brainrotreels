@@ -56,8 +56,50 @@ const providerActionsModule = "./src/components/global/providers/better-auth/act
  * WHERE: Enforced by `Route` on ResourceNav['href'] in src/lib/resources.ts and
  *        on ROUTES in src/lib/config; checked by `tsc --noEmit`.
  */
+/**
+ * SOURCE OF TRUTH KEYWORDS: remotePatterns, R2_PUBLIC_URL, PUBLIC_LIBRARY_IMAGES,
+ *   SIGNED_URLS_ARE_NOT_OPTIMISED
+ *
+ * WHAT:  Allows `next/image` to load from the R2 public CDN origin.
+ * WHY:   PUBLIC_LIBRARY_IMAGES. `next/image` refuses any remote host that is
+ *        not listed here, so without this the first curated background
+ *        thumbnail in Phase 11 fails to render with an error that names
+ *        configuration rather than the image.
+ *        SIGNED_URLS_ARE_NOT_OPTIMISED: this is only for the PUBLIC library
+ *        objects. A tenant's own media is served through short-lived signed
+ *        URLs with a query string, which are unique per request and therefore
+ *        uncacheable — those render through a plain `<img>` (see
+ *        SIGNED_THUMB_NOT_NEXT_IMAGE in the media table), and putting them
+ *        through the optimiser would make the server re-fetch every thumbnail
+ *        on every page view.
+ *        Derived from R2_PUBLIC_URL rather than hardcoded, and omitted entirely
+ *        when it is unset, because an empty hostname in `remotePatterns` is a
+ *        build error — and a repo with no bucket connected must still build.
+ * WHERE: Read by next/image at build and request time. The variable is
+ *        documented in .env.example alongside the other R2_* values.
+ */
+const r2PublicHost = (() => {
+  const raw = process.env["R2_PUBLIC_URL"]?.trim()
+  if (!raw) return null
+  try {
+    return new URL(raw).hostname
+  } catch {
+    /* A malformed URL is the operator's typo, and failing the build over an
+     * optional CDN origin would be worse than rendering no library images. */
+    console.warn(`[next.config] R2_PUBLIC_URL="${raw}" is not a valid URL — ignoring it.`)
+    return null
+  }
+})()
+
 const nextConfig: NextConfig = {
   reactCompiler: true,
+  ...(r2PublicHost !== null
+    ? {
+        images: {
+          remotePatterns: [{ protocol: "https" as const, hostname: r2PublicHost }],
+        },
+      }
+    : {}),
   turbopack: {
     resolveAlias: {
       "@providers-active": providerSurfaceModule,

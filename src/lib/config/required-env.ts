@@ -189,6 +189,47 @@ export const OPTIONAL_ENV: readonly OptionalEnvVar[] = [
       ...STRIPE_PRICE_KEYS,
     ],
   },
+  /* Media. Two rows rather than one, because they fail at different points and
+   * an operator fixing the wrong one learns nothing: without R2 an upload
+   * cannot START, and without ffmpeg it lands in the bucket and is then marked
+   * `failed`. Neither is provider-specific (no `whenProvider`) — object storage
+   * and transcoding are app concerns, not auth ones. */
+  {
+    id: 'storage',
+    label: 'Media storage (Cloudflare R2)',
+    purpose:
+      'Needed before anyone can upload. Uploaded video, generated audio and finished renders all live in the bucket — the database only ever stores the key. Without it the media library loads but every upload is refused.',
+    help: 'Create an R2 bucket, then an API token with object read/write on it. Add a lifecycle rule deleting the `tmp/` prefix after 24 hours — the key convention assumes it and nothing in code enforces it. R2_PUBLIC_URL is only for the public library assets served over the CDN.',
+    icon: 'HardDrive',
+    link: { label: 'Open the Cloudflare R2 dashboard', url: 'https://dash.cloudflare.com/?to=/:account/r2' },
+    keys: [
+      { key: 'R2_ACCOUNT_ID', label: 'Account ID' },
+      { key: 'R2_ACCESS_KEY_ID', label: 'Access key ID' },
+      { key: 'R2_SECRET_ACCESS_KEY', label: 'Secret access key' },
+      { key: 'R2_BUCKET', label: 'Bucket name' },
+      { key: 'R2_PUBLIC_URL', label: 'Public CDN origin', optional: true },
+    ],
+  },
+  {
+    id: 'media',
+    label: 'Media processing (ffmpeg)',
+    purpose:
+      'Needed before an upload can be USED. Each file is probed, converted to a 9:16 master and given a small preview version, a poster frame and a waveform. Without ffmpeg the bytes upload fine and the asset is then marked failed, so nothing can be put in a video.',
+    help: 'Install ffmpeg in whatever runs the background workflows — that process has to be a long-lived container, not a serverless function (an ffmpeg build is larger than a serverless bundle and a transcode outlasts its time budget). Leave both paths blank to resolve the binaries on PATH.',
+    icon: 'Film',
+    link: { label: 'Download ffmpeg', url: 'https://ffmpeg.org/download.html' },
+    /* BOTH optional, and that is the honest shape rather than a convenience.
+     * Leaving these blank is a WORKING configuration — the binaries resolve on
+     * PATH, which is what a container image with ffmpeg installed gives you —
+     * so a red row for an empty value would be wrong. This checklist can only
+     * report whether a variable is SET (see the note on isSet below); whether
+     * ffmpeg is actually installed can only be answered by running it, which
+     * is not something a page load should do. */
+    keys: [
+      { key: 'FFMPEG_PATH', label: 'ffmpeg path (blank ⇒ found on PATH)', optional: true },
+      { key: 'FFPROBE_PATH', label: 'ffprobe path (blank ⇒ found on PATH)', optional: true },
+    ],
+  },
 ]
 
 export interface OptionalEnvKeyStatus extends OptionalEnvKey {
