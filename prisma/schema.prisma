@@ -193,6 +193,7 @@ model Organization {
   subscriptions     Subscription[]
   usageMetrics      UsageMetrics[]
   activityLogs      ActivityLog[]
+  projects          Project[]
 
   @@map("organization")
 }
@@ -397,4 +398,69 @@ model ActivityLog {
   @@index([action])
   @@index([entity])
   @@map("activity_log")
+}
+
+// ============================================================================
+// VIDEO STUDIO — Projects and their timeline documents
+// ============================================================================
+
+/// Project — one video being made inside a workspace. The row holds everything
+/// cheap to query (title, kind, status); the expensive part — the timeline
+/// document itself — lives in the 1:1 Timeline row so a project list never
+/// drags a 200KB jsonb column along with it.
+///
+/// BRANCH POLICY (decided in Phase 01, implemented in Phase 15): regenerating a
+/// project whose `manualEdited` is true NEVER overwrites the edited timeline. It
+/// creates a NEW Project row with `parentId` pointing at the edited one, so the
+/// manual work survives as its own version. `versions` is that back-relation.
+///
+/// `kind` and `status` are String, not Prisma enums — this schema has zero enum
+/// blocks and the validated unions live in src/lib/types/project.ts.
+///
+/// SOURCE OF TRUTH KEYWORD: Project
+model Project {
+  id             String   @id @default(cuid())
+  organizationId String
+  title          String
+  kind           String // reddit-story | voiceover | quiz | motion
+  status         String   @default("draft") // draft | generating | ready | failed | cancelled
+  aspect         String   @default("9:16")
+  manualEdited   Boolean  @default(false)
+  parentId       String? // set when a regeneration branched off an edited project
+  settings       Json?
+  sourceRef      String? // the Reddit URL, the topic, the uploaded doc key
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  parent       Project?     @relation("ProjectVersions", fields: [parentId], references: [id])
+  versions     Project[]    @relation("ProjectVersions")
+  timeline     Timeline?
+
+  @@index([organizationId])
+  @@index([organizationId, createdAt])
+  @@index([parentId])
+  @@map("project")
+}
+
+/// Timeline — the versioned timeline document for one project, keyed by
+/// projectId (no surrogate id: the relation is strictly 1:1).
+///
+/// `docVersion` is the DOCUMENT SCHEMA version, migrated on every read by
+/// migrate() in src/lib/timeline/migrate.ts. `revision` is the OPTIMISTIC
+/// CONCURRENCY counter the editor bumps per save — two different numbers that
+/// are easy to confuse. Nothing reads `doc` without passing it through
+/// migrate() first.
+///
+/// SOURCE OF TRUTH KEYWORD: Timeline
+model Timeline {
+  projectId  String   @id
+  docVersion Int
+  doc        Json
+  revision   Int      @default(0)
+  updatedAt  DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("timeline")
 }

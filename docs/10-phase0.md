@@ -315,7 +315,9 @@ asking the question generically must widen through the declared interface.
 
 ## Where to go next
 
-`docs/phases/00-README.md` for the conventions and the full phase list;
-`docs/phases/01-timeline-document.md` for the next piece of work. The timeline document is
-pure and isomorphic by design — the same `apply()` runs in the browser editor and on the
-server — and two implementations drifting apart is the documented way this architecture fails.
+`docs/phases/00-README.md` for the conventions and the full phase list.
+
+Phase 01 has since landed: **`docs/11-phase1.md`** explains the timeline document and the six
+rules you need before touching it. It is pure and isomorphic by design — the same `apply()` runs
+in the browser editor and on the server — and two implementations drifting apart is the documented
+way this architecture fails.
