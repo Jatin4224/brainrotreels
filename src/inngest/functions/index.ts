@@ -19,7 +19,8 @@
  * WHERE: Consumed by src/app/api/inngest/route.ts.
  */
 
+import { assetIngestFunction } from './asset-ingest'
 import { helloFunction } from './hello'
 import { usageResetFunction } from './usage-reset'
 
-export const INNGEST_FUNCTIONS = [helloFunction, usageResetFunction]
+export const INNGEST_FUNCTIONS = [helloFunction, usageResetFunction, assetIngestFunction]

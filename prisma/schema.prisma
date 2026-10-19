@@ -194,6 +194,7 @@ model Organization {
   usageMetrics      UsageMetrics[]
   activityLogs      ActivityLog[]
   projects          Project[]
+  assets            Asset[]
 
   @@map("organization")
 }
@@ -463,4 +464,99 @@ model Timeline {
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@map("timeline")
+}
+
+// ============================================================================
+// MEDIA — one asset system for uploads, library media, generated clips, renders
+// ============================================================================
+
+/// Asset — one piece of media, whatever produced it: a customer upload, a
+/// curated library background, generated narration, generated footage, or a
+/// finished render. ONE table rather than one per source, because every
+/// consumer downstream (the timeline document, the renderer, the media picker)
+/// wants the same five answers — where are the bytes, how long is it, what
+/// shape is it, is it ready, may this workspace use it.
+///
+/// LIBRARY ROWS HAVE A NULL organizationId. That is the only reason the column
+/// is nullable, and it has a consequence every query has to respect: an
+/// ownership check is "mine OR library", never "not null" and never
+/// `organizationId !== null`. Writing the check the obvious way hands every
+/// workspace every other workspace's media the first time someone passes an id.
+/// See findAssetForOrganization in src/services/assets.service.ts — it is the
+/// one place that check is written.
+///
+/// BYTES ARE METERED ON `storage`, NOT ON A LIMIT OF ITS OWN. `assets` declares
+/// no `limit` in src/lib/resources.ts, so the procedure factory does not bump a
+/// counter for it; `assets.completeUpload` adds `bytes` to the `storage`
+/// counter by hand and `assets.delete` subtracts the same number back. `bytes`
+/// is therefore not merely informational — it is the quantity the quota is
+/// charged on, so it must be the real object size, never an estimate.
+///
+/// `kind`, `source`, `status` and `moderationStatus` are String, not Prisma
+/// enums — this schema has zero enum blocks and the validated unions live in
+/// src/lib/types/asset.ts.
+///
+/// SOURCE OF TRUTH KEYWORD: Asset
+model Asset {
+  id               String   @id @default(cuid())
+  organizationId   String? // null for library assets — see the note above
+  kind             String // background | upload | ai_footage | image | audio_tts | audio_music | sfx | render_output | avatar
+  source           String // library | upload | generated | stock
+  filename         String
+  storageKey       String
+  contentType      String
+  bytes            Int
+  durationSec      Float? // Phase 11 loops a background shorter than the narration off this
+  width            Int?
+  height           Int?
+  license          String   @default("owned")
+  minPlan          String? // library gating only (Phase 11)
+  moderationStatus String   @default("pending") // pending | approved | rejected | skipped
+  status           String   @default("processing") // processing | ready | failed
+  error            String? // the readable reason a failed ingest gives the customer
+  promptText       String? // ai_footage auditing (Phase 17)
+  modelVersion     String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  organization Organization?  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  variants     AssetVariant[]
+
+  @@index([organizationId])
+  @@index([organizationId, kind])
+  @@index([kind, source])
+  @@map("asset")
+}
+
+/// AssetVariant — a derived rendition of an Asset: the 9:16 master the renderer
+/// uses, the small proxy the browser previews with, a poster frame, a waveform
+/// image.
+///
+/// Rows are UPSERTED per variant by the ingest workflow, one step each, which
+/// is what makes a retry resume instead of restarting: a run that already
+/// produced `vertical_1080` and then failed on `thumb` re-enters with the
+/// master still recorded. `@@unique([assetId, variant])` is what makes that
+/// upsert well-defined.
+///
+/// `bytes` here is NOT added to the `storage` counter. Derived renditions are a
+/// cost of storing the original, and charging a customer three times for one
+/// upload — once for the file and twice for variants they never asked for —
+/// would make the quota unexplainable. Deleting the asset still deletes these
+/// objects; see DELETE_REMOVES_EVERY_OBJECT in src/services/assets.service.ts.
+///
+/// SOURCE OF TRUTH KEYWORD: AssetVariant
+model AssetVariant {
+  id         String @id @default(cuid())
+  assetId    String
+  variant    String // vertical_1080 | proxy_480 | thumb | waveform
+  storageKey String
+  width      Int?
+  height     Int?
+  bytes      Int
+
+  asset Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@unique([assetId, variant])
+  @@index([assetId])
+  @@map("asset_variant")
 }

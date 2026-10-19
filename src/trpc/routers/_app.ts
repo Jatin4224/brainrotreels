@@ -32,6 +32,7 @@ import { portalRouter } from './portal'
 import { devRouter } from './dev'
 import { userRouter } from './user'
 import { projectsRouter } from './projects'
+import { assetsRouter } from './assets'
 
 /**
  * SOURCE OF TRUTH KEYWORDS: appRouter, AppRouter
@@ -45,6 +46,7 @@ import { projectsRouter } from './projects'
 export const appRouter = createTRPCRouter({
   organization: organizationRouter,
   projects: projectsRouter,
+  assets: assetsRouter,
   usage: usageRouter,
   auditLogs: auditLogsRouter,
   member: memberRouter,

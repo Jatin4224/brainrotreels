@@ -460,8 +460,9 @@ this phase's; it is written up in `PROGRESS.md`.
 
 ## Where to go next
 
-`docs/phases/02-media-assets.md` — uploads, the ingest job and signed URLs, which is what turns
-the asset *handles* in this document into real files. Phase 03 then renders one.
+`docs/12-phase2.md` — uploads, the ingest job and signed URLs, which is what turns the asset
+*handles* in this document into real files (the phase brief itself is
+`docs/phases/02-media-assets.md`). Phase 03 then renders one.
 
 When you get to Phase 03, the rule to carry over is the one in `architecture.md`: an unknown
 `render` value logs a warning and draws nothing. A bad item must never crash a paid render.

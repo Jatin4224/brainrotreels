@@ -30,6 +30,8 @@ import {
   CreditCardIcon,
   DatabaseIcon,
   ExternalLinkIcon,
+  FilmIcon,
+  HardDriveIcon,
   KeyRoundIcon,
   PlayCircleIcon,
   ShieldCheckIcon,
@@ -46,6 +48,8 @@ const SETUP_ICONS: Record<string, LucideIcon> = {
   KeyRound: KeyRoundIcon,
   ShieldCheck: ShieldCheckIcon,
   CreditCard: CreditCardIcon,
+  HardDrive: HardDriveIcon,
+  Film: FilmIcon,
 }
 
 function iconFor(name: string): LucideIcon {

@@ -25,6 +25,7 @@ These docs explain how this boilerplate is shaped and why. The README tells you 
 9. `09-providers-and-adapters.md` — the provider seam, and how to plug in a new auth/billing provider
 10. `10-phase0.md` — what the product added on top, and the traps it found
 11. `11-phase1.md` — the timeline document: the contract every generator, editor and renderer shares
+12. `12-phase2.md` — media assets: uploads, signed URLs, the ingest job, and where ffmpeg runs
 
 ## If you only have five minutes
 
