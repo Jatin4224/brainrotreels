@@ -71,6 +71,27 @@ import {
 } from '@/lib/types'
 import { formatBytes } from '@/lib/resources'
 
+/**
+ * SOURCE OF TRUTH KEYWORDS: SignedVariant, assets.get
+ *
+ * WHAT:  One variant as `assets.get` returns it — its dimensions plus a
+ *        short-lived URL.
+ * WHY:   Named rather than inferred so the full map `assets.get` returns keeps
+ *        its `Record<VariantName, SignedVariant | null>` shape all the way to
+ *        the client. `url` is nullable because signing can legitimately refuse
+ *        (a row whose key is outside its own prefix — see SIGNING_BOUNDARY),
+ *        and a consumer has to handle that rather than render a broken player.
+ * WHERE: The `get` handler below; reached on the client through
+ *        inferRouterOutputs.
+ */
+interface SignedVariant {
+  variant: VariantName
+  width: number | null
+  height: number | null
+  bytes: number
+  url: string | null
+}
+
 export const assetsRouter = createTRPCRouter({
   /**
    * SOURCE OF TRUTH KEYWORDS: assets.createUploadUrl, GATE_BEFORE_SIGNING,
@@ -320,25 +341,28 @@ export const assetsRouter = createTRPCRouter({
 
       const url = await assetsService.signScopedKey(asset.storageKey, input.organizationId)
 
-      const variantEntries = await Promise.all(
-        VARIANT_NAMES.map(async (name: VariantName) => {
-          const row = asset.variants.find((variant) => variant.variant === name)
-          if (row === undefined) return [name, null] as const
-          const signed = await assetsService.signScopedKey(row.storageKey, input.organizationId)
-          return [
-            name,
-            { variant: name, width: row.width, height: row.height, bytes: row.bytes, url: signed },
-          ] as const
-        })
-      )
+      /* The rows are already loaded, so the map is built from them rather than
+       * re-read — but it is built by the SERVICE's toVariantMap, not by a
+       * `.find()` per name here, so the router and getAssetVariants cannot
+       * disagree about an unrecognised variant name. */
+      const rowsByVariant = assetsService.toVariantMap(asset.variants)
+      const variants = assetsService.emptyVariantMap<SignedVariant>()
+
+      for (const name of VARIANT_NAMES) {
+        const row = rowsByVariant[name]
+        if (row === null) continue
+        variants[name] = {
+          variant: name,
+          width: row.width,
+          height: row.height,
+          bytes: row.bytes,
+          url: await assetsService.signScopedKey(row.storageKey, input.organizationId),
+        }
+      }
 
       const { variants: _variants, ...rest } = asset
 
-      return {
-        ...rest,
-        url,
-        variants: Object.fromEntries(variantEntries),
-      }
+      return { ...rest, url, variants }
     }),
 
   /**

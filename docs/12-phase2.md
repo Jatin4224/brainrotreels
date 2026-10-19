@@ -393,6 +393,14 @@ came out of the scoped query, presigning is local HMAC with no network call per 
 `signScopedKey` still re-checks each key's prefix. Fetching them per tile would be a request per
 asset on every page change.
 
+**One thing to know before you rely on these.** `signAssetUrl`, `signVariantUrl`,
+`getAssetVariants` and `sumAssetBytes` are the phase's *published contracts* and currently have
+**no callers in app code** — the two endpoints that sign today already hold their rows, so they go
+through `signScopedKey` directly rather than re-reading by id. The functions are the API Phase 04's
+render pre-flight and Phase 15's editor are meant to use, and they apply the full two-step check.
+Being uncalled means they are also unexercised, so the first phase to adopt one should verify it
+rather than assume it: start from `signAssetUrl` and check that a foreign id returns `null`.
+
 ## Deletion — the ordering is chosen for the failure direction
 
 ```

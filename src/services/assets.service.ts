@@ -347,17 +347,45 @@ export async function upsertAssetVariant(
  *        thumbnail.
  * WHERE: assets.get; the render pre-flight in Phase 04; the editor in Phase 15.
  */
-export type VariantMap = Record<VariantName, Prisma.AssetVariantGetPayload<Record<string, never>> | null>
+export type AssetVariantRow = Prisma.AssetVariantGetPayload<Record<string, never>>
 
-export async function getAssetVariants(assetId: string): Promise<VariantMap> {
-  const rows = await prisma.assetVariant.findMany({ where: { assetId } })
+export type VariantMap = Record<VariantName, AssetVariantRow | null>
 
-  const map: VariantMap = {
+/**
+ * SOURCE OF TRUTH KEYWORDS: emptyVariantMap, toVariantMap, VARIANT_MAP_IS_SEEDED
+ *
+ * WHAT:  Turns the array Prisma returns into the full, named map — and the
+ *        seeded empty map every caller starts from.
+ * WHY:   VARIANT_MAP_IS_SEEDED. Separated from getAssetVariants because the two
+ *        callers arrive with the rows in different ways: the service reads them,
+ *        and `assets.get` already has them from its own `include`. Before this
+ *        existed the router rebuilt the map itself with a `.find()` per name —
+ *        which is precisely the noise this map exists to remove, and it meant
+ *        the two could disagree about an unknown variant name.
+ *
+ *        Seeding from VARIANT_NAMES rather than accumulating keys is what makes
+ *        the result a genuine `Record<VariantName, …>`: building it with
+ *        `Object.fromEntries` produces `{ [k: string]: … }`, so every consumer
+ *        downstream loses the key union and `map.proxy_48` stops being a
+ *        compile error.
+ * WHERE: getAssetVariants below, and assets.get in src/trpc/routers/assets.ts.
+ */
+/* Written out rather than built from VARIANT_NAMES, because an object literal
+ * assertion is banned by eslint and a loop would need one. The upside is
+ * better than the workaround it replaces: the return type makes a missing key a
+ * compile error here, so adding a variant name cannot ship without this map
+ * learning about it. */
+export function emptyVariantMap<T>(): Record<VariantName, T | null> {
+  return {
     vertical_1080: null,
     proxy_480: null,
     thumb: null,
     waveform: null,
   }
+}
+
+export function toVariantMap(rows: readonly AssetVariantRow[]): VariantMap {
+  const map = emptyVariantMap<AssetVariantRow>()
 
   for (const row of rows) {
     /* Parsed, not cast. The column is a String (STRING_NOT_ENUM), so a row
@@ -368,6 +396,10 @@ export async function getAssetVariants(assetId: string): Promise<VariantMap> {
   }
 
   return map
+}
+
+export async function getAssetVariants(assetId: string): Promise<VariantMap> {
+  return toVariantMap(await prisma.assetVariant.findMany({ where: { assetId } }))
 }
 
 /**

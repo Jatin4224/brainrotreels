@@ -9,7 +9,7 @@
  */
 
 /**
- * SOURCE OF TRUTH KEYWORDS: ffmpegBinary, ffprobeBinary, isFfmpegConfigured,
+ * SOURCE OF TRUTH KEYWORDS: ffmpegBinary, ffprobeBinary,
  *   runTool, MEDIA_TOOL_TIMEOUT_MS, ARGV_NEVER_A_SHELL, LAZY_BINARY
  *
  * WHAT:  Where the two binaries live, and the one function that runs either of
@@ -65,20 +65,15 @@ export function ffprobeBinary(): string {
   return FFPROBE_PATH
 }
 
-/**
- * SOURCE OF TRUTH KEYWORDS: isFfmpegConfigured
- *
- * WHAT:  Whether the operator has pointed this deployment at ffmpeg explicitly.
- * WHY:   Mirrors isR2Configured so a future setup-checklist row can report media
- *        readiness the same way it reports storage. It answers "was this
- *        configured", not "does the binary work" — proving the latter means
- *        running it, which is not something a health check should do on every
- *        page load.
- * WHERE: Available to the setup checklist; not required by the ingest path.
- */
-export function isFfmpegConfigured(): boolean {
-  return Boolean(process.env['FFMPEG_PATH']?.trim() && process.env['FFPROBE_PATH']?.trim())
-}
+/* NO `isFfmpegConfigured()` HERE, deliberately — the obvious mirror of
+ * isR2Configured in storage/r2/client.ts would be misleading. Both variables
+ * empty is a WORKING configuration (the binaries resolve on PATH, which is what
+ * a container image with ffmpeg installed gives you), so a presence check
+ * cannot answer "is media processing available" — only running the binary can,
+ * and that is not something a health check should do on every page load. The
+ * setup checklist states this in words instead: see the `media` row in
+ * src/lib/config/required-env.ts, whose keys are both marked optional for
+ * exactly this reason. */
 
 /**
  * SOURCE OF TRUTH KEYWORDS: runTool, ARGV_NEVER_A_SHELL, READABLE_INGEST_FAILURE
