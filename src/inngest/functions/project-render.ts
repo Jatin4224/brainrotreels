@@ -120,6 +120,14 @@ import {
   markRenderProgress,
   markRenderStarted,
 } from '@/services/renders.service'
+import { estimateRenderCost } from '@/lib/credits'
+import {
+  InsufficientCreditsError,
+  commit,
+  findOpenHoldForRef,
+  hold,
+  release,
+} from '@/services/credits.service'
 
 /**
  * SOURCE OF TRUTH KEYWORDS: renderRequestedEventSchema, EVENT_PAYLOAD_PARSED
@@ -247,7 +255,7 @@ export const projectRenderFunction = inngestClient.createFunction(
         console.error('[project.render] Failure handler could not read the original event.')
         return
       }
-      await failRender(
+      await failRenderAndRelease(
         prisma,
         parsed.data.data.event.data.renderId,
         'failed',
@@ -322,7 +330,22 @@ export const projectRenderFunction = inngestClient.createFunction(
     const assets = assetUrlMapSchema.parse(signed)
 
     // ───────────────────────────────────────────────────────────────────────
-    // [3] START RENDER — one provider round-trip, its own step. Returns as
+    // [3] HOLD CREDITS — HOLD_IN_THE_WORKFLOW. The money is reserved here,
+    //     after everything that could still refuse the render for free and
+    //     immediately before the provider is called.
+    // ───────────────────────────────────────────────────────────────────────
+    /* The returned hold id is deliberately NOT carried through the rest of the
+     * run. Every later step that settles it — the commit in `finalize`, the
+     * refund in `failRenderAndRelease` — looks the hold up by the RENDER ID
+     * through `findOpenHoldForRef`, because most of those paths cannot have
+     * been handed a holdId: `onFailure` receives only the original event, and
+     * a replayed step gets its own fresh locals. One lookup rule, reachable
+     * from everywhere, beats a value that half the paths do not have. The step
+     * still returns it so it shows in the run's own output when debugging. */
+    await step.run('hold-credits', () => holdRenderCredits(renderId, preflight))
+
+    // ───────────────────────────────────────────────────────────────────────
+    // [4] START RENDER — one provider round-trip, its own step. Returns as
     //     soon as the render is accepted; see
     //     START_AND_AWAIT_ARE_DIFFERENT_STEPS.
     // ───────────────────────────────────────────────────────────────────────
@@ -336,7 +359,7 @@ export const projectRenderFunction = inngestClient.createFunction(
          * the render stalls until the timeout — having been fully paid for.
          * Refusing to START is strictly cheaper than discovering this in 45
          * minutes. */
-        await failRender(
+        await failRenderAndRelease(
           prisma,
           renderId,
           'failed',
@@ -375,7 +398,7 @@ export const projectRenderFunction = inngestClient.createFunction(
         if (error instanceof RenderProviderError) {
           console.error(`[project.render] ${renderId} start failed:`, error.detail)
           if (error.permanent) {
-            await failRender(prisma, renderId, 'failed', error.message)
+            await failRenderAndRelease(prisma, renderId, 'failed', error.message)
             throw new NonRetriableError(error.message)
           }
           /* Transient — thrown plainly so Inngest retries with backoff. The row
@@ -432,7 +455,7 @@ export const projectRenderFunction = inngestClient.createFunction(
        * still land on the row as a readable failure rather than as a run that
        * vanished. */
       return await step.run('finalize-unreadable', async () => {
-        await failRender(
+        await failRenderAndRelease(
           prisma,
           renderId,
           'failed',
@@ -446,7 +469,7 @@ export const projectRenderFunction = inngestClient.createFunction(
 
     if (outcome.data.outcome !== 'success' || outcome.data.outputUrl === null) {
       return await step.run('finalize-failed', async () => {
-        await failRender(
+        await failRenderAndRelease(
           prisma,
           renderId,
           outcome.data.outcome === 'timeout' ? 'timedOut' : 'failed',
@@ -505,7 +528,7 @@ async function loadRenderInputs(renderId: string): Promise<{
 
   const resolution = renderResolutionSchema.safeParse(render.resolution)
   if (!resolution.success) {
-    await failRender(prisma, renderId, 'failed', 'This render asked for an unsupported quality.')
+    await failRenderAndRelease(prisma, renderId, 'failed', 'This render asked for an unsupported quality.')
     throw new NonRetriableError(
       `[project.render] Render ${renderId} has resolution "${render.resolution}".`,
     )
@@ -517,7 +540,7 @@ async function loadRenderInputs(renderId: string): Promise<{
     render.projectId,
   )
   if (project === null || project.timeline === null) {
-    await failRender(
+    await failRenderAndRelease(
       prisma,
       renderId,
       'failed',
@@ -530,7 +553,7 @@ async function loadRenderInputs(renderId: string): Promise<{
 
   const migrated = tryMigrate(project.timeline.doc)
   if (!migrated.ok) {
-    await failRender(
+    await failRenderAndRelease(
       prisma,
       renderId,
       'failed',
@@ -547,7 +570,7 @@ async function loadRenderInputs(renderId: string): Promise<{
   const resolved = resolveWordAnchors(migrated.doc)
   const validated = validate(resolved)
   if (!validated.ok) {
-    await failRender(
+    await failRenderAndRelease(
       prisma,
       renderId,
       'failed',
@@ -566,7 +589,7 @@ async function loadRenderInputs(renderId: string): Promise<{
   })
   if (currentKey !== render.docHash) {
     /* KEY_MISMATCH_IS_A_STALE_RENDER — see the WHY above. */
-    await failRender(
+    await failRenderAndRelease(
       prisma,
       renderId,
       'failed',
@@ -803,7 +826,55 @@ async function storeRenderOutput(
         )
       }
 
-      return { renderId, outputAssetId: outputAsset.id, bytes }
+      /**
+       * SOURCE OF TRUTH KEYWORDS: COMMIT_WITH_THE_OUTPUT, CHARGE_WHAT_IT_COST
+       *
+       * The charge lands in the SAME transaction as the asset rows and the
+       * `completed` status. That is the point: a committed charge with no
+       * video, or a video with no charge, are both reachable the moment these
+       * are two transactions — and the first is a customer paying for nothing,
+       * which is exactly what this phase exists to prevent.
+       *
+       * CHARGE_WHAT_IT_COST: the cost is re-estimated from the render's REAL
+       * output duration rather than reusing the held amount. Today the two are
+       * equal, because the duration is known before the render starts. They
+       * stop being equal the moment anything makes the real length differ from
+       * the planned one, and `commit` already handles that — it writes the
+       * actual and releases the difference (PARTIAL_RELEASE). Committing the
+       * held amount instead would make every estimate a flat price and hide
+       * the divergence permanently.
+       *
+       * A missing hold is not an error. `findOpenHoldForRef` returns nothing
+       * when this step is replayed after the commit already happened, and
+       * `commit` itself refuses a second settlement — so a retried finalize
+       * charges once (DOUBLE_COMMIT_REFUSED).
+       */
+      const actual = estimateRenderCost({
+        durationSeconds: preflight.durationInSeconds,
+        resolution: preflight.resolution,
+      })
+
+      const openHold = await findOpenHoldForRef(tx, render.id)
+      if (openHold !== null) {
+        await commit(tx, openHold.id, actual.total, {
+          kind: 'render',
+          renderId: render.id,
+          breakdown: actual.lines,
+        })
+      }
+
+      /* Phase 04 left these null and said Phase 05 would fill them. This is
+       * that. Written in the same transaction as the ledger movement, so the
+       * number on the render and the number in the ledger cannot disagree. */
+      await tx.render.update({
+        where: { id: render.id },
+        data: {
+          creditsCharged: actual.total,
+          costBreakdown: { total: actual.total, lines: actual.lines },
+        },
+      })
+
+      return { renderId, outputAssetId: outputAsset.id, bytes, creditsCharged: actual.total }
     })
   })
 }
@@ -843,7 +914,7 @@ async function resolveTimedOutRender(
     /* Never started — so there is nothing to ask about. The row is still
      * `queued`, which means the start step did not complete, and the wait
      * expiring is the first thing to notice it. */
-    await failRender(
+    await failRenderAndRelease(
       prisma,
       renderId,
       'timedOut',
@@ -865,7 +936,7 @@ async function resolveTimedOutRender(
   }
 
   if (progress.status === 'failed') {
-    await failRender(
+    await failRenderAndRelease(
       prisma,
       renderId,
       'failed',
@@ -880,7 +951,7 @@ async function resolveTimedOutRender(
    * moved — which is the difference between "the renderer is slow" and "the
    * renderer is dead" for whoever reads this next. */
   await markRenderProgress(prisma, renderId, progress.progress)
-  await failRender(
+  await failRenderAndRelease(
     prisma,
     renderId,
     'timedOut',
@@ -888,4 +959,132 @@ async function resolveTimedOutRender(
     progress.progress,
   )
   return { renderId, status: 'timedOut' }
+}
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: failRenderAndRelease, NO_PATH_FORGETS_THE_REFUND,
+ *   RELEASE_IS_THE_SAFETY_NET
+ *
+ * WHAT:  Marks a render failed or timed out AND gives back whatever was held
+ *        for it.
+ *
+ * WHY:   NO_PATH_FORGETS_THE_REFUND. There are thirteen places in this file
+ *        that can end a render badly — a missing secret, a broken document, a
+ *        stale cache key, a provider refusal, a timeout, an unreadable
+ *        webhook, the failure handler. Every one of them has to refund, and
+ *        "remember to call release too" is a rule that holds until somebody
+ *        adds the fourteenth path. So there is no bare `failRender` call left
+ *        in this file: the only way to fail a render is through this function,
+ *        and refunding is not something a caller can omit.
+ *
+ *        It finds the hold by the RENDER ID rather than taking a holdId,
+ *        because most of those paths do not have one — the document check
+ *        fails before the hold step runs, and `onFailure` receives only the
+ *        original event. `findOpenHoldForRef` returns the unsettled hold or
+ *        nothing, so calling this before a hold exists, or twice, is a no-op
+ *        rather than an error (DOUBLE_COMMIT_REFUSED in the service).
+ *
+ *        The refund is best-effort around the status write: if releasing
+ *        throws, the render is still marked failed and the error is logged
+ *        loudly. The alternative — letting the release failure propagate —
+ *        would leave a render stuck on `rendering` forever because its refund
+ *        did not work, which is two problems instead of one. The nightly
+ *        reconcile cron is what catches the stranded hold.
+ * WHERE: Every failure path in this file, including onFailure.
+ */
+async function failRenderAndRelease(
+  db: typeof prisma,
+  renderId: string,
+  status: 'failed' | 'timedOut',
+  error: string,
+  progress?: number,
+): Promise<void> {
+  await failRender(db, renderId, status, error, progress)
+
+  try {
+    const open = await findOpenHoldForRef(db, renderId)
+    if (open !== null) {
+      await release(db, open.id, { reason: `render ${status}` })
+    }
+  } catch (releaseError) {
+    /* The render is already honest on the row; the money is not. Logged rather
+     * than thrown — see the WHY above. `credits.reconcile` reports the
+     * stranded hold. */
+    console.error(
+      `[project.render] ${renderId} was marked ${status} but its credit hold could not be released:`,
+      releaseError,
+    )
+  }
+}
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: holdRenderCredits, HOLD_IN_THE_WORKFLOW,
+ *   ORPHANED_HOLD, HOLD_IS_IDEMPOTENT
+ *
+ * WHAT:  Reserves the credits this render will cost, and returns the hold id.
+ *
+ * WHY:   HOLD_IN_THE_WORKFLOW rather than in `renders.create`, and the gap
+ *        between them is deliberate. A hold placed in the request would sit
+ *        inside that request's 10-second Prisma transaction, and a request
+ *        that timed out AFTER holding would strand the money with no workflow
+ *        in existence to release it. Here, the hold and everything that can
+ *        release it live in the same durable run.
+ *
+ *        It is placed immediately before the provider call and AFTER every
+ *        check that can still refuse the render for free — a broken document
+ *        or a missing asset must not cost the customer a reservation.
+ *
+ *        HOLD_IS_IDEMPOTENT via ORPHANED_HOLD: Inngest retries a step, and a
+ *        retry that placed a SECOND hold would leave the first unsettled
+ *        forever — nothing would ever commit or release it, the customer's
+ *        balance would be quietly short, and both the ledger and the cache
+ *        would still agree, so reconcile would report nothing wrong. So the
+ *        step looks for an existing open hold against this render first and
+ *        reuses it.
+ *
+ *        An `InsufficientCreditsError` here is PERMANENT. The balance will not
+ *        grow by itself, and retrying a render the customer cannot afford
+ *        three times produces the same refusal three times — so it marks the
+ *        row and stops. `renders.create` already refused on the estimate, so
+ *        reaching this means the balance moved in between, which a concurrent
+ *        render does routinely.
+ * WHERE: The `hold-credits` step above.
+ */
+async function holdRenderCredits(
+  renderId: string,
+  preflight: PreflightFacts,
+): Promise<string> {
+  const existing = await findOpenHoldForRef(prisma, renderId)
+  if (existing !== null) {
+    /* A retry of this step. The money is already reserved; reusing the hold is
+     * what keeps commit/release able to settle exactly one thing. */
+    return existing.id
+  }
+
+  const cost = estimateRenderCost({
+    durationSeconds: preflight.durationInSeconds,
+    resolution: preflight.resolution,
+  })
+
+  try {
+    return await hold(prisma, preflight.organizationId, cost.total, renderId, {
+      kind: 'render',
+      resolution: preflight.resolution,
+      durationSeconds: preflight.durationInSeconds,
+      breakdown: cost.lines,
+    })
+  } catch (error) {
+    if (error instanceof InsufficientCreditsError) {
+      await failRenderAndRelease(
+        prisma,
+        renderId,
+        'failed',
+        `This render needs ${error.required} credits and this workspace has ${error.available}. Top up and try again.`,
+      )
+      throw new NonRetriableError(
+        `[project.render] ${renderId} could not be held: ${error.message}`,
+      )
+    }
+    throw error
+  }
 }

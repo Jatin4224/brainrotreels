@@ -29,6 +29,7 @@
  */
 
 import { PLAN_ORDER, PLANS, isPaidPlan } from './plans'
+import { CREDIT_PACKS } from '@/lib/types/credits'
 import { AUTH_PROVIDER } from '@/lib/adapters/provider'
 
 export interface RequiredEnvVar {
@@ -165,6 +166,19 @@ const STRIPE_PRICE_KEYS: OptionalEnvKey[] = PLAN_ORDER.filter(isPaidPlan).flatMa
   }))
 )
 
+/* Credit-pack price ids, DERIVED from the pack table so the checklist can
+ * never list a pack that does not exist or miss one that does. Marked optional
+ * for the same reason the plan prices are: you only need a price for the packs
+ * you actually sell, and a pack with no price is simply not purchasable (see
+ * PACK_PRICE_IS_ENV_DRIVEN in src/lib/types/credits.ts). */
+const CREDIT_PACK_PRICE_KEYS: OptionalEnvKey[] = (
+  Object.keys(CREDIT_PACKS) as (keyof typeof CREDIT_PACKS)[]
+).map((pack) => ({
+  key: CREDIT_PACKS[pack].priceEnvKey,
+  label: `${CREDIT_PACKS[pack].label} price (${CREDIT_PACKS[pack].credits.toLocaleString('en-US')} credits)`,
+  optional: true,
+}))
+
 /* Fail-soft integrations. Adding one here surfaces it on the setup checklist as
  * an informational row; it NEVER affects hasMissingRequiredEnv (never blocks).
  *
@@ -187,6 +201,7 @@ export const OPTIONAL_ENV: readonly OptionalEnvVar[] = [
       { key: 'NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY', label: 'Publishable key' },
       { key: 'STRIPE_WEBHOOK_SECRET', label: 'Webhook signing secret' },
       ...STRIPE_PRICE_KEYS,
+      ...CREDIT_PACK_PRICE_KEYS,
     ],
   },
   /* Media. Two rows rather than one, because they fail at different points and

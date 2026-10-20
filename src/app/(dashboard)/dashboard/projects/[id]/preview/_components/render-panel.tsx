@@ -52,6 +52,7 @@
  */
 
 import * as React from 'react'
+import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 
 import { trpc } from '@/trpc/react-provider'
@@ -112,6 +113,7 @@ export function RenderPanel({ projectId }: { projectId: string }) {
   const organizationId = useActiveOrganizationId()
   const { hasPermission } = useActiveOrganization()
   const upgradeModal = useUpgradeModal()
+  const router = useRouter()
   const plan = usePlanTier()
 
   const enabled = organizationId !== undefined
@@ -195,6 +197,23 @@ export function RenderPanel({ projectId }: { projectId: string }) {
 
   if (!enabled || plan === null) return <Skeleton className="h-56 w-full rounded-xl" />
 
+  /* COST_ON_THE_BUTTON. The price comes from the SERVER, through the same
+   * estimator the refusal and the hold use — a cost computed here would be a
+   * second implementation of pricing, and the button would promise one number
+   * while the handler charged another. Re-queried per resolution because that
+   * is exactly what changes it. */
+  const estimateQuery = trpc.renders.estimate.useQuery(
+    {
+      organizationId: organizationId ?? '',
+      projectId,
+      resolution: resolution ?? '1080p',
+    },
+    { enabled: enabled && resolution !== null, retry: false },
+  )
+
+  const cost = estimateQuery.data?.cost ?? null
+  const affordable = estimateQuery.data?.affordable ?? true
+
   const allowed = resolutionsForPlan(plan)
   const watermarked = !planHasCleanExport(plan)
   const busy = createRender.isPending || (latest !== null && isRunning(latest.status))
@@ -270,6 +289,15 @@ export function RenderPanel({ projectId }: { projectId: string }) {
               disabled={!canRender || busy || resolution === null}
               onClick={() => {
                 if (resolution === null) return
+                /* A short balance sends them where they can fix it rather than
+                   firing a request we already know the server will refuse with
+                   INSUFFICIENT_CREDITS. The server still refuses it if they
+                   get here another way — this is the affordance, not the
+                   boundary. */
+                if (!affordable) {
+                  router.push('/dashboard/settings/credits')
+                  return
+                }
                 createRender.mutate({
                   organizationId,
                   projectId,
@@ -277,7 +305,19 @@ export function RenderPanel({ projectId }: { projectId: string }) {
                 })
               }}
             >
-              {busy ? 'Rendering…' : 'Render video'}
+              {/* COST_ON_THE_BUTTON, and the label switches to the REMEDY when
+                  the balance is short — a disabled "Render (12 credits)" tells
+                  a customer they cannot proceed but not what to do about it,
+                  which is the version of this that generates support tickets.
+                  The cost is omitted while it loads rather than shown as 0,
+                  because a price that flickers from 0 to 12 reads as a bait. */}
+              {busy
+                ? 'Rendering…'
+                : !affordable
+                  ? 'Top up credits'
+                  : cost === null
+                    ? 'Render video'
+                    : `Render video (${cost.total} credits)`}
             </Button>
           </FeatureGate>
 

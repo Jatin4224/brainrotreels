@@ -331,6 +331,57 @@ export const RESOURCES = {
     },
   },
 
+  /**
+   * SOURCE OF TRUTH KEYWORDS: RESOURCES.credits, CREDITS_HAVE_NO_LIMIT,
+   *   credits.purchase, LEDGER_NOT_A_COUNTER
+   *
+   * The credit balance and its history.
+   *
+   * CREDITS_HAVE_NO_LIMIT, and this is the entry's whole point — it declares
+   * NEITHER `limit` NOR `flag`. That looks like an omission and is the
+   * opposite: the registry's `limit` is a COUNTER with a `UsageMetrics` row
+   * behind it, which can only increment on create and decrement on delete.
+   * Credits need a hold, a partial commit and a refund, and a counter has no
+   * vocabulary for any of them. Declaring a limit here would make the factory
+   * gate and bump a second, parallel number that disagrees with the ledger
+   * within one failed render.
+   *
+   * So the balance lives in `CreditLedger` + `Organization.creditBalance`, and
+   * the refusal is thrown by hand with `ERROR_CODES.INSUFFICIENT_CREDITS`
+   * rather than by the factory. The two systems sit side by side on purpose:
+   * countable product objects (`projects`, `renders`, `storage`) keep the
+   * automatic gates; variable-cost work (render minutes, TTS seconds,
+   * generated footage) goes on the ledger. Grep LEDGER_NOT_A_COUNTER.
+   *
+   * `purchase` is a permission of its own rather than `create`, for two
+   * reasons that both matter: the factory auto-gates and auto-counts on the
+   * path verb `create`, which must not happen here, and spending real money is
+   * genuinely a different authority from making things — a workspace can
+   * reasonably let a member render while reserving top-ups to whoever owns the
+   * card. The audit template is keyed by that same PATH verb.
+   */
+  credits: {
+    name: 'Credits',
+    description: 'Credit balance and purchase history',
+    permissions: ['read', 'purchase'],
+    category: 'Billing',
+    nav: {
+      label: 'Credits',
+      href: '/dashboard/settings/credits',
+      icon: 'CreditCard',
+      section: 'settings',
+      requirePermission: 'credits:read',
+    },
+    audit: {
+      describe: { purchase: 'Purchased {input.packKey} credits' },
+    },
+    /* Each attempt is a real payment-intent round trip against a real card.
+     * A loop here is both a Stripe bill and a fraud signal on the account. */
+    rateLimit: {
+      purchase: { count: 10, window: '1 m' },
+    },
+  },
+
   invitation: {
     name: 'Invitations',
     description: 'Send invites and cancel pending invitations',

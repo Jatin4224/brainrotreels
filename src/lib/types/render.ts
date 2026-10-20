@@ -477,3 +477,21 @@ export const getRenderSchema = z.object({
 export const retryRenderSchema = getRenderSchema
 
 export type RetryRenderValues = z.infer<typeof retryRenderSchema>
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: estimateRenderSchema, COST_ON_THE_BUTTON
+ *
+ * WHAT:  Input for `renders.estimate`.
+ * WHY:   The same two facts `createRenderSchema` carries minus the commitment
+ *        — a separate schema rather than reusing that one, because this is a
+ *        READ and conflating them would mean a future required field on
+ *        create silently becoming required to see a price.
+ * WHERE: The render panel's cost label.
+ */
+export const estimateRenderSchema = z.object({
+  organizationId: z.string().min(1),
+  projectId: z.string().min(1),
+  resolution: renderResolutionSchema,
+})
+
+export type EstimateRenderValues = z.infer<typeof estimateRenderSchema>

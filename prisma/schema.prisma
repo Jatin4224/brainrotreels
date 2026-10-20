@@ -186,6 +186,20 @@ model Organization {
   // from PORTAL_INITIAL_OWNER_EMAIL (src/lib/config/portal.ts).
   isPortalOrganization Boolean @default(false)
 
+  // Credits — a CACHE OF THE LEDGER SUM, never an independent number. Every
+  // write that changes it appends a CreditLedger row in the SAME transaction,
+  // so the two can only disagree if a transaction boundary is wrong — which is
+  // exactly what the nightly `credits.reconcile` cron looks for and reports.
+  //
+  // It exists because the alternative is summing the ledger on every read, and
+  // the ledger is append-only and unbounded: a workspace that has been
+  // rendering for a year would pay for thousands of rows to answer "can I
+  // afford this", on the request path, before every paid action.
+  //
+  // NEVER write this without a ledger row beside it. The ledger is the truth;
+  // this is the fast answer. See src/services/credits.service.ts.
+  creditBalance Int @default(0)
+
   // Relations
   members           Member[]
   invitations       Invitation[]
@@ -196,6 +210,7 @@ model Organization {
   projects          Project[]
   assets            Asset[]
   renders           Render[]
+  creditLedger      CreditLedger[]
 
   @@map("organization")
 }
@@ -623,4 +638,90 @@ model Render {
   @@index([projectId])
   @@index([organizationId, createdAt])
   @@map("render")
+}
+
+// ============================================================================
+// CREDITS — a ledger, because a counter cannot express a hold or a refund
+// ============================================================================
+
+/// CreditLedger — append-only. Every credit that enters or leaves a workspace
+/// is a row here, and `Organization.creditBalance` is only ever a cache of
+/// their sum (written in the same transaction, never on its own).
+///
+/// WHY A LEDGER AND NOT A `UsageMetrics` COUNTER. A counter can increment and
+/// decrement and that is all it can say. Paid work here has three properties a
+/// counter has no vocabulary for: a render's true cost is unknown until it
+/// finishes, a failed render must give the money back, and a top-up has to
+/// survive a plan change. Expressing that on a counter means hand-written
+/// compensation on every failure path — and the first failed render gets it
+/// wrong. So countable product objects (`projects`, `renders`, `storage`) stay
+/// on the registry and its automatic gates, and variable-cost work lives here.
+///
+/// THE HOLD/COMMIT/RELEASE SHAPE, which is what makes "nobody is charged for a
+/// video that was not made" true rather than aspirational:
+///
+///   hold    — negative, written BEFORE the paid work starts. The money is
+///             reserved, so a second render cannot spend it while the first is
+///             running.
+///   commit  — negative, written when the work finished, for its REAL cost.
+///   release — positive, reversing a hold in full (failure) or in part (the
+///             work cost less than estimated).
+///
+/// A hold is therefore always followed by exactly one of: a commit plus a
+/// release for the difference, or a release for the whole amount. `holdId`
+/// links both back, and it is what makes double-commit detectable — see
+/// `commit` in src/services/credits.service.ts.
+///
+/// `delta` IS SIGNED and the sign is not derivable from `kind` alone by a
+/// reader skimming: hold and commit are negative, purchase/grant/release are
+/// positive. Storing the sign rather than an absolute value is what lets the
+/// balance be `SUM(delta)` with no branching, which is the property the
+/// reconcile cron depends on.
+///
+/// `kind` is String, not a Prisma enum — this schema has zero enum blocks and
+/// the validated union lives in src/lib/types/credits.ts.
+///
+/// SOURCE OF TRUTH KEYWORD: CreditLedger
+model CreditLedger {
+  id             String   @id @default(cuid())
+  organizationId String
+  delta          Int // negative for hold/commit, positive for purchase/grant/release
+  kind           String // purchase | grant | hold | commit | release
+  refId          String? // renderId, jobId, stripe payment intent
+  holdId         String? // links commit/release back to its hold
+  metadata       Json?
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([organizationId, createdAt])
+  @@index([holdId])
+  @@index([refId])
+  @@map("credit_ledger")
+}
+
+/// StripeEvent — every Stripe event id this app has already processed.
+///
+/// WHY IT EXISTS, and why Phase 05 is where it became urgent. Stripe delivers
+/// at least once and replays on its own schedule; until now the webhook's
+/// replay safety was INCIDENTAL, resting on the fact that upserting by
+/// subscription id happens to be idempotent. One handler was never idempotent
+/// at all — `markUserFingerprintsAsTrialUsed` genuinely re-runs on every
+/// replay — and it was harmless only because re-marking a used trial as used
+/// changes nothing.
+///
+/// Credits remove that luck. A replayed top-up that grants a second time is a
+/// direct, unrecoverable loss, so the webhook now inserts this row FIRST and
+/// bails if it already exists. The primary key IS the Stripe event id, so the
+/// database itself refuses the second insert — the check and the guarantee are
+/// the same operation, which is the only version of this that cannot race.
+///
+/// SOURCE OF TRUTH KEYWORD: StripeEvent
+model StripeEvent {
+  id          String   @id // the Stripe event id
+  type        String
+  processedAt DateTime @default(now())
+
+  @@map("stripe_event")
 }

@@ -13,7 +13,8 @@ worse than an empty box.
 - [ ] Phase 04: Cloud rendering — built; **blocked on an AWS account** for the Lambda deploy, so no
       render has ever run in the cloud. See the note below for exactly which checks are met and
       which are untested.
-- [ ] Phase 05: Credits and entitlements
+- [ ] Phase 05: Credits and entitlements — built; **blocked on the Neon database being unreachable**
+      and on Phase 04's AWS gap, so no credit has ever moved. Rates are PLACEHOLDERS. See the note.
 - [ ] Phase 06: Script generation
 - [ ] Phase 07: Voices and TTS
 - [ ] Phase 08: Alignment and captions
@@ -610,3 +611,143 @@ every check below is untested:
 - No throwaway QA account was created this phase; the webhook probes needed no authenticated
   session. `REMOTION_WEBHOOK_SECRET` was added to `.env` for the duration of the probe and the file
   was restored from a backup afterwards — `git diff .env` is clean.
+
+### Phase 05 — 2026-10-21
+
+Built: the `CreditLedger` and `StripeEvent` models plus `Organization.creditBalance` and their
+migration (**applied**), the `credits` registry entry, `src/lib/types/credits.ts`,
+`src/lib/credits/estimate.ts` (the pure tariff), `credits.service.ts` (hold / commit / release /
+grant / purchase / getBalance), the `credits` router, hold-commit-release wired through
+`project.render`, the insufficient-credits refusal in `renders.create`, `renders.estimate`, the
+Stripe event-dedupe gate, the `credits.reconcile` cron, the credits screen, and the cost on the
+render button. 13 new tests; the suite is 423 and green, `tsc --noEmit`, `eslint` and `next build`
+are clean.
+
+**⚠ THE CREDIT RATES ARE PLACEHOLDERS AND NOBODY HAS PRICED THEM.** `CREDIT_RATES` in
+`src/lib/credits/estimate.ts` is internally consistent and shaped like a real tariff — a flat base
+per job, a per-second rate, 1080p dearer than 720p, a premium-voice surcharge — but no number in it
+has been compared against what a Lambda render, a TTS second or a generated image actually costs,
+or against what the plans sell for. The same is true of the three pack sizes in `CREDIT_PACKS`.
+This was flagged before the phase started and built to the stated fallback: the rates are in ONE
+constant and the maths is a pure function, so setting real prices is one edit to one object with no
+arithmetic scattered anywhere else. **Do not charge anybody until that edit happens.**
+
+**Decisions worth knowing about, because none of them were in the phase file:**
+
+- **`renders.create` refuses on the estimate; the WORKFLOW places the hold.** The phase implies both
+  happen together. They must not: a hold placed in the request would sit inside that request's
+  10-second Prisma transaction, and a request that timed out *after* holding would strand the money
+  with no workflow in existence to release it. Separating them means the hold and everything that
+  can release it live in the same durable run. The cost of the gap is that a balance can move
+  between the two, which is why the hold path handles `InsufficientCreditsError` as a permanent
+  failure rather than assuming the earlier check still holds. Grep `HOLD_IN_THE_WORKFLOW`.
+- **There is no bare `failRender` call left in the render workflow.** Thirteen paths can end a
+  render badly — a missing secret, a broken document, a stale cache key, a provider refusal, a
+  timeout, an unreadable webhook, the failure handler — and every one has to refund. "Remember to
+  call release too" is a rule that holds until somebody adds the fourteenth path, so all thirteen
+  now go through `failRenderAndRelease`, and refunding is not something a caller can omit. Grep
+  `NO_PATH_FORGETS_THE_REFUND`.
+- **The hold is found by RENDER ID, not carried as a holdId.** Most of the paths that settle it
+  cannot have been handed one — `onFailure` receives only the original event, and a replayed step
+  gets fresh locals. One lookup rule reachable from everywhere beats a value half the paths do not
+  have. `findOpenHoldForRef` is also what makes the hold step idempotent: an Inngest retry that
+  placed a SECOND hold would leave the first unsettled forever, the customer quietly short, with
+  the ledger and the cache still agreeing — so reconcile would report nothing. Grep `ORPHANED_HOLD`.
+- **`commit` re-estimates from the real output rather than charging the held amount.** Today they
+  are equal because a render's duration is known before it starts. They stop being equal the moment
+  anything makes the real length differ from the planned one, and `commit` already handles that —
+  it writes the actual and releases the difference. Charging the hold instead would make every
+  estimate a flat price and hide the divergence permanently. Grep `CHARGE_WHAT_IT_COST`.
+- **The charge, the asset rows and the `completed` status commit in ONE transaction.** A committed
+  charge with no video, or a video with no charge, are both reachable the moment those are two
+  transactions — and the first is a customer paying for nothing, which is the exact thing this
+  phase exists to prevent. `Render.creditsCharged` and `costBreakdown`, left null by Phase 04, are
+  filled in that same transaction so the number on the render and the number in the ledger cannot
+  disagree.
+- **The Stripe dedupe INSERT is the check.** `StripeEvent`'s primary key is the event id, so the
+  database refuses the second write — rather than a read-then-write, where two concurrent
+  deliveries of one event both read "not seen" and both proceed. It is recorded BEFORE the handlers
+  run, which takes a deliberate trade: an event that fails mid-handler is never retried, because it
+  is already marked seen. That is the right direction — money that was *not* granted is recoverable
+  by hand, money granted twice is not. Grep `STRIPE_EVENT_DEDUPE`.
+- **A top-up is granted twice over, on purpose.** `credits.purchase` writes the ledger row in the
+  same request that charges the card, AND `payment_intent.succeeded` grants it again if that
+  request died in between. Both are safe because `purchase` is keyed on the payment intent id and
+  refuses a second row for one it has seen. The two close different holes — the event table stops
+  one *delivery* being processed twice, the refId stops two *different* events being read as one
+  top-up — and a replayed grant is unrecoverable, so it is worth two locks.
+- **SCA is a refusal, not a retry.** A card that comes back `requires_action` is reported as a
+  failed top-up rather than being carried through a client-side confirmation step. Handling 3-D
+  Secure properly needs that step; pretending a pending payment succeeded would grant credits for
+  money that may never arrive. Worth revisiting when a real card population exists. Grep
+  `SCA_IS_A_REFUSAL_FOR_NOW`.
+- **`credits` declares neither `limit` nor `flag` in the registry**, which looks like an omission
+  and is the opposite. The registry's `limit` is a counter with a `UsageMetrics` row behind it, and
+  declaring one here would make the factory gate and bump a second, parallel number that disagrees
+  with the ledger within one failed render. `purchase` is also its own permission rather than
+  `create`, because the factory auto-gates on the path verb `create` — and because spending real
+  money is genuinely a different authority from making things.
+- **`reconcile` reports and does not repair.** The cache can only diverge from the ledger if a
+  transaction boundary is wrong in code; healing the number would remove the only evidence the bug
+  exists while it kept producing it. It also hunts STRANDED HOLDS separately, because that failure
+  leaves the ledger and the cache in perfect agreement — both say the money is gone — while the
+  customer is short and no render ever used it. Balance reconciliation alone would never see it.
+  Both halves are SQL aggregates rather than rows read into the process: the ledger is append-only
+  and unbounded, and a job that loads it all to add it up fails on the night it is most needed.
+- **The balance shown is spendable, not gross.** A hold IS a negative ledger row, so holds are
+  already deducted and no caller has to remember to subtract anything in flight.
+- **The render button switches to "Top up credits" when the balance is short**, and clicking it
+  navigates to the credits screen rather than firing a request the server will refuse. A disabled
+  "Render (12 credits)" tells a customer they cannot proceed but not what to do about it.
+
+**Verified.**
+
+- **The estimator is covered by 13 tests**, written against PROPERTIES rather than the placeholder
+  numbers — the total is always a whole number, never negative, longer costs more, 1080p costs more
+  than 720p, the lines always add up to the total, the resolution multiplier applies only to
+  renders, and a NaN/negative/Infinite duration collapses to the base charge instead of producing a
+  charge nobody intended. That last set matters: a zero frame rate divides to Infinity and a broken
+  document produces NaN, and a NaN total would be held, committed and shown to a customer without
+  anything throwing.
+- **`next build` succeeds** with `/dashboard/settings/credits` present, and the full suite is 423
+  green with `tsc` and `eslint` clean.
+- **The migration is applied.** `prisma migrate status` reports the database up to date and
+  `migrate diff` reports no drift; `credit_ledger`, `stripe_event` and `organization.creditBalance`
+  were each confirmed reachable through the client immediately after applying.
+
+**NOT verified, and this is why the box is unticked.**
+
+**The Neon database went unreachable partway through this phase** — TCP connects on 5432 but
+Postgres does not answer, and it stayed down across every retry since. It was healthy when the
+migration applied, so this is on Neon's side (a suspended project or exhausted free-tier compute),
+not something in this branch. Everything below needs it back:
+
+- A forced render failure returning the exact credits held.
+- A render costing less than estimated committing the real cost and releasing the remainder.
+- Committing the same hold twice being refused.
+- Replaying a Stripe webhook twice adding credits once, and the trial fingerprint being marked once.
+- `credits.reconcile` reporting zero drift after a day of mixed activity.
+- Rendering with too few credits being refused before any provider call. The refusal is wired and
+  the error contract is the pre-existing `INSUFFICIENT_CREDITS` cause, but no request has run.
+
+Note that the first five of those are ALSO blocked by Phase 04's own gap — there is still no AWS
+account, so no render has ever completed, which means no hold has ever been committed by a real
+render rather than by a probe. The credit paths through `project.render` are therefore reachable
+only by driving the workflow directly.
+
+**Deliberately not committed:** no database-backed test file. The existing 24 test files are pure
+units and nothing in the suite touches Prisma; adding a DB-backed test would start a new pattern
+(CLAUDE.md rule 1) and make `npm test` depend on a live database. The ledger semantics were going
+to be proven by a throwaway probe against the real database the way Phase 04's webhook was — that
+probe is what the outage blocked.
+
+**Also outstanding:**
+
+- **The credit rates and pack sizes need real prices** before anyone is charged. See the warning at
+  the top of this note.
+- **Phase 04's AWS deploy, R2 credentials and the Remotion licence** are all still open and now
+  block Phase 05's verification as well as their own.
+- **A plan's monthly credit allowance is not wired.** `grant` exists and is the right mechanism, but
+  nothing calls it on a subscription renewal — so today credits only arrive by purchase. The phase
+  brief does not ask for the allowance and the registry has no field for it; it is a product
+  decision that belongs with the pricing one.

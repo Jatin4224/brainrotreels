@@ -65,17 +65,20 @@
 
 import { TRPCError } from '@trpc/server'
 
-import { createTRPCRouter } from '../init'
+import { createStructuredError, createTRPCRouter } from '../init'
 import { protectedProcedure } from '../procedures'
 import { permissions } from '@/lib/permissions'
 import { checkBooleanFeature, getOrganizationTier } from '@/lib/feature-gate'
 import { enqueue } from '@/lib/adapters/jobs'
 import { incrementUsage } from '@/services/usage.service'
+import { getBalance } from '@/services/credits.service'
+import { estimateRenderCost } from '@/lib/credits'
+import { ERROR_CODES } from '@/lib/errors'
 import { findProjectWithTimeline } from '@/services/projects.service'
 import { signAssetUrl } from '@/services/assets.service'
 import * as rendersService from '@/services/renders.service'
 import { resolveWordAnchors, tryMigrate, validate } from '@/lib/timeline'
-import { renderCacheKey } from '@/lib/render'
+import { planComposition, renderCacheKey } from '@/lib/render'
 import {
   FINAL_URL_TTL_SECONDS,
   RENDER_ATTEMPT_LIMIT,
@@ -84,6 +87,7 @@ import {
   isResolutionAllowedForPlan,
   listRendersSchema,
   resolutionsForPlan,
+  estimateRenderSchema,
   retryRenderSchema,
 } from '@/lib/types'
 
@@ -203,7 +207,49 @@ export const rendersRouter = createTRPCRouter({
          * off them. This branch is a guard against a stale client or a
          * double-click, not the download path. */
         await incrementUsage(input.organizationId, 'renders', -1, ctx.db)
-        return { render: existing, reused: true }
+        return { render: existing, reused: true, cost: null }
+      }
+
+      /**
+       * SOURCE OF TRUTH KEYWORDS: REFUSE_BEFORE_PAYING, INSUFFICIENT_CREDITS
+       *
+       * The credit check, and it is deliberately AFTER the reuse check and
+       * BEFORE the row. After reuse, because a render that costs nothing must
+       * not be refused for lack of credits — the customer already paid for
+       * that file. Before the row, because a refusal must leave no trace: a
+       * queued `Render` that was never affordable would show in the panel as a
+       * render that is about to start and never will.
+       *
+       * This refuses on the ESTIMATE; the hold is placed by the workflow (see
+       * HOLD_IN_THE_WORKFLOW there). The two are separated because the gap
+       * between them is small and the alternative is worse: holding here would
+       * put a credit movement inside the request's 10-second transaction, and
+       * a request that timed out after holding would strand the money with no
+       * workflow in existence to release it.
+       *
+       * The error carries `required` and `available` through the EXISTING
+       * `INSUFFICIENT_CREDITS` cause, which has been declared in
+       * src/lib/errors with no producer since Phase 00. This is its first.
+       * The client renders the top-up prompt straight off it.
+       */
+      const cost = estimateRenderCost({
+        durationSeconds: planComposition(validated.doc).durationInSeconds,
+        resolution: input.resolution,
+      })
+
+      const available = await getBalance(input.organizationId, ctx.db)
+      if (available < cost.total) {
+        throw createStructuredError(
+          'FORBIDDEN',
+          `This render costs ${cost.total} credits and this workspace has ${available}.`,
+          {
+            errorCode: ERROR_CODES.INSUFFICIENT_CREDITS,
+            resource: 'credits',
+            required: cost.total,
+            available,
+            message: `Not enough credits to render. ${cost.total} needed, ${available} available.`,
+          },
+        )
       }
 
       const render = await rendersService.createQueuedRender(ctx.db, {
@@ -228,7 +274,68 @@ export const rendersRouter = createTRPCRouter({
         id: `render-${render.id}-attempt-${render.attempts}`,
       })
 
-      return { render, reused: false }
+      /* The cost travels back so the panel can say what the render will cost
+       * without re-deriving it — and so the number the customer is told is
+       * provably the number that was checked against their balance. */
+      return { render, reused: false, cost }
+    }),
+
+  /**
+   * SOURCE OF TRUTH KEYWORDS: renders.estimate, COST_ON_THE_BUTTON,
+   *   ESTIMATE_IS_A_READ, ONE_PRICE_TWO_SURFACES
+   *
+   * WHAT:  What rendering this project at this size would cost, and whether
+   *        the workspace can currently afford it.
+   *
+   * WHY:   COST_ON_THE_BUTTON is the phase's own requirement — every
+   *        credit-spending action shows its cost in the label. That number has
+   *        to come from the SERVER, through the same `estimateRenderCost` the
+   *        refusal and the hold use (ONE_PRICE_TWO_SURFACES): a cost computed
+   *        in the browser would be a second implementation of pricing, and the
+   *        first time the rates changed the button would promise one price
+   *        while the handler charged another.
+   *
+   *        ESTIMATE_IS_A_READ — a query, so it is cheap and repeatable. It
+   *        deliberately does NOT sign any asset URLs, which is what makes it
+   *        affordable to call on every resolution toggle; `projects.preview`
+   *        is the expensive read and this is not it.
+   *
+   *        It returns the BALANCE alongside the cost so the button can switch
+   *        to "Top up credits" without a second round trip, and so the two
+   *        numbers it compares were read at the same instant. Fetching them
+   *        separately would show "costs 12, you have 11" from two different
+   *        moments, which is how a button disables itself for a customer who
+   *        just topped up.
+   *
+   *        A project with no timeline returns `cost: null` rather than
+   *        throwing — the panel renders a plain disabled button for a draft
+   *        project, and an error toast on a page the customer merely opened
+   *        would be noise.
+   * WHERE: The render panel's label and its affordability state.
+   */
+  estimate: protectedProcedure({ requirePermission: permissions.RENDERS_READ })
+    .input(estimateRenderSchema)
+    .query(async ({ ctx, input }) => {
+      const balance = await getBalance(input.organizationId, ctx.db)
+
+      const project = await findProjectWithTimeline(
+        ctx.db,
+        input.organizationId,
+        input.projectId,
+      )
+      if (!project || project.timeline === null) {
+        return { cost: null, balance, affordable: false }
+      }
+
+      const migrated = tryMigrate(project.timeline.doc)
+      if (!migrated.ok) return { cost: null, balance, affordable: false }
+
+      const cost = estimateRenderCost({
+        durationSeconds: planComposition(resolveWordAnchors(migrated.doc)).durationInSeconds,
+        resolution: input.resolution,
+      })
+
+      return { cost, balance, affordable: balance >= cost.total }
     }),
 
   /**
