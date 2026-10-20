@@ -1,14 +1,8 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
-'use client'
+"use client";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: PricingCardSkeleton, ComparisonTableSkeleton,
@@ -28,9 +22,9 @@
  *        billing.getAvailablePlans resolves.
  */
 
-import type { CSSProperties } from 'react'
+import type { CSSProperties } from "react";
 
-import { Skeleton } from '@/components/ui/skeleton'
+import { Skeleton } from "@/components/ui/skeleton";
 
 export function PricingCardSkeleton() {
   return (
@@ -59,15 +53,15 @@ export function PricingCardSkeleton() {
         ))}
       </div>
     </div>
-  )
+  );
 }
 
-const SKELETON_LINE_WIDTHS = [75, 60, 80, 50, 70] as const
+const SKELETON_LINE_WIDTHS = [75, 60, 80, 50, 70] as const;
 
 /* Row counts per placeholder category — uneven on purpose, so the loading state
  * looks like a grouped table rather than a uniform block. */
-const SKELETON_CATEGORIES = [4, 3, 2] as const
-const SKELETON_COLUMNS = [1, 2, 3, 4] as const
+const SKELETON_CATEGORIES = [4, 3, 2] as const;
+const SKELETON_COLUMNS = [1, 2, 3, 4] as const;
 
 export function ComparisonTableSkeleton({ style }: { style?: CSSProperties }) {
   return (
@@ -82,7 +76,10 @@ export function ComparisonTableSkeleton({ style }: { style?: CSSProperties }) {
               <Skeleton className="h-4 w-28 shrink-0" />
               <div className="flex flex-1 gap-6">
                 {SKELETON_COLUMNS.map((column) => (
-                  <div key={column} className="flex flex-1 flex-col items-center gap-1">
+                  <div
+                    key={column}
+                    className="flex flex-1 flex-col items-center gap-1"
+                  >
                     <Skeleton className="h-3 w-14" />
                     <Skeleton className="h-0.5 w-full" />
                   </div>
@@ -112,5 +109,5 @@ export function ComparisonTableSkeleton({ style }: { style?: CSSProperties }) {
         ))}
       </div>
     </div>
-  )
+  );
 }

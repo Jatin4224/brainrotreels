@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -25,14 +19,14 @@
  *        src/lib/resources.ts (`auditLogs.flag`).
  */
 
-import { z } from 'zod'
-import { createTRPCRouter } from '../init'
-import { protectedProcedure } from '../procedures'
-import { permissions } from '@/lib/permissions'
+import { z } from "zod";
+import { createTRPCRouter } from "../init";
+import { protectedProcedure } from "../procedures";
+import { permissions } from "@/lib/permissions";
 import {
   getOrganizationAuditFilterOptions,
   getOrganizationAuditLogs,
-} from '@/services/activity-log.service'
+} from "@/services/activity-log.service";
 
 /* `page` / `pageSize` are read by the procedure factory from rawInput; the
  * factory owns clamping and default values. Declaring them here (without
@@ -48,7 +42,7 @@ const listAuditLogsSchema = z.object({
   fromDate: z.date().optional(),
   toDate: z.date().optional(),
   search: z.string().optional(),
-})
+});
 
 export const auditLogsRouter = createTRPCRouter({
   list: protectedProcedure({
@@ -57,7 +51,7 @@ export const auditLogsRouter = createTRPCRouter({
   })
     .input(listAuditLogsSchema)
     .query(async ({ ctx, input }) => {
-      const { skip, take } = ctx.pagination
+      const { skip, take } = ctx.pagination;
       return getOrganizationAuditLogs(
         {
           organizationId: input.organizationId,
@@ -69,8 +63,8 @@ export const auditLogsRouter = createTRPCRouter({
           search: input.search,
         },
         skip,
-        take
-      )
+        take,
+      );
     }),
 
   /* AUDIT_FILTERS_FROM_DATA: the verbs and entities this tenant has actually
@@ -78,7 +72,11 @@ export const auditLogsRouter = createTRPCRouter({
    * permission as `list` — it is a read of the same rows, and the factory's
    * flag check applies to every verb on this resource, so a plan without audit
    * logs cannot enumerate them either. */
-  filterOptions: protectedProcedure({ requirePermission: permissions.AUDIT_LOGS_READ })
+  filterOptions: protectedProcedure({
+    requirePermission: permissions.AUDIT_LOGS_READ,
+  })
     .input(z.object({ organizationId: z.string() }))
-    .query(async ({ input }) => getOrganizationAuditFilterOptions(input.organizationId)),
-})
+    .query(async ({ input }) =>
+      getOrganizationAuditFilterOptions(input.organizationId),
+    ),
+});

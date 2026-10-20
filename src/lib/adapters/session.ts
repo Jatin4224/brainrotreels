@@ -1,14 +1,8 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
-import 'server-only'
+import "server-only";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: getServerSession, PROVIDER_NEUTRAL_SESSION
@@ -26,10 +20,10 @@ import 'server-only'
  *        src/lib/adapters/<provider>/index.ts.
  */
 
-import { cache } from 'react'
+import { cache } from "react";
 
-import { getAuthAdapter } from './index'
-import type { AdapterSession } from './types'
+import { getAuthAdapter } from "./index";
+import type { AdapterSession } from "./types";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: getServerSession
@@ -37,7 +31,9 @@ import type { AdapterSession } from './types'
  * WHAT:  The current request's session, or null when signed out.
  * WHERE: Server components, layouts, and route handlers.
  */
-export const getServerSession = cache(async (): Promise<AdapterSession | null> => {
-  const adapter = await getAuthAdapter()
-  return adapter.identity.getSession()
-})
+export const getServerSession = cache(
+  async (): Promise<AdapterSession | null> => {
+    const adapter = await getAuthAdapter();
+    return adapter.identity.getSession();
+  },
+);

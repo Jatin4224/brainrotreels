@@ -1,14 +1,8 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
-'use client'
+"use client";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: NavUser
@@ -20,63 +14,69 @@
  * WHERE: Rendered by AppSidebar. Uses authClient.useSession / authClient.signOut.
  */
 
-import * as React from 'react'
-import { useRouter } from 'next/navigation'
-import { ChevronsUpDown, LogOut, UserIcon, ShieldCheckIcon } from 'lucide-react'
+import * as React from "react";
+import { useRouter } from "next/navigation";
+import {
+  ChevronsUpDown,
+  LogOut,
+  UserIcon,
+  ShieldCheckIcon,
+} from "lucide-react";
 
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
+} from "@/components/ui/dropdown-menu";
 import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
   useSidebar,
-} from '@/components/ui/sidebar'
-import { authClient } from '@/lib/better-auth/auth-client'
-import { AUTH_ROUTES, PORTAL_PATH } from '@/lib/config'
-import { trpc } from '@/trpc/react-provider'
-import { SidebarEntrySkeleton } from '../sidebar-skeletons'
+} from "@/components/ui/sidebar";
+import { authClient } from "@/lib/better-auth/auth-client";
+import { AUTH_ROUTES, PORTAL_PATH } from "@/lib/config";
+import { trpc } from "@/trpc/react-provider";
+import { SidebarEntrySkeleton } from "../sidebar-skeletons";
 
 function initialsOf(name: string | null | undefined, email: string): string {
-  const source = name?.trim() || email
-  const parts = source.split(/\s+/).filter(Boolean)
-  const letters = parts.length >= 2 ? `${parts[0]?.[0]}${parts[1]?.[0]}` : source.slice(0, 2)
-  return letters.toUpperCase()
+  const source = name?.trim() || email;
+  const parts = source.split(/\s+/).filter(Boolean);
+  const letters =
+    parts.length >= 2 ? `${parts[0]?.[0]}${parts[1]?.[0]}` : source.slice(0, 2);
+  return letters.toUpperCase();
 }
 
 export function NavUser() {
-  const { isMobile } = useSidebar()
-  const router = useRouter()
-  const [signingOut, setSigningOut] = React.useState(false)
+  const { isMobile } = useSidebar();
+  const router = useRouter();
+  const [signingOut, setSigningOut] = React.useState(false);
   /* Profile is prefetched + hydrated by the dashboard/portal layout, so this
    * resolves from cache on first render (no flicker, no client round-trip). */
   const { data: user } = trpc.user.getProfile.useQuery(undefined, {
     staleTime: 5 * 60 * 1000,
-  })
+  });
   /* Surfaces the /portal link only for platform admins (owner email or portal
    * member); resolved server-side so the owner email never reaches the client. */
   const { data: portalAccess } = trpc.portal.getAccess.useQuery(undefined, {
     staleTime: 5 * 60 * 1000,
-  })
+  });
 
   /* Hold the footer row's height instead of collapsing it — returning null
    * here made the sidebar jump once the profile query resolved. */
-  if (!user) return <SidebarEntrySkeleton />
+  if (!user) return <SidebarEntrySkeleton />;
 
-  const name = user.name || user.email
-  const image = user.image ?? undefined
+  const name = user.name || user.email;
+  const image = user.image ?? undefined;
 
   async function handleSignOut() {
-    if (signingOut) return
-    setSigningOut(true)
-    await authClient.signOut()
-    window.location.assign(AUTH_ROUTES.signIn)
+    if (signingOut) return;
+    setSigningOut(true);
+    await authClient.signOut();
+    window.location.assign(AUTH_ROUTES.signIn);
   }
 
   return (
@@ -99,13 +99,15 @@ export function NavUser() {
             </Avatar>
             <div className="grid flex-1 text-left text-sm leading-tight">
               <span className="truncate font-medium">{name}</span>
-              <span className="truncate text-xs text-muted-foreground">{user.email}</span>
+              <span className="truncate text-xs text-muted-foreground">
+                {user.email}
+              </span>
             </div>
             <ChevronsUpDown className="ml-auto size-4" />
           </DropdownMenuTrigger>
           <DropdownMenuContent
             className="w-(--radix-dropdown-menu-trigger-width) min-w-56 rounded-lg"
-            side={isMobile ? 'bottom' : 'right'}
+            side={isMobile ? "bottom" : "right"}
             align="end"
             sideOffset={4}
           >
@@ -120,7 +122,9 @@ export function NavUser() {
               </Avatar>
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-medium">{name}</span>
-                <span className="truncate text-xs text-muted-foreground">{user.email}</span>
+                <span className="truncate text-xs text-muted-foreground">
+                  {user.email}
+                </span>
               </div>
             </div>
             <DropdownMenuSeparator />
@@ -136,7 +140,9 @@ export function NavUser() {
                 that tab is gated by ROUTE_AUTHORIZATION, so a member without
                 `billing:read` is redirected away; a dedicated profile page is
                 the real fix. */}
-            <DropdownMenuItem onClick={() => router.push('/dashboard/settings')}>
+            <DropdownMenuItem
+              onClick={() => router.push("/dashboard/settings")}
+            >
               <UserIcon />
               Account
             </DropdownMenuItem>
@@ -148,5 +154,5 @@ export function NavUser() {
         </DropdownMenu>
       </SidebarMenuItem>
     </SidebarMenu>
-  )
+  );
 }

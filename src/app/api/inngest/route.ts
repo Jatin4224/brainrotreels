@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -28,16 +22,16 @@
  *        from src/inngest/functions.
  */
 
-import { serve } from 'inngest/next'
+import { serve } from "inngest/next";
 
-import { inngestClient } from '@/lib/adapters/jobs/inngest/client'
-import { INNGEST_FUNCTIONS } from '@/inngest/functions'
+import { inngestClient } from "@/lib/adapters/jobs/inngest/client";
+import { INNGEST_FUNCTIONS } from "@/inngest/functions";
 
-export const runtime = 'nodejs'
-export const maxDuration = 300
-export const dynamic = 'force-dynamic'
+export const runtime = "nodejs";
+export const maxDuration = 300;
+export const dynamic = "force-dynamic";
 
 export const { GET, POST, PUT } = serve({
   client: inngestClient,
   functions: INNGEST_FUNCTIONS,
-})
+});

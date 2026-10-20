@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -31,11 +25,11 @@
  */
 
 /** Matches the lifecycle rule that deletes scratch objects after 24 hours. */
-export const TMP_PREFIX = 'tmp'
+export const TMP_PREFIX = "tmp";
 
-export type LibraryKind = 'backgrounds' | 'music' | 'sfx' | 'avatars'
+export type LibraryKind = "backgrounds" | "music" | "sfx" | "avatars";
 
-export type ProjectAssetKind = 'audio' | 'footage' | 'renders'
+export type ProjectAssetKind = "audio" | "footage" | "renders";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: assertKeySegment, KEY_TRAVERSAL_GUARD
@@ -47,33 +41,42 @@ export type ProjectAssetKind = 'audio' | 'footage' | 'renders'
  */
 export function assertKeySegment(value: string, label: string): string {
   if (value.length === 0) {
-    throw new Error(`[storage] ${label} must not be empty.`)
+    throw new Error(`[storage] ${label} must not be empty.`);
   }
-  if (value.includes('/') || value.includes('\\')) {
-    throw new Error(`[storage] ${label} must not contain a path separator: "${value}".`)
+  if (value.includes("/") || value.includes("\\")) {
+    throw new Error(
+      `[storage] ${label} must not contain a path separator: "${value}".`,
+    );
   }
-  if (value === '.' || value === '..' || value.startsWith('.')) {
-    throw new Error(`[storage] ${label} must not start with a dot: "${value}".`)
+  if (value === "." || value === ".." || value.startsWith(".")) {
+    throw new Error(
+      `[storage] ${label} must not start with a dot: "${value}".`,
+    );
   }
   /* Control characters and raw whitespace break signed-URL round-trips in
    * ways that are tedious to debug. */
   if (/[\x00-\x1f\x7f]/.test(value)) {
-    throw new Error(`[storage] ${label} contains a control character.`)
+    throw new Error(`[storage] ${label} contains a control character.`);
   }
-  return value
+  return value;
 }
 
 function join(...segments: readonly string[]): string {
-  return segments.join('/')
+  return segments.join("/");
 }
 
 /**
  * Shared, non-tenant assets: curated backgrounds, music, sfx, avatar art.
  * Served through the CDN rather than signed — they are public by definition.
  */
-export function libraryKey(kind: LibraryKind, ...rest: readonly string[]): string {
-  rest.forEach((segment, i) => assertKeySegment(segment, `library segment ${i}`))
-  return join('library', kind, ...rest)
+export function libraryKey(
+  kind: LibraryKind,
+  ...rest: readonly string[]
+): string {
+  rest.forEach((segment, i) =>
+    assertKeySegment(segment, `library segment ${i}`),
+  );
+  return join("library", kind, ...rest);
 }
 
 /** A workspace's own upload and its derived variants. */
@@ -82,10 +85,10 @@ export function uploadKey(
   assetId: string,
   filename: string,
 ): string {
-  assertKeySegment(organizationId, 'organizationId')
-  assertKeySegment(assetId, 'assetId')
-  assertKeySegment(filename, 'filename')
-  return join('orgs', organizationId, 'uploads', assetId, filename)
+  assertKeySegment(organizationId, "organizationId");
+  assertKeySegment(assetId, "assetId");
+  assertKeySegment(filename, "filename");
+  return join("orgs", organizationId, "uploads", assetId, filename);
 }
 
 /** Anything produced for one project: narration audio, footage, renders. */
@@ -95,10 +98,12 @@ export function projectKey(
   kind: ProjectAssetKind,
   ...rest: readonly string[]
 ): string {
-  assertKeySegment(organizationId, 'organizationId')
-  assertKeySegment(projectId, 'projectId')
-  rest.forEach((segment, i) => assertKeySegment(segment, `project segment ${i}`))
-  return join('orgs', organizationId, 'projects', projectId, kind, ...rest)
+  assertKeySegment(organizationId, "organizationId");
+  assertKeySegment(projectId, "projectId");
+  rest.forEach((segment, i) =>
+    assertKeySegment(segment, `project segment ${i}`),
+  );
+  return join("orgs", organizationId, "projects", projectId, kind, ...rest);
 }
 
 /** A render's outputs live together so one delete removes the whole set. */
@@ -108,9 +113,9 @@ export function renderKey(
   renderId: string,
   filename: string,
 ): string {
-  assertKeySegment(renderId, 'renderId')
-  assertKeySegment(filename, 'filename')
-  return projectKey(organizationId, projectId, 'renders', renderId, filename)
+  assertKeySegment(renderId, "renderId");
+  assertKeySegment(filename, "filename");
+  return projectKey(organizationId, projectId, "renders", renderId, filename);
 }
 
 /**
@@ -118,9 +123,9 @@ export function renderKey(
  * that must survive a job may be written here.
  */
 export function tmpKey(jobId: string, ...rest: readonly string[]): string {
-  assertKeySegment(jobId, 'jobId')
-  rest.forEach((segment, i) => assertKeySegment(segment, `tmp segment ${i}`))
-  return join(TMP_PREFIX, jobId, ...rest)
+  assertKeySegment(jobId, "jobId");
+  rest.forEach((segment, i) => assertKeySegment(segment, `tmp segment ${i}`));
+  return join(TMP_PREFIX, jobId, ...rest);
 }
 
 /**
@@ -131,11 +136,14 @@ export function tmpKey(jobId: string, ...rest: readonly string[]): string {
  *        asset; this says the key agrees. Cheap, and it turns a corrupted row
  *        into a refusal rather than a cross-tenant read.
  */
-export function isOwnedByOrganization(key: string, organizationId: string): boolean {
-  return key.startsWith(`orgs/${organizationId}/`)
+export function isOwnedByOrganization(
+  key: string,
+  organizationId: string,
+): boolean {
+  return key.startsWith(`orgs/${organizationId}/`);
 }
 
 /** Library objects are readable by everyone; nothing else is, without a check. */
 export function isLibraryKey(key: string): boolean {
-  return key.startsWith('library/')
+  return key.startsWith("library/");
 }

@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -46,22 +40,21 @@
  *        through src/services/credits.service.ts.
  */
 
-import { TRPCError } from '@trpc/server'
+import { TRPCError } from "@trpc/server";
 
-import { createTRPCRouter } from '../init'
-import { protectedProcedure } from '../procedures'
-import { permissions } from '@/lib/permissions'
-import { getStripeClient, isStripeConfigured } from '@/lib/config'
-import { ensureStripeCustomer } from '@/services/payment.service'
-import * as creditsService from '@/services/credits.service'
+import { createTRPCRouter } from "../init";
+import { protectedProcedure } from "../procedures";
+import { permissions } from "@/lib/permissions";
+import { getStripeClient, isStripeConfigured } from "@/lib/config";
+import { ensureStripeCustomer } from "@/services/payment.service";
+import * as creditsService from "@/services/credits.service";
 import {
   CREDIT_PACKS,
   getBalanceSchema,
   listLedgerSchema,
   purchaseCreditsSchema,
-
   type CreditPackKey,
-} from '@/lib/types'
+} from "@/lib/types";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: packPriceId, PACK_PRICE_IS_ENV_DRIVEN
@@ -75,9 +68,9 @@ import {
  * WHERE: `purchase` and `getPacks` below.
  */
 function packPriceId(packKey: CreditPackKey): string | null {
-  const key = CREDIT_PACKS[packKey].priceEnvKey
-  const value = process.env[key]?.trim()
-  return value !== undefined && value.length > 0 ? value : null
+  const key = CREDIT_PACKS[packKey].priceEnvKey;
+  const value = process.env[key]?.trim();
+  return value !== undefined && value.length > 0 ? value : null;
 }
 
 export const creditsRouter = createTRPCRouter({
@@ -90,7 +83,9 @@ export const creditsRouter = createTRPCRouter({
    *        subtract anything in flight.
    * WHERE: The credits screen, and the cost label on every spending button.
    */
-  getBalance: protectedProcedure({ requirePermission: permissions.CREDITS_READ })
+  getBalance: protectedProcedure({
+    requirePermission: permissions.CREDITS_READ,
+  })
     .input(getBalanceSchema)
     .query(async ({ ctx, input }) => ({
       balance: await creditsService.getBalance(input.organizationId, ctx.db),
@@ -131,18 +126,24 @@ export const creditsRouter = createTRPCRouter({
    *        this project".
    * WHERE: The ledger table on the credits screen.
    */
-  listLedger: protectedProcedure({ requirePermission: permissions.CREDITS_READ, paginate: true })
+  listLedger: protectedProcedure({
+    requirePermission: permissions.CREDITS_READ,
+    paginate: true,
+  })
     .input(listLedgerSchema)
     .query(async ({ ctx, input }) => {
-      const { skip, take, pageSize } = ctx.pagination
+      const { skip, take, pageSize } = ctx.pagination;
       const page = await creditsService.listLedger(
         ctx.db,
         { organizationId: input.organizationId, kind: input.kind },
         { skip, take },
-      )
+      );
       /* SERVER_TOTAL_PAGES — against the pageSize the FACTORY clamped to, as
        * in every other paginated list in this codebase. */
-      return { ...page, totalPages: Math.max(1, Math.ceil(page.total / pageSize)) }
+      return {
+        ...page,
+        totalPages: Math.max(1, Math.ceil(page.total / pageSize)),
+      };
     }),
 
   /**
@@ -178,37 +179,37 @@ export const creditsRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       if (!isStripeConfigured()) {
         throw new TRPCError({
-          code: 'PRECONDITION_FAILED',
-          message: 'Payments are not configured, so credits cannot be bought.',
-        })
+          code: "PRECONDITION_FAILED",
+          message: "Payments are not configured, so credits cannot be bought.",
+        });
       }
 
-      const priceId = packPriceId(input.packKey)
+      const priceId = packPriceId(input.packKey);
       if (priceId === null) {
         throw new TRPCError({
-          code: 'PRECONDITION_FAILED',
+          code: "PRECONDITION_FAILED",
           message: `The ${CREDIT_PACKS[input.packKey].label} is not available for purchase.`,
-        })
+        });
       }
 
-      const stripe = getStripeClient()
+      const stripe = getStripeClient();
 
       /* The price is read FROM STRIPE rather than taken from input or from a
        * number in this codebase — Stripe is where money lives, and a local
        * copy of an amount would drift from what the customer is actually
        * charged the first time somebody edits the price in the dashboard. */
-      const price = await stripe.prices.retrieve(priceId)
+      const price = await stripe.prices.retrieve(priceId);
       if (price.unit_amount === null) {
         throw new TRPCError({
-          code: 'PRECONDITION_FAILED',
-          message: 'That credit pack is misconfigured and cannot be bought.',
-        })
+          code: "PRECONDITION_FAILED",
+          message: "That credit pack is misconfigured and cannot be bought.",
+        });
       }
 
       const customerId = await ensureStripeCustomer(input.organizationId, {
         email: ctx.user.email,
         name: ctx.user.name,
-      })
+      });
 
       const intent = await stripe.paymentIntents.create({
         customer: customerId,
@@ -225,19 +226,19 @@ export const creditsRouter = createTRPCRouter({
           credits: String(CREDIT_PACKS[input.packKey].credits),
           userId: ctx.user.id,
         },
-      })
+      });
 
       /* SCA_IS_A_REFUSAL_FOR_NOW — anything but an outright success is treated
        * as "no money arrived", which is the only safe reading of a pending
        * payment when the next thing we would do is hand over credits. */
-      if (intent.status !== 'succeeded') {
+      if (intent.status !== "succeeded") {
         throw new TRPCError({
-          code: 'BAD_REQUEST',
+          code: "BAD_REQUEST",
           message:
-            intent.status === 'requires_action'
-              ? 'This card needs extra verification. Please use a different card.'
-              : 'That payment did not go through. Please try another card.',
-        })
+            intent.status === "requires_action"
+              ? "This card needs extra verification. Please use a different card."
+              : "That payment did not go through. Please try another card.",
+        });
       }
 
       const row = await creditsService.purchase(ctx.db, {
@@ -245,7 +246,7 @@ export const creditsRouter = createTRPCRouter({
         amount: CREDIT_PACKS[input.packKey].credits,
         paymentIntentId: intent.id,
         packKey: input.packKey,
-      })
+      });
 
       return {
         /* Null means the webhook got there first — the credits are already on
@@ -254,6 +255,6 @@ export const creditsRouter = createTRPCRouter({
         granted: row !== null,
         credits: CREDIT_PACKS[input.packKey].credits,
         balance: await creditsService.getBalance(input.organizationId, ctx.db),
-      }
+      };
     }),
-})
+});

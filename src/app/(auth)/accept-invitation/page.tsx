@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -32,48 +26,58 @@
  *        src/lib/adapters/session (PROVIDER_NEUTRAL_SESSION).
  */
 
-import type { Metadata } from 'next'
-import { redirect } from 'next/navigation'
+import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 
-import { getAdapterCapabilities } from '@/lib/adapters'
-import { getServerSession } from '@/lib/adapters/session'
-import { AUTH_ROUTES } from '@/lib/config'
-import { AuthShell } from '@/components/global/auth'
-import { AcceptInvitation } from './_components/accept-invitation'
-import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { getAdapterCapabilities } from "@/lib/adapters";
+import { getServerSession } from "@/lib/adapters/session";
+import { AUTH_ROUTES } from "@/lib/config";
+import { AuthShell } from "@/components/global/auth";
+import { AcceptInvitation } from "./_components/accept-invitation";
+import {
+  Card,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 
 export const metadata: Metadata = {
-  title: 'Accept invitation',
-}
+  title: "Accept invitation",
+};
 
 export default async function AcceptInvitationPage({
   searchParams,
 }: {
-  searchParams: Promise<{ id?: string }>
+  searchParams: Promise<{ id?: string }>;
 }) {
-  const { id } = await searchParams
+  const { id } = await searchParams;
 
   /* PROVIDER_ISOLATION: a provider that owns invitations performs the join from
    * its own ticket link, so this route has nothing to accept. Send the visitor
    * somewhere useful rather than rendering an error about a local invitation
    * that never existed. */
-  const capabilities = await getAdapterCapabilities()
-  if (capabilities.providerInvitations) redirect(AUTH_ROUTES.signIn)
+  const capabilities = await getAdapterCapabilities();
+  if (capabilities.providerInvitations) redirect(AUTH_ROUTES.signIn);
 
-  const session = await getServerSession()
+  const session = await getServerSession();
 
   return (
     <AuthShell>
       {id ? (
-        <AcceptInvitation invitationId={id} viewerEmail={session?.user.email ?? null} />
+        <AcceptInvitation
+          invitationId={id}
+          viewerEmail={session?.user.email ?? null}
+        />
       ) : (
         <Card>
           <CardHeader className="text-center">
             <CardTitle className="text-xl">Invitation unavailable</CardTitle>
-            <CardDescription>This link is missing its invitation reference.</CardDescription>
+            <CardDescription>
+              This link is missing its invitation reference.
+            </CardDescription>
           </CardHeader>
         </Card>
       )}
     </AuthShell>
-  )
+  );
 }

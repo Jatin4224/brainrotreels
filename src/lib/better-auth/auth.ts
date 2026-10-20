@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -21,59 +15,59 @@
  *        src/lib/better-auth/auth-client.ts.
  */
 
-import { betterAuth } from 'better-auth'
-import { prismaAdapter } from 'better-auth/adapters/prisma'
+import { betterAuth } from "better-auth";
+import { prismaAdapter } from "better-auth/adapters/prisma";
 import {
   organization,
   twoFactor,
   admin,
   lastLoginMethod,
-} from 'better-auth/plugins'
-import { nextCookies } from 'better-auth/next-js'
-import { cache } from 'react'
-import { headers } from 'next/headers'
+} from "better-auth/plugins";
+import { nextCookies } from "better-auth/next-js";
+import { cache } from "react";
+import { headers } from "next/headers";
 
-import { prisma } from '@/lib/config'
-import { ac, roles } from '@/lib/better-auth/access-control'
-import { APP_URL, APP_NAME, APP_DOMAIN } from '@/lib/config/branding'
-import { REGISTRATION_OPEN } from '@/lib/config/registration'
-import { isDevEmailFallbackActive } from '@/lib/config/resend'
+import { prisma } from "@/lib/config";
+import { ac, roles } from "@/lib/better-auth/access-control";
+import { APP_URL, APP_NAME, APP_DOMAIN } from "@/lib/config/branding";
+import { REGISTRATION_OPEN } from "@/lib/config/registration";
+import { isDevEmailFallbackActive } from "@/lib/config/resend";
 import {
   sendVerificationEmail as sendVerificationEmailService,
   sendPasswordResetEmail as sendPasswordResetEmailService,
-} from '@/services/email.service'
+} from "@/services/email.service";
 
 function resolveAuthSecret(): string {
-  const secret = process.env['BETTER_AUTH_SECRET']
-  if (secret && secret.length > 0) return secret
+  const secret = process.env["BETTER_AUTH_SECRET"];
+  if (secret && secret.length > 0) return secret;
 
-  if (process.env.NODE_ENV === 'production') {
+  if (process.env.NODE_ENV === "production") {
     throw new Error(
-      '[auth] BETTER_AUTH_SECRET is required in production. ' +
-        'Generate one with: openssl rand -base64 32'
-    )
+      "[auth] BETTER_AUTH_SECRET is required in production. " +
+        "Generate one with: openssl rand -base64 32",
+    );
   }
 
   console.warn(
-    '[auth] BETTER_AUTH_SECRET is not set. Falling back to an INSECURE ' +
-      'development-only key. DO NOT deploy without setting BETTER_AUTH_SECRET.'
-  )
-  return 'dev-only-secret-change-me'
+    "[auth] BETTER_AUTH_SECRET is not set. Falling back to an INSECURE " +
+      "development-only key. DO NOT deploy without setting BETTER_AUTH_SECRET.",
+  );
+  return "dev-only-secret-change-me";
 }
 
 function resolveGoogleProvider():
   | {
       socialProviders: {
         google: {
-          clientId: string
-          clientSecret: string
-          disableImplicitSignUp: true
-        }
-      }
+          clientId: string;
+          clientSecret: string;
+          disableImplicitSignUp: true;
+        };
+      };
     }
   | Record<string, never> {
-  const clientId = process.env['NEXT_PUBLIC_GOOGLE_CLIENT_ID']
-  const clientSecret = process.env['GOOGLE_CLIENT_SECRET']
+  const clientId = process.env["NEXT_PUBLIC_GOOGLE_CLIENT_ID"];
+  const clientSecret = process.env["GOOGLE_CLIENT_SECRET"];
 
   if (clientId && clientSecret) {
     return {
@@ -84,34 +78,34 @@ function resolveGoogleProvider():
           disableImplicitSignUp: true,
         },
       },
-    }
+    };
   }
 
   if (clientId && !clientSecret) {
     console.warn(
-      '[auth] NEXT_PUBLIC_GOOGLE_CLIENT_ID is set but GOOGLE_CLIENT_SECRET ' +
-        'is missing. Google OAuth is DISABLED until both are configured.'
-    )
+      "[auth] NEXT_PUBLIC_GOOGLE_CLIENT_ID is set but GOOGLE_CLIENT_SECRET " +
+        "is missing. Google OAuth is DISABLED until both are configured.",
+    );
   } else if (!clientId && clientSecret) {
     console.warn(
-      '[auth] GOOGLE_CLIENT_SECRET is set but NEXT_PUBLIC_GOOGLE_CLIENT_ID ' +
-        'is missing. Google OAuth is DISABLED until both are configured.'
-    )
+      "[auth] GOOGLE_CLIENT_SECRET is set but NEXT_PUBLIC_GOOGLE_CLIENT_ID " +
+        "is missing. Google OAuth is DISABLED until both are configured.",
+    );
   }
 
-  return {}
+  return {};
 }
 
 const APP_DOMAIN_CONFIGURED =
-  typeof process.env['NEXT_PUBLIC_APP_DOMAIN'] === 'string' &&
-  process.env['NEXT_PUBLIC_APP_DOMAIN'].length > 0
+  typeof process.env["NEXT_PUBLIC_APP_DOMAIN"] === "string" &&
+  process.env["NEXT_PUBLIC_APP_DOMAIN"].length > 0;
 
 /* Cross-subdomain mode + the matching trustedOrigins wildcard are both
  * gated on NEXT_PUBLIC_APP_DOMAIN — advertising cross-subdomain trust without
  * the env to back it up is a footgun. */
 const crossSubDomainCookies = APP_DOMAIN_CONFIGURED
   ? { enabled: true as const, domain: `.${APP_DOMAIN}` }
-  : { enabled: false as const }
+  : { enabled: false as const };
 
 /**
  * SOURCE OF TRUTH KEYWORDS: auth
@@ -133,8 +127,8 @@ export const auth = betterAuth({
         before: async () => {
           if (!REGISTRATION_OPEN) {
             throw new Error(
-              'Registration is currently closed. This platform is invitation-only.'
-            )
+              "Registration is currently closed. This platform is invitation-only.",
+            );
           }
         },
       },
@@ -142,7 +136,7 @@ export const auth = betterAuth({
   },
 
   database: prismaAdapter(prisma, {
-    provider: 'postgresql',
+    provider: "postgresql",
   }),
 
   /* requireEmailVerification closes the account-linking takeover where an
@@ -154,18 +148,33 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
     requireEmailVerification: !isDevEmailFallbackActive(),
-    async sendResetPassword({ user, url }: { user: { email: string }; url: string }) {
+    async sendResetPassword({
+      user,
+      url,
+    }: {
+      user: { email: string };
+      url: string;
+    }) {
       /* Dev convenience: log the link too so local flows work without Resend
        * (sendPasswordResetEmailService no-ops when RESEND_API_KEY is unset). */
-      console.info(`[auth] password reset for ${user.email}: ${url}`)
-      await sendPasswordResetEmailService({ to: user.email, resetLink: url })
+      console.info(`[auth] password reset for ${user.email}: ${url}`);
+      await sendPasswordResetEmailService({ to: user.email, resetLink: url });
     },
   },
 
   emailVerification: {
-    sendVerificationEmail: async ({ user, url }: { user: { email: string }; url: string }) => {
-      console.info(`[auth] email verification for ${user.email}: ${url}`)
-      await sendVerificationEmailService({ to: user.email, verificationLink: url })
+    sendVerificationEmail: async ({
+      user,
+      url,
+    }: {
+      user: { email: string };
+      url: string;
+    }) => {
+      console.info(`[auth] email verification for ${user.email}: ${url}`);
+      await sendVerificationEmailService({
+        to: user.email,
+        verificationLink: url,
+      });
     },
     sendOnSignUp: true,
     autoSignInAfterVerification: true,
@@ -178,7 +187,7 @@ export const auth = betterAuth({
     organization({
       ac,
       roles,
-      creatorRole: 'owner',
+      creatorRole: "owner",
       allowUserToCreateOrganization: true,
       dynamicAccessControl: { enabled: true },
       async sendInvitationEmail() {},
@@ -193,21 +202,21 @@ export const auth = betterAuth({
   advanced: {
     crossSubDomainCookies,
     useSecureCookies:
-      process.env.NODE_ENV === 'production' &&
-      !process.env['NEXT_PUBLIC_APP_URL']?.startsWith('http://'),
+      process.env.NODE_ENV === "production" &&
+      !process.env["NEXT_PUBLIC_APP_URL"]?.startsWith("http://"),
   },
 
   secret: resolveAuthSecret(),
 
-  baseURL: process.env['BETTER_AUTH_URL'] || APP_URL,
+  baseURL: process.env["BETTER_AUTH_URL"] || APP_URL,
 
   trustedOrigins:
-    process.env.NODE_ENV === 'development'
-      ? ['*']
+    process.env.NODE_ENV === "development"
+      ? ["*"]
       : APP_DOMAIN_CONFIGURED
         ? [APP_URL, `https://*.${APP_DOMAIN}`]
         : [APP_URL],
-})
+});
 
 /**
  * SOURCE OF TRUTH KEYWORDS: Session, User
@@ -217,8 +226,8 @@ export const auth = betterAuth({
  *        Better Auth schema is the source of truth (see RULE 1 in CLAUDE.md).
  * WHERE: Consumed by tRPC context and any server code typing the session.
  */
-export type Session = typeof auth.$Infer.Session
-export type User = typeof auth.$Infer.Session.user
+export type Session = typeof auth.$Infer.Session;
+export type User = typeof auth.$Infer.Session.user;
 
 /**
  * SOURCE OF TRUTH KEYWORDS: getCachedSession
@@ -236,6 +245,6 @@ export type User = typeof auth.$Infer.Session.user
  * Prisma pool runs out (P2024). Never cache sessions in Redis here —
  * revocations must reflect immediately. */
 export const getCachedSession = cache(async () => {
-  const requestHeaders = await headers()
-  return auth.api.getSession({ headers: requestHeaders })
-})
+  const requestHeaders = await headers();
+  return auth.api.getSession({ headers: requestHeaders });
+});

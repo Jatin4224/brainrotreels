@@ -1,14 +1,8 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
-'use client'
+"use client";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: TeamSwitcher
@@ -24,9 +18,9 @@
  *        + useActiveOrganization; mutates via authClient.organization.setActive.
  */
 
-import * as React from 'react'
-import { useRouter } from 'next/navigation'
-import { ChevronsUpDown, Plus, Check, GalleryVerticalEnd } from 'lucide-react'
+import * as React from "react";
+import { useRouter } from "next/navigation";
+import { ChevronsUpDown, Plus, Check, GalleryVerticalEnd } from "lucide-react";
 
 import {
   DropdownMenu,
@@ -36,45 +30,46 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
+} from "@/components/ui/dropdown-menu";
 import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
   useSidebar,
-} from '@/components/ui/sidebar'
-import { trpc } from '@/trpc/react-provider'
-import { authClient } from '@/lib/better-auth/auth-client'
-import { useActiveOrganization } from '@/hooks/use-active-organization'
-import { ROUTES } from '@/lib/config'
-import { SidebarEntrySkeleton } from '../sidebar-skeletons'
+} from "@/components/ui/sidebar";
+import { trpc } from "@/trpc/react-provider";
+import { authClient } from "@/lib/better-auth/auth-client";
+import { useActiveOrganization } from "@/hooks/use-active-organization";
+import { ROUTES } from "@/lib/config";
+import { SidebarEntrySkeleton } from "../sidebar-skeletons";
 
 export function TeamSwitcher() {
-  const router = useRouter()
-  const { isMobile } = useSidebar()
-  const { activeOrganization } = useActiveOrganization()
-  const { data: organizations } = trpc.organization.getUserOrganizations.useQuery(undefined, {
-    staleTime: 5 * 60 * 1000,
-  })
-  const [switchingId, setSwitchingId] = React.useState<string | null>(null)
+  const router = useRouter();
+  const { isMobile } = useSidebar();
+  const { activeOrganization } = useActiveOrganization();
+  const { data: organizations } =
+    trpc.organization.getUserOrganizations.useQuery(undefined, {
+      staleTime: 5 * 60 * 1000,
+    });
+  const [switchingId, setSwitchingId] = React.useState<string | null>(null);
 
   async function handleSwitch(org: { id: string; slug: string }) {
-    if (org.id === activeOrganization?.id || switchingId) return
-    setSwitchingId(org.id)
+    if (org.id === activeOrganization?.id || switchingId) return;
+    setSwitchingId(org.id);
     await authClient.organization.setActive({
       organizationId: org.id,
       organizationSlug: org.slug,
-    })
+    });
     /* Hard reload so every org-scoped server query re-resolves the new active
      * org from the refreshed session. */
-    window.location.reload()
+    window.location.reload();
   }
 
   /* Before the active org resolves, reserve the row rather than rendering a
    * placeholder label that then swaps — the text change was a visible flash. */
-  if (!activeOrganization) return <SidebarEntrySkeleton />
+  if (!activeOrganization) return <SidebarEntrySkeleton />;
 
-  const label = activeOrganization.name
+  const label = activeOrganization.name;
 
   return (
     <SidebarMenu>
@@ -104,7 +99,7 @@ export function TeamSwitcher() {
           <DropdownMenuContent
             className="w-(--radix-dropdown-menu-trigger-width) min-w-56 rounded-lg"
             align="start"
-            side={isMobile ? 'bottom' : 'right'}
+            side={isMobile ? "bottom" : "right"}
             sideOffset={4}
           >
             <DropdownMenuGroup>
@@ -125,15 +120,20 @@ export function TeamSwitcher() {
               ))}
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="gap-2 p-2" onClick={() => router.push(ROUTES.onboarding)}>
+            <DropdownMenuItem
+              className="gap-2 p-2"
+              onClick={() => router.push(ROUTES.onboarding)}
+            >
               <div className="flex size-6 items-center justify-center rounded-md border bg-transparent">
                 <Plus className="size-4" />
               </div>
-              <span className="text-muted-foreground font-medium">New workspace</span>
+              <span className="text-muted-foreground font-medium">
+                New workspace
+              </span>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </SidebarMenuItem>
     </SidebarMenu>
-  )
+  );
 }

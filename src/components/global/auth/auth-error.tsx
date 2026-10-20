@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -33,11 +27,11 @@
 
 export interface AuthErrorProps {
   /** The message, or null/empty to render nothing. */
-  error: string | null | undefined
+  error: string | null | undefined;
 }
 
 export function AuthError({ error }: AuthErrorProps) {
-  if (!error) return null
+  if (!error) return null;
   return (
     <div
       role="alert"
@@ -45,5 +39,5 @@ export function AuthError({ error }: AuthErrorProps) {
     >
       {error}
     </div>
-  )
+  );
 }

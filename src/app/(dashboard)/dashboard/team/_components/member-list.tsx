@@ -1,14 +1,8 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
-'use client'
+"use client";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: MemberList, COPYABLE_INVITE_LINK, handleCopyLink,
@@ -34,23 +28,29 @@
  *        (src/trpc/routers/member.ts).
  */
 
-import * as React from 'react'
-import { MoreHorizontalIcon, Loader2Icon, RefreshCw, Mail, LinkIcon } from 'lucide-react'
-import { toast } from 'sonner'
+import * as React from "react";
+import {
+  MoreHorizontalIcon,
+  Loader2Icon,
+  RefreshCw,
+  Mail,
+  LinkIcon,
+} from "lucide-react";
+import { toast } from "sonner";
 
-import { trpc } from '@/trpc/react-provider'
-import { useActiveOrganization } from '@/hooks/use-active-organization'
-import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard'
-import { permissions } from '@/lib/permissions'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
+import { trpc } from "@/trpc/react-provider";
+import { useActiveOrganization } from "@/hooks/use-active-organization";
+import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
+import { permissions } from "@/lib/permissions";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
+} from "@/components/ui/dropdown-menu";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -60,9 +60,9 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
-import { memberInitials } from './ownership-card'
-import type { OrganizationMember } from './member-types'
+} from "@/components/ui/alert-dialog";
+import { memberInitials } from "./ownership-card";
+import type { OrganizationMember } from "./member-types";
 
 export function MemberList({
   organizationId,
@@ -70,65 +70,74 @@ export function MemberList({
   onEditMember,
   onRemoveMember,
 }: {
-  organizationId: string
-  members: OrganizationMember[]
-  onEditMember: (member: OrganizationMember) => void
-  onRemoveMember: (memberId: string) => void
+  organizationId: string;
+  members: OrganizationMember[];
+  onEditMember: (member: OrganizationMember) => void;
+  onRemoveMember: (memberId: string) => void;
 }) {
-  const { hasPermission } = useActiveOrganization()
-  const utils = trpc.useUtils()
+  const { hasPermission } = useActiveOrganization();
+  const utils = trpc.useUtils();
 
-  const canUpdate = hasPermission(permissions.MEMBER_UPDATE)
-  const canDelete = hasPermission(permissions.MEMBER_DELETE)
-  const canCancel = hasPermission(permissions.INVITATION_CANCEL)
-  const canResend = hasPermission(permissions.INVITATION_CREATE)
+  const canUpdate = hasPermission(permissions.MEMBER_UPDATE);
+  const canDelete = hasPermission(permissions.MEMBER_DELETE);
+  const canCancel = hasPermission(permissions.INVITATION_CANCEL);
+  const canResend = hasPermission(permissions.INVITATION_CREATE);
 
-  const [removeTarget, setRemoveTarget] = React.useState<OrganizationMember | null>(null)
-  const [cancelTarget, setCancelTarget] = React.useState<OrganizationMember | null>(null)
-  const [processingInviteId, setProcessingInviteId] = React.useState<string | null>(null)
-  const { copy } = useCopyToClipboard()
+  const [removeTarget, setRemoveTarget] =
+    React.useState<OrganizationMember | null>(null);
+  const [cancelTarget, setCancelTarget] =
+    React.useState<OrganizationMember | null>(null);
+  const [processingInviteId, setProcessingInviteId] = React.useState<
+    string | null
+  >(null);
+  const { copy } = useCopyToClipboard();
 
-  const resend = trpc.invitation.resend.useMutation()
-  const cancel = trpc.invitation.cancel.useMutation()
+  const resend = trpc.invitation.resend.useMutation();
+  const cancel = trpc.invitation.cancel.useMutation();
 
   /* Toast rather than an inline tick: the dropdown closes on select, so the
    * item that would show the tick is gone before it could be seen. */
   async function handleCopyLink(invitationLink: string) {
-    const ok = await copy(invitationLink)
-    if (ok) toast.success('Invitation link copied')
-    else toast.error('Could not copy the link. Copy it from the address below.', {
-      description: invitationLink,
-    })
+    const ok = await copy(invitationLink);
+    if (ok) toast.success("Invitation link copied");
+    else
+      toast.error("Could not copy the link. Copy it from the address below.", {
+        description: invitationLink,
+      });
   }
 
   async function handleResend(invitationId: string) {
-    setProcessingInviteId(invitationId)
+    setProcessingInviteId(invitationId);
     try {
-      await resend.mutateAsync({ organizationId, invitationId })
-      toast.success('Invitation resent')
+      await resend.mutateAsync({ organizationId, invitationId });
+      toast.success("Invitation resent");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to resend invitation')
+      toast.error(
+        err instanceof Error ? err.message : "Failed to resend invitation",
+      );
     } finally {
-      setProcessingInviteId(null)
+      setProcessingInviteId(null);
     }
   }
 
   async function confirmCancel() {
-    if (!cancelTarget?.invitationId) return
-    const invitationId = cancelTarget.invitationId
-    setCancelTarget(null)
-    setProcessingInviteId(invitationId)
+    if (!cancelTarget?.invitationId) return;
+    const invitationId = cancelTarget.invitationId;
+    setCancelTarget(null);
+    setProcessingInviteId(invitationId);
     try {
-      await cancel.mutateAsync({ organizationId, invitationId })
+      await cancel.mutateAsync({ organizationId, invitationId });
       await Promise.all([
         utils.member.list.invalidate({ organizationId }),
         utils.usage.invalidate(),
-      ])
-      toast.success('Invitation canceled')
+      ]);
+      toast.success("Invitation canceled");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to cancel invitation')
+      toast.error(
+        err instanceof Error ? err.message : "Failed to cancel invitation",
+      );
     } finally {
-      setProcessingInviteId(null)
+      setProcessingInviteId(null);
     }
   }
 
@@ -137,16 +146,20 @@ export function MemberList({
       <div className="flex flex-col items-center justify-center py-12 text-center">
         <p className="text-sm text-muted-foreground">No members found</p>
       </div>
-    )
+    );
   }
 
   return (
     <>
       <div className="space-y-3">
         {members.map((member) => {
-          const isPending = member.isPending
-          const processing = member.invitationId !== null && processingInviteId === member.invitationId
-          const showMenu = isPending ? canResend || canCancel : canUpdate || canDelete
+          const isPending = member.isPending;
+          const processing =
+            member.invitationId !== null &&
+            processingInviteId === member.invitationId;
+          const showMenu = isPending
+            ? canResend || canCancel
+            : canUpdate || canDelete;
           return (
             <div
               key={member.id}
@@ -154,12 +167,23 @@ export function MemberList({
             >
               <div className="flex min-w-0 flex-1 items-center gap-3">
                 <Avatar className="size-10 shrink-0">
-                  {member.user.image ? <AvatarImage src={member.user.image} alt={member.user.name} /> : null}
-                  <AvatarFallback>{memberInitials(member.user.name)}</AvatarFallback>
+                  {member.user.image ? (
+                    <AvatarImage
+                      src={member.user.image}
+                      alt={member.user.name}
+                    />
+                  ) : null}
+                  <AvatarFallback>
+                    {memberInitials(member.user.name)}
+                  </AvatarFallback>
                 </Avatar>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">{member.user.name}</p>
-                  <p className="truncate text-xs text-muted-foreground">{member.user.email}</p>
+                  <p className="truncate text-sm font-medium">
+                    {member.user.name}
+                  </p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {member.user.email}
+                  </p>
                 </div>
               </div>
 
@@ -167,23 +191,34 @@ export function MemberList({
                 {isPending ? (
                   <>
                     {member.roleName ? (
-                      <Badge variant="secondary" className="hidden capitalize sm:inline-flex">
+                      <Badge
+                        variant="secondary"
+                        className="hidden capitalize sm:inline-flex"
+                      >
                         {member.roleName}
                       </Badge>
                     ) : null}
-                    <Badge variant="secondary" className="flex items-center gap-1">
+                    <Badge
+                      variant="secondary"
+                      className="flex items-center gap-1"
+                    >
                       <Mail className="h-3 w-3" />
                       Pending
                     </Badge>
                   </>
                 ) : member.roleName ? (
-                  <Badge variant="secondary" className="hidden capitalize sm:inline-flex">
+                  <Badge
+                    variant="secondary"
+                    className="hidden capitalize sm:inline-flex"
+                  >
                     {member.roleName}
                   </Badge>
                 ) : member.permissions.length > 0 ? (
                   <Badge variant="outline" className="hidden sm:inline-flex">
-                    {member.permissions.length}{' '}
-                    {member.permissions.length === 1 ? 'permission' : 'permissions'}
+                    {member.permissions.length}{" "}
+                    {member.permissions.length === 1
+                      ? "permission"
+                      : "permissions"}
                   </Badge>
                 ) : (
                   <Badge variant="outline" className="hidden sm:inline-flex">
@@ -194,7 +229,14 @@ export function MemberList({
                 {showMenu ? (
                   <DropdownMenu>
                     <DropdownMenuTrigger
-                      render={<Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" disabled={processing} />}
+                      render={
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 shrink-0"
+                          disabled={processing}
+                        />
+                      }
                     >
                       {processing ? (
                         <Loader2Icon className="h-4 w-4 animate-spin" />
@@ -209,7 +251,8 @@ export function MemberList({
                           {member.invitationLink ? (
                             <DropdownMenuItem
                               onClick={() =>
-                                member.invitationLink && handleCopyLink(member.invitationLink)
+                                member.invitationLink &&
+                                handleCopyLink(member.invitationLink)
                               }
                             >
                               <LinkIcon className="mr-2 h-4 w-4" />
@@ -218,7 +261,10 @@ export function MemberList({
                           ) : null}
                           {canResend ? (
                             <DropdownMenuItem
-                              onClick={() => member.invitationId && handleResend(member.invitationId)}
+                              onClick={() =>
+                                member.invitationId &&
+                                handleResend(member.invitationId)
+                              }
                               disabled={processing}
                             >
                               <RefreshCw className="mr-2 h-4 w-4" />
@@ -237,7 +283,9 @@ export function MemberList({
                       ) : (
                         <>
                           {canUpdate ? (
-                            <DropdownMenuItem onClick={() => onEditMember(member)}>
+                            <DropdownMenuItem
+                              onClick={() => onEditMember(member)}
+                            >
                               Edit permissions
                             </DropdownMenuItem>
                           ) : null}
@@ -256,17 +304,21 @@ export function MemberList({
                 ) : null}
               </div>
             </div>
-          )
+          );
         })}
       </div>
 
-      <AlertDialog open={removeTarget !== null} onOpenChange={(open) => !open && setRemoveTarget(null)}>
+      <AlertDialog
+        open={removeTarget !== null}
+        onOpenChange={(open) => !open && setRemoveTarget(null)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Remove member?</AlertDialogTitle>
             <AlertDialogDescription>
-              Remove <strong>{removeTarget?.user.name}</strong> ({removeTarget?.user.email}) from your
-              organization? They lose access to all organization resources.
+              Remove <strong>{removeTarget?.user.name}</strong> (
+              {removeTarget?.user.email}) from your organization? They lose
+              access to all organization resources.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -274,8 +326,8 @@ export function MemberList({
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() => {
-                if (removeTarget) onRemoveMember(removeTarget.id)
-                setRemoveTarget(null)
+                if (removeTarget) onRemoveMember(removeTarget.id);
+                setRemoveTarget(null);
               }}
             >
               Remove member
@@ -284,13 +336,17 @@ export function MemberList({
         </AlertDialogContent>
       </AlertDialog>
 
-      <AlertDialog open={cancelTarget !== null} onOpenChange={(open) => !open && setCancelTarget(null)}>
+      <AlertDialog
+        open={cancelTarget !== null}
+        onOpenChange={(open) => !open && setCancelTarget(null)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Cancel invitation?</AlertDialogTitle>
             <AlertDialogDescription>
-              Cancel the invitation for <strong>{cancelTarget?.user.email}</strong>? They will no longer be
-              able to accept it.
+              Cancel the invitation for{" "}
+              <strong>{cancelTarget?.user.email}</strong>? They will no longer
+              be able to accept it.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -305,5 +361,5 @@ export function MemberList({
         </AlertDialogContent>
       </AlertDialog>
     </>
-  )
+  );
 }

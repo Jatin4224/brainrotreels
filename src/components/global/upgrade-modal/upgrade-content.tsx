@@ -1,14 +1,8 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
-'use client'
+"use client";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: UpgradeContent, UpgradeContentProps, UpgradeStep,
@@ -40,9 +34,9 @@
  *        <UpgradeModalProvider /> mounts once for the whole app.
  */
 
-import * as React from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
-import confetti from 'canvas-confetti'
+import * as React from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import confetti from "canvas-confetti";
 import {
   CheckIcon,
   ChevronLeftIcon,
@@ -52,10 +46,10 @@ import {
   LockIcon,
   PlusIcon,
   XIcon,
-} from 'lucide-react'
-import { toast } from 'sonner'
+} from "lucide-react";
+import { toast } from "sonner";
 
-import { cn, formatCurrency } from '@/lib/utils'
+import { cn, formatCurrency } from "@/lib/utils";
 import {
   BRANDING,
   PLANS,
@@ -63,35 +57,53 @@ import {
   isPaidPlan,
   type BillingInterval,
   type PlanKey,
-} from '@/lib/config'
-import { getPlanFeatureRows, type ResourceKey } from '@/lib/resources'
-import { isPurchasablePlan, type AvailablePlan, type PurchasablePlanKey } from '@/lib/types'
-import { permissions } from '@/lib/permissions'
-import { trpc } from '@/trpc/react-provider'
-import { useActiveOrganization } from '@/hooks/use-active-organization'
-import { AddPaymentMethodDialog, PaymentMethodOption } from '@/components/global/billing'
-import { UsageLimitList } from '@/components/global/usage-limit-list'
-import { Button } from '@/components/ui/button'
-import { Label } from '@/components/ui/label'
-import { Skeleton } from '@/components/ui/skeleton'
-import { PricingCard, PricingNoiseFilter, type PriceDisplay } from './pricing-card'
-import { FeatureComparisonTable } from './feature-comparison-table'
-import { PricingGridFrame, DASHED_CELL_STYLE, RIGHT_FADE_MASK } from './pricing-grid-frame'
-import { calculateSavings } from './pricing-math'
-import { ComparisonTableSkeleton, PricingCardSkeleton } from './pricing-skeletons'
+} from "@/lib/config";
+import { getPlanFeatureRows, type ResourceKey } from "@/lib/resources";
+import {
+  isPurchasablePlan,
+  type AvailablePlan,
+  type PurchasablePlanKey,
+} from "@/lib/types";
+import { permissions } from "@/lib/permissions";
+import { trpc } from "@/trpc/react-provider";
+import { useActiveOrganization } from "@/hooks/use-active-organization";
+import {
+  AddPaymentMethodDialog,
+  PaymentMethodOption,
+} from "@/components/global/billing";
+import { UsageLimitList } from "@/components/global/usage-limit-list";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  PricingCard,
+  PricingNoiseFilter,
+  type PriceDisplay,
+} from "./pricing-card";
+import { FeatureComparisonTable } from "./feature-comparison-table";
+import {
+  PricingGridFrame,
+  DASHED_CELL_STYLE,
+  RIGHT_FADE_MASK,
+} from "./pricing-grid-frame";
+import { calculateSavings } from "./pricing-math";
+import {
+  ComparisonTableSkeleton,
+  PricingCardSkeleton,
+} from "./pricing-skeletons";
 
 export interface UpgradeContentProps {
-  organizationId: string
+  organizationId: string;
   /** The resource whose gate opened this, when a gate did. */
-  resource?: ResourceKey | undefined
+  resource?: ResourceKey | undefined;
   /** The registry's upgrade sentence for that resource, already interpolated. */
-  upgradeMessage?: string | undefined
+  upgradeMessage?: string | undefined;
   /** Plan to open on, when the caller's own copy already named one. */
-  plan?: PlanKey | undefined
-  onClose?: (() => void) | undefined
+  plan?: PlanKey | undefined;
+  onClose?: (() => void) | undefined;
 }
 
-type UpgradeStep = 'select-plan' | 'payment' | 'success'
+type UpgradeStep = "select-plan" | "payment" | "success";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: UserScenario, UPGRADE_SCENARIO_COPY
@@ -100,17 +112,17 @@ type UpgradeStep = 'select-plan' | 'payment' | 'success'
  * BRANDING.upgradeModal.scenarios — the keys here and there are the same set,
  * so adding a situation is one entry in each.
  */
-type UserScenario = keyof typeof BRANDING.upgradeModal.scenarios
+type UserScenario = keyof typeof BRANDING.upgradeModal.scenarios;
 
 /* Seconds the success step waits before reloading. The new plan changes gates,
  * nav, and quotas across the whole shell, so a reload is the honest way to
  * re-derive all of it — the countdown exists so it never feels like a crash. */
-const SUCCESS_RELOAD_SECONDS = 5
+const SUCCESS_RELOAD_SECONDS = 5;
 
 /* Placeholder columns while the catalogue loads. Three, not the real count,
  * because the real count is not known yet — the fade mask on the right says
  * "there may be more" rather than committing to a number. */
-const SKELETON_COLUMN_COUNT = 3
+const SKELETON_COLUMN_COUNT = 3;
 
 export function UpgradeContent({
   organizationId,
@@ -119,80 +131,91 @@ export function UpgradeContent({
   plan,
   onClose,
 }: UpgradeContentProps) {
-  const [step, setStep] = React.useState<UpgradeStep>('select-plan')
+  const [step, setStep] = React.useState<UpgradeStep>("select-plan");
   /* Both selections are stored as OVERRIDES and resolved against a derived
    * default below. Storing the resolved value instead would need an effect to
    * seed it once the data lands, which is a render-after-render round trip and
    * a stale value the moment the underlying data changes. */
-  const [planOverride, setPlanOverride] = React.useState<PlanKey | null>(plan ?? null)
-  const [billingInterval, setBillingInterval] = React.useState<BillingInterval>('monthly')
-  const [cardOverride, setCardOverride] = React.useState<string | null>(null)
-  const [isAddingCard, setIsAddingCard] = React.useState(false)
-  const [countdown, setCountdown] = React.useState(SUCCESS_RELOAD_SECONDS)
+  const [planOverride, setPlanOverride] = React.useState<PlanKey | null>(
+    plan ?? null,
+  );
+  const [billingInterval, setBillingInterval] =
+    React.useState<BillingInterval>("monthly");
+  const [cardOverride, setCardOverride] = React.useState<string | null>(null);
+  const [isAddingCard, setIsAddingCard] = React.useState(false);
+  const [countdown, setCountdown] = React.useState(SUCCESS_RELOAD_SECONDS);
 
-  const { hasPermission } = useActiveOrganization()
-  const canReadBilling = hasPermission(permissions.BILLING_READ)
+  const { hasPermission } = useActiveOrganization();
+  const canReadBilling = hasPermission(permissions.BILLING_READ);
 
-  const utils = trpc.useUtils()
+  const utils = trpc.useUtils();
 
   // ── Reads ────────────────────────────────────────────────────────────────
   /* Catalogue + amounts. Open to every member — see billing.getAvailablePlans. */
   const plansQuery = trpc.billing.getAvailablePlans.useQuery(undefined, {
     staleTime: 1000 * 60 * 10,
-  })
+  });
   /* Whether this OPEN started with the catalogue already known. A lazy initial
    * state, not a derived value: it must answer for the first render forever
    * after, and it must not follow the query once it resolves. */
-  const [hadPlansOnMount] = React.useState(() => plansQuery.data !== undefined)
+  const [hadPlansOnMount] = React.useState(() => plansQuery.data !== undefined);
 
   /* Entitlement state from the SAME read the gates use, so the modal and the
    * server can never disagree about which plan the org is on. */
-  const gatesQuery = trpc.usage.getFeatureGates.useQuery({ organizationId })
+  const gatesQuery = trpc.usage.getFeatureGates.useQuery({ organizationId });
 
   /* Interval + whether a subscription already exists — billing-permissioned,
    * because it is tenant billing data rather than a price list. */
   const subscriptionQuery = trpc.billing.getSubscription.useQuery(
     { organizationId },
-    { enabled: canReadBilling }
-  )
+    { enabled: canReadBilling },
+  );
 
   const trialQuery = trpc.billing.getTrialEligibility.useQuery(undefined, {
     staleTime: 1000 * 60 * 10,
-  })
+  });
 
   const paymentMethodsQuery = trpc.billing.getPaymentMethods.useQuery(
     { organizationId },
-    { enabled: canReadBilling && step === 'payment' }
-  )
+    { enabled: canReadBilling && step === "payment" },
+  );
 
   /* WHOLE_LADDER_IN_ONE_READ — every plan's blockers up front, so a card can be
    * marked before it is clicked. */
-  const blockerQuery = trpc.usage.getDowngradeBlockerMap.useQuery({ organizationId })
+  const blockerQuery = trpc.usage.getDowngradeBlockerMap.useQuery({
+    organizationId,
+  });
 
   // ── Derived state ────────────────────────────────────────────────────────
-  const currentTier: PlanKey = gatesQuery.data?.tier ?? 'free'
-  const isCurrentlyOnTrial = gatesQuery.data?.isOnTrial ?? false
-  const hasSubscription = subscriptionQuery.data?.subscription != null
-  const currentInterval = subscriptionQuery.data?.billingInterval ?? null
+  const currentTier: PlanKey = gatesQuery.data?.tier ?? "free";
+  const isCurrentlyOnTrial = gatesQuery.data?.isOnTrial ?? false;
+  const hasSubscription = subscriptionQuery.data?.subscription != null;
+  const currentInterval = subscriptionQuery.data?.billingInterval ?? null;
   /* User-level trial history. The card-level check still runs server-side at
    * purchase; this is the half that is knowable before a card is picked. */
-  const hasUsedTrial = trialQuery.data?.hasUsedTrial ?? false
+  const hasUsedTrial = trialQuery.data?.hasUsedTrial ?? false;
 
   /* Buying is two different permissions depending on which mutation this will
    * become — mirrored from the router so the UI never offers a doomed click. */
   const canPurchase =
     canReadBilling &&
-    hasPermission(hasSubscription ? permissions.BILLING_UPDATE : permissions.BILLING_CREATE)
+    hasPermission(
+      hasSubscription ? permissions.BILLING_UPDATE : permissions.BILLING_CREATE,
+    );
 
   const plans = React.useMemo<AvailablePlan[]>(() => {
-    const available = plansQuery.data ?? []
-    return available
-      .filter((plan) => plan.showPlan)
-      /* A trial already consumed must not be advertised: the server refuses to
-       * grant a second one, so showing the badge would promise a free start and
-       * then charge for it. */
-      .map((plan) => (hasUsedTrial && plan.trialDays > 0 ? { ...plan, trialDays: 0 } : plan))
-  }, [plansQuery.data, hasUsedTrial])
+    const available = plansQuery.data ?? [];
+    return (
+      available
+        .filter((plan) => plan.showPlan)
+        /* A trial already consumed must not be advertised: the server refuses to
+         * grant a second one, so showing the badge would promise a free start and
+         * then charge for it. */
+        .map((plan) =>
+          hasUsedTrial && plan.trialDays > 0 ? { ...plan, trialDays: 0 } : plan,
+        )
+    );
+  }, [plansQuery.data, hasUsedTrial]);
 
   /* Open on the obvious next step up; an explicit pick always wins.
    * DERIVED FROM CONFIG, NOT FROM THE PRICE QUERY: which plan comes after the
@@ -200,44 +223,52 @@ export function UpgradeContent({
    * so the selection — and everything keyed off it, including the header copy —
    * is final on the first render instead of arriving with the amounts. */
   const defaultPlan = React.useMemo<PlanKey | null>(() => {
-    const sellable = PLAN_ORDER.filter((key) => PLANS[key].showPlan && isPaidPlan(key))
+    const sellable = PLAN_ORDER.filter(
+      (key) => PLANS[key].showPlan && isPaidPlan(key),
+    );
     /* Mid-trial the destination is the plan being TRIALLED — converting is the
      * decision in front of the user, and pre-selecting the tier above it sells
      * past what they came to buy. */
-    if (isCurrentlyOnTrial && sellable.includes(currentTier)) return currentTier
-    const currentIndex = PLAN_ORDER.indexOf(currentTier)
-    const next = sellable.find((key) => PLAN_ORDER.indexOf(key) > currentIndex)
-    return next ?? sellable[sellable.length - 1] ?? null
-  }, [currentTier, isCurrentlyOnTrial])
-  const selectedPlan = planOverride ?? defaultPlan
+    if (isCurrentlyOnTrial && sellable.includes(currentTier))
+      return currentTier;
+    const currentIndex = PLAN_ORDER.indexOf(currentTier);
+    const next = sellable.find((key) => PLAN_ORDER.indexOf(key) > currentIndex);
+    return next ?? sellable[sellable.length - 1] ?? null;
+  }, [currentTier, isCurrentlyOnTrial]);
+  const selectedPlan = planOverride ?? defaultPlan;
 
   /* Charge the card the customer already pays with unless they pick another. */
   const paymentMethodId =
-    cardOverride ?? paymentMethodsQuery.data?.find((method) => method.isDefault)?.id ?? ''
+    cardOverride ??
+    paymentMethodsQuery.data?.find((method) => method.isDefault)?.id ??
+    "";
 
   React.useEffect(() => {
-    if (step !== 'success') return
+    if (step !== "success") return;
     const timer = window.setInterval(() => {
       setCountdown((previous) => {
         if (previous <= 1) {
-          window.location.reload()
-          return 0
+          window.location.reload();
+          return 0;
         }
-        return previous - 1
-      })
-    }, 1000)
-    return () => window.clearInterval(timer)
-  }, [step])
+        return previous - 1;
+      });
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [step]);
 
-  const currentPlan = plans.find((plan) => plan.key === selectedPlan) ?? null
-  const blockers = selectedPlan ? (blockerQuery.data?.[selectedPlan] ?? []) : []
+  const currentPlan = plans.find((plan) => plan.key === selectedPlan) ?? null;
+  const blockers = selectedPlan
+    ? (blockerQuery.data?.[selectedPlan] ?? [])
+    : [];
   /* Over-cap usage must come down first; losing a flag feature cannot be "fixed"
    * by deleting anything, so it is disclosed and the switch proceeds. Same line
    * the server draws in ensureDowngradeIsSafe. */
-  const mustResolve = blockers.filter((blocker) => !blocker.isFeatureLoss)
+  const mustResolve = blockers.filter((blocker) => !blocker.isFeatureLoss);
   /* FAILS CLOSED while the map loads: an unverified downgrade is unrecoverable,
    * a delayed one is not. */
-  const isPlanReachable = blockerQuery.data !== undefined && mustResolve.length === 0
+  const isPlanReachable =
+    blockerQuery.data !== undefined && mustResolve.length === 0;
 
   /* NO_PROVISIONAL_HEADER. The scenario is what the header, the CTA and the
    * success copy all read, and it flips on two facts: the plan the org is on,
@@ -249,47 +280,53 @@ export function UpgradeContent({
    * is not (a cold cache, a slow network, the modal opened outside a
    * prefetching route). Trial LENGTH comes from PLANS rather than the price
    * query for the same reason — it is local config, not a provider fact. */
-  const isHeaderResolved = gatesQuery.data !== undefined && trialQuery.data !== undefined
-  const trialDays = selectedPlan && !hasUsedTrial ? PLANS[selectedPlan].trialDays : 0
+  const isHeaderResolved =
+    gatesQuery.data !== undefined && trialQuery.data !== undefined;
+  const trialDays =
+    selectedPlan && !hasUsedTrial ? PLANS[selectedPlan].trialDays : 0;
   const scenario = resolveScenario({
     currentTier,
     selectedPlan,
     isCurrentlyOnTrial,
     hasUsedTrial,
     trialDays,
-  })
-  const copy = BRANDING.upgradeModal.scenarios[scenario]
+  });
+  const copy = BRANDING.upgradeModal.scenarios[scenario];
 
   const maxSavings = plans.reduce(
     (max, plan) => (plan.isFree ? max : Math.max(max, calculateSavings(plan))),
-    0
-  )
+    0,
+  );
 
   /* An interval the org is already on is not a change — offering it as an option
    * would let someone "switch" to what they already have and be charged for the
    * proration of nothing. */
   const availableIntervals =
     selectedPlan === currentTier && currentInterval && !isCurrentlyOnTrial
-      ? { monthly: currentInterval === 'yearly', yearly: currentInterval === 'monthly' }
-      : { monthly: true, yearly: true }
+      ? {
+          monthly: currentInterval === "yearly",
+          yearly: currentInterval === "monthly",
+        }
+      : { monthly: true, yearly: true };
 
   // ── Writes ───────────────────────────────────────────────────────────────
-  const createSubscription = trpc.billing.createSubscription.useMutation()
-  const upgradeOrganization = trpc.billing.upgradeOrganization.useMutation()
-  const setDefaultPaymentMethod = trpc.billing.setDefaultPaymentMethod.useMutation()
+  const createSubscription = trpc.billing.createSubscription.useMutation();
+  const upgradeOrganization = trpc.billing.upgradeOrganization.useMutation();
+  const setDefaultPaymentMethod =
+    trpc.billing.setDefaultPaymentMethod.useMutation();
   const isSubmitting =
     createSubscription.isPending ||
     upgradeOrganization.isPending ||
-    setDefaultPaymentMethod.isPending
+    setDefaultPaymentMethod.isPending;
 
   async function handlePurchase() {
     if (!selectedPlan || !isPurchasablePlan(selectedPlan)) {
-      toast.error('Choose a plan to continue')
-      return
+      toast.error("Choose a plan to continue");
+      return;
     }
     if (!paymentMethodId) {
-      toast.error('Choose a payment method to continue')
-      return
+      toast.error("Choose a payment method to continue");
+      return;
     }
 
     try {
@@ -300,13 +337,14 @@ export function UpgradeContent({
         hasSubscription,
         expectTrial: (currentPlan?.trialDays ?? 0) > 0,
         isDefaultCard:
-          paymentMethodsQuery.data?.find((method) => method.id === paymentMethodId)?.isDefault ??
-          false,
+          paymentMethodsQuery.data?.find(
+            (method) => method.id === paymentMethodId,
+          )?.isDefault ?? false,
         create: createSubscription.mutateAsync,
         upgrade: upgradeOrganization.mutateAsync,
         setDefault: setDefaultPaymentMethod.mutateAsync,
         organizationId,
-      })
+      });
 
       /* Everything downstream of a plan change is re-derived from these four
        * reads, so they are all invalidated together rather than one screen at a
@@ -316,18 +354,20 @@ export function UpgradeContent({
         utils.usage.getDowngradeBlockerMap.invalidate({ organizationId }),
         utils.usage.getPlanOverages.invalidate({ organizationId }),
         utils.billing.getSubscription.invalidate({ organizationId }),
-      ])
+      ]);
 
-      setCountdown(SUCCESS_RELOAD_SECONDS)
-      setStep('success')
-      fireConfetti()
+      setCountdown(SUCCESS_RELOAD_SECONDS);
+      setStep("success");
+      fireConfetti();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Could not change the plan')
+      toast.error(
+        error instanceof Error ? error.message : "Could not change the plan",
+      );
     }
   }
 
   // ── Render ───────────────────────────────────────────────────────────────
-  const selectedPlanName = selectedPlan ? PLANS[selectedPlan].name : ''
+  const selectedPlanName = selectedPlan ? PLANS[selectedPlan].name : "";
 
   return (
     <>
@@ -336,14 +376,15 @@ export function UpgradeContent({
       <AddPaymentMethodDialog
         open={isAddingCard}
         onOpenChange={(open) => {
-          setIsAddingCard(open)
-          if (!open) void utils.billing.getPaymentMethods.invalidate({ organizationId })
+          setIsAddingCard(open);
+          if (!open)
+            void utils.billing.getPaymentMethods.invalidate({ organizationId });
         }}
         organizationId={organizationId}
       />
 
       <div className="flex h-full w-full flex-col overflow-hidden bg-background">
-        {onClose && step !== 'success' ? (
+        {onClose && step !== "success" ? (
           <button
             type="button"
             onClick={onClose}
@@ -354,7 +395,7 @@ export function UpgradeContent({
           </button>
         ) : null}
 
-        {step === 'select-plan' ? (
+        {step === "select-plan" ? (
           <div className="flex flex-1 flex-col overflow-y-auto">
             {/* Wide enough for four capped cards side by side (4 × 320 plus the
                 page padding), which is the ONLY thing that uses the extra room:
@@ -386,7 +427,9 @@ export function UpgradeContent({
               <div className="mb-6 max-w-5xl text-center sm:mb-8">
                 {isHeaderResolved ? (
                   <>
-                    <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">{copy.title}</h2>
+                    <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">
+                      {copy.title}
+                    </h2>
                     <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground sm:text-base">
                       {copy.description}
                     </p>
@@ -400,21 +443,23 @@ export function UpgradeContent({
               </div>
 
               <div className="mb-8 inline-flex items-center rounded-full border border-border/50 bg-muted/50 p-1 sm:mb-10">
-                {(['monthly', 'yearly'] as const).map((interval) => (
+                {(["monthly", "yearly"] as const).map((interval) => (
                   <button
                     key={interval}
                     type="button"
                     onClick={() => setBillingInterval(interval)}
                     className={cn(
-                      'flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium capitalize transition-all',
+                      "flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium capitalize transition-all",
                       billingInterval === interval
-                        ? 'bg-background text-foreground shadow-sm'
-                        : 'text-muted-foreground hover:text-foreground'
+                        ? "bg-background text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground",
                     )}
                   >
                     {interval}
-                    {interval === 'yearly' && maxSavings > 0 ? (
-                      <span className="text-xs font-semibold text-success">-{maxSavings}%</span>
+                    {interval === "yearly" && maxSavings > 0 ? (
+                      <span className="text-xs font-semibold text-success">
+                        -{maxSavings}%
+                      </span>
                     ) : null}
                   </button>
                 ))}
@@ -435,11 +480,14 @@ export function UpgradeContent({
                     <div style={RIGHT_FADE_MASK}>
                       <PricingGridFrame columns={SKELETON_COLUMN_COUNT}>
                         <div className="grid w-full grid-cols-1 gap-0 sm:grid-cols-2 lg:grid-cols-3">
-                          {Array.from({ length: SKELETON_COLUMN_COUNT }, (_, index) => (
-                            <div key={index} style={DASHED_CELL_STYLE}>
-                              <PricingCardSkeleton />
-                            </div>
-                          ))}
+                          {Array.from(
+                            { length: SKELETON_COLUMN_COUNT },
+                            (_, index) => (
+                              <div key={index} style={DASHED_CELL_STYLE}>
+                                <PricingCardSkeleton />
+                              </div>
+                            ),
+                          )}
                         </div>
                       </PricingGridFrame>
                     </div>
@@ -464,15 +512,15 @@ export function UpgradeContent({
                     <PricingGridFrame columns={plans.length}>
                       <div
                         className={cn(
-                          'grid w-full grid-cols-1 gap-0 sm:grid-cols-2',
+                          "grid w-full grid-cols-1 gap-0 sm:grid-cols-2",
                           /* Wrapping to a second row is the correct answer on a
                              narrow screen — the frame closes around whatever
                              shape the rows make. */
                           plans.length >= 4
-                            ? 'lg:grid-cols-3 xl:grid-cols-4'
+                            ? "lg:grid-cols-3 xl:grid-cols-4"
                             : plans.length === 3
-                              ? 'lg:grid-cols-3'
-                              : 'sm:grid-cols-2'
+                              ? "lg:grid-cols-3"
+                              : "sm:grid-cols-2",
                         )}
                       >
                         {plans.map((plan) => (
@@ -484,16 +532,19 @@ export function UpgradeContent({
                               isSelected={selectedPlan === plan.key}
                               isCurrentPlan={plan.key === currentTier}
                               isCurrentlyOnTrial={isCurrentlyOnTrial}
-                              isBlocked={(blockerQuery.data?.[plan.key] ?? []).some(
-                                (blocker) => !blocker.isFeatureLoss
+                              isBlocked={(
+                                blockerQuery.data?.[plan.key] ?? []
+                              ).some((blocker) => !blocker.isFeatureLoss)}
+                              priceDisplay={getPriceDisplay(
+                                plan,
+                                billingInterval,
                               )}
-                              priceDisplay={getPriceDisplay(plan, billingInterval)}
                               billingInterval={billingInterval}
                               savings={calculateSavings(plan)}
                               onSelect={() => setPlanOverride(plan.key)}
                               onProceed={() => {
-                                setPlanOverride(plan.key)
-                                setStep('payment')
+                                setPlanOverride(plan.key);
+                                setStep("payment");
                               }}
                             />
                           </div>
@@ -519,7 +570,12 @@ export function UpgradeContent({
 
               <div className="mt-8 flex items-center gap-3 sm:mt-10">
                 {onClose ? (
-                  <Button variant="ghost" size="sm" onClick={onClose} className="text-muted-foreground">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={onClose}
+                    className="text-muted-foreground"
+                  >
                     {BRANDING.upgradeModal.secondaryCtaLabel}
                   </Button>
                 ) : null}
@@ -528,12 +584,18 @@ export function UpgradeContent({
                   onClick={() => {
                     /* Carry the only legal interval over rather than landing on
                        the payment step with a disabled choice pre-selected. */
-                    if (availableIntervals.monthly && !availableIntervals.yearly) {
-                      setBillingInterval('monthly')
-                    } else if (availableIntervals.yearly && !availableIntervals.monthly) {
-                      setBillingInterval('yearly')
+                    if (
+                      availableIntervals.monthly &&
+                      !availableIntervals.yearly
+                    ) {
+                      setBillingInterval("monthly");
+                    } else if (
+                      availableIntervals.yearly &&
+                      !availableIntervals.monthly
+                    ) {
+                      setBillingInterval("yearly");
                     }
-                    setStep('payment')
+                    setStep("payment");
                   }}
                   disabled={!selectedPlan || (currentPlan?.isFree ?? true)}
                 >
@@ -544,14 +606,14 @@ export function UpgradeContent({
           </div>
         ) : null}
 
-        {step === 'payment' && currentPlan ? (
+        {step === "payment" && currentPlan ? (
           <div className="flex flex-1 flex-col overflow-y-auto">
             <div className="flex flex-1 flex-col items-center px-4 py-8 sm:px-6 sm:py-12">
               <div className="w-full max-w-lg">
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => setStep('select-plan')}
+                  onClick={() => setStep("select-plan")}
                   className="mb-4 -ml-2 w-fit text-muted-foreground"
                 >
                   <ChevronLeftIcon className="mr-1 size-4" />
@@ -563,7 +625,7 @@ export function UpgradeContent({
                     {BRANDING.upgradeModal.paymentTitle}
                   </h2>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    {scenario === 'paid_downgrade'
+                    {scenario === "paid_downgrade"
                       ? `Move this workspace to ${currentPlan.name}`
                       : `Complete your upgrade to ${currentPlan.name}`}
                   </p>
@@ -571,14 +633,16 @@ export function UpgradeContent({
 
                 <div className="space-y-6">
                   <div className="space-y-3">
-                    <Label className="text-base font-medium">Billing interval</Label>
+                    <Label className="text-base font-medium">
+                      Billing interval
+                    </Label>
                     <div role="radiogroup" className="grid grid-cols-2 gap-4">
-                      {(['monthly', 'yearly'] as const)
+                      {(["monthly", "yearly"] as const)
                         .filter((interval) => availableIntervals[interval])
                         .map((interval) => {
-                          const price = getIntervalPrice(currentPlan, interval)
-                          const selected = billingInterval === interval
-                          const savings = calculateSavings(currentPlan)
+                          const price = getIntervalPrice(currentPlan, interval);
+                          const selected = billingInterval === interval;
+                          const savings = calculateSavings(currentPlan);
                           return (
                             <button
                               key={interval}
@@ -587,24 +651,28 @@ export function UpgradeContent({
                               aria-checked={selected}
                               onClick={() => setBillingInterval(interval)}
                               className={cn(
-                                'relative flex flex-col items-center justify-between rounded-2xl border bg-card p-4 transition-all duration-200',
+                                "relative flex flex-col items-center justify-between rounded-2xl border bg-card p-4 transition-all duration-200",
                                 selected
-                                  ? 'border-primary/60 shadow-lg'
-                                  : 'border-border/50 hover:border-primary/30'
+                                  ? "border-primary/60 shadow-lg"
+                                  : "border-border/50 hover:border-primary/30",
                               )}
                             >
-                              {interval === 'yearly' && savings > 0 ? (
+                              {interval === "yearly" && savings > 0 ? (
                                 <span className="absolute -top-2 -right-2 rounded-full bg-success px-2 py-0.5 text-xs font-bold text-success-foreground">
                                   Save {savings}%
                                 </span>
                               ) : null}
-                              <span className="text-sm font-semibold capitalize">{interval}</span>
-                              <span className="mt-2 text-2xl font-bold">{price.main}</span>
+                              <span className="text-sm font-semibold capitalize">
+                                {interval}
+                              </span>
+                              <span className="mt-2 text-2xl font-bold">
+                                {price.main}
+                              </span>
                               <span className="mt-1 text-center text-xs text-muted-foreground">
                                 {price.sub}
                               </span>
                             </button>
-                          )
+                          );
                         })}
                     </div>
                   </div>
@@ -616,14 +684,16 @@ export function UpgradeContent({
                       <p className="text-sm text-muted-foreground">
                         {mustResolve.length > 0
                           ? `${currentPlan.name} does not cover everything this workspace is using. Remove the excess below, then switch.`
-                          : 'You can switch now. These are part of your current plan and would no longer be included.'}
+                          : "You can switch now. These are part of your current plan and would no longer be included."}
                       </p>
                       <UsageLimitList blockers={blockers} />
                     </div>
                   ) : null}
 
                   <div className="space-y-3">
-                    <Label className="text-base font-medium">Payment method</Label>
+                    <Label className="text-base font-medium">
+                      Payment method
+                    </Label>
 
                     {!canReadBilling ? (
                       <div className="rounded-2xl border border-dashed border-border bg-muted/20 p-6 text-center text-sm text-muted-foreground">
@@ -662,7 +732,9 @@ export function UpgradeContent({
                       <>
                         <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-muted/20 py-8 text-center">
                           <CreditCardIcon className="mb-3 size-10 text-muted-foreground" />
-                          <p className="text-sm font-medium">No payment methods on file</p>
+                          <p className="text-sm font-medium">
+                            No payment methods on file
+                          </p>
                           <p className="mt-1 text-xs text-muted-foreground">
                             Add a card to continue
                           </p>
@@ -682,12 +754,20 @@ export function UpgradeContent({
 
                 <div className="mt-8 border-t border-border/50 pt-6">
                   <div className="flex justify-end gap-3">
-                    <Button variant="ghost" onClick={() => setStep('select-plan')}>
+                    <Button
+                      variant="ghost"
+                      onClick={() => setStep("select-plan")}
+                    >
                       Back
                     </Button>
                     <Button
                       onClick={handlePurchase}
-                      disabled={!paymentMethodId || !canPurchase || !isPlanReachable || isSubmitting}
+                      disabled={
+                        !paymentMethodId ||
+                        !canPurchase ||
+                        !isPlanReachable ||
+                        isSubmitting
+                      }
                       className="gap-2"
                     >
                       {isSubmitting ? (
@@ -709,7 +789,7 @@ export function UpgradeContent({
           </div>
         ) : null}
 
-        {step === 'success' ? (
+        {step === "success" ? (
           <div className="flex flex-1 flex-col items-center justify-center px-4 py-8 sm:px-6 sm:py-12">
             <div className="w-full max-w-md text-center">
               <div className="mx-auto mb-6 flex size-16 items-center justify-center rounded-full bg-primary/10">
@@ -717,25 +797,32 @@ export function UpgradeContent({
               </div>
 
               <h2 className="text-xl font-bold tracking-tight sm:text-2xl">
-                {BRANDING.upgradeModal.successTitle.replace('{planName}', selectedPlanName)}
+                {BRANDING.upgradeModal.successTitle.replace(
+                  "{planName}",
+                  selectedPlanName,
+                )}
               </h2>
               <p className="mt-2 text-sm text-muted-foreground">
-                {scenario === 'trial_to_paid'
+                {scenario === "trial_to_paid"
                   ? BRANDING.upgradeModal.successTrialBody
-                  : scenario === 'paid_downgrade'
+                  : scenario === "paid_downgrade"
                     ? BRANDING.upgradeModal.successDowngradeBody
                     : BRANDING.upgradeModal.successBody}
               </p>
 
               <div className="mt-6 rounded-xl border border-border/50 bg-muted/50 px-4 py-3">
                 <p className="text-sm text-muted-foreground">
-                  Refreshing your workspace in{' '}
-                  <span className="font-bold text-primary">{countdown}</span> second
-                  {countdown === 1 ? '' : 's'}...
+                  Refreshing your workspace in{" "}
+                  <span className="font-bold text-primary">{countdown}</span>{" "}
+                  second
+                  {countdown === 1 ? "" : "s"}...
                 </p>
               </div>
 
-              <Button onClick={() => window.location.reload()} className="mt-6 w-full">
+              <Button
+                onClick={() => window.location.reload()}
+                className="mt-6 w-full"
+              >
                 Get started
               </Button>
             </div>
@@ -743,7 +830,7 @@ export function UpgradeContent({
         ) : null}
       </div>
     </>
-  )
+  );
 }
 
 /**
@@ -756,35 +843,38 @@ export function UpgradeContent({
  * WHERE: <UpgradeContent /> above.
  */
 function resolveScenario(input: {
-  currentTier: PlanKey
-  selectedPlan: PlanKey | null
-  isCurrentlyOnTrial: boolean
-  hasUsedTrial: boolean
-  trialDays: number
+  currentTier: PlanKey;
+  selectedPlan: PlanKey | null;
+  isCurrentlyOnTrial: boolean;
+  hasUsedTrial: boolean;
+  trialDays: number;
 }): UserScenario {
-  if (input.isCurrentlyOnTrial) return 'trial_to_paid'
+  if (input.isCurrentlyOnTrial) return "trial_to_paid";
 
-  if (input.currentTier === 'free') {
+  if (input.currentTier === "free") {
     /* A trial is only worth naming if this user can still be granted one — the
      * server refuses a second, so promising it would be a lie. */
-    return !input.hasUsedTrial && input.trialDays > 0 ? 'free_to_trial' : 'free_to_paid'
+    return !input.hasUsedTrial && input.trialDays > 0
+      ? "free_to_trial"
+      : "free_to_paid";
   }
 
-  if (!input.selectedPlan || input.selectedPlan === input.currentTier) return 'paid_same'
+  if (!input.selectedPlan || input.selectedPlan === input.currentTier)
+    return "paid_same";
 
-  const currentIndex = PLAN_ORDER.indexOf(input.currentTier)
-  const selectedIndex = PLAN_ORDER.indexOf(input.selectedPlan)
-  if (selectedIndex > currentIndex) return 'paid_upgrade'
-  if (selectedIndex < currentIndex) return 'paid_downgrade'
-  return 'paid_same'
+  const currentIndex = PLAN_ORDER.indexOf(input.currentTier);
+  const selectedIndex = PLAN_ORDER.indexOf(input.selectedPlan);
+  if (selectedIndex > currentIndex) return "paid_upgrade";
+  if (selectedIndex < currentIndex) return "paid_downgrade";
+  return "paid_same";
 }
 
 /* Name of the tier below, for the "All X features plus..." line on a card. */
 function getPreviousPlanName(plan: PlanKey): string | null {
-  const index = PLAN_ORDER.indexOf(plan)
-  if (index <= 0) return null
-  const previous = PLAN_ORDER[index - 1]
-  return previous ? PLANS[previous].name : null
+  const index = PLAN_ORDER.indexOf(plan);
+  if (index <= 0) return null;
+  const previous = PLAN_ORDER[index - 1];
+  return previous ? PLANS[previous].name : null;
 }
 
 /**
@@ -798,55 +888,66 @@ function getPreviousPlanName(plan: PlanKey): string | null {
  *        configured yet must still show what it INCLUDES.
  * WHERE: <UpgradeContent /> above.
  */
-function getPriceDisplay(plan: AvailablePlan, interval: BillingInterval): PriceDisplay {
-  if (plan.isFree) return { main: '$0', sub: 'Free forever' }
+function getPriceDisplay(
+  plan: AvailablePlan,
+  interval: BillingInterval,
+): PriceDisplay {
+  if (plan.isFree) return { main: "$0", sub: "Free forever" };
 
-  const price = interval === 'monthly' ? plan.monthlyPrice : plan.yearlyPrice
-  if (!price) return { main: '—', sub: 'Not available' }
+  const price = interval === "monthly" ? plan.monthlyPrice : plan.yearlyPrice;
+  if (!price) return { main: "—", sub: "Not available" };
 
-  const hasTrial = plan.trialDays > 0
+  const hasTrial = plan.trialDays > 0;
   const perMonth =
-    interval === 'monthly' ? price.amount : Math.round(price.amount / 12)
-  const perMonthLabel = formatCurrency(perMonth, price.currency)
+    interval === "monthly" ? price.amount : Math.round(price.amount / 12);
+  const perMonthLabel = formatCurrency(perMonth, price.currency);
 
   if (hasTrial) {
     return {
-      main: 'Free',
+      main: "Free",
       sub: `for ${plan.trialDays} days, then ${perMonthLabel}/mo`,
-    }
+    };
   }
 
-  if (interval === 'monthly') return { main: perMonthLabel, sub: '/month' }
+  if (interval === "monthly") return { main: perMonthLabel, sub: "/month" };
 
   return {
     main: `${perMonthLabel}/mo`,
     sub: `Billed ${formatCurrency(price.amount, price.currency)} annually`,
-  }
+  };
 }
 
 /* Same three facts as getPriceDisplay, worded for the interval cards on the
  * payment step, where the yearly total matters more than the headline. */
-function getIntervalPrice(plan: AvailablePlan, interval: BillingInterval): PriceDisplay {
-  const price = interval === 'monthly' ? plan.monthlyPrice : plan.yearlyPrice
-  if (!price) return { main: '—', sub: 'Not available' }
+function getIntervalPrice(
+  plan: AvailablePlan,
+  interval: BillingInterval,
+): PriceDisplay {
+  const price = interval === "monthly" ? plan.monthlyPrice : plan.yearlyPrice;
+  if (!price) return { main: "—", sub: "Not available" };
 
-  const hasTrial = plan.trialDays > 0
-  const amountLabel = formatCurrency(price.amount, price.currency)
+  const hasTrial = plan.trialDays > 0;
+  const amountLabel = formatCurrency(price.amount, price.currency);
 
-  if (interval === 'monthly') {
+  if (interval === "monthly") {
     return {
-      main: hasTrial ? 'Free' : amountLabel,
-      sub: hasTrial ? `for ${plan.trialDays} days, then ${amountLabel}/mo` : 'per month',
-    }
+      main: hasTrial ? "Free" : amountLabel,
+      sub: hasTrial
+        ? `for ${plan.trialDays} days, then ${amountLabel}/mo`
+        : "per month",
+    };
   }
 
-  const perMonthLabel = formatCurrency(Math.round(price.amount / 12), price.currency)
+  const perMonthLabel = formatCurrency(
+    Math.round(price.amount / 12),
+    price.currency,
+  );
   return {
-    main: hasTrial ? 'Free' : `${perMonthLabel}/mo`,
+    main: hasTrial ? "Free" : `${perMonthLabel}/mo`,
     sub: hasTrial
       ? `for ${plan.trialDays} days, then ${amountLabel} annually`
       : `Billed ${amountLabel} annually`,
-  }
+  };
 }
 
 /**
@@ -863,29 +964,29 @@ function getIntervalPrice(plan: AvailablePlan, interval: BillingInterval): Price
  * WHERE: handlePurchase in <UpgradeContent />.
  */
 async function submitPlanChange(input: {
-  organizationId: string
-  plan: PurchasablePlanKey
-  interval: BillingInterval
-  paymentMethodId: string
-  hasSubscription: boolean
-  expectTrial: boolean
-  isDefaultCard: boolean
+  organizationId: string;
+  plan: PurchasablePlanKey;
+  interval: BillingInterval;
+  paymentMethodId: string;
+  hasSubscription: boolean;
+  expectTrial: boolean;
+  isDefaultCard: boolean;
   create: (values: {
-    organizationId: string
-    planKey: PurchasablePlanKey
-    billingInterval: BillingInterval
-    paymentMethodId: string
-    expectTrial: boolean
-  }) => Promise<unknown>
+    organizationId: string;
+    planKey: PurchasablePlanKey;
+    billingInterval: BillingInterval;
+    paymentMethodId: string;
+    expectTrial: boolean;
+  }) => Promise<unknown>;
   upgrade: (values: {
-    organizationId: string
-    planKey: PurchasablePlanKey
-    billingInterval: BillingInterval
-  }) => Promise<unknown>
+    organizationId: string;
+    planKey: PurchasablePlanKey;
+    billingInterval: BillingInterval;
+  }) => Promise<unknown>;
   setDefault: (values: {
-    organizationId: string
-    paymentMethodId: string
-  }) => Promise<unknown>
+    organizationId: string;
+    paymentMethodId: string;
+  }) => Promise<unknown>;
 }): Promise<void> {
   if (!input.hasSubscription) {
     await input.create({
@@ -894,22 +995,22 @@ async function submitPlanChange(input: {
       billingInterval: input.interval,
       paymentMethodId: input.paymentMethodId,
       expectTrial: input.expectTrial,
-    })
-    return
+    });
+    return;
   }
 
   if (!input.isDefaultCard) {
     await input.setDefault({
       organizationId: input.organizationId,
       paymentMethodId: input.paymentMethodId,
-    })
+    });
   }
 
   await input.upgrade({
     organizationId: input.organizationId,
     planKey: input.plan,
     billingInterval: input.interval,
-  })
+  });
 }
 
 /**
@@ -919,13 +1020,27 @@ async function submitPlanChange(input: {
  * and it never blocks the reload countdown behind it.
  */
 function fireConfetti(): void {
-  const end = Date.now() + 500
+  const end = Date.now() + 500;
 
   const frame = () => {
-    confetti({ particleCount: 4, angle: 60, spread: 55, origin: { x: 0, y: 1 }, startVelocity: 100, scalar: 1.7 })
-    confetti({ particleCount: 4, angle: 120, spread: 55, origin: { x: 1, y: 1 }, startVelocity: 100, scalar: 1.7 })
-    if (Date.now() < end) requestAnimationFrame(frame)
-  }
+    confetti({
+      particleCount: 4,
+      angle: 60,
+      spread: 55,
+      origin: { x: 0, y: 1 },
+      startVelocity: 100,
+      scalar: 1.7,
+    });
+    confetti({
+      particleCount: 4,
+      angle: 120,
+      spread: 55,
+      origin: { x: 1, y: 1 },
+      startVelocity: 100,
+      scalar: 1.7,
+    });
+    if (Date.now() < end) requestAnimationFrame(frame);
+  };
 
-  frame()
+  frame();
 }

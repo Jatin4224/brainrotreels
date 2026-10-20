@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -30,79 +24,79 @@
  *        src/lib/adapters/provider.
  */
 
-import { AUTH_PROVIDER } from '@/lib/adapters/provider'
+import { AUTH_PROVIDER } from "@/lib/adapters/provider";
 import {
   authLimiter,
   buildRateLimitHeaders,
   checkRateLimit,
   getClientIp,
-} from '@/lib/rate-limit'
+} from "@/lib/rate-limit";
 
 /* PROVIDER_ISOLATION: when Better Auth is not the selected provider this route
  * must not exist. Returning 404 keeps a stale bookmark or a probing request from
  * reaching Better Auth's handler — and therefore its database adapter — in a
  * deployment that runs on a different provider entirely. */
-const IS_ACTIVE = AUTH_PROVIDER === 'better-auth'
+const IS_ACTIVE = AUTH_PROVIDER === "better-auth";
 
 const notFound = (): Response =>
-  new Response(JSON.stringify({ error: 'Not found' }), {
+  new Response(JSON.stringify({ error: "Not found" }), {
     status: 404,
-    headers: { 'Content-Type': 'application/json' },
-  })
+    headers: { "Content-Type": "application/json" },
+  });
 
 /* Memoised per runtime instance so the dynamic import cost is paid once, not
  * on every auth request. */
 let handlersPromise: Promise<{
-  GET: (request: Request) => Promise<Response>
-  POST: (request: Request) => Promise<Response>
-}> | null = null
+  GET: (request: Request) => Promise<Response>;
+  POST: (request: Request) => Promise<Response>;
+}> | null = null;
 
 async function loadBetterAuthHandlers() {
   if (!handlersPromise) {
     handlersPromise = (async () => {
       const [{ auth }, { toNextJsHandler }] = await Promise.all([
-        import('@/lib/better-auth/auth'),
-        import('better-auth/next-js'),
-      ])
-      return toNextJsHandler(auth)
-    })()
+        import("@/lib/better-auth/auth"),
+        import("better-auth/next-js"),
+      ]);
+      return toNextJsHandler(auth);
+    })();
   }
-  return handlersPromise
+  return handlersPromise;
 }
 
 export async function GET(request: Request): Promise<Response> {
-  if (!IS_ACTIVE) return notFound()
-  const handlers = await loadBetterAuthHandlers()
-  return handlers.GET(request)
+  if (!IS_ACTIVE) return notFound();
+  const handlers = await loadBetterAuthHandlers();
+  return handlers.GET(request);
 }
 
 // POSTs cover every credential-bearing flow (sign-in, sign-up, password reset,
 // 2FA, OAuth start) — IP-keyed limit blocks brute-force and stuffing.
 export async function POST(request: Request): Promise<Response> {
-  if (!IS_ACTIVE) return notFound()
+  if (!IS_ACTIVE) return notFound();
 
-  const ip = getClientIp(request.headers)
-  const identifier = ip ?? 'auth:anonymous'
+  const ip = getClientIp(request.headers);
+  const identifier = ip ?? "auth:anonymous";
 
   /* Rate limit BEFORE loading Better Auth so a flood cannot be used to force
    * repeated module resolution work. */
-  const result = await checkRateLimit(authLimiter, identifier)
+  const result = await checkRateLimit(authLimiter, identifier);
   if (!result.allowed) {
     return new Response(
       JSON.stringify({
-        error: 'TOO_MANY_REQUESTS',
-        message: 'Too many authentication attempts. Please try again shortly.',
+        error: "TOO_MANY_REQUESTS",
+        message: "Too many authentication attempts. Please try again shortly.",
       }),
       {
         status: 429,
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
           ...buildRateLimitHeaders(result),
         },
-      }
-    )
+      },
+    );
   }
 
-  const handlers = await loadBetterAuthHandlers()
-  return handlers.POST(request)
+  const handlers = await loadBetterAuthHandlers();
+  return handlers.POST(request);
 }

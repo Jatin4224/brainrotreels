@@ -1,14 +1,8 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
-import 'server-only'
+import "server-only";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: resolvePortalAdmin, ensurePortalOwnerOrganization,
@@ -28,10 +22,10 @@ import 'server-only'
  *        /portal layout (auto-provision + gate).
  */
 
-import { prisma } from '@/lib/config/prisma'
-import { isPortalOwnerEmail, isPortalEnabled } from '@/lib/config/portal'
-import { getPlatformActivityLogs } from '@/services/activity-log.service'
-import { ensureUniqueOrganizationSlug } from '@/services/organization.service'
+import { prisma } from "@/lib/config/prisma";
+import { isPortalOwnerEmail, isPortalEnabled } from "@/lib/config/portal";
+import { getPlatformActivityLogs } from "@/services/activity-log.service";
+import { ensureUniqueOrganizationSlug } from "@/services/organization.service";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: isPortalMember
@@ -43,8 +37,8 @@ export async function isPortalMember(userId: string): Promise<boolean> {
   const member = await prisma.member.findFirst({
     where: { userId, organization: { isPortalOrganization: true } },
     select: { id: true },
-  })
-  return member !== null
+  });
+  return member !== null;
 }
 
 /**
@@ -54,10 +48,13 @@ export async function isPortalMember(userId: string): Promise<boolean> {
  *        owner email or a member of a portal org.
  * WHERE: portalProcedure gate + portal.getAccess.
  */
-export async function resolvePortalAdmin(user: { id: string; email: string }): Promise<boolean> {
-  if (!isPortalEnabled()) return false
-  if (isPortalOwnerEmail(user.email)) return true
-  return isPortalMember(user.id)
+export async function resolvePortalAdmin(user: {
+  id: string;
+  email: string;
+}): Promise<boolean> {
+  if (!isPortalEnabled()) return false;
+  if (isPortalOwnerEmail(user.email)) return true;
+  return isPortalMember(user.id);
 }
 
 /**
@@ -72,56 +69,59 @@ export async function resolvePortalAdmin(user: { id: string; email: string }): P
  * WHERE: Called by the /portal layout before rendering.
  */
 export async function ensurePortalOwnerOrganization(user: {
-  id: string
-  email: string
-  name: string
+  id: string;
+  email: string;
+  name: string;
 }): Promise<string | null> {
-  if (!isPortalEnabled() || !isPortalOwnerEmail(user.email)) return null
+  if (!isPortalEnabled() || !isPortalOwnerEmail(user.email)) return null;
 
   const existing = await prisma.member.findFirst({
     where: { userId: user.id, organization: { isPortalOrganization: true } },
     select: { organizationId: true },
-  })
-  if (existing) return existing.organizationId
+  });
+  if (existing) return existing.organizationId;
 
-  const organizationId = crypto.randomUUID()
-  const slug = await ensureUniqueOrganizationSlug(prisma, 'platform')
-  const now = new Date()
+  const organizationId = crypto.randomUUID();
+  const slug = await ensureUniqueOrganizationSlug(prisma, "platform");
+  const now = new Date();
 
   await prisma.$transaction(async (tx) => {
     await tx.organization.create({
       data: {
         id: organizationId,
-        name: `${user.name || 'Platform'} — Portal`,
+        name: `${user.name || "Platform"} — Portal`,
         slug,
         createdAt: now,
         isPortalOrganization: true,
       },
-    })
+    });
     await tx.member.create({
       data: {
         id: crypto.randomUUID(),
         organizationId,
         userId: user.id,
-        role: 'owner',
+        role: "owner",
         createdAt: now,
       },
-    })
-    await tx.user.update({ where: { id: user.id }, data: { onboardingComplete: true } })
-  })
+    });
+    await tx.user.update({
+      where: { id: user.id },
+      data: { onboardingComplete: true },
+    });
+  });
 
-  return organizationId
+  return organizationId;
 }
 
 export interface PortalOrganizationRow {
-  id: string
-  name: string
-  slug: string
-  createdAt: Date
-  isPortalOrganization: boolean
-  memberCount: number
-  plan: string | null
-  subscriptionStatus: string | null
+  id: string;
+  name: string;
+  slug: string;
+  createdAt: Date;
+  isPortalOrganization: boolean;
+  memberCount: number;
+  plan: string | null;
+  subscriptionStatus: string | null;
 }
 
 /**
@@ -132,11 +132,11 @@ export interface PortalOrganizationRow {
  */
 export async function listAllOrganizations(
   skip: number,
-  take: number
+  take: number,
 ): Promise<{ items: PortalOrganizationRow[]; total: number }> {
   const [orgs, total] = await Promise.all([
     prisma.organization.findMany({
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       skip,
       take,
       select: {
@@ -147,14 +147,14 @@ export async function listAllOrganizations(
         isPortalOrganization: true,
         _count: { select: { members: true } },
         subscriptions: {
-          orderBy: { createdAt: 'desc' },
+          orderBy: { createdAt: "desc" },
           take: 1,
           select: { plan: true, status: true },
         },
       },
     }),
     prisma.organization.count(),
-  ])
+  ]);
 
   return {
     items: orgs.map((org) => ({
@@ -168,16 +168,16 @@ export async function listAllOrganizations(
       subscriptionStatus: org.subscriptions[0]?.status ?? null,
     })),
     total,
-  }
+  };
 }
 
 export interface PortalUserRow {
-  id: string
-  name: string
-  email: string
-  createdAt: Date
-  banned: boolean
-  emailVerified: boolean
+  id: string;
+  name: string;
+  email: string;
+  createdAt: Date;
+  banned: boolean;
+  emailVerified: boolean;
 }
 
 /**
@@ -188,11 +188,11 @@ export interface PortalUserRow {
  */
 export async function listAllUsers(
   skip: number,
-  take: number
+  take: number,
 ): Promise<{ items: PortalUserRow[]; total: number }> {
   const [users, total] = await Promise.all([
     prisma.user.findMany({
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       skip,
       take,
       select: {
@@ -205,7 +205,7 @@ export async function listAllUsers(
       },
     }),
     prisma.user.count(),
-  ])
+  ]);
 
   return {
     items: users.map((u) => ({
@@ -217,13 +217,13 @@ export async function listAllUsers(
       emailVerified: u.emailVerified,
     })),
     total,
-  }
+  };
 }
 
 export interface PortalOverview {
-  totalOrganizations: number
-  totalUsers: number
-  activeSubscriptions: number
+  totalOrganizations: number;
+  totalUsers: number;
+  activeSubscriptions: number;
 }
 
 /**
@@ -233,12 +233,15 @@ export interface PortalOverview {
  * WHERE: portal.getOverview.
  */
 export async function getPortalOverview(): Promise<PortalOverview> {
-  const [totalOrganizations, totalUsers, activeSubscriptions] = await Promise.all([
-    prisma.organization.count({ where: { isPortalOrganization: false } }),
-    prisma.user.count(),
-    prisma.subscription.count({ where: { status: { in: ['active', 'trialing'] } } }),
-  ])
-  return { totalOrganizations, totalUsers, activeSubscriptions }
+  const [totalOrganizations, totalUsers, activeSubscriptions] =
+    await Promise.all([
+      prisma.organization.count({ where: { isPortalOrganization: false } }),
+      prisma.user.count(),
+      prisma.subscription.count({
+        where: { status: { in: ["active", "trialing"] } },
+      }),
+    ]);
+  return { totalOrganizations, totalUsers, activeSubscriptions };
 }
 
 /**
@@ -248,5 +251,5 @@ export async function getPortalOverview(): Promise<PortalOverview> {
  * WHERE: portal.listActivity.
  */
 export async function listPlatformActivity(skip: number, take: number) {
-  return getPlatformActivityLogs(skip, take)
+  return getPlatformActivityLogs(skip, take);
 }

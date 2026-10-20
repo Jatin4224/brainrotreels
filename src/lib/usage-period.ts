@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -35,13 +29,13 @@
  *        usage.reset workflow. Pure — no Prisma, no env.
  */
 
-import { RESOURCES, type LimitResourceKey } from './resources'
+import { RESOURCES, type LimitResourceKey } from "./resources";
 
 export function isPeriodicResource(resourceKey: LimitResourceKey): boolean {
-  const definition = RESOURCES[resourceKey]
-  if (!('limit' in definition)) return false
-  const { limit } = definition as { limit: { period?: 'month' } }
-  return limit.period === 'month'
+  const definition = RESOURCES[resourceKey];
+  if (!("limit" in definition)) return false;
+  const { limit } = definition as { limit: { period?: "month" } };
+  return limit.period === "month";
 }
 
 /**
@@ -49,7 +43,9 @@ export function isPeriodicResource(resourceKey: LimitResourceKey): boolean {
  * to a previous period.
  */
 export function currentPeriodStart(now: Date = new Date()): Date {
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0, 0))
+  return new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0, 0),
+  );
 }
 
 /**
@@ -61,9 +57,9 @@ export function isUsageStale(
   lastResetAt: Date | null | undefined,
   now: Date = new Date(),
 ): boolean {
-  if (!isPeriodicResource(resourceKey)) return false
-  if (!lastResetAt) return false
-  return lastResetAt.getTime() < currentPeriodStart(now).getTime()
+  if (!isPeriodicResource(resourceKey)) return false;
+  if (!lastResetAt) return false;
+  return lastResetAt.getTime() < currentPeriodStart(now).getTime();
 }
 
 /**
@@ -76,12 +72,12 @@ export function effectiveUsage(
   lastResetAt: Date | null | undefined,
   now: Date = new Date(),
 ): number {
-  return isUsageStale(resourceKey, lastResetAt, now) ? 0 : storedUsage
+  return isUsageStale(resourceKey, lastResetAt, now) ? 0 : storedUsage;
 }
 
 /** Every resource whose counter refills — the cron's work list. */
 export function periodicResourceKeys(): LimitResourceKey[] {
   return (Object.keys(RESOURCES) as LimitResourceKey[]).filter(
     (key) => key in RESOURCES && isPeriodicResource(key),
-  )
+  );
 }

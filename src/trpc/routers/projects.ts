@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -34,24 +28,28 @@
  *        src/lib/timeline before it leaves this file.
  */
 
-import { TRPCError } from '@trpc/server'
+import { TRPCError } from "@trpc/server";
 
-import type { Prisma } from '@/generated/prisma'
+import type { Prisma } from "@/generated/prisma";
 
-import { createStructuredError, createTRPCRouter } from '../init'
-import { protectedProcedure } from '../procedures'
-import { permissions } from '@/lib/permissions'
-import { checkFeatureGate } from '@/lib/feature-gate'
-import { ERROR_CODES } from '@/lib/errors'
-import { incrementUsage } from '@/services/usage.service'
-import { signDocumentAssets } from '@/services/assets.service'
+import { createStructuredError, createTRPCRouter } from "../init";
+import { protectedProcedure } from "../procedures";
+import { permissions } from "@/lib/permissions";
+import { checkFeatureGate } from "@/lib/feature-gate";
+import { ERROR_CODES } from "@/lib/errors";
+import { incrementUsage } from "@/services/usage.service";
+import { signDocumentAssets } from "@/services/assets.service";
 import {
   findProjectForOrganization,
   findProjectWithTimeline,
   listProjects,
-} from '@/services/projects.service'
-import { TimelineMigrationError, resolveWordAnchors, tryMigrate } from '@/lib/timeline'
-import { collectAssetHandles, planComposition } from '@/lib/render'
+} from "@/services/projects.service";
+import {
+  TimelineMigrationError,
+  resolveWordAnchors,
+  tryMigrate,
+} from "@/lib/timeline";
+import { collectAssetHandles, planComposition } from "@/lib/render";
 import {
   createProjectSchema,
   deleteProjectSchema,
@@ -60,7 +58,7 @@ import {
   listProjectsSchema,
   previewProjectSchema,
   renameProjectSchema,
-} from '@/lib/types'
+} from "@/lib/types";
 
 export const projectsRouter = createTRPCRouter({
   /* No gate, no counter, no audit row written here — the factory does all three
@@ -74,16 +72,21 @@ export const projectsRouter = createTRPCRouter({
           title: input.title,
           kind: input.kind,
           aspect: input.aspect,
-          ...(input.sourceRef !== undefined ? { sourceRef: input.sourceRef } : {}),
+          ...(input.sourceRef !== undefined
+            ? { sourceRef: input.sourceRef }
+            : {}),
           ...(input.settings !== undefined ? { settings: input.settings } : {}),
         },
-      })
+      }),
     ),
 
-  list: protectedProcedure({ requirePermission: permissions.PROJECTS_READ, paginate: true })
+  list: protectedProcedure({
+    requirePermission: permissions.PROJECTS_READ,
+    paginate: true,
+  })
     .input(listProjectsSchema)
     .query(async ({ ctx, input }) => {
-      const { skip, take, pageSize } = ctx.pagination
+      const { skip, take, pageSize } = ctx.pagination;
       const page = await listProjects(
         ctx.db,
         {
@@ -92,12 +95,15 @@ export const projectsRouter = createTRPCRouter({
           kind: input.kind,
           status: input.status,
         },
-        { skip, take }
-      )
+        { skip, take },
+      );
       /* SERVER_TOTAL_PAGES — computed here, against the pageSize the FACTORY
        * clamped to, so the client's pager cannot disagree with the query that
        * produced the rows. The service stays pure Prisma and does no maths. */
-      return { ...page, totalPages: Math.max(1, Math.ceil(page.total / pageSize)) }
+      return {
+        ...page,
+        totalPages: Math.max(1, Math.ceil(page.total / pageSize)),
+      };
     }),
 
   /**
@@ -118,24 +124,36 @@ export const projectsRouter = createTRPCRouter({
   get: protectedProcedure({ requirePermission: permissions.PROJECTS_READ })
     .input(getProjectSchema)
     .query(async ({ ctx, input }) => {
-      const project = await findProjectWithTimeline(ctx.db, input.organizationId, input.id)
-      if (!project) throw new TRPCError({ code: 'NOT_FOUND', message: 'Project not found' })
+      const project = await findProjectWithTimeline(
+        ctx.db,
+        input.organizationId,
+        input.id,
+      );
+      if (!project)
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Project not found",
+        });
 
-      const { timeline, ...rest } = project
+      const { timeline, ...rest } = project;
       if (timeline === null) {
-        return { ...rest, timeline: null, timelineErrors: [] }
+        return { ...rest, timeline: null, timelineErrors: [] };
       }
 
-      const migrated = tryMigrate(timeline.doc)
+      const migrated = tryMigrate(timeline.doc);
       if (!migrated.ok) {
-        return { ...rest, timeline: null, timelineErrors: migrated.errors }
+        return { ...rest, timeline: null, timelineErrors: migrated.errors };
       }
 
       return {
         ...rest,
-        timeline: { doc: migrated.doc, revision: timeline.revision, updatedAt: timeline.updatedAt },
+        timeline: {
+          doc: migrated.doc,
+          revision: timeline.revision,
+          updatedAt: timeline.updatedAt,
+        },
         timelineErrors: [],
-      }
+      };
     }),
 
   /**
@@ -173,26 +191,46 @@ export const projectsRouter = createTRPCRouter({
   preview: protectedProcedure({ requirePermission: permissions.PROJECTS_READ })
     .input(previewProjectSchema)
     .query(async ({ ctx, input }) => {
-      const project = await findProjectWithTimeline(ctx.db, input.organizationId, input.id)
-      if (!project) throw new TRPCError({ code: 'NOT_FOUND', message: 'Project not found' })
+      const project = await findProjectWithTimeline(
+        ctx.db,
+        input.organizationId,
+        input.id,
+      );
+      if (!project)
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Project not found",
+        });
 
-      const { timeline, ...rest } = project
+      const { timeline, ...rest } = project;
       if (timeline === null) {
-        return { project: rest, doc: null, assets: {}, composition: null, timelineErrors: [] }
+        return {
+          project: rest,
+          doc: null,
+          assets: {},
+          composition: null,
+          timelineErrors: [],
+        };
       }
 
-      const migrated = tryMigrate(timeline.doc)
+      const migrated = tryMigrate(timeline.doc);
       if (!migrated.ok) {
-        return { project: rest, doc: null, assets: {}, composition: null, timelineErrors: migrated.errors }
+        return {
+          project: rest,
+          doc: null,
+          assets: {},
+          composition: null,
+          timelineErrors: migrated.errors,
+        };
       }
 
-      const resolved = resolveWordAnchors(migrated.doc)
+      const resolved = resolveWordAnchors(migrated.doc);
       const assets = await signDocumentAssets(
         ctx.db,
         collectAssetHandles(resolved),
         input.organizationId,
-        input.quality ?? 'preview'
-      )
+        input.quality ?? "preview",
+      );
 
       return {
         project: rest,
@@ -200,7 +238,7 @@ export const projectsRouter = createTRPCRouter({
         assets,
         composition: planComposition(resolved),
         timelineErrors: [],
-      }
+      };
     }),
 
   /**
@@ -218,13 +256,21 @@ export const projectsRouter = createTRPCRouter({
   rename: protectedProcedure({ requirePermission: permissions.PROJECTS_UPDATE })
     .input(renameProjectSchema)
     .mutation(async ({ ctx, input }) => {
-      const existing = await findProjectForOrganization(ctx.db, input.organizationId, input.id)
-      if (!existing) throw new TRPCError({ code: 'NOT_FOUND', message: 'Project not found' })
+      const existing = await findProjectForOrganization(
+        ctx.db,
+        input.organizationId,
+        input.id,
+      );
+      if (!existing)
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Project not found",
+        });
 
       return ctx.db.project.update({
         where: { id: existing.id },
         data: { title: input.title },
-      })
+      });
     }),
 
   /* The counter decrement and the audit row are the factory's, as on create.
@@ -232,10 +278,18 @@ export const projectsRouter = createTRPCRouter({
   delete: protectedProcedure({ requirePermission: permissions.PROJECTS_DELETE })
     .input(deleteProjectSchema)
     .mutation(async ({ ctx, input }) => {
-      const existing = await findProjectForOrganization(ctx.db, input.organizationId, input.id)
-      if (!existing) throw new TRPCError({ code: 'NOT_FOUND', message: 'Project not found' })
+      const existing = await findProjectForOrganization(
+        ctx.db,
+        input.organizationId,
+        input.id,
+      );
+      if (!existing)
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Project not found",
+        });
 
-      return ctx.db.project.delete({ where: { id: existing.id } })
+      return ctx.db.project.delete({ where: { id: existing.id } });
     }),
 
   /**
@@ -264,28 +318,41 @@ export const projectsRouter = createTRPCRouter({
    */
   duplicate: protectedProcedure({
     requirePermission: permissions.PROJECTS_CREATE,
-    audit: { action: 'duplicate' },
+    audit: { action: "duplicate" },
   })
     .input(duplicateProjectSchema)
     .mutation(async ({ ctx, input }) => {
-      const source = await findProjectWithTimeline(ctx.db, input.organizationId, input.id)
-      if (!source) throw new TRPCError({ code: 'NOT_FOUND', message: 'Project not found' })
+      const source = await findProjectWithTimeline(
+        ctx.db,
+        input.organizationId,
+        input.id,
+      );
+      if (!source)
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Project not found",
+        });
 
       /* Built to the same shape the factory's own gate throws, so the client's
        * upgrade modal opens identically whether the cap was hit by `create` or
        * by `duplicate` — see UPGRADE_COPY_FROM_REGISTRY in protected.ts. */
-      const gate = await checkFeatureGate(input.organizationId, 'projects', 1)
+      const gate = await checkFeatureGate(input.organizationId, "projects", 1);
       if (!gate.allowed) {
-        throw createStructuredError('FORBIDDEN', gate.reason || 'Plan limit reached', {
-          errorCode: ERROR_CODES.USAGE_LIMIT_REACHED,
-          resource: 'projects',
-          limit: gate.limit ?? 0,
-          current: gate.currentUsage ?? 0,
-          currentPlan: gate.plan,
-          upgradeRequired: true,
-          message: gate.reason || 'You have reached your plan limit for projects',
-          upgradeMessage: gate.upgradeMessage,
-        })
+        throw createStructuredError(
+          "FORBIDDEN",
+          gate.reason || "Plan limit reached",
+          {
+            errorCode: ERROR_CODES.USAGE_LIMIT_REACHED,
+            resource: "projects",
+            limit: gate.limit ?? 0,
+            current: gate.currentUsage ?? 0,
+            currentPlan: gate.plan,
+            upgradeRequired: true,
+            message:
+              gate.reason || "You have reached your plan limit for projects",
+            upgradeMessage: gate.upgradeMessage,
+          },
+        );
       }
 
       const copy = await ctx.db.project.create({
@@ -298,7 +365,7 @@ export const projectsRouter = createTRPCRouter({
           ...(source.sourceRef !== null ? { sourceRef: source.sourceRef } : {}),
           ...(source.settings !== null ? { settings: source.settings } : {}),
         },
-      })
+      });
 
       if (source.timeline !== null) {
         await ctx.db.timeline.create({
@@ -312,14 +379,14 @@ export const projectsRouter = createTRPCRouter({
             doc: source.timeline.doc as Prisma.InputJsonValue,
             revision: 0,
           },
-        })
+        });
       }
 
-      await incrementUsage(input.organizationId, 'projects', 1, ctx.db)
-      return copy
+      await incrementUsage(input.organizationId, "projects", 1, ctx.db);
+      return copy;
     }),
-})
+});
 
 /* Re-exported so a caller catching a failed migration from `get` does not have
  * to reach into the timeline module for the error class. */
-export { TimelineMigrationError }
+export { TimelineMigrationError };

@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -36,7 +30,7 @@
  *        Re-exported from src/lib/types.
  */
 
-import { z } from 'zod'
+import { z } from "zod";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: CREDIT_LEDGER_KINDS, creditLedgerKindSchema,
@@ -61,11 +55,17 @@ import { z } from 'zod'
  *        and unrecoverable later: the information is gone.
  * WHERE: CreditLedger.kind.
  */
-export const CREDIT_LEDGER_KINDS = ['purchase', 'grant', 'hold', 'commit', 'release'] as const
+export const CREDIT_LEDGER_KINDS = [
+  "purchase",
+  "grant",
+  "hold",
+  "commit",
+  "release",
+] as const;
 
-export const creditLedgerKindSchema = z.enum(CREDIT_LEDGER_KINDS)
+export const creditLedgerKindSchema = z.enum(CREDIT_LEDGER_KINDS);
 
-export type CreditLedgerKind = z.infer<typeof creditLedgerKindSchema>
+export type CreditLedgerKind = z.infer<typeof creditLedgerKindSchema>;
 
 /**
  * SOURCE OF TRUTH KEYWORDS: SIGN_BY_KIND, BALANCE_IS_A_SUM
@@ -87,7 +87,7 @@ export const SIGN_BY_KIND: Readonly<Record<CreditLedgerKind, 1 | -1>> = {
   release: 1,
   hold: -1,
   commit: -1,
-}
+};
 
 /**
  * SOURCE OF TRUTH KEYWORDS: CostLine, CostBreakdown, costBreakdownSchema,
@@ -112,18 +112,18 @@ export const costLineSchema = z
     label: z.string().min(1),
     credits: z.number().int(),
   })
-  .strict()
+  .strict();
 
-export type CostLine = z.infer<typeof costLineSchema>
+export type CostLine = z.infer<typeof costLineSchema>;
 
 export const costBreakdownSchema = z
   .object({
     total: z.number().int().nonnegative(),
     lines: z.array(costLineSchema),
   })
-  .strict()
+  .strict();
 
-export type CostBreakdown = z.infer<typeof costBreakdownSchema>
+export type CostBreakdown = z.infer<typeof costBreakdownSchema>;
 
 /**
  * SOURCE OF TRUTH KEYWORDS: CREDITABLE_KINDS, creditableKindSchema,
@@ -138,11 +138,17 @@ export type CostBreakdown = z.infer<typeof costBreakdownSchema>
  *        a rate table with a hole in it is easier to see than a missing case.
  * WHERE: estimate()'s input; the `kind` on a hold's metadata.
  */
-export const CREDITABLE_KINDS = ['render', 'script', 'tts', 'alignment', 'footage'] as const
+export const CREDITABLE_KINDS = [
+  "render",
+  "script",
+  "tts",
+  "alignment",
+  "footage",
+] as const;
 
-export const creditableKindSchema = z.enum(CREDITABLE_KINDS)
+export const creditableKindSchema = z.enum(CREDITABLE_KINDS);
 
-export type CreditableKind = z.infer<typeof creditableKindSchema>
+export type CreditableKind = z.infer<typeof creditableKindSchema>;
 
 /**
  * SOURCE OF TRUTH KEYWORDS: CREDIT_PACKS, CreditPackKey, creditPackKeySchema,
@@ -171,18 +177,35 @@ export type CreditableKind = z.infer<typeof creditableKindSchema>
  * WHERE: `credits.purchase`; the top-up cards on the credits screen.
  */
 export const CREDIT_PACKS = {
-  small: { credits: 500, label: 'Starter pack', priceEnvKey: 'STRIPE_CREDIT_PACK_SMALL_PRICE' },
-  medium: { credits: 2_000, label: 'Creator pack', priceEnvKey: 'STRIPE_CREDIT_PACK_MEDIUM_PRICE' },
-  large: { credits: 10_000, label: 'Studio pack', priceEnvKey: 'STRIPE_CREDIT_PACK_LARGE_PRICE' },
-} as const satisfies Record<string, { credits: number; label: string; priceEnvKey: string }>
+  small: {
+    credits: 500,
+    label: "Starter pack",
+    priceEnvKey: "STRIPE_CREDIT_PACK_SMALL_PRICE",
+  },
+  medium: {
+    credits: 2_000,
+    label: "Creator pack",
+    priceEnvKey: "STRIPE_CREDIT_PACK_MEDIUM_PRICE",
+  },
+  large: {
+    credits: 10_000,
+    label: "Studio pack",
+    priceEnvKey: "STRIPE_CREDIT_PACK_LARGE_PRICE",
+  },
+} as const satisfies Record<
+  string,
+  { credits: number; label: string; priceEnvKey: string }
+>;
 
-export type CreditPackKey = keyof typeof CREDIT_PACKS
+export type CreditPackKey = keyof typeof CREDIT_PACKS;
 
-export const CREDIT_PACK_KEYS = Object.keys(CREDIT_PACKS) as readonly CreditPackKey[]
+export const CREDIT_PACK_KEYS = Object.keys(
+  CREDIT_PACKS,
+) as readonly CreditPackKey[];
 
 export const creditPackKeySchema = z.enum(
   Object.keys(CREDIT_PACKS) as [CreditPackKey, ...CreditPackKey[]],
-)
+);
 
 /**
  * SOURCE OF TRUTH KEYWORDS: purchaseCreditsSchema, listLedgerSchema,
@@ -201,15 +224,15 @@ export const creditPackKeySchema = z.enum(
  *        amount could buy ten thousand credits for the price of five hundred.
  * WHERE: src/trpc/routers/credits.ts.
  */
-export const LEDGER_PAGE_SIZE = 20
+export const LEDGER_PAGE_SIZE = 20;
 
 export const purchaseCreditsSchema = z.object({
   organizationId: z.string().min(1),
   packKey: creditPackKeySchema,
   paymentMethodId: z.string().min(1),
-})
+});
 
-export type PurchaseCreditsValues = z.infer<typeof purchaseCreditsSchema>
+export type PurchaseCreditsValues = z.infer<typeof purchaseCreditsSchema>;
 
 export const listLedgerSchema = z.object({
   organizationId: z.string().min(1),
@@ -220,10 +243,10 @@ export const listLedgerSchema = z.object({
   page: z.number().int().positive().optional(),
   pageSize: z.number().int().positive().optional(),
   kind: creditLedgerKindSchema.optional(),
-})
+});
 
-export type ListLedgerValues = z.infer<typeof listLedgerSchema>
+export type ListLedgerValues = z.infer<typeof listLedgerSchema>;
 
 export const getBalanceSchema = z.object({
   organizationId: z.string().min(1),
-})
+});

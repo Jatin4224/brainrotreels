@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -21,13 +15,13 @@
  *        and src/trpc/routers/_app.ts.
  */
 
-import 'server-only'
+import "server-only";
 
-import { createTRPCOptionsProxy } from '@trpc/tanstack-react-query'
-import { cache } from 'react'
-import { createTRPCContext } from './init'
-import { makeQueryClient } from './tanstack-config'
-import { appRouter } from './routers/_app'
+import { createTRPCOptionsProxy } from "@trpc/tanstack-react-query";
+import { cache } from "react";
+import { createTRPCContext } from "./init";
+import { makeQueryClient } from "./tanstack-config";
+import { appRouter } from "./routers/_app";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: getQueryClient
@@ -42,7 +36,7 @@ import { appRouter } from './routers/_app'
 /* `cache()` so sibling Server Components in one request share ONE
  * QueryClient — without it, parallel prefetches each get their own and the
  * hydration boundary only ships one. */
-export const getQueryClient = cache(makeQueryClient)
+export const getQueryClient = cache(makeQueryClient);
 
 /**
  * SOURCE OF TRUTH KEYWORDS: trpc
@@ -59,4 +53,4 @@ export const trpc = createTRPCOptionsProxy({
   ctx: createTRPCContext,
   router: appRouter,
   queryClient: getQueryClient,
-})
+});

@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -34,14 +28,14 @@
  *        Router input lives in src/trpc/routers/audit-logs.ts.
  */
 
-import { z } from 'zod'
+import { z } from "zod";
 
-import { RESOURCES, isResourceKey } from '@/lib/resources'
+import { RESOURCES, isResourceKey } from "@/lib/resources";
 
 /** Select sentinel meaning "don't filter on this field". */
-export const AUDIT_FILTER_ALL = 'all'
+export const AUDIT_FILTER_ALL = "all";
 
-export const AUDIT_SEARCH_MAX = 200
+export const AUDIT_SEARCH_MAX = 200;
 
 export const auditLogFilterSchema = z.object({
   search: z.string().trim().max(AUDIT_SEARCH_MAX),
@@ -49,15 +43,15 @@ export const auditLogFilterSchema = z.object({
    * (AUDIT_FILTERS_FROM_DATA), so no fixed union can describe them. */
   action: z.string(),
   entity: z.string(),
-})
+});
 
-export type AuditLogFilterValues = z.infer<typeof auditLogFilterSchema>
+export type AuditLogFilterValues = z.infer<typeof auditLogFilterSchema>;
 
 export const AUDIT_FILTER_DEFAULTS: AuditLogFilterValues = {
-  search: '',
+  search: "",
   action: AUDIT_FILTER_ALL,
   entity: AUDIT_FILTER_ALL,
-}
+};
 
 /**
  * SOURCE OF TRUTH KEYWORDS: normalizeAuditFilters
@@ -70,20 +64,20 @@ export const AUDIT_FILTER_DEFAULTS: AuditLogFilterValues = {
  * WHERE: The audit-log table, when building its query input.
  */
 export function normalizeAuditFilters(values: AuditLogFilterValues): {
-  search?: string
-  action?: string
-  entity?: string
+  search?: string;
+  action?: string;
+  entity?: string;
 } {
-  const parsed = auditLogFilterSchema.parse(values)
-  const search = parsed.search.trim()
-  const action = parsed.action === AUDIT_FILTER_ALL ? '' : parsed.action
-  const entity = parsed.entity === AUDIT_FILTER_ALL ? '' : parsed.entity
+  const parsed = auditLogFilterSchema.parse(values);
+  const search = parsed.search.trim();
+  const action = parsed.action === AUDIT_FILTER_ALL ? "" : parsed.action;
+  const entity = parsed.entity === AUDIT_FILTER_ALL ? "" : parsed.entity;
 
   return {
     ...(search ? { search } : {}),
     ...(action ? { action } : {}),
     ...(entity ? { entity } : {}),
-  }
+  };
 }
 
 /**
@@ -107,7 +101,9 @@ export function normalizeAuditFilters(values: AuditLogFilterValues): {
  *        src/app/(dashboard)/dashboard/settings/audit-logs/_components.
  */
 export function getAuditEntityLabel(entity: string): string {
-  if (isResourceKey(entity)) return RESOURCES[entity].name
-  const spaced = entity.replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/[_-]+/g, ' ')
-  return spaced.charAt(0).toUpperCase() + spaced.slice(1)
+  if (isResourceKey(entity)) return RESOURCES[entity].name;
+  const spaced = entity
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/[_-]+/g, " ");
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
 }

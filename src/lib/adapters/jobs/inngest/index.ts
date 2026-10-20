@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -24,34 +18,34 @@
  * WHERE: Loaded by ../index.ts through a dynamic import.
  */
 
-import 'server-only'
+import "server-only";
 
-import { inngestClient } from './client'
-import type { JobEvent, JobsAdapter } from '../types'
+import { inngestClient } from "./client";
+import type { JobEvent, JobsAdapter } from "../types";
 
 /* Inngest wants `id` omitted rather than undefined — exactOptionalPropertyTypes
  * makes that distinction real, so build the payload conditionally. */
 function toInngestPayload(event: JobEvent): {
-  name: string
-  data: Record<string, unknown>
-  id?: string
+  name: string;
+  data: Record<string, unknown>;
+  id?: string;
 } {
   return {
     name: event.name,
     data: event.data,
     ...(event.id !== undefined ? { id: event.id } : {}),
-  }
+  };
 }
 
 export const inngestJobsAdapter: JobsAdapter = {
-  id: 'inngest',
+  id: "inngest",
 
   async send(event) {
-    await inngestClient.send(toInngestPayload(event))
+    await inngestClient.send(toInngestPayload(event));
   },
 
   async sendMany(events) {
-    if (events.length === 0) return
-    await inngestClient.send(events.map(toInngestPayload))
+    if (events.length === 0) return;
+    await inngestClient.send(events.map(toInngestPayload));
   },
-}
+};

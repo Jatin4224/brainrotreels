@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -30,7 +24,7 @@ import {
   Settings,
   Users,
   type LucideIcon,
-} from 'lucide-react'
+} from "lucide-react";
 
 /* Keyed by the exact strings used in RESOURCES[*].nav.icon. */
 export const NAV_ICONS: Record<string, LucideIcon> = {
@@ -44,9 +38,9 @@ export const NAV_ICONS: Record<string, LucideIcon> = {
   CreditCard,
   Settings,
   LayoutDashboard,
-}
+};
 
-export type NavIconName = keyof typeof NAV_ICONS
+export type NavIconName = keyof typeof NAV_ICONS;
 
 /**
  * SOURCE OF TRUTH KEYWORDS: getNavIcon
@@ -56,5 +50,5 @@ export type NavIconName = keyof typeof NAV_ICONS
  * WHERE: Called by app-sidebar.tsx when rendering each nav item.
  */
 export function getNavIcon(name: string): LucideIcon {
-  return NAV_ICONS[name] ?? Circle
+  return NAV_ICONS[name] ?? Circle;
 }

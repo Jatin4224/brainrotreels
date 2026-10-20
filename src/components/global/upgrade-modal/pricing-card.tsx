@@ -1,14 +1,8 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
-'use client'
+"use client";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: PricingCard, PricingCardProps, PriceDisplay,
@@ -32,14 +26,14 @@
  * WHERE: Rendered per plan by <UpgradeContent /> inside <PricingGridFrame />.
  */
 
-import { CheckIcon } from 'lucide-react'
+import { CheckIcon } from "lucide-react";
 
-import { cn } from '@/lib/utils'
-import type { BillingInterval } from '@/lib/config'
-import type { PlanFeatureRow } from '@/lib/resources'
-import type { AvailablePlan } from '@/lib/types'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
+import { cn } from "@/lib/utils";
+import type { BillingInterval } from "@/lib/config";
+import type { PlanFeatureRow } from "@/lib/resources";
+import type { AvailablePlan } from "@/lib/types";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: PriceDisplay
@@ -48,29 +42,29 @@ import { Button } from '@/components/ui/button'
  * trial state — e.g. `{ main: 'Free', sub: 'for 14 days, then $49/mo' }`.
  */
 export interface PriceDisplay {
-  main: string
-  sub: string
+  main: string;
+  sub: string;
 }
 
 export interface PricingCardProps {
-  plan: AvailablePlan
+  plan: AvailablePlan;
   /** Registry-derived rows for THIS plan — see getPlanFeatureRows. */
-  features: PlanFeatureRow[]
+  features: PlanFeatureRow[];
   /** Name of the tier below, for the "All X features plus..." line. */
-  previousPlanName: string | null
-  isSelected: boolean
-  isCurrentPlan: boolean
-  isCurrentlyOnTrial: boolean
+  previousPlanName: string | null;
+  isSelected: boolean;
+  isCurrentPlan: boolean;
+  isCurrentlyOnTrial: boolean;
   /** DOWNGRADE_REQUIRES_CLEANUP — the org is using more than this plan allows. */
-  isBlocked: boolean
-  priceDisplay: PriceDisplay
-  billingInterval: BillingInterval
+  isBlocked: boolean;
+  priceDisplay: PriceDisplay;
+  billingInterval: BillingInterval;
   /** Percent saved by paying yearly; 0 hides the badge. */
-  savings: number
+  savings: number;
   /** Selects the card for comparison. */
-  onSelect: () => void
+  onSelect: () => void;
   /** Selects it AND moves to the payment step. */
-  onProceed: () => void
+  onProceed: () => void;
 }
 
 export function PricingCard({
@@ -87,13 +81,16 @@ export function PricingCard({
   onSelect,
   onProceed,
 }: PricingCardProps) {
-  const hasTrial = plan.trialDays > 0
+  const hasTrial = plan.trialDays > 0;
   /* The free tier is never bought, and the plan you already pay for is not a
    * destination — but a TRIAL of it is, because converting is a real action. */
-  const canProceed = !plan.isFree && !(isCurrentPlan && !isCurrentlyOnTrial)
+  const canProceed = !plan.isFree && !(isCurrentPlan && !isCurrentlyOnTrial);
 
   return (
-    <div onClick={onSelect} className="relative flex h-full cursor-pointer flex-col">
+    <div
+      onClick={onSelect}
+      className="relative flex h-full cursor-pointer flex-col"
+    >
       {isSelected ? (
         <>
           {/* Solid rounded surface — covers the dashed cell edges so the
@@ -117,7 +114,9 @@ export function PricingCard({
       <div className="relative z-10 flex flex-1 flex-col p-6 sm:p-7">
         <h3 className="text-lg font-semibold tracking-tight">{plan.name}</h3>
         {plan.description ? (
-          <p className="mt-1 text-sm text-muted-foreground">{plan.description}</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {plan.description}
+          </p>
         ) : null}
 
         {/* Badge row keeps a fixed minimum height so cards with no badge line
@@ -154,10 +153,12 @@ export function PricingCard({
             {priceDisplay.main}
           </div>
           {priceDisplay.sub ? (
-            <p className="mt-1 text-sm text-muted-foreground">{priceDisplay.sub}</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {priceDisplay.sub}
+            </p>
           ) : null}
 
-          {billingInterval === 'yearly' && savings > 0 && !plan.isFree ? (
+          {billingInterval === "yearly" && savings > 0 && !plan.isFree ? (
             <Badge
               variant="secondary"
               className="mt-2 border border-success-border/40 bg-success/10 text-[10px] text-success"
@@ -170,20 +171,20 @@ export function PricingCard({
         <Button
           onClick={(event) => {
             /* The card itself selects on click; the CTA must not double-fire. */
-            event.stopPropagation()
-            if (canProceed) onProceed()
+            event.stopPropagation();
+            if (canProceed) onProceed();
           }}
           disabled={!canProceed}
-          variant={isSelected && canProceed ? 'default' : 'outline'}
+          variant={isSelected && canProceed ? "default" : "outline"}
           className="mb-6 w-full rounded-full"
         >
           {isCurrentPlan && !isCurrentlyOnTrial
-            ? 'Current plan'
+            ? "Current plan"
             : isCurrentPlan && isCurrentlyOnTrial
-              ? 'Keep this plan'
+              ? "Keep this plan"
               : plan.isFree
-                ? 'Included'
-                : 'Get started →'}
+                ? "Included"
+                : "Get started →"}
         </Button>
 
         <div className="flex-1 space-y-3">
@@ -197,23 +198,25 @@ export function PricingCard({
             <div
               key={feature.resource}
               className={cn(
-                'flex items-center gap-2.5 text-sm',
-                !feature.isIncluded && 'opacity-40'
+                "flex items-center gap-2.5 text-sm",
+                !feature.isIncluded && "opacity-40",
               )}
             >
               <CheckIcon
                 className={cn(
-                  'size-4 shrink-0',
-                  feature.isIncluded ? 'text-primary' : 'text-muted-foreground'
+                  "size-4 shrink-0",
+                  feature.isIncluded ? "text-primary" : "text-muted-foreground",
                 )}
               />
               {/* A limit reads as "10 seats", a flag as its own name — the noun
                   comes from the registry entry's `unit`, which is why a cap of
                   one renders "1 seat" rather than "1 Team Members". */}
               <span className="flex-1">
-                {feature.kind === 'limit' ? (
+                {feature.kind === "limit" ? (
                   <>
-                    {feature.isIncluded ? <span className="font-medium">{feature.amount} </span> : null}
+                    {feature.isIncluded ? (
+                      <span className="font-medium">{feature.amount} </span>
+                    ) : null}
                     {feature.noun}
                   </>
                 ) : (
@@ -225,7 +228,7 @@ export function PricingCard({
         </div>
       </div>
     </div>
-  )
+  );
 }
 
 /**
@@ -242,9 +245,14 @@ export function PricingNoiseFilter() {
     <svg className="absolute h-0 w-0 overflow-hidden" aria-hidden="true">
       <defs>
         <filter id="pricing-noise" x="0%" y="0%" width="100%" height="100%">
-          <feTurbulence type="fractalNoise" baseFrequency="0.65" numOctaves="3" stitchTiles="stitch" />
+          <feTurbulence
+            type="fractalNoise"
+            baseFrequency="0.65"
+            numOctaves="3"
+            stitchTiles="stitch"
+          />
         </filter>
       </defs>
     </svg>
-  )
+  );
 }

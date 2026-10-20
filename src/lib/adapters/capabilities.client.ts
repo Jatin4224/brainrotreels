@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -29,8 +23,8 @@
  *        Server-side truth lives in src/lib/adapters/<provider>/index.ts.
  */
 
-import { AUTH_PROVIDER } from './provider'
-import type { AdapterCapabilities, AuthProviderId } from './types'
+import { AUTH_PROVIDER } from "./provider";
+import type { AdapterCapabilities, AuthProviderId } from "./types";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: CLIENT_CAPABILITIES
@@ -41,12 +35,12 @@ import type { AdapterCapabilities, AuthProviderId } from './types'
  * WHERE: Read by getClientCapabilities below.
  */
 const CLIENT_CAPABILITIES: Record<AuthProviderId, AdapterCapabilities> = {
-  'better-auth': {
+  "better-auth": {
     ownershipTransfer: true,
     providerInvitations: false,
     appManagedOrganizations: true,
   },
-}
+};
 
 /**
  * SOURCE OF TRUTH KEYWORDS: getClientCapabilities
@@ -55,7 +49,7 @@ const CLIENT_CAPABILITIES: Record<AuthProviderId, AdapterCapabilities> = {
  * WHERE: Called by client components and by useProviderCapabilities.
  */
 export function getClientCapabilities(): AdapterCapabilities {
-  return CLIENT_CAPABILITIES[AUTH_PROVIDER]
+  return CLIENT_CAPABILITIES[AUTH_PROVIDER];
 }
 
 /**
@@ -68,5 +62,5 @@ export function getClientCapabilities(): AdapterCapabilities {
  * WHERE: Client components gating provider-dependent controls.
  */
 export function useProviderCapabilities(): AdapterCapabilities {
-  return getClientCapabilities()
+  return getClientCapabilities();
 }

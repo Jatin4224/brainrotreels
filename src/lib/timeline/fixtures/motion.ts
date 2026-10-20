@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -25,80 +19,103 @@
  * WHERE: validate.test.ts, ops.test.ts; the Phase 16 motion studio.
  */
 
-import type { TimelineDoc } from '../schema'
+import type { TimelineDoc } from "../schema";
 
 export function motionFixture(): TimelineDoc {
   return {
     version: 4,
-    kind: 'motion',
-    timing: 'resolved',
+    kind: "motion",
+    timing: "resolved",
     canvas: { width: 1080, height: 1920, fps: 30 },
-    style: { paletteId: 'mono', captionStyleId: 'none', safeZone: 'none' },
+    style: { paletteId: "mono", captionStyleId: "none", safeZone: "none" },
     words: [],
     tracks: [
       {
-        id: 'scenes',
-        type: 'scene',
-        label: 'Scenes',
+        id: "scenes",
+        type: "scene",
+        label: "Scenes",
         items: [
           {
-            id: 's1',
+            id: "s1",
             start: 0,
             duration: 2.5,
-            render: 'motion',
+            render: "motion",
             scene: {
-              layout: 'stack-center',
+              layout: "stack-center",
               elements: [
-                { id: 's1-head', kind: 'headline', text: 'Three numbers' },
-                { id: 's1-sub', kind: 'subhead', text: 'that explain the quarter' },
+                { id: "s1-head", kind: "headline", text: "Three numbers" },
+                {
+                  id: "s1-sub",
+                  kind: "subhead",
+                  text: "that explain the quarter",
+                },
               ],
             },
           },
           {
-            id: 's2',
+            id: "s2",
             start: 2.5,
             duration: 3,
-            render: 'motion',
+            render: "motion",
             scene: {
-              layout: 'figure-left',
+              layout: "figure-left",
               elements: [
-                { id: 's2-stat', kind: 'bigStat', text: '41%', props: { countFrom: 0 } },
-                { id: 's2-caption', kind: 'caption', text: 'of signups never finish setup' },
+                {
+                  id: "s2-stat",
+                  kind: "bigStat",
+                  text: "41%",
+                  props: { countFrom: 0 },
+                },
+                {
+                  id: "s2-caption",
+                  kind: "caption",
+                  text: "of signups never finish setup",
+                },
               ],
             },
           },
           {
-            id: 's3',
+            id: "s3",
             start: 5.5,
             duration: 2.5,
-            render: 'motion',
+            render: "motion",
             scene: {
-              layout: 'stack-center',
-              elements: [{ id: 's3-cta', kind: 'headline', text: 'Fix the first five minutes' }],
+              layout: "stack-center",
+              elements: [
+                {
+                  id: "s3-cta",
+                  kind: "headline",
+                  text: "Fix the first five minutes",
+                },
+              ],
             },
           },
         ],
       },
       {
-        id: 'overlays',
-        type: 'overlay',
-        label: 'Overlays',
+        id: "overlays",
+        type: "overlay",
+        label: "Overlays",
         items: [
           {
-            id: 'o1',
+            id: "o1",
             start: 0,
             duration: 8,
-            render: 'media',
+            render: "media",
             z: 1,
             box: { x: 0.82, y: 0.04, w: 0.14, h: 0.06 },
-            assetId: 'logo_badge',
+            assetId: "logo_badge",
           },
         ],
       },
     ],
     speakers: {},
     assets: {
-      logo_badge: { assetId: 'ast_logo_badge', kind: 'image', license: 'owned' },
+      logo_badge: {
+        assetId: "ast_logo_badge",
+        kind: "image",
+        license: "owned",
+      },
     },
-  }
+  };
 }

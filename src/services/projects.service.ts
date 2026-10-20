@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -31,11 +25,11 @@
  *        here.
  */
 
-import 'server-only'
+import "server-only";
 
-import type { Prisma, PrismaClient } from '@/generated/prisma'
+import type { Prisma, PrismaClient } from "@/generated/prisma";
 
-type DbClient = PrismaClient | Prisma.TransactionClient
+type DbClient = PrismaClient | Prisma.TransactionClient;
 
 /**
  * SOURCE OF TRUTH KEYWORDS: PROJECT_LIST_SELECT, ProjectListItem
@@ -56,9 +50,11 @@ export const PROJECT_LIST_SELECT = {
   parentId: true,
   createdAt: true,
   updatedAt: true,
-} as const satisfies Prisma.ProjectSelect
+} as const satisfies Prisma.ProjectSelect;
 
-export type ProjectListItem = Prisma.ProjectGetPayload<{ select: typeof PROJECT_LIST_SELECT }>
+export type ProjectListItem = Prisma.ProjectGetPayload<{
+  select: typeof PROJECT_LIST_SELECT;
+}>;
 
 /**
  * SOURCE OF TRUTH KEYWORDS: listProjects, ProjectListFilters
@@ -77,34 +73,34 @@ export type ProjectListItem = Prisma.ProjectGetPayload<{ select: typeof PROJECT_
 export async function listProjects(
   db: DbClient,
   filters: {
-    organizationId: string
-    search?: string | undefined
-    kind?: string | undefined
-    status?: string | undefined
+    organizationId: string;
+    search?: string | undefined;
+    kind?: string | undefined;
+    status?: string | undefined;
   },
-  pagination: { skip: number; take: number }
+  pagination: { skip: number; take: number },
 ): Promise<{ items: ProjectListItem[]; total: number }> {
   const where: Prisma.ProjectWhereInput = {
     organizationId: filters.organizationId,
     ...(filters.kind !== undefined ? { kind: filters.kind } : {}),
     ...(filters.status !== undefined ? { status: filters.status } : {}),
     ...(filters.search !== undefined && filters.search.length > 0
-      ? { title: { contains: filters.search, mode: 'insensitive' } }
+      ? { title: { contains: filters.search, mode: "insensitive" } }
       : {}),
-  }
+  };
 
   const [items, total] = await Promise.all([
     db.project.findMany({
       where,
       select: PROJECT_LIST_SELECT,
-      orderBy: { updatedAt: 'desc' },
+      orderBy: { updatedAt: "desc" },
       skip: pagination.skip,
       take: pagination.take,
     }),
     db.project.count({ where }),
-  ])
+  ]);
 
-  return { items, total }
+  return { items, total };
 }
 
 /**
@@ -119,9 +115,9 @@ export async function listProjects(
 export async function findProjectForOrganization(
   db: DbClient,
   organizationId: string,
-  id: string
+  id: string,
 ): Promise<Prisma.ProjectGetPayload<Record<string, never>> | null> {
-  return db.project.findFirst({ where: { id, organizationId } })
+  return db.project.findFirst({ where: { id, organizationId } });
 }
 
 /**
@@ -136,16 +132,17 @@ export async function findProjectForOrganization(
  * WHERE: projects.get; the editor (Phase 15) and the render pre-flight
  *        (Phase 04).
  */
-export type ProjectWithTimeline = Prisma.ProjectGetPayload<{ include: { timeline: true } }>
+export type ProjectWithTimeline = Prisma.ProjectGetPayload<{
+  include: { timeline: true };
+}>;
 
 export async function findProjectWithTimeline(
   db: DbClient,
   organizationId: string,
-  id: string
+  id: string,
 ): Promise<ProjectWithTimeline | null> {
   return db.project.findFirst({
     where: { id, organizationId },
     include: { timeline: true },
-  })
+  });
 }
-

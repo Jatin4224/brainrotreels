@@ -1,14 +1,8 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
-'use client'
+"use client";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: AuditLogsTable, DataTable, usePaginatedFilters,
@@ -27,29 +21,34 @@
  * WHERE: Rendered by /dashboard/settings/audit-logs.
  */
 
-import { format, formatDistanceToNow } from 'date-fns'
-import type { inferRouterOutputs } from '@trpc/server'
+import { format, formatDistanceToNow } from "date-fns";
+import type { inferRouterOutputs } from "@trpc/server";
 
-import type { AppRouter } from '@/trpc/routers/_app'
-import { trpc } from '@/trpc/react-provider'
-import { useActiveOrganizationId } from '@/hooks/use-active-organization'
+import type { AppRouter } from "@/trpc/routers/_app";
+import { trpc } from "@/trpc/react-provider";
+import { useActiveOrganizationId } from "@/hooks/use-active-organization";
 import {
   AUDIT_FILTER_DEFAULTS,
   normalizeAuditFilters,
   type AuditLogFilterValues,
-} from '@/lib/types/audit'
-import { getAuditEntityLabel } from '@/lib/resources'
-import { DataTable, type DataTableColumn, usePaginatedFilters } from '@/components/global/data-table'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Badge } from '@/components/ui/badge'
-import { AuditLogFilters } from './audit-log-filters'
+} from "@/lib/types/audit";
+import { getAuditEntityLabel } from "@/lib/resources";
+import {
+  DataTable,
+  type DataTableColumn,
+  usePaginatedFilters,
+} from "@/components/global/data-table";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { AuditLogFilters } from "./audit-log-filters";
 
-const PAGE_SIZE = 20
+const PAGE_SIZE = 20;
 
 /* Derived from the router output so the row shape follows the server — the
  * pattern docs/08-types-and-grep.md prescribes for client code mirroring a
  * server contract. */
-type AuditLogEntry = inferRouterOutputs<AppRouter>['auditLogs']['list']['logs'][number]
+type AuditLogEntry =
+  inferRouterOutputs<AppRouter>["auditLogs"]["list"]["logs"][number];
 
 /* AUDIT_ROW_SUMMARY — `description` is null on every auto-audited row (the
  * procedure factory records action + entity, not prose), so the summary is
@@ -58,65 +57,71 @@ type AuditLogEntry = inferRouterOutputs<AppRouter>['auditLogs']['list']['logs'][
  * ("resend" → "resent", not "resended") and the timestamp already establishes
  * that it happened. */
 function summarize(log: AuditLogEntry): string {
-  if (log.description !== null) return log.description
-  const entityLabel = getAuditEntityLabel(log.entity).toLowerCase()
-  return `${log.action.charAt(0).toUpperCase()}${log.action.slice(1)} ${entityLabel}`
+  if (log.description !== null) return log.description;
+  const entityLabel = getAuditEntityLabel(log.entity).toLowerCase();
+  return `${log.action.charAt(0).toUpperCase()}${log.action.slice(1)} ${entityLabel}`;
 }
 
 const columns: readonly DataTableColumn<AuditLogEntry>[] = [
   {
-    id: 'event',
-    header: 'Event',
+    id: "event",
+    header: "Event",
     cell: (log) => {
-      const actor = log.user?.name ?? 'System'
-      const createdAt = new Date(log.createdAt)
+      const actor = log.user?.name ?? "System";
+      const createdAt = new Date(log.createdAt);
       return (
         <div className="flex min-w-0 items-center gap-3">
           <Avatar className="size-8 shrink-0">
-            {log.user?.image ? <AvatarImage src={log.user.image} alt={actor} /> : null}
-            <AvatarFallback className="text-xs">{actor.charAt(0).toUpperCase()}</AvatarFallback>
+            {log.user?.image ? (
+              <AvatarImage src={log.user.image} alt={actor} />
+            ) : null}
+            <AvatarFallback className="text-xs">
+              {actor.charAt(0).toUpperCase()}
+            </AvatarFallback>
           </Avatar>
           <div className="min-w-0">
             <p className="truncate text-sm">{summarize(log)}</p>
             <p className="truncate text-xs text-muted-foreground">
-              {actor} ·{' '}
+              {actor} ·{" "}
               <time dateTime={createdAt.toISOString()}>
                 {formatDistanceToNow(createdAt, { addSuffix: true })}
               </time>
             </p>
           </div>
         </div>
-      )
+      );
     },
   },
   {
-    id: 'entity',
-    header: 'Record',
+    id: "entity",
+    header: "Record",
     hideOnMobile: true,
-    className: 'w-px',
-    cell: (log) => <Badge variant="secondary">{getAuditEntityLabel(log.entity)}</Badge>,
+    className: "w-px",
+    cell: (log) => (
+      <Badge variant="secondary">{getAuditEntityLabel(log.entity)}</Badge>
+    ),
   },
   {
-    id: 'action',
-    header: 'Action',
-    className: 'w-px text-right',
+    id: "action",
+    header: "Action",
+    className: "w-px text-right",
     cell: (log) => (
       <Badge variant="outline" className="capitalize">
         {log.action}
       </Badge>
     ),
   },
-]
+];
 
 /* Exact timestamps live here, not in the row: a forensic reader needs the real
  * time, while the list reads better relative. */
 function AuditLogDetail({ log }: { log: AuditLogEntry }) {
-  const createdAt = new Date(log.createdAt)
+  const createdAt = new Date(log.createdAt);
 
   return (
     <dl className="grid gap-2 text-xs sm:grid-cols-[7rem_1fr]">
       <dt className="text-muted-foreground">Recorded</dt>
-      <dd>{format(createdAt, 'MMMM d, yyyy · HH:mm:ss')}</dd>
+      <dd>{format(createdAt, "MMMM d, yyyy · HH:mm:ss")}</dd>
 
       {log.entityId ? (
         <>
@@ -139,34 +144,39 @@ function AuditLogDetail({ log }: { log: AuditLogEntry }) {
         </>
       ) : null}
     </dl>
-  )
+  );
 }
 
 export function AuditLogsTable() {
-  const organizationId = useActiveOrganizationId()
+  const organizationId = useActiveOrganizationId();
 
   const { filters, setFilters, applied, page, setPage, isFiltered } =
     usePaginatedFilters<AuditLogFilterValues>({
       defaults: AUDIT_FILTER_DEFAULTS,
-      searchKey: 'search',
+      searchKey: "search",
       normalize: normalizeAuditFilters,
-    })
+    });
 
-  const enabled = organizationId !== undefined
+  const enabled = organizationId !== undefined;
 
   const query = trpc.auditLogs.list.useQuery(
-    { organizationId: organizationId ?? '', page, pageSize: PAGE_SIZE, ...applied },
+    {
+      organizationId: organizationId ?? "",
+      page,
+      pageSize: PAGE_SIZE,
+      ...applied,
+    },
     { enabled, retry: false, placeholderData: (previous) => previous },
-  )
+  );
 
   const optionsQuery = trpc.auditLogs.filterOptions.useQuery(
-    { organizationId: organizationId ?? '' },
+    { organizationId: organizationId ?? "" },
     { enabled, retry: false, staleTime: 60_000 },
-  )
+  );
 
-  if (!organizationId) return null
+  if (!organizationId) return null;
 
-  const data = query.data
+  const data = query.data;
 
   return (
     <DataTable<AuditLogEntry>
@@ -176,7 +186,9 @@ export function AuditLogsTable() {
       total={data?.total ?? 0}
       page={page}
       pageSize={PAGE_SIZE}
-      {...(data?.totalPages !== undefined ? { totalPages: data.totalPages } : {})}
+      {...(data?.totalPages !== undefined
+        ? { totalPages: data.totalPages }
+        : {})}
       onPageChange={setPage}
       isLoading={query.isPending && data === undefined}
       isFetching={query.isFetching}
@@ -191,11 +203,13 @@ export function AuditLogsTable() {
         />
       }
       expandedRow={(log) =>
-        log.entityId !== null || log.metadata !== null ? <AuditLogDetail log={log} /> : null
+        log.entityId !== null || log.metadata !== null ? (
+          <AuditLogDetail log={log} />
+        ) : null
       }
       empty="No activity recorded yet."
       emptyFiltered="No activity matches these filters."
-      countLabel={['entry', 'entries']}
+      countLabel={["entry", "entries"]}
     />
-  )
+  );
 }

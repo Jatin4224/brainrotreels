@@ -1,14 +1,8 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
-'use client'
+"use client";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: ProjectPreview, RemotionPlayer, PROXY_FOR_SCRUBBING,
@@ -43,27 +37,29 @@
  * WHERE: Mounted by the preview page's server component.
  */
 
-import * as React from 'react'
-import { Player } from '@remotion/player'
+import * as React from "react";
+import { Player } from "@remotion/player";
 
-import { trpc } from '@/trpc/react-provider'
-import { useActiveOrganizationId } from '@/hooks/use-active-organization'
-import { TimelineRenderer } from '@/remotion/timeline-renderer'
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { Card, CardContent } from '@/components/ui/card'
-import { Skeleton } from '@/components/ui/skeleton'
+import { trpc } from "@/trpc/react-provider";
+import { useActiveOrganizationId } from "@/hooks/use-active-organization";
+import { TimelineRenderer } from "@/remotion/timeline-renderer";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export function ProjectPreview({ projectId }: { projectId: string }) {
-  const organizationId = useActiveOrganizationId()
-  const enabled = organizationId !== undefined
+  const organizationId = useActiveOrganizationId();
+  const enabled = organizationId !== undefined;
 
   const query = trpc.projects.preview.useQuery(
-    { organizationId: organizationId ?? '', id: projectId },
+    { organizationId: organizationId ?? "", id: projectId },
     { enabled, retry: false },
-  )
+  );
 
   if (!enabled || (query.isPending && query.data === undefined)) {
-    return <Skeleton className="mx-auto aspect-[9/16] w-full max-w-sm rounded-xl" />
+    return (
+      <Skeleton className="mx-auto aspect-[9/16] w-full max-w-sm rounded-xl" />
+    );
   }
 
   if (query.error !== null) {
@@ -72,39 +68,45 @@ export function ProjectPreview({ projectId }: { projectId: string }) {
         <AlertTitle>This project could not be opened</AlertTitle>
         <AlertDescription>{query.error.message}</AlertDescription>
       </Alert>
-    )
+    );
   }
 
-  const data = query.data
-  if (data === undefined) return null
+  const data = query.data;
+  if (data === undefined) return null;
 
   /* PREVIEW_EMPTY_STATES — the two cases are deliberately not merged. */
   if (data.doc === null) {
-    const broken = data.timelineErrors.length > 0
+    const broken = data.timelineErrors.length > 0;
     return (
       <Card>
         <CardContent className="py-10 text-center text-sm text-muted-foreground">
           {broken ? (
             <>
-              <p className="font-medium text-foreground">This timeline could not be read</p>
+              <p className="font-medium text-foreground">
+                This timeline could not be read
+              </p>
               <p className="mt-1">
-                It was written in a format this version cannot open. Nothing has been lost —
-                please contact support with the project name.
+                It was written in a format this version cannot open. Nothing has
+                been lost — please contact support with the project name.
               </p>
             </>
           ) : (
             <>
-              <p className="font-medium text-foreground">Nothing to preview yet</p>
-              <p className="mt-1">This project has no timeline. Generate one to see it here.</p>
+              <p className="font-medium text-foreground">
+                Nothing to preview yet
+              </p>
+              <p className="mt-1">
+                This project has no timeline. Generate one to see it here.
+              </p>
             </>
           )}
         </CardContent>
       </Card>
-    )
+    );
   }
 
-  const { doc, assets, composition } = data
-  if (composition === null) return null
+  const { doc, assets, composition } = data;
+  if (composition === null) return null;
 
   return (
     <div className="flex flex-col items-center gap-3">
@@ -124,14 +126,17 @@ export function ProjectPreview({ projectId }: { projectId: string }) {
         loop
         acknowledgeRemotionLicense
         className="overflow-hidden rounded-xl border border-border bg-card"
-        style={{ width: '100%', maxWidth: 360, aspectRatio: `${composition.width} / ${composition.height}` }}
+        style={{
+          width: "100%",
+          maxWidth: 360,
+          aspectRatio: `${composition.width} / ${composition.height}`,
+        }}
       />
 
       <p className="text-xs text-muted-foreground">
-        {composition.durationInSeconds.toFixed(1)}s · {composition.width}×{composition.height} ·
-        {' '}
-        {composition.fps}fps · preview quality
+        {composition.durationInSeconds.toFixed(1)}s · {composition.width}×
+        {composition.height} · {composition.fps}fps · preview quality
       </p>
     </div>
-  )
+  );
 }

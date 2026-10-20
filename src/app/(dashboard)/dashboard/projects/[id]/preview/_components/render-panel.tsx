@@ -1,14 +1,8 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
-'use client'
+"use client";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: RenderPanel, LOCKED_NOT_HIDDEN, POLL_WHILE_RUNNING,
@@ -51,17 +45,20 @@
  * WHERE: Rendered beside the player on /dashboard/projects/[id]/preview.
  */
 
-import * as React from 'react'
-import { useRouter } from 'next/navigation'
-import { toast } from 'sonner'
+import * as React from "react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
-import { trpc } from '@/trpc/react-provider'
-import { useActiveOrganization, useActiveOrganizationId } from '@/hooks/use-active-organization'
-import { FeatureGate, usePlanTier } from '@/components/feature-gate'
-import { useUpgradeModal } from '@/components/global/upgrade-modal'
-import { permissions } from '@/lib/permissions'
-import { PLANS } from '@/lib/config/plans'
-import { RESOURCES } from '@/lib/resources'
+import { trpc } from "@/trpc/react-provider";
+import {
+  useActiveOrganization,
+  useActiveOrganizationId,
+} from "@/hooks/use-active-organization";
+import { FeatureGate, usePlanTier } from "@/components/feature-gate";
+import { useUpgradeModal } from "@/components/global/upgrade-modal";
+import { permissions } from "@/lib/permissions";
+import { PLANS } from "@/lib/config/plans";
+import { RESOURCES } from "@/lib/resources";
 import {
   RENDER_ATTEMPT_LIMIT,
   RENDER_RESOLUTIONS,
@@ -70,22 +67,22 @@ import {
   resolutionsForPlan,
   type RenderResolution,
   type RenderStatus,
-} from '@/lib/types'
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { Badge } from '@/components/ui/badge'
-import { Button, buttonVariants } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Skeleton } from '@/components/ui/skeleton'
+} from "@/lib/types";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 
 /** Two seconds, as on the media table — fast enough to feel live, slow enough
  *  that a long render is not hundreds of requests. */
-const RUNNING_POLL_MS = 2000
+const RUNNING_POLL_MS = 2000;
 
 /** The states that mean work is still happening, so the list keeps polling. */
-const RUNNING_STATUSES: readonly RenderStatus[] = ['queued', 'rendering']
+const RUNNING_STATUSES: readonly RenderStatus[] = ["queued", "rendering"];
 
 function isRunning(status: string): boolean {
-  return (RUNNING_STATUSES as readonly string[]).includes(status)
+  return (RUNNING_STATUSES as readonly string[]).includes(status);
 }
 
 /**
@@ -99,25 +96,28 @@ function isRunning(status: string): boolean {
  * WHERE: The row below.
  */
 const RENDER_STATUS_COPY: Readonly<
-  Record<RenderStatus, { label: string; tone: 'default' | 'secondary' | 'destructive' }>
+  Record<
+    RenderStatus,
+    { label: string; tone: "default" | "secondary" | "destructive" }
+  >
 > = {
-  queued: { label: 'Queued', tone: 'secondary' },
-  rendering: { label: 'Rendering', tone: 'secondary' },
-  completed: { label: 'Ready', tone: 'default' },
-  failed: { label: 'Failed', tone: 'destructive' },
-  timedOut: { label: 'Timed out', tone: 'destructive' },
-}
+  queued: { label: "Queued", tone: "secondary" },
+  rendering: { label: "Rendering", tone: "secondary" },
+  completed: { label: "Ready", tone: "default" },
+  failed: { label: "Failed", tone: "destructive" },
+  timedOut: { label: "Timed out", tone: "destructive" },
+};
 
 export function RenderPanel({ projectId }: { projectId: string }) {
-  const utils = trpc.useUtils()
-  const organizationId = useActiveOrganizationId()
-  const { hasPermission } = useActiveOrganization()
-  const upgradeModal = useUpgradeModal()
-  const router = useRouter()
-  const plan = usePlanTier()
+  const utils = trpc.useUtils();
+  const organizationId = useActiveOrganizationId();
+  const { hasPermission } = useActiveOrganization();
+  const upgradeModal = useUpgradeModal();
+  const router = useRouter();
+  const plan = usePlanTier();
 
-  const enabled = organizationId !== undefined
-  const canRender = hasPermission(permissions.RENDERS_CREATE)
+  const enabled = organizationId !== undefined;
+  const canRender = hasPermission(permissions.RENDERS_CREATE);
 
   /**
    * SOURCE OF TRUTH KEYWORDS: CHOICE_IS_DERIVED_NOT_SYNCED
@@ -131,12 +131,12 @@ export function RenderPanel({ projectId }: { projectId: string }) {
    * overwriting a deliberate choice to export something smaller. Derived, the
    * default simply appears the moment the plan does, and a click still wins.
    */
-  const [chosen, setChosen] = React.useState<RenderResolution | null>(null)
+  const [chosen, setChosen] = React.useState<RenderResolution | null>(null);
   const resolution: RenderResolution | null =
-    chosen ?? (plan === null ? null : bestResolutionForPlan(plan))
+    chosen ?? (plan === null ? null : bestResolutionForPlan(plan));
 
   const rendersQuery = trpc.renders.list.useQuery(
-    { organizationId: organizationId ?? '', projectId },
+    { organizationId: organizationId ?? "", projectId },
     {
       enabled,
       retry: false,
@@ -144,58 +144,69 @@ export function RenderPanel({ projectId }: { projectId: string }) {
       /* POLL_WHILE_RUNNING — the predicate is re-evaluated after every fetch,
        * so polling stops by itself when the last render settles. */
       refetchInterval: (query) =>
-        (query.state.data?.rows ?? []).some((render) => isRunning(render.status))
+        (query.state.data?.rows ?? []).some((render) =>
+          isRunning(render.status),
+        )
           ? RUNNING_POLL_MS
           : false,
     },
-  )
+  );
 
-  const latest = rendersQuery.data?.rows[0] ?? null
+  const latest = rendersQuery.data?.rows[0] ?? null;
 
   /* The download URL is signed per request and therefore cannot live on the
    * list row (DOWNLOAD_URL_IS_SIGNED_ON_READ) — so it is fetched only for the
    * render that actually has something to download. */
   const detailQuery = trpc.renders.get.useQuery(
-    { organizationId: organizationId ?? '', id: latest?.id ?? '' },
-    { enabled: enabled && latest !== null && latest.status === 'completed', retry: false },
-  )
+    { organizationId: organizationId ?? "", id: latest?.id ?? "" },
+    {
+      enabled: enabled && latest !== null && latest.status === "completed",
+      retry: false,
+    },
+  );
 
   const createRender = trpc.renders.create.useMutation({
     onSuccess: (result) => {
       if (result.reused) {
         /* REUSE_IS_INVISIBLE — said out loud, because a render that completes
          * instantly otherwise reads as a bug rather than as a saving. */
-        toast.success('This version has already been rendered', {
-          description: 'Nothing changed since the last export, so it did not cost a render.',
-        })
+        toast.success("This version has already been rendered", {
+          description:
+            "Nothing changed since the last export, so it did not cost a render.",
+        });
       } else {
-        toast.success('Rendering started', {
-          description: 'This takes a few minutes. You can leave this page.',
-        })
+        toast.success("Rendering started", {
+          description: "This takes a few minutes. You can leave this page.",
+        });
       }
-      void utils.renders.invalidate()
+      void utils.renders.invalidate();
       /* The monthly counter moved, so the gate and any meter reading it are
          stale — unless this was a reuse, which spends nothing. The invalidate
          is unconditional because it is cheap and being wrong in the other
          direction shows a customer a quota they have already spent. */
-      void utils.usage.invalidate()
+      void utils.usage.invalidate();
     },
     onError: (error) => {
-      toast.error('That render could not be started', { description: error.message })
+      toast.error("That render could not be started", {
+        description: error.message,
+      });
     },
-  })
+  });
 
   const retryRender = trpc.renders.retry.useMutation({
     onSuccess: () => {
-      toast.success('Trying that render again')
-      void utils.renders.invalidate()
+      toast.success("Trying that render again");
+      void utils.renders.invalidate();
     },
     onError: (error) => {
-      toast.error('That render could not be retried', { description: error.message })
+      toast.error("That render could not be retried", {
+        description: error.message,
+      });
     },
-  })
+  });
 
-  if (!enabled || plan === null) return <Skeleton className="h-56 w-full rounded-xl" />
+  if (!enabled || plan === null)
+    return <Skeleton className="h-56 w-full rounded-xl" />;
 
   /* COST_ON_THE_BUTTON. The price comes from the SERVER, through the same
    * estimator the refusal and the hold use — a cost computed here would be a
@@ -204,19 +215,20 @@ export function RenderPanel({ projectId }: { projectId: string }) {
    * is exactly what changes it. */
   const estimateQuery = trpc.renders.estimate.useQuery(
     {
-      organizationId: organizationId ?? '',
+      organizationId: organizationId ?? "",
       projectId,
-      resolution: resolution ?? '1080p',
+      resolution: resolution ?? "1080p",
     },
     { enabled: enabled && resolution !== null, retry: false },
-  )
+  );
 
-  const cost = estimateQuery.data?.cost ?? null
-  const affordable = estimateQuery.data?.affordable ?? true
+  const cost = estimateQuery.data?.cost ?? null;
+  const affordable = estimateQuery.data?.affordable ?? true;
 
-  const allowed = resolutionsForPlan(plan)
-  const watermarked = !planHasCleanExport(plan)
-  const busy = createRender.isPending || (latest !== null && isRunning(latest.status))
+  const allowed = resolutionsForPlan(plan);
+  const watermarked = !planHasCleanExport(plan);
+  const busy =
+    createRender.isPending || (latest !== null && isRunning(latest.status));
 
   return (
     <Card>
@@ -231,41 +243,43 @@ export function RenderPanel({ projectId }: { projectId: string }) {
           <p className="text-sm font-medium text-foreground">Quality</p>
           <div className="flex flex-wrap gap-2">
             {RENDER_RESOLUTIONS.map((option) => {
-              const unlocked = isResolutionAllowedForPlan(plan, option)
-              const selected = resolution === option
+              const unlocked = isResolutionAllowedForPlan(plan, option);
+              const selected = resolution === option;
 
               return (
                 <Button
                   key={option}
                   type="button"
                   size="sm"
-                  variant={selected ? 'default' : 'outline'}
+                  variant={selected ? "default" : "outline"}
                   onClick={() => {
                     if (unlocked) {
-                      setChosen(option)
-                      return
+                      setChosen(option);
+                      return;
                     }
                     /* The same modal a server refusal would produce, so the two
                        paths land on one screen. */
                     upgradeModal.open({
-                      resource: 'renders',
+                      resource: "renders",
                       upgradeMessage: `${option} exports are included from ${PLANS.starter.name} upwards.`,
-                    })
+                    });
                   }}
                   /* NOT disabled when locked — a disabled button cannot be
                      clicked, and clicking is what opens the upgrade path. It is
                      styled as unavailable and behaves as an upsell. */
-                  className={unlocked ? undefined : 'opacity-60'}
+                  className={unlocked ? undefined : "opacity-60"}
                 >
                   {option}
-                  {unlocked ? null : <span className="ml-1.5 text-xs">· Upgrade</span>}
+                  {unlocked ? null : (
+                    <span className="ml-1.5 text-xs">· Upgrade</span>
+                  )}
                 </Button>
-              )
+              );
             })}
           </div>
           {allowed.length < RENDER_RESOLUTIONS.length ? (
             <p className="text-xs text-muted-foreground">
-              Your plan exports at {allowed.join(' and ')}.
+              Your plan exports at {allowed.join(" and ")}.
             </p>
           ) : null}
         </div>
@@ -288,21 +302,21 @@ export function RenderPanel({ projectId }: { projectId: string }) {
               type="button"
               disabled={!canRender || busy || resolution === null}
               onClick={() => {
-                if (resolution === null) return
+                if (resolution === null) return;
                 /* A short balance sends them where they can fix it rather than
                    firing a request we already know the server will refuse with
                    INSUFFICIENT_CREDITS. The server still refuses it if they
                    get here another way — this is the affordance, not the
                    boundary. */
                 if (!affordable) {
-                  router.push('/dashboard/settings/credits')
-                  return
+                  router.push("/dashboard/settings/credits");
+                  return;
                 }
                 createRender.mutate({
                   organizationId,
                   projectId,
                   resolution,
-                })
+                });
               }}
             >
               {/* COST_ON_THE_BUTTON, and the label switches to the REMEDY when
@@ -312,11 +326,11 @@ export function RenderPanel({ projectId }: { projectId: string }) {
                   The cost is omitted while it loads rather than shown as 0,
                   because a price that flickers from 0 to 12 reads as a bait. */}
               {busy
-                ? 'Rendering…'
+                ? "Rendering…"
                 : !affordable
-                  ? 'Top up credits'
+                  ? "Top up credits"
                   : cost === null
-                    ? 'Render video'
+                    ? "Render video"
                     : `Render video (${cost.total} credits)`}
             </Button>
           </FeatureGate>
@@ -337,12 +351,14 @@ export function RenderPanel({ projectId }: { projectId: string }) {
         ) : (
           <div className="flex flex-col gap-2 rounded-lg border border-border p-3">
             <div className="flex flex-wrap items-center gap-2">
-              <Badge variant={RENDER_STATUS_COPY[toRenderStatus(latest.status)].tone}>
+              <Badge
+                variant={RENDER_STATUS_COPY[toRenderStatus(latest.status)].tone}
+              >
                 {RENDER_STATUS_COPY[toRenderStatus(latest.status)].label}
               </Badge>
               <span className="text-sm text-muted-foreground">
                 {latest.resolution}
-                {latest.watermark ? ' · watermarked' : ''}
+                {latest.watermark ? " · watermarked" : ""}
               </span>
             </div>
 
@@ -358,7 +374,8 @@ export function RenderPanel({ projectId }: { projectId: string }) {
                   />
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  {Math.round(latest.progress * 100)}% · this can take a few minutes
+                  {Math.round(latest.progress * 100)}% · this can take a few
+                  minutes
                 </p>
               </div>
             ) : null}
@@ -368,7 +385,7 @@ export function RenderPanel({ projectId }: { projectId: string }) {
             ) : null}
 
             <div className="flex flex-wrap items-center gap-2">
-              {latest.status === 'completed' ? (
+              {latest.status === "completed" ? (
                 detailQuery.data?.downloadUrl ? (
                   /* A plain anchor styled with buttonVariants rather than a
                      <Button>: this Button has no `asChild`, and the element
@@ -379,7 +396,7 @@ export function RenderPanel({ projectId }: { projectId: string }) {
                   <a
                     href={detailQuery.data.downloadUrl}
                     download
-                    className={buttonVariants({ size: 'sm' })}
+                    className={buttonVariants({ size: "sm" })}
                   >
                     Download
                   </a>
@@ -390,7 +407,7 @@ export function RenderPanel({ projectId }: { projectId: string }) {
                 )
               ) : null}
 
-              {(latest.status === 'failed' || latest.status === 'timedOut') &&
+              {(latest.status === "failed" || latest.status === "timedOut") &&
               latest.attempts < RENDER_ATTEMPT_LIMIT ? (
                 <Button
                   size="sm"
@@ -404,7 +421,7 @@ export function RenderPanel({ projectId }: { projectId: string }) {
                 </Button>
               ) : null}
 
-              {(latest.status === 'failed' || latest.status === 'timedOut') &&
+              {(latest.status === "failed" || latest.status === "timedOut") &&
               latest.attempts >= RENDER_ATTEMPT_LIMIT ? (
                 <p className="text-xs text-muted-foreground">
                   This render has already been retried once.
@@ -415,7 +432,7 @@ export function RenderPanel({ projectId }: { projectId: string }) {
         )}
       </CardContent>
     </Card>
-  )
+  );
 }
 
 /**
@@ -432,7 +449,7 @@ export function RenderPanel({ projectId }: { projectId: string }) {
  * WHERE: The row above.
  */
 function toRenderStatus(value: string): RenderStatus {
-  return value in RENDER_STATUS_COPY ? (value as RenderStatus) : 'failed'
+  return value in RENDER_STATUS_COPY ? (value as RenderStatus) : "failed";
 }
 
 /**
@@ -447,5 +464,5 @@ function toRenderStatus(value: string): RenderStatus {
  * WHERE: The watermark notice above.
  */
 function planHasCleanExport(plan: keyof typeof PLANS): boolean {
-  return RESOURCES.watermarkFree.flag.perPlan[plan]
+  return RESOURCES.watermarkFree.flag.perPlan[plan];
 }

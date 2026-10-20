@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -27,7 +21,7 @@
  *        (Phase 15).
  */
 
-export { TIMELINE_DOC_VERSION, RENDER_KINDS, TRACK_TYPES } from './schema'
+export { TIMELINE_DOC_VERSION, RENDER_KINDS, TRACK_TYPES } from "./schema";
 export type {
   TimelineDoc,
   Track,
@@ -55,7 +49,7 @@ export type {
   RenderKind,
   Speaker,
   AssetRef,
-} from './schema'
+} from "./schema";
 export {
   timelineDocSchema,
   wordTokenSchema,
@@ -65,18 +59,36 @@ export {
   speakerSchema,
   canvasSpecSchema,
   styleSpecSchema,
-} from './schema'
+} from "./schema";
 
-export { validate } from './validate'
-export { migrate, tryMigrate, TimelineMigrationError, MIGRATIONS } from './migrate'
-export type { MigrationStep } from './migrate'
-export { apply, opSchema, itemPatchSchema } from './ops'
-export type { Op, ItemPatch } from './ops'
-export { resolveWordAnchors, hasUnresolvedAnchors, snapToFrame } from './anchors'
-export { hashDoc, canonicalize, stableStringify, CACHE_IRRELEVANT_FIELDS } from './hash'
+export { validate } from "./validate";
+export {
+  migrate,
+  tryMigrate,
+  TimelineMigrationError,
+  MIGRATIONS,
+} from "./migrate";
+export type { MigrationStep } from "./migrate";
+export { apply, opSchema, itemPatchSchema } from "./ops";
+export type { Op, ItemPatch } from "./ops";
+export {
+  resolveWordAnchors,
+  hasUnresolvedAnchors,
+  snapToFrame,
+} from "./anchors";
+export {
+  hashDoc,
+  canonicalize,
+  stableStringify,
+  CACHE_IRRELEVANT_FIELDS,
+} from "./hash";
 
-export { TIMELINE_ERROR_CODES, timelineError } from './errors'
-export type { ValidationError, ValidationResult, TimelineErrorCode } from './errors'
+export { TIMELINE_ERROR_CODES, timelineError } from "./errors";
+export type {
+  ValidationError,
+  ValidationResult,
+  TimelineErrorCode,
+} from "./errors";
 
 export {
   TIME_EPSILON,
@@ -92,5 +104,5 @@ export {
   secondsToFrames,
   framesToSeconds,
   cloneDoc,
-} from './time'
-export type { TimelineItemRef } from './time'
+} from "./time";
+export type { TimelineItemRef } from "./time";

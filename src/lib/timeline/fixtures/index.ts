@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -30,10 +24,10 @@
  *        compositions in Phase 03, and by the generator tests in Phase 06.
  */
 
-export { buildWords } from './words'
-export { redditStoryFixture } from './reddit-story'
-export { voiceoverFixture } from './voiceover'
-export { quizFixture } from './quiz'
-export { motionFixture } from './motion'
-export { legacyV1Fixture } from './legacy-v1'
-export { FIXTURES_BY_KIND } from './by-kind'
+export { buildWords } from "./words";
+export { redditStoryFixture } from "./reddit-story";
+export { voiceoverFixture } from "./voiceover";
+export { quizFixture } from "./quiz";
+export { motionFixture } from "./motion";
+export { legacyV1Fixture } from "./legacy-v1";
+export { FIXTURES_BY_KIND } from "./by-kind";

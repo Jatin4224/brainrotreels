@@ -1,14 +1,8 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
-'use client'
+"use client";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: ProjectRowActions, RenameProjectDialog,
@@ -29,16 +23,24 @@
  * WHERE: Passed to <DataTable rowActions> by ProjectsTable.
  */
 
-import * as React from 'react'
-import { useRouter } from 'next/navigation'
-import { Copy, Loader2Icon, MoreHorizontal, Pencil, PlayIcon, Trash2 } from 'lucide-react'
-import { toast } from 'sonner'
+import * as React from "react";
+import { useRouter } from "next/navigation";
+import {
+  Copy,
+  FileTextIcon,
+  Loader2Icon,
+  MoreHorizontal,
+  Pencil,
+  PlayIcon,
+  Trash2,
+} from "lucide-react";
+import { toast } from "sonner";
 
-import { trpc } from '@/trpc/react-provider'
-import { useActiveOrganization } from '@/hooks/use-active-organization'
-import { permissions } from '@/lib/permissions'
-import { projectTitleSchema } from '@/lib/types'
-import { FeatureGate } from '@/components/feature-gate'
+import { trpc } from "@/trpc/react-provider";
+import { useActiveOrganization } from "@/hooks/use-active-organization";
+import { permissions } from "@/lib/permissions";
+import { projectTitleSchema } from "@/lib/types";
+import { FeatureGate } from "@/components/feature-gate";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -48,8 +50,8 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
-import { Button } from '@/components/ui/button'
+} from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -57,71 +59,90 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog'
+} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 export interface ProjectRowActionsProps {
-  organizationId: string
-  project: { id: string; title: string }
+  organizationId: string;
+  project: { id: string; title: string };
 }
 
-export function ProjectRowActions({ organizationId, project }: ProjectRowActionsProps) {
-  const utils = trpc.useUtils()
-  const router = useRouter()
-  const { hasPermission } = useActiveOrganization()
-  const [renaming, setRenaming] = React.useState(false)
-  const [confirmingDelete, setConfirmingDelete] = React.useState(false)
+export function ProjectRowActions({
+  organizationId,
+  project,
+}: ProjectRowActionsProps) {
+  const utils = trpc.useUtils();
+  const router = useRouter();
+  const { hasPermission } = useActiveOrganization();
+  const [renaming, setRenaming] = React.useState(false);
+  const [confirmingDelete, setConfirmingDelete] = React.useState(false);
 
-  const duplicate = trpc.projects.duplicate.useMutation()
-  const remove = trpc.projects.delete.useMutation()
+  const duplicate = trpc.projects.duplicate.useMutation();
+  const remove = trpc.projects.delete.useMutation();
 
-  const canUpdate = hasPermission(permissions.PROJECTS_UPDATE)
-  const canCreate = hasPermission(permissions.PROJECTS_CREATE)
-  const canDelete = hasPermission(permissions.PROJECTS_DELETE)
-  if (!canUpdate && !canCreate && !canDelete) return null
+  const canUpdate = hasPermission(permissions.PROJECTS_UPDATE);
+  const canCreate = hasPermission(permissions.PROJECTS_CREATE);
+  const canDelete = hasPermission(permissions.PROJECTS_DELETE);
+  if (!canUpdate && !canCreate && !canDelete) return null;
 
   /* Both mutations change the row count, so the usage counter is refetched
    * alongside the list — the plan cards and the create gate read it. */
   async function refresh() {
-    await Promise.all([utils.projects.list.invalidate(), utils.usage.invalidate()])
+    await Promise.all([
+      utils.projects.list.invalidate(),
+      utils.usage.invalidate(),
+    ]);
   }
 
   async function handleDuplicate() {
     try {
-      const copy = await duplicate.mutateAsync({ organizationId, id: project.id })
-      await refresh()
-      toast.success(`"${copy.title}" created`)
+      const copy = await duplicate.mutateAsync({
+        organizationId,
+        id: project.id,
+      });
+      await refresh();
+      toast.success(`"${copy.title}" created`);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Could not duplicate this project.')
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : "Could not duplicate this project.",
+      );
     }
   }
 
   async function handleDelete() {
     try {
-      await remove.mutateAsync({ organizationId, id: project.id })
-      await refresh()
-      setConfirmingDelete(false)
-      toast.success(`"${project.title}" deleted`)
+      await remove.mutateAsync({ organizationId, id: project.id });
+      await refresh();
+      setConfirmingDelete(false);
+      toast.success(`"${project.title}" deleted`);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Could not delete this project.')
+      toast.error(
+        err instanceof Error ? err.message : "Could not delete this project.",
+      );
     }
   }
 
-  const isBusy = duplicate.isPending || remove.isPending
+  const isBusy = duplicate.isPending || remove.isPending;
 
   return (
     <>
       <DropdownMenu>
         <DropdownMenuTrigger
           render={
-            <Button variant="ghost" size="icon" aria-label={`Actions for ${project.title}`}>
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label={`Actions for ${project.title}`}
+            >
               {isBusy ? (
                 <Loader2Icon className="size-4 animate-spin" />
               ) : (
@@ -135,10 +156,25 @@ export function ProjectRowActions({ organizationId, project }: ProjectRowActions
               a video is not an edit. The route is typed, so a rename of the
               page fails the build rather than shipping a dead menu item. */}
           <DropdownMenuItem
-            onClick={() => router.push(`/dashboard/projects/${project.id}/preview`)}
+            onClick={() =>
+              router.push(`/dashboard/projects/${project.id}/preview`)
+            }
           >
             <PlayIcon className="size-4" />
             Preview
+          </DropdownMenuItem>
+          {/* The script is where a project actually starts — a preview has
+              nothing to show until one exists. Gated on `read` like the
+              preview above: the editor's own mutations check `scripts:update`
+              individually, so somebody who can only read sees the words
+              without the controls. */}
+          <DropdownMenuItem
+            onClick={() =>
+              router.push(`/dashboard/projects/${project.id}/script`)
+            }
+          >
+            <FileTextIcon className="size-4" />
+            Script
           </DropdownMenuItem>
           {canUpdate ? (
             <DropdownMenuItem onClick={() => setRenaming(true)}>
@@ -178,26 +214,33 @@ export function ProjectRowActions({ organizationId, project }: ProjectRowActions
       <AlertDialog open={confirmingDelete} onOpenChange={setConfirmingDelete}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete &ldquo;{project.title}&rdquo;?</AlertDialogTitle>
+            <AlertDialogTitle>
+              Delete &ldquo;{project.title}&rdquo;?
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              The project and its timeline are removed for good. This cannot be undone.
+              The project and its timeline are removed for good. This cannot be
+              undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={remove.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={remove.isPending}>
+              Cancel
+            </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDelete}
               disabled={remove.isPending}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {remove.isPending ? <Loader2Icon className="size-4 animate-spin" /> : null}
+              {remove.isPending ? (
+                <Loader2Icon className="size-4 animate-spin" />
+              ) : null}
               Delete project
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </>
-  )
+  );
 }
 
 /**
@@ -215,31 +258,39 @@ function RenameProjectDialog({
   project,
   onClose,
 }: {
-  organizationId: string
-  project: { id: string; title: string }
-  onClose: () => void
+  organizationId: string;
+  project: { id: string; title: string };
+  onClose: () => void;
 }) {
-  const utils = trpc.useUtils()
-  const rename = trpc.projects.rename.useMutation()
-  const [title, setTitle] = React.useState(project.title)
-  const [error, setError] = React.useState<string | null>(null)
+  const utils = trpc.useUtils();
+  const rename = trpc.projects.rename.useMutation();
+  const [title, setTitle] = React.useState(project.title);
+  const [error, setError] = React.useState<string | null>(null);
 
-  const parsed = projectTitleSchema.safeParse(title)
-  const validationMessage = parsed.success ? null : (parsed.error.issues[0]?.message ?? null)
+  const parsed = projectTitleSchema.safeParse(title);
+  const validationMessage = parsed.success
+    ? null
+    : (parsed.error.issues[0]?.message ?? null);
 
   async function handleSave() {
     if (!parsed.success) {
-      setError(validationMessage)
-      return
+      setError(validationMessage);
+      return;
     }
-    setError(null)
+    setError(null);
     try {
-      await rename.mutateAsync({ organizationId, id: project.id, title: parsed.data })
-      await utils.projects.list.invalidate()
-      toast.success('Project renamed')
-      onClose()
+      await rename.mutateAsync({
+        organizationId,
+        id: project.id,
+        title: parsed.data,
+      });
+      await utils.projects.list.invalidate();
+      toast.success("Project renamed");
+      onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not rename this project.')
+      setError(
+        err instanceof Error ? err.message : "Could not rename this project.",
+      );
     }
   }
 
@@ -247,7 +298,9 @@ function RenameProjectDialog({
     <DialogContent className="sm:max-w-md">
       <DialogHeader>
         <DialogTitle>Rename project</DialogTitle>
-        <DialogDescription>Only the title changes. The timeline is untouched.</DialogDescription>
+        <DialogDescription>
+          Only the title changes. The timeline is untouched.
+        </DialogDescription>
       </DialogHeader>
 
       <div className="flex flex-col gap-2">
@@ -271,12 +324,16 @@ function RenameProjectDialog({
         </Button>
         <Button
           onClick={handleSave}
-          disabled={rename.isPending || !parsed.success || title === project.title}
+          disabled={
+            rename.isPending || !parsed.success || title === project.title
+          }
         >
-          {rename.isPending ? <Loader2Icon className="size-4 animate-spin" /> : null}
+          {rename.isPending ? (
+            <Loader2Icon className="size-4 animate-spin" />
+          ) : null}
           Save
         </Button>
       </DialogFooter>
     </DialogContent>
-  )
+  );
 }

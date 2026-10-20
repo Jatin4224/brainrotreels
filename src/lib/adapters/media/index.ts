@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -25,10 +19,10 @@
  * WHERE: src/inngest/functions/asset-ingest.ts.
  */
 
-import 'server-only'
+import "server-only";
 
-import { MEDIA_PROVIDER } from './provider'
-import type { MediaAdapter } from './types'
+import { MEDIA_PROVIDER } from "./provider";
+import type { MediaAdapter } from "./types";
 
 export type {
   MediaAdapter,
@@ -38,30 +32,32 @@ export type {
   MediaProviderId,
   TranscodeFit,
   TranscodeRequest,
-} from './types'
-export { MEDIA_PROVIDER_IDS, MediaProcessingError } from './types'
-export { MEDIA_PROVIDER, DEFAULT_MEDIA_PROVIDER } from './provider'
+} from "./types";
+export { MEDIA_PROVIDER_IDS, MediaProcessingError } from "./types";
+export { MEDIA_PROVIDER, DEFAULT_MEDIA_PROVIDER } from "./provider";
 
-let adapterPromise: Promise<MediaAdapter> | null = null
+let adapterPromise: Promise<MediaAdapter> | null = null;
 
 async function loadAdapter(): Promise<MediaAdapter> {
   /* Exhaustive over MediaProviderId — a new id without a case here is a
    * compile error at the `never` branch. */
   switch (MEDIA_PROVIDER) {
-    case 'ffmpeg': {
-      const mod = await import('./ffmpeg')
-      return mod.ffmpegMediaAdapter
+    case "ffmpeg": {
+      const mod = await import("./ffmpeg");
+      return mod.ffmpegMediaAdapter;
     }
     default: {
-      const exhaustive: never = MEDIA_PROVIDER
-      throw new Error(`[adapters/media] No adapter registered for "${String(exhaustive)}".`)
+      const exhaustive: never = MEDIA_PROVIDER;
+      throw new Error(
+        `[adapters/media] No adapter registered for "${String(exhaustive)}".`,
+      );
     }
   }
 }
 
 export async function getMediaAdapter(): Promise<MediaAdapter> {
   if (!adapterPromise) {
-    adapterPromise = loadAdapter()
+    adapterPromise = loadAdapter();
   }
-  return adapterPromise
+  return adapterPromise;
 }

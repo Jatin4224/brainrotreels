@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -39,8 +33,8 @@
  * WHERE: Phase 04's render reuse, and the editor's dirty check.
  */
 
-import { roundSeconds } from './time'
-import type { TimelineDoc } from './schema'
+import { roundSeconds } from "./time";
+import type { TimelineDoc } from "./schema";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: CACHE_IRRELEVANT_FIELDS
@@ -51,12 +45,12 @@ import type { TimelineDoc } from './schema'
  *        before adding to this list.
  * WHERE: canonicalize() below.
  */
-export const CACHE_IRRELEVANT_FIELDS: readonly string[] = ['label']
+export const CACHE_IRRELEVANT_FIELDS: readonly string[] = ["label"];
 
 /* FNV-1a, 64-bit. The constants are the algorithm's, not arbitrary. */
-const FNV_OFFSET_BASIS = 0xcbf29ce484222325n
-const FNV_PRIME = 0x100000001b3n
-const MASK_64 = 0xffffffffffffffffn
+const FNV_OFFSET_BASIS = 0xcbf29ce484222325n;
+const FNV_PRIME = 0x100000001b3n;
+const MASK_64 = 0xffffffffffffffffn;
 
 /**
  * SOURCE OF TRUTH KEYWORDS: hashDoc, docHash
@@ -67,7 +61,7 @@ const MASK_64 = 0xffffffffffffffffn
  * WHERE: Stored as the render's `docHash` in Phase 04.
  */
 export function hashDoc(doc: TimelineDoc): string {
-  return fnv1a64(stableStringify(canonicalize(doc)))
+  return fnv1a64(stableStringify(canonicalize(doc)));
 }
 
 /**
@@ -88,32 +82,33 @@ type CanonicalValue =
   | boolean
   | null
   | CanonicalValue[]
-  | { [key: string]: CanonicalValue }
+  | { [key: string]: CanonicalValue };
 
 export function canonicalize(value: unknown): CanonicalValue {
-  if (value === null) return null
-  if (typeof value === 'string' || typeof value === 'boolean') return value
-  if (typeof value === 'number') return Number.isFinite(value) ? roundSeconds(value) : 0
-  if (Array.isArray(value)) return value.map((entry) => canonicalize(entry))
+  if (value === null) return null;
+  if (typeof value === "string" || typeof value === "boolean") return value;
+  if (typeof value === "number")
+    return Number.isFinite(value) ? roundSeconds(value) : 0;
+  if (Array.isArray(value)) return value.map((entry) => canonicalize(entry));
 
-  if (typeof value === 'object') {
-    const source: Record<string, unknown> = { ...value }
-    const out: { [key: string]: CanonicalValue } = {}
+  if (typeof value === "object") {
+    const source: Record<string, unknown> = { ...value };
+    const out: { [key: string]: CanonicalValue } = {};
     for (const key of Object.keys(source)) {
-      if (CACHE_IRRELEVANT_FIELDS.includes(key)) continue
-      const entry = source[key]
+      if (CACHE_IRRELEVANT_FIELDS.includes(key)) continue;
+      const entry = source[key];
       /* An absent field and a field set to undefined describe the same
        * document — JSON cannot tell them apart once stored, so neither can
        * the hash. */
-      if (entry === undefined) continue
-      out[key] = canonicalize(entry)
+      if (entry === undefined) continue;
+      out[key] = canonicalize(entry);
     }
-    return out
+    return out;
   }
 
   /* Functions, symbols and bigints cannot appear in a parsed document; mapping
    * them to null keeps this total rather than throwing from a cache key. */
-  return null
+  return null;
 }
 
 /**
@@ -127,31 +122,32 @@ export function canonicalize(value: unknown): CanonicalValue {
  * WHERE: hashDoc().
  */
 export function stableStringify(value: CanonicalValue): string {
-  if (value === null) return 'null'
-  if (typeof value === 'string') return JSON.stringify(value)
-  if (typeof value === 'number' || typeof value === 'boolean') return String(value)
+  if (value === null) return "null";
+  if (typeof value === "string") return JSON.stringify(value);
+  if (typeof value === "number" || typeof value === "boolean")
+    return String(value);
   if (Array.isArray(value)) {
-    return `[${value.map((entry) => stableStringify(entry)).join(',')}]`
+    return `[${value.map((entry) => stableStringify(entry)).join(",")}]`;
   }
 
-  const keys = Object.keys(value).sort()
-  const parts: string[] = []
+  const keys = Object.keys(value).sort();
+  const parts: string[] = [];
   for (const key of keys) {
-    const entry = value[key]
-    if (entry === undefined) continue
-    parts.push(`${JSON.stringify(key)}:${stableStringify(entry)}`)
+    const entry = value[key];
+    if (entry === undefined) continue;
+    parts.push(`${JSON.stringify(key)}:${stableStringify(entry)}`);
   }
-  return `{${parts.join(',')}}`
+  return `{${parts.join(",")}}`;
 }
 
 /* Hashes the UTF-16 code units rather than UTF-8 bytes. The input is produced
  * by this module, so the encoding only has to be consistent with itself — and
  * avoiding TextEncoder keeps the file free of platform globals. */
 function fnv1a64(input: string): string {
-  let hash = FNV_OFFSET_BASIS
+  let hash = FNV_OFFSET_BASIS;
   for (let index = 0; index < input.length; index += 1) {
-    hash ^= BigInt(input.charCodeAt(index))
-    hash = (hash * FNV_PRIME) & MASK_64
+    hash ^= BigInt(input.charCodeAt(index));
+    hash = (hash * FNV_PRIME) & MASK_64;
   }
-  return hash.toString(16).padStart(16, '0')
+  return hash.toString(16).padStart(16, "0");
 }

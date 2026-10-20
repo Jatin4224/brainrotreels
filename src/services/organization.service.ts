@@ -1,14 +1,8 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
-import 'server-only'
+import "server-only";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: createOrganizationWithOwner, slugifyOrganizationName,
@@ -25,12 +19,12 @@ import 'server-only'
  *        src/trpc/routers/organization.ts; `db` is the caller's tx client.
  */
 
-import { nanoid } from 'nanoid'
-import type { DbClient } from '@/lib/config/prisma'
+import { nanoid } from "nanoid";
+import type { DbClient } from "@/lib/config/prisma";
 
 export interface CreateOrganizationResult {
-  organizationId: string
-  slug: string
+  organizationId: string;
+  slug: string;
 }
 
 /* Lowercase, strip non-alphanumerics to hyphens, collapse repeats, trim. */
@@ -38,31 +32,31 @@ export function slugifyOrganizationName(name: string): string {
   const base = name
     .toLowerCase()
     .trim()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 40)
-  return base.length > 0 ? base : 'org'
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 40);
+  return base.length > 0 ? base : "org";
 }
 
 /* Appends a short random suffix until the slug is free. Runs against the
  * caller's `db` (the tx) so the check and the create stay consistent. */
 export async function ensureUniqueOrganizationSlug(
   db: DbClient,
-  baseSlug: string
+  baseSlug: string,
 ): Promise<string> {
-  let candidate = baseSlug
+  let candidate = baseSlug;
   /* Bounded retry — collisions are rare; the random suffix makes a loop of a
    * few iterations effectively impossible to exhaust. */
   for (let attempt = 0; attempt < 6; attempt++) {
     const existing = await db.organization.findUnique({
       where: { slug: candidate },
       select: { id: true },
-    })
-    if (!existing) return candidate
-    candidate = `${baseSlug}-${nanoid(6).toLowerCase()}`
+    });
+    if (!existing) return candidate;
+    candidate = `${baseSlug}-${nanoid(6).toLowerCase()}`;
   }
   /* Final fallback — a fully random slug that can't realistically collide. */
-  return `${baseSlug}-${nanoid(10).toLowerCase()}`
+  return `${baseSlug}-${nanoid(10).toLowerCase()}`;
 }
 
 /**
@@ -76,11 +70,14 @@ export async function ensureUniqueOrganizationSlug(
  */
 export async function createOrganizationWithOwner(
   db: DbClient,
-  params: { userId: string; name: string; logo?: string | undefined }
+  params: { userId: string; name: string; logo?: string | undefined },
 ): Promise<CreateOrganizationResult> {
-  const organizationId = crypto.randomUUID()
-  const slug = await ensureUniqueOrganizationSlug(db, slugifyOrganizationName(params.name))
-  const now = new Date()
+  const organizationId = crypto.randomUUID();
+  const slug = await ensureUniqueOrganizationSlug(
+    db,
+    slugifyOrganizationName(params.name),
+  );
+  const now = new Date();
 
   await db.organization.create({
     data: {
@@ -90,19 +87,19 @@ export async function createOrganizationWithOwner(
       logo: params.logo ?? null,
       createdAt: now,
     },
-  })
+  });
 
   await db.member.create({
     data: {
       id: crypto.randomUUID(),
       organizationId,
       userId: params.userId,
-      role: 'owner',
+      role: "owner",
       createdAt: now,
     },
-  })
+  });
 
-  return { organizationId, slug }
+  return { organizationId, slug };
 }
 
 /**
@@ -133,23 +130,23 @@ export async function createOrganizationWithOwner(
  */
 export async function ensurePersonalWorkspace(
   db: DbClient,
-  params: { userId: string; name: string; logo?: string | undefined }
+  params: { userId: string; name: string; logo?: string | undefined },
 ): Promise<CreateOrganizationResult & { created: boolean }> {
   const existing = await db.member.findFirst({
     where: { userId: params.userId },
     select: { organizationId: true, organization: { select: { slug: true } } },
-    orderBy: { createdAt: 'asc' },
-  })
+    orderBy: { createdAt: "asc" },
+  });
 
   if (existing) {
     return {
       organizationId: existing.organizationId,
       slug: existing.organization.slug,
       created: false,
-    }
+    };
   }
 
-  const result = await createOrganizationWithOwner(db, params)
+  const result = await createOrganizationWithOwner(db, params);
 
   await db.user.update({
     where: { id: params.userId },
@@ -157,9 +154,9 @@ export async function ensurePersonalWorkspace(
      * (see the dashboard layout and protectedProcedure). Kept in step so the
      * flag never contradicts reality. */
     data: { onboardingComplete: true },
-  })
+  });
 
-  return { ...result, created: true }
+  return { ...result, created: true };
 }
 
 /**
@@ -172,12 +169,16 @@ export async function ensurePersonalWorkspace(
  *        so it only has to be recognisable, and the user can rename it.
  * WHERE: Used by the dashboard layout when auto-creating.
  */
-export function workspaceNameFor(user: { name: string; email: string }): string {
-  const trimmed = user.name.trim()
-  if (trimmed.length > 0) return `${trimmed}'s workspace`
+export function workspaceNameFor(user: {
+  name: string;
+  email: string;
+}): string {
+  const trimmed = user.name.trim();
+  if (trimmed.length > 0) return `${trimmed}'s workspace`;
 
-  const localPart = user.email.split('@')[0]?.trim()
-  if (localPart !== undefined && localPart.length > 0) return `${localPart}'s workspace`
+  const localPart = user.email.split("@")[0]?.trim();
+  if (localPart !== undefined && localPart.length > 0)
+    return `${localPart}'s workspace`;
 
-  return 'My workspace'
+  return "My workspace";
 }

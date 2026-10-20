@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -39,52 +33,53 @@
 
 export interface ProviderSelector<TId extends string> {
   /** Every registered id for this seam. */
-  readonly ids: readonly TId[]
+  readonly ids: readonly TId[];
   /** The selected id for this process. */
-  readonly provider: TId
-  isId(value: string): value is TId
+  readonly provider: TId;
+  isId(value: string): value is TId;
   /**
    * Throws unless `id` is the selected provider. Called at module scope by
    * each implementation so a stray static import dies at boot with a precise
    * message instead of initialising a second SDK.
    */
-  assertActive(id: TId): void
+  assertActive(id: TId): void;
 }
 
 export interface ProviderSelectorOptions<TId extends string> {
   /** Human name used in error messages, e.g. 'jobs'. */
-  label: string
+  label: string;
   /** The env var's name — for error messages only; never read from here. */
-  envVar: string
+  envVar: string;
   /** The value, read literally by the caller. */
-  rawValue: string | undefined
-  ids: readonly TId[]
-  fallback: TId
+  rawValue: string | undefined;
+  ids: readonly TId[];
+  fallback: TId;
 }
 
 export function createProviderSelector<TId extends string>(
   options: ProviderSelectorOptions<TId>,
 ): ProviderSelector<TId> {
-  const { label, envVar, rawValue, ids, fallback } = options
+  const { label, envVar, rawValue, ids, fallback } = options;
 
-  const isId = (value: string): value is TId => (ids as readonly string[]).includes(value)
+  const isId = (value: string): value is TId =>
+    (ids as readonly string[]).includes(value);
 
   const resolve = (): TId => {
-    if (rawValue === undefined || rawValue.trim().length === 0) return fallback
+    if (rawValue === undefined || rawValue.trim().length === 0) return fallback;
 
-    const normalized = rawValue.trim().toLowerCase()
+    const normalized = rawValue.trim().toLowerCase();
     if (!isId(normalized)) {
       /* Fail loudly. A typo would otherwise fall back to a DIFFERENT provider
        * than the operator configured — the exact mixing this prevents. */
       throw new Error(
         `[adapters/${label}] ${envVar}="${rawValue}" is not a known provider. ` +
-          `Expected one of: ${ids.join(', ')}.`,
-      )
+          `Expected one of: ${ids.join(", ")}.`,
+      );
     }
-    return normalized
-  }
+    return normalized;
+  };
 
-  const provider = resolve()
+  const provider = resolve();
 
   return {
     ids,
@@ -96,8 +91,8 @@ export function createProviderSelector<TId extends string>(
           `[adapters/${label}] The "${id}" implementation was loaded while ` +
             `${envVar}="${provider}". Providers must never run side by side. ` +
             `Remove the import that pulled it in, or change the env var.`,
-        )
+        );
       }
     },
-  }
+  };
 }

@@ -1,14 +1,8 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
-'use client'
+"use client";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: setActiveOrganization,
@@ -31,7 +25,7 @@
  * WHERE: Called by the onboarding flow and the accept-invitation screen.
  */
 
-import { activeSetOrganization } from '@providers-active-actions'
+import { activeSetOrganization } from "@providers-active-actions";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: setActiveOrganization
@@ -44,9 +38,8 @@ import { activeSetOrganization } from '@providers-active-actions'
  * WHERE: Onboarding completion and invitation acceptance.
  */
 export async function setActiveOrganization(params: {
-  organizationId: string
-  organizationSlug?: string
+  organizationId: string;
+  organizationSlug?: string;
 }): Promise<void> {
-  await activeSetOrganization(params)
+  await activeSetOrganization(params);
 }
-

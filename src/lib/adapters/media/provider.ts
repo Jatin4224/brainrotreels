@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -20,21 +14,21 @@
  * WHERE: Used by ./index.ts and asserted at module scope by ./ffmpeg.
  */
 
-import { createProviderSelector } from '../select-provider'
-import { MEDIA_PROVIDER_IDS, type MediaProviderId } from './types'
+import { createProviderSelector } from "../select-provider";
+import { MEDIA_PROVIDER_IDS, type MediaProviderId } from "./types";
 
-export const DEFAULT_MEDIA_PROVIDER: MediaProviderId = 'ffmpeg'
+export const DEFAULT_MEDIA_PROVIDER: MediaProviderId = "ffmpeg";
 
 export const mediaSelector = createProviderSelector<MediaProviderId>({
-  label: 'media',
-  envVar: 'MEDIA_PROVIDER',
-  rawValue: process.env['MEDIA_PROVIDER'],
+  label: "media",
+  envVar: "MEDIA_PROVIDER",
+  rawValue: process.env["MEDIA_PROVIDER"],
   ids: MEDIA_PROVIDER_IDS,
   fallback: DEFAULT_MEDIA_PROVIDER,
-})
+});
 
-export const MEDIA_PROVIDER: MediaProviderId = mediaSelector.provider
+export const MEDIA_PROVIDER: MediaProviderId = mediaSelector.provider;
 
 export function assertMediaProviderActive(id: MediaProviderId): void {
-  mediaSelector.assertActive(id)
+  mediaSelector.assertActive(id);
 }

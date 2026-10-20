@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -41,57 +35,57 @@
  * not so much that the bed disappears and the cut back up becomes the loudest
  * thing in the video.
  */
-export const DUCK_LEVEL = 0.25
+export const DUCK_LEVEL = 0.25;
 
 /** The ramp in and out, in seconds. See DUCKING_CURVE. */
-export const DUCK_RAMP_SECONDS = 0.15
+export const DUCK_RAMP_SECONDS = 0.15;
 
 export interface FrameWindow {
-  from: number
-  durationInFrames: number
+  from: number;
+  durationInFrames: number;
 }
 
 export function duckingVolumeAt(args: {
-  frame: number
-  fps: number
-  windows: readonly FrameWindow[]
+  frame: number;
+  fps: number;
+  windows: readonly FrameWindow[];
 }): number {
-  const { frame, fps, windows } = args
-  if (windows.length === 0) return 1
+  const { frame, fps, windows } = args;
+  if (windows.length === 0) return 1;
 
   /* At least one frame, so a very low fps cannot round the ramp to zero and
    * reintroduce the click the ramp exists to remove. */
-  const ramp = Math.max(1, Math.round(DUCK_RAMP_SECONDS * fps))
+  const ramp = Math.max(1, Math.round(DUCK_RAMP_SECONDS * fps));
 
   /* The DEEPEST duck any window asks for wins. With two overlapping narration
    * lines, taking the last or the average would let the bed rise between them
    * — audible as a swell in the middle of a sentence. */
-  let deepest = 1
+  let deepest = 1;
 
   for (const window of windows) {
-    const start = window.from
-    const end = window.from + window.durationInFrames
+    const start = window.from;
+    const end = window.from + window.durationInFrames;
 
     /* Fully ducked for the body of the window. */
     if (frame >= start && frame < end) {
-      deepest = Math.min(deepest, DUCK_LEVEL)
-      continue
+      deepest = Math.min(deepest, DUCK_LEVEL);
+      continue;
     }
 
     /* Ramping DOWN in the frames just before it starts, so the bed is already
      * low when the first syllable lands rather than dipping under it. */
     if (frame < start && frame > start - ramp) {
-      const progress = (frame - (start - ramp)) / ramp
-      deepest = Math.min(deepest, 1 - (1 - DUCK_LEVEL) * progress)
-      continue
+      const progress = (frame - (start - ramp)) / ramp;
+      deepest = Math.min(deepest, 1 - (1 - DUCK_LEVEL) * progress);
+      continue;
     }
 
     /* Ramping back UP after it ends. */
     if (frame >= end && frame < end + ramp) {
-      const progress = (frame - end) / ramp
-      deepest = Math.min(deepest, DUCK_LEVEL + (1 - DUCK_LEVEL) * progress)
+      const progress = (frame - end) / ramp;
+      deepest = Math.min(deepest, DUCK_LEVEL + (1 - DUCK_LEVEL) * progress);
     }
   }
 
-  return deepest
+  return deepest;
 }

@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -20,11 +14,11 @@
  *        explicitly want to bump a counter.
  */
 
-import 'server-only'
+import "server-only";
 
-import { cache } from 'react'
-import { prisma, type DbClient } from '@/lib/config/prisma'
-import type { LimitResourceKey } from '@/lib/resources'
+import { cache } from "react";
+import { prisma, type DbClient } from "@/lib/config/prisma";
+import type { LimitResourceKey } from "@/lib/resources";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: getUsageMetrics
@@ -41,9 +35,9 @@ export const getUsageMetrics = cache(
       where: {
         organizationId_featureKey: { organizationId, featureKey: resourceKey },
       },
-    })
-  }
-)
+    });
+  },
+);
 
 /**
  * SOURCE OF TRUTH KEYWORDS: incrementUsage
@@ -58,15 +52,19 @@ export async function incrementUsage(
   organizationId: string,
   resourceKey: LimitResourceKey,
   incrementBy: number = 1,
-  db: DbClient = prisma
+  db: DbClient = prisma,
 ): Promise<void> {
   await db.usageMetrics.upsert({
     where: {
       organizationId_featureKey: { organizationId, featureKey: resourceKey },
     },
     update: { currentUsage: { increment: incrementBy }, updatedAt: new Date() },
-    create: { organizationId, featureKey: resourceKey, currentUsage: incrementBy },
-  })
+    create: {
+      organizationId,
+      featureKey: resourceKey,
+      currentUsage: incrementBy,
+    },
+  });
 }
 
 /**
@@ -81,7 +79,7 @@ export async function decrementUsage(
   organizationId: string,
   resourceKey: LimitResourceKey,
   decrementBy: number = 1,
-  db: DbClient = prisma
+  db: DbClient = prisma,
 ): Promise<void> {
   // Read via the same client we'll write to — cached getUsageMetrics would
   // bypass the active tx and break atomicity.
@@ -89,8 +87,8 @@ export async function decrementUsage(
     where: {
       organizationId_featureKey: { organizationId, featureKey: resourceKey },
     },
-  })
-  if (!metrics) return
+  });
+  if (!metrics) return;
 
   await db.usageMetrics.update({
     where: {
@@ -102,7 +100,7 @@ export async function decrementUsage(
       currentUsage: Math.max(0, metrics.currentUsage - decrementBy),
       updatedAt: new Date(),
     },
-  })
+  });
 }
 
 /**
@@ -122,9 +120,9 @@ export async function decrementUsage(
 export async function resetPeriodicUsage(
   resourceKeys: readonly LimitResourceKey[],
   periodStart: Date,
-  db: DbClient = prisma
+  db: DbClient = prisma,
 ): Promise<number> {
-  if (resourceKeys.length === 0) return 0
+  if (resourceKeys.length === 0) return 0;
 
   const result = await db.usageMetrics.updateMany({
     where: {
@@ -132,7 +130,7 @@ export async function resetPeriodicUsage(
       lastResetAt: { lt: periodStart },
     },
     data: { currentUsage: 0, lastResetAt: periodStart, updatedAt: new Date() },
-  })
+  });
 
-  return result.count
+  return result.count;
 }

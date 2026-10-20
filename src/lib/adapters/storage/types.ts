@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -27,46 +21,46 @@
  */
 
 /** Short by default: a leaked URL should stop working quickly. */
-export const DEFAULT_SIGNED_GET_TTL_SECONDS = 900
+export const DEFAULT_SIGNED_GET_TTL_SECONDS = 900;
 
 /** Long enough for a slow mobile upload, short enough to limit reuse. */
-export const DEFAULT_SIGNED_PUT_TTL_SECONDS = 3600
+export const DEFAULT_SIGNED_PUT_TTL_SECONDS = 3600;
 
 export interface StorageObjectInfo {
-  key: string
-  bytes: number
-  contentType: string | undefined
-  lastModified: Date | undefined
+  key: string;
+  bytes: number;
+  contentType: string | undefined;
+  lastModified: Date | undefined;
 }
 
 export interface SignedPutOptions {
-  contentType: string
-  maxBytes: number
-  ttlSeconds?: number
+  contentType: string;
+  maxBytes: number;
+  ttlSeconds?: number;
 }
 
 export interface StorageAdapter {
-  readonly id: StorageProviderId
+  readonly id: StorageProviderId;
 
   putObject(args: {
-    key: string
-    body: Uint8Array | Buffer
-    contentType: string
-  }): Promise<void>
+    key: string;
+    body: Uint8Array | Buffer;
+    contentType: string;
+  }): Promise<void>;
 
-  signedGetUrl(key: string, ttlSeconds?: number): Promise<string>
+  signedGetUrl(key: string, ttlSeconds?: number): Promise<string>;
 
-  signedPutUrl(key: string, options: SignedPutOptions): Promise<string>
+  signedPutUrl(key: string, options: SignedPutOptions): Promise<string>;
 
-  deleteObject(key: string): Promise<void>
+  deleteObject(key: string): Promise<void>;
 
   /** Batch delete — removing a render means removing its whole prefix. */
-  deleteObjects(keys: readonly string[]): Promise<void>
+  deleteObjects(keys: readonly string[]): Promise<void>;
 
   /** Returns null when absent, so a caller can distinguish missing from failed. */
-  head(key: string): Promise<StorageObjectInfo | null>
+  head(key: string): Promise<StorageObjectInfo | null>;
 }
 
-export const STORAGE_PROVIDER_IDS = ['r2'] as const
+export const STORAGE_PROVIDER_IDS = ["r2"] as const;
 
-export type StorageProviderId = (typeof STORAGE_PROVIDER_IDS)[number]
+export type StorageProviderId = (typeof STORAGE_PROVIDER_IDS)[number];

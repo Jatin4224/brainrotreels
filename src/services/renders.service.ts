@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -51,15 +45,15 @@
  *        src/app/api/webhooks/remotion/route.ts.
  */
 
-import 'server-only'
+import "server-only";
 
-import type { Prisma } from '@/generated/prisma'
-import { type DbClient } from '@/lib/config/prisma'
+import type { Prisma } from "@/generated/prisma";
+import { type DbClient } from "@/lib/config/prisma";
 import {
   RENDER_TERMINAL_STATUSES,
   type RenderResolution,
   type RenderStatus,
-} from '@/lib/types/render'
+} from "@/lib/types/render";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: RENDER_LIST_SELECT, RenderListItem
@@ -86,14 +80,16 @@ export const RENDER_LIST_SELECT = {
   startedAt: true,
   finishedAt: true,
   createdAt: true,
-} as const satisfies Prisma.RenderSelect
+} as const satisfies Prisma.RenderSelect;
 
-export type RenderListItem = Prisma.RenderGetPayload<{ select: typeof RENDER_LIST_SELECT }>
+export type RenderListItem = Prisma.RenderGetPayload<{
+  select: typeof RENDER_LIST_SELECT;
+}>;
 
 export interface RenderListFilters {
-  organizationId: string
-  projectId?: string | undefined
-  status?: RenderStatus | undefined
+  organizationId: string;
+  projectId?: string | undefined;
+  status?: RenderStatus | undefined;
 }
 
 /**
@@ -113,22 +109,24 @@ export async function listRenders(
 ): Promise<{ rows: RenderListItem[]; total: number }> {
   const where: Prisma.RenderWhereInput = {
     organizationId: filters.organizationId,
-    ...(filters.projectId !== undefined ? { projectId: filters.projectId } : {}),
+    ...(filters.projectId !== undefined
+      ? { projectId: filters.projectId }
+      : {}),
     ...(filters.status !== undefined ? { status: filters.status } : {}),
-  }
+  };
 
   const [rows, total] = await Promise.all([
     db.render.findMany({
       where,
       select: RENDER_LIST_SELECT,
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       skip: page.skip,
       take: page.take,
     }),
     db.render.count({ where }),
-  ])
+  ]);
 
-  return { rows, total }
+  return { rows, total };
 }
 
 /**
@@ -146,7 +144,7 @@ export async function findRenderForOrganization(
   organizationId: string,
   id: string,
 ): Promise<Prisma.RenderGetPayload<Record<string, never>> | null> {
-  return db.render.findFirst({ where: { id, organizationId } })
+  return db.render.findFirst({ where: { id, organizationId } });
 }
 
 /**
@@ -170,7 +168,7 @@ export async function findRenderById(
   db: DbClient,
   id: string,
 ): Promise<Prisma.RenderGetPayload<Record<string, never>> | null> {
-  return db.render.findUnique({ where: { id } })
+  return db.render.findUnique({ where: { id } });
 }
 
 /**
@@ -204,10 +202,10 @@ export async function findReusableRender(
     where: {
       projectId,
       docHash,
-      status: 'completed',
+      status: "completed",
       outputAssetId: { not: null },
     },
-  })
+  });
 }
 
 /**
@@ -228,14 +226,14 @@ export async function findReusableRender(
 export async function createQueuedRender(
   db: DbClient,
   data: {
-    organizationId: string
-    projectId: string
-    docHash: string
-    resolution: RenderResolution
-    watermark: boolean
+    organizationId: string;
+    projectId: string;
+    docHash: string;
+    resolution: RenderResolution;
+    watermark: boolean;
   },
 ): Promise<Prisma.RenderGetPayload<Record<string, never>>> {
-  return db.render.create({ data })
+  return db.render.create({ data });
 }
 
 /**
@@ -260,10 +258,15 @@ export async function markRenderStarted(
   providerRenderId: string,
 ): Promise<number> {
   const result = await db.render.updateMany({
-    where: { id, status: 'queued' },
-    data: { status: 'rendering', providerRenderId, startedAt: new Date(), error: null },
-  })
-  return result.count
+    where: { id, status: "queued" },
+    data: {
+      status: "rendering",
+      providerRenderId,
+      startedAt: new Date(),
+      error: null,
+    },
+  });
+  return result.count;
 }
 
 /**
@@ -283,12 +286,12 @@ export async function markRenderProgress(
   progress: number,
 ): Promise<number> {
   const result = await db.render.updateMany({
-    where: { id, status: 'rendering' },
+    where: { id, status: "rendering" },
     /* Clamped: a provider reporting 1.02 would render as a bar past its own
      * track, and a negative would render as none at all. */
     data: { progress: Math.min(1, Math.max(0, progress)) },
-  })
-  return result.count
+  });
+  return result.count;
 }
 
 /**
@@ -313,17 +316,17 @@ export async function completeRender(
   output: { outputAssetId: string; posterAssetId: string | null },
 ): Promise<number> {
   const result = await db.render.updateMany({
-    where: { id, status: 'rendering' },
+    where: { id, status: "rendering" },
     data: {
-      status: 'completed',
+      status: "completed",
       progress: 1,
       error: null,
       outputAssetId: output.outputAssetId,
       posterAssetId: output.posterAssetId,
       finishedAt: new Date(),
     },
-  })
-  return result.count
+  });
+  return result.count;
 }
 
 /**
@@ -345,7 +348,7 @@ export async function completeRender(
 export async function failRender(
   db: DbClient,
   id: string,
-  status: Extract<RenderStatus, 'failed' | 'timedOut'>,
+  status: Extract<RenderStatus, "failed" | "timedOut">,
   error: string,
   progress?: number,
 ): Promise<number> {
@@ -358,10 +361,12 @@ export async function failRender(
        * error. Same cap and same reason as markAssetFailed. */
       error: error.slice(0, 500),
       finishedAt: new Date(),
-      ...(progress !== undefined ? { progress: Math.min(1, Math.max(0, progress)) } : {}),
+      ...(progress !== undefined
+        ? { progress: Math.min(1, Math.max(0, progress)) }
+        : {}),
     },
-  })
-  return result.count
+  });
+  return result.count;
 }
 
 /**
@@ -395,11 +400,11 @@ export async function prepareRenderRetry(
   const result = await db.render.updateMany({
     where: {
       id,
-      status: { in: ['failed', 'timedOut'] },
+      status: { in: ["failed", "timedOut"] },
       attempts: { lt: attemptLimit },
     },
     data: {
-      status: 'queued',
+      status: "queued",
       providerRenderId: null,
       error: null,
       progress: 0,
@@ -407,8 +412,8 @@ export async function prepareRenderRetry(
       finishedAt: null,
       attempts: { increment: 1 },
     },
-  })
-  return result.count
+  });
+  return result.count;
 }
 
 /**
@@ -450,30 +455,32 @@ export async function prepareRenderRetry(
 export async function createRenderOutputAsset(
   db: DbClient,
   data: {
-    organizationId: string
-    filename: string
-    storageKey: string
-    contentType: string
-    bytes: number
-    durationSec?: number | null
-    width?: number | null
-    height?: number | null
+    organizationId: string;
+    filename: string;
+    storageKey: string;
+    contentType: string;
+    bytes: number;
+    durationSec?: number | null;
+    width?: number | null;
+    height?: number | null;
   },
 ): Promise<Prisma.AssetGetPayload<Record<string, never>>> {
   return db.asset.create({
     data: {
       organizationId: data.organizationId,
-      kind: 'render_output',
-      source: 'generated',
+      kind: "render_output",
+      source: "generated",
       filename: data.filename,
       storageKey: data.storageKey,
       contentType: data.contentType,
       bytes: data.bytes,
-      status: 'ready',
-      moderationStatus: 'skipped',
-      ...(data.durationSec !== undefined ? { durationSec: data.durationSec } : {}),
+      status: "ready",
+      moderationStatus: "skipped",
+      ...(data.durationSec !== undefined
+        ? { durationSec: data.durationSec }
+        : {}),
       ...(data.width !== undefined ? { width: data.width } : {}),
       ...(data.height !== undefined ? { height: data.height } : {}),
     },
-  })
+  });
 }

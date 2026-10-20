@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -50,16 +44,20 @@
  *        mounted by the Player on /dashboard/projects/[id]/preview.
  */
 
-import { createElement } from 'react'
-import { AbsoluteFill, Sequence } from 'remotion'
+import { createElement } from "react";
+import { AbsoluteFill, Sequence } from "remotion";
 
-import { dropUnknownRenderKinds, planTimeline, type PlannedItem } from '@/lib/render'
-import { timelineDocSchema, type TimelineDoc } from '@/lib/timeline'
-import type { AssetUrlMap, RenderItemProps } from '@/lib/types'
-import { AudioClip } from './components/audio-clip'
-import { Watermark } from './components/watermark'
-import { loadRenderFonts } from './fonts'
-import { resolveRenderComponent } from './registry'
+import {
+  dropUnknownRenderKinds,
+  planTimeline,
+  type PlannedItem,
+} from "@/lib/render";
+import { timelineDocSchema, type TimelineDoc } from "@/lib/timeline";
+import type { AssetUrlMap, RenderItemProps } from "@/lib/types";
+import { AudioClip } from "./components/audio-clip";
+import { Watermark } from "./components/watermark";
+import { loadRenderFonts } from "./fonts";
+import { resolveRenderComponent } from "./registry";
 
 /* A type alias, not an interface, and that is load-bearing: Remotion's
  * `component` prop requires props assignable to `Record<string, unknown>`, and
@@ -68,8 +66,8 @@ import { resolveRenderComponent } from './registry'
  * <Composition> with an error that points at Remotion rather than here. */
 export type TimelineRendererProps = {
   /** A resolved document, as JSON — see PARSE_ONCE_AT_THE_BOUNDARY. */
-  doc: Record<string, unknown>
-  assets: AssetUrlMap
+  doc: Record<string, unknown>;
+  assets: AssetUrlMap;
   /**
    * WATERMARK_IS_A_PROP. Set by the render pre-flight from the workspace's
    * `watermarkFree` entitlement, never by a generator and never from the
@@ -78,49 +76,53 @@ export type TimelineRendererProps = {
    * wrong. Optional and defaulting to false, because the studio and the CLI
    * render fixtures with no workspace behind them.
    */
-  watermark?: boolean
-}
+  watermark?: boolean;
+};
 
-export function TimelineRenderer({ doc, assets, watermark = false }: TimelineRendererProps) {
+export function TimelineRenderer({
+  doc,
+  assets,
+  watermark = false,
+}: TimelineRendererProps) {
   /* Before the first frame, not in an effect — an effect would run after
    * frame 0 had already been captured with the fallback face. */
-  loadRenderFonts()
+  loadRenderFonts();
 
   /* FORWARD_COMPATIBLE_DOCUMENT. A document written by a NEWER release can
    * carry a render kind this build has never heard of, and the strict schema
    * below would reject the whole document for it — turning one unrecognised
    * overlay into a black video. Those items are dropped first, so the rest of
    * the document still renders. See ONE_BAD_ITEM_IS_NOT_A_BAD_DOCUMENT. */
-  const sanitised = dropUnknownRenderKinds(doc)
+  const sanitised = dropUnknownRenderKinds(doc);
   if (sanitised.droppedCount > 0) {
     console.warn(
       `[remotion/TimelineRenderer] Dropped ${sanitised.droppedCount} item(s) with no component ` +
-        `for render kind(s): ${sanitised.droppedKinds.join(', ')}. The rest of the video still renders.`
-    )
+        `for render kind(s): ${sanitised.droppedKinds.join(", ")}. The rest of the video still renders.`,
+    );
   }
 
-  const parsed = timelineDocSchema.safeParse(sanitised.doc)
+  const parsed = timelineDocSchema.safeParse(sanitised.doc);
   if (!parsed.success) {
     console.error(
-      '[remotion/TimelineRenderer] The document did not parse; drawing an empty frame.',
-      parsed.error.issues.slice(0, 5)
-    )
+      "[remotion/TimelineRenderer] The document did not parse; drawing an empty frame.",
+      parsed.error.issues.slice(0, 5),
+    );
     /* BAD_DOCUMENT_DRAWS_BLACK — see the file header. */
-    return <AbsoluteFill style={{ backgroundColor: 'black' }} />
+    return <AbsoluteFill style={{ backgroundColor: "black" }} />;
   }
 
   /* Not named `document` — that would shadow the DOM global that fonts.ts and
    * every browser API in this tree rely on. */
-  const timeline = parsed.data
-  const planned = planTimeline(timeline)
-  const narrationWindows = collectNarrationWindows(planned)
+  const timeline = parsed.data;
+  const planned = planTimeline(timeline);
+  const narrationWindows = collectNarrationWindows(planned);
 
   return (
     /* Black, explicitly. A composition with no background is transparent, and
      * transparency becomes whatever the encoder decides — usually black, but
      * not guaranteed, and a background that depends on the encoder is a
      * difference between preview and output. */
-    <AbsoluteFill style={{ backgroundColor: 'black' }}>
+    <AbsoluteFill style={{ backgroundColor: "black" }}>
       {planned.map((plan) => (
         <Sequence
           key={plan.id}
@@ -148,7 +150,7 @@ export function TimelineRenderer({ doc, assets, watermark = false }: TimelineRen
           WATERMARK_IS_NOT_A_TRACK_ITEM. */}
       {watermark ? <Watermark canvas={timeline.canvas} /> : null}
     </AbsoluteFill>
-  )
+  );
 }
 
 /**
@@ -176,10 +178,10 @@ function PlannedItemRenderer({
   canvas,
   narrationWindows,
 }: {
-  plan: PlannedItem
-  assets: AssetUrlMap
-  canvas: TimelineDoc['canvas']
-  narrationWindows: readonly { from: number; durationInFrames: number }[]
+  plan: PlannedItem;
+  assets: AssetUrlMap;
+  canvas: TimelineDoc["canvas"];
+  narrationWindows: readonly { from: number; durationInFrames: number }[];
 }) {
   /* `item` is a document value, which is JSON by construction — the props
    * every component receives are deliberately loose, and each one narrows what
@@ -189,14 +191,14 @@ function PlannedItemRenderer({
     assets,
     frames: { from: plan.from, durationInFrames: plan.durationInFrames },
     canvas,
+  };
+
+  if (plan.trackType === "audio") {
+    return <AudioClip {...props} narrationWindows={narrationWindows} />;
   }
 
-  if (plan.trackType === 'audio') {
-    return <AudioClip {...props} narrationWindows={narrationWindows} />
-  }
-
-  const component = resolveRenderComponent(plan.render)
-  if (component === null) return null
+  const component = resolveRenderComponent(plan.render);
+  if (component === null) return null;
 
   /* `createElement`, not `<Component {...props} />`, and not a style choice.
    * Assigning a looked-up component to a capitalised local and rendering it as
@@ -205,7 +207,7 @@ function PlannedItemRenderer({
    * during render (a new identity every frame, which React would remount).
    * createElement says plainly that the dispatch is dynamic, and the identity
    * really is stable because RENDER_COMPONENTS is a module constant. */
-  return createElement(component, props)
+  return createElement(component, props);
 }
 
 /**
@@ -226,17 +228,17 @@ function PlannedItemRenderer({
  * WHERE: Passed to every AudioClip.
  */
 function collectNarrationWindows(
-  planned: readonly PlannedItem[]
+  planned: readonly PlannedItem[],
 ): { from: number; durationInFrames: number }[] {
-  const windows: { from: number; durationInFrames: number }[] = []
+  const windows: { from: number; durationInFrames: number }[] = [];
 
   for (const plan of planned) {
-    if (plan.trackType !== 'audio') continue
-    const item = plan.item
-    if (!('speaker' in item) || typeof item.speaker !== 'string') continue
-    if ('duck' in item && item.duck === true) continue
-    windows.push({ from: plan.from, durationInFrames: plan.durationInFrames })
+    if (plan.trackType !== "audio") continue;
+    const item = plan.item;
+    if (!("speaker" in item) || typeof item.speaker !== "string") continue;
+    if ("duck" in item && item.duck === true) continue;
+    windows.push({ from: plan.from, durationInFrames: plan.durationInFrames });
   }
 
-  return windows
+  return windows;
 }

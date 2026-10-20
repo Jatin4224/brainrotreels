@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -24,24 +18,24 @@
  *        src/trpc/routers/_app.
  */
 
-import { createTRPCRouter } from '../init'
-import { authProcedure } from '../procedures'
-import { TRPCError } from '@trpc/server'
+import { createTRPCRouter } from "../init";
+import { authProcedure } from "../procedures";
+import { TRPCError } from "@trpc/server";
 
-import { createOrganizationSchema } from '@/lib/types'
-import { createOrganizationWithOwner } from '@/services/organization.service'
-import { getAdapterCapabilities } from '@/lib/adapters'
+import { createOrganizationSchema } from "@/lib/types";
+import { createOrganizationWithOwner } from "@/services/organization.service";
+import { getAdapterCapabilities } from "@/lib/adapters";
 
 // authProcedure, not protectedProcedure: this is how the client discovers
 // which org to use before it can pass organizationId in inputs — and how a
 // brand-new user (zero memberships) creates their first org during onboarding.
 export const organizationRouter = createTRPCRouter({
   getActiveOrganization: authProcedure.query(async ({ ctx }) =>
-    ctx.getActiveOrganization()
+    ctx.getActiveOrganization(),
   ),
 
   getUserOrganizations: authProcedure.query(async ({ ctx }) =>
-    ctx.getUserOrganizations()
+    ctx.getUserOrganizations(),
   ),
 
   /**
@@ -64,13 +58,13 @@ export const organizationRouter = createTRPCRouter({
        * getMemberships reads the provider, so it would never appear and the
        * user would loop in onboarding forever. Fail loudly instead — the UI
        * routes to the provider's own create-organization screen. */
-      const capabilities = await getAdapterCapabilities()
+      const capabilities = await getAdapterCapabilities();
       if (!capabilities.appManagedOrganizations) {
         throw new TRPCError({
-          code: 'BAD_REQUEST',
+          code: "BAD_REQUEST",
           message:
-            'Organizations are managed by the auth provider. Create it through the provider’s own flow instead.',
-        })
+            "Organizations are managed by the auth provider. Create it through the provider’s own flow instead.",
+        });
       }
 
       /* Deliberately NOT ensurePersonalWorkspace: this procedure is the
@@ -83,12 +77,12 @@ export const organizationRouter = createTRPCRouter({
           userId: ctx.user.id,
           name: input.name,
           logo: input.logo,
-        })
+        });
         await tx.user.update({
           where: { id: ctx.user.id },
           data: { onboardingComplete: true },
-        })
-        return result
-      })
+        });
+        return result;
+      });
     }),
-})
+});

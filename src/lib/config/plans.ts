@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 import {
@@ -14,7 +8,7 @@ import {
   envOptional,
   envString,
   publicEnv,
-} from './env.public'
+} from "./env.public";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: PLAN_KEYS, PlanKey, PlanDefinition, PLANS,
@@ -51,25 +45,31 @@ import {
  * (isPortalOrganization). It grants everything (unlimited limits, all flags) and
  * is never shown in pricing or the upgrade order.
  */
-export const PLAN_KEYS = ['free', 'starter', 'pro', 'enterprise', 'portal'] as const
+export const PLAN_KEYS = [
+  "free",
+  "starter",
+  "pro",
+  "enterprise",
+  "portal",
+] as const;
 
-export type PlanKey = (typeof PLAN_KEYS)[number]
+export type PlanKey = (typeof PLAN_KEYS)[number];
 
-export type BillingInterval = 'monthly' | 'yearly'
+export type BillingInterval = "monthly" | "yearly";
 
 export interface PlanDefinition {
-  name: string
+  name: string;
   /* One line under the plan name on a pricing card — who the plan is for. */
-  description: string
-  icon: string
-  showPlan: boolean
-  trialDays: number
+  description: string;
+  icon: string;
+  showPlan: boolean;
+  trialDays: number;
   /* Stripe recurring Price ids per interval. `free` has none. Env-driven, so
    * values are `string | undefined` (exactOptionalPropertyTypes). */
   stripe: {
-    monthly?: string | undefined
-    yearly?: string | undefined
-  }
+    monthly?: string | undefined;
+    yearly?: string | undefined;
+  };
 }
 
 /* Operator-tunable plan attributes come from `publicEnv`, which reads every
@@ -92,23 +92,23 @@ export interface PlanDefinition {
  */
 export const PLANS: Record<PlanKey, PlanDefinition> = {
   free: {
-    name: envString(publicEnv.NEXT_PUBLIC_FREE_NAME, 'Free'),
+    name: envString(publicEnv.NEXT_PUBLIC_FREE_NAME, "Free"),
     description: envString(
       publicEnv.NEXT_PUBLIC_FREE_DESCRIPTION,
-      'Everything you need to try things out.'
+      "Everything you need to try things out.",
     ),
-    icon: 'Package',
+    icon: "Package",
     showPlan: envBoolean(publicEnv.NEXT_PUBLIC_FREE_SHOW_PLAN, true),
     trialDays: envInteger(publicEnv.NEXT_PUBLIC_FREE_TRIAL_DAYS, 0),
     stripe: {},
   },
   starter: {
-    name: envString(publicEnv.NEXT_PUBLIC_STARTER_NAME, 'Starter'),
+    name: envString(publicEnv.NEXT_PUBLIC_STARTER_NAME, "Starter"),
     description: envString(
       publicEnv.NEXT_PUBLIC_STARTER_DESCRIPTION,
-      'For a small team getting off the ground.'
+      "For a small team getting off the ground.",
     ),
-    icon: 'Rocket',
+    icon: "Rocket",
     showPlan: envBoolean(publicEnv.NEXT_PUBLIC_STARTER_SHOW_PLAN, true),
     trialDays: envInteger(publicEnv.NEXT_PUBLIC_STARTER_TRIAL_DAYS, 14),
     stripe: {
@@ -117,12 +117,12 @@ export const PLANS: Record<PlanKey, PlanDefinition> = {
     },
   },
   pro: {
-    name: envString(publicEnv.NEXT_PUBLIC_PRO_NAME, 'Pro'),
+    name: envString(publicEnv.NEXT_PUBLIC_PRO_NAME, "Pro"),
     description: envString(
       publicEnv.NEXT_PUBLIC_PRO_DESCRIPTION,
-      'For teams that need room to grow.'
+      "For teams that need room to grow.",
     ),
-    icon: 'Zap',
+    icon: "Zap",
     showPlan: envBoolean(publicEnv.NEXT_PUBLIC_PRO_SHOW_PLAN, true),
     trialDays: envInteger(publicEnv.NEXT_PUBLIC_PRO_TRIAL_DAYS, 14),
     stripe: {
@@ -131,12 +131,12 @@ export const PLANS: Record<PlanKey, PlanDefinition> = {
     },
   },
   enterprise: {
-    name: envString(publicEnv.NEXT_PUBLIC_ENTERPRISE_NAME, 'Enterprise'),
+    name: envString(publicEnv.NEXT_PUBLIC_ENTERPRISE_NAME, "Enterprise"),
     description: envString(
       publicEnv.NEXT_PUBLIC_ENTERPRISE_DESCRIPTION,
-      'Unlimited scale with everything included.'
+      "Unlimited scale with everything included.",
     ),
-    icon: 'Building',
+    icon: "Building",
     showPlan: envBoolean(publicEnv.NEXT_PUBLIC_ENTERPRISE_SHOW_PLAN, true),
     trialDays: envInteger(publicEnv.NEXT_PUBLIC_ENTERPRISE_TRIAL_DAYS, 30),
     stripe: {
@@ -146,14 +146,14 @@ export const PLANS: Record<PlanKey, PlanDefinition> = {
   },
   /* Hidden platform-admin tier — never sold, never in PLAN_ORDER, not renamable. */
   portal: {
-    name: 'Portal',
-    description: 'Platform administration workspace.',
-    icon: 'ShieldCheck',
+    name: "Portal",
+    description: "Platform administration workspace.",
+    icon: "ShieldCheck",
     showPlan: false,
     trialDays: 0,
     stripe: {},
   },
-}
+};
 
 /**
  * SOURCE OF TRUTH KEYWORDS: PLAN_ORDER
@@ -168,7 +168,9 @@ export const PLANS: Record<PlanKey, PlanDefinition> = {
  *        a stable upgrade ladder. The pricing UI filters by showPlan itself.
  * WHERE: getPlanByPriceId / getNextPlan below; plan-selector + Stripe webhook.
  */
-export const PLAN_ORDER: readonly PlanKey[] = PLAN_KEYS.filter((plan) => plan !== 'portal')
+export const PLAN_ORDER: readonly PlanKey[] = PLAN_KEYS.filter(
+  (plan) => plan !== "portal",
+);
 
 /**
  * SOURCE OF TRUTH KEYWORDS: isPaidPlan
@@ -177,7 +179,7 @@ export const PLAN_ORDER: readonly PlanKey[] = PLAN_KEYS.filter((plan) => plan !=
  * WHERE: Onboarding + billing branch on whether checkout is needed.
  */
 export function isPaidPlan(plan: PlanKey): boolean {
-  return plan !== 'free'
+  return plan !== "free";
 }
 
 /**
@@ -188,8 +190,11 @@ export function isPaidPlan(plan: PlanKey): boolean {
  *        with a clear "price not configured" message rather than a Stripe 400.
  * WHERE: billing.createSubscription / upgradeOrganization.
  */
-export function getPlanPriceId(plan: PlanKey, interval: BillingInterval): string | null {
-  return PLANS[plan].stripe[interval] ?? null
+export function getPlanPriceId(
+  plan: PlanKey,
+  interval: BillingInterval,
+): string | null {
+  return PLANS[plan].stripe[interval] ?? null;
 }
 
 /**
@@ -202,10 +207,10 @@ export function getPlanPriceId(plan: PlanKey, interval: BillingInterval): string
  */
 export function getPlanByPriceId(priceId: string): PlanKey | null {
   for (const plan of PLAN_ORDER) {
-    const { monthly, yearly } = PLANS[plan].stripe
-    if (monthly === priceId || yearly === priceId) return plan
+    const { monthly, yearly } = PLANS[plan].stripe;
+    if (monthly === priceId || yearly === priceId) return plan;
   }
-  return null
+  return null;
 }
 
 /**
@@ -215,7 +220,7 @@ export function getPlanByPriceId(priceId: string): PlanKey | null {
  * WHERE: Upgrade copy / {nextPlan} interpolation.
  */
 export function getNextPlan(plan: PlanKey): PlanKey | null {
-  const index = PLAN_ORDER.indexOf(plan)
-  if (index === -1 || index === PLAN_ORDER.length - 1) return null
-  return PLAN_ORDER[index + 1] ?? null
+  const index = PLAN_ORDER.indexOf(plan);
+  if (index === -1 || index === PLAN_ORDER.length - 1) return null;
+  return PLAN_ORDER[index + 1] ?? null;
 }

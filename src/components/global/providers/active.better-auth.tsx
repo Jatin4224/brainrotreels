@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -23,40 +17,44 @@
  *        directly — importing it by name defeats the alias.
  */
 
-import type * as React from 'react'
-import type { Route } from 'next'
+import type * as React from "react";
+import type { Route } from "next";
 
-import { TeamSwitcher } from './better-auth/org-switcher'
-import { NavUser } from './better-auth/user-menu'
-import { AuthForm } from './better-auth/auth-form'
-import { ForgotPasswordForm } from './better-auth/forgot-password-form'
-import { ResetPasswordForm } from './better-auth/reset-password-form'
-import { BetterAuthMemberManagement } from './better-auth/member-management'
-import { BetterAuthBillingScreen } from './better-auth/billing-screen'
-import { BetterAuthOnboarding } from './better-auth/onboarding'
-import { BetterAuthOrganizationAdvanced } from './better-auth/organization-advanced'
-import type { AuthFormMode } from '@/lib/types'
+import { TeamSwitcher } from "./better-auth/org-switcher";
+import { NavUser } from "./better-auth/user-menu";
+import { AuthForm } from "./better-auth/auth-form";
+import { ForgotPasswordForm } from "./better-auth/forgot-password-form";
+import { ResetPasswordForm } from "./better-auth/reset-password-form";
+import { BetterAuthMemberManagement } from "./better-auth/member-management";
+import { BetterAuthBillingScreen } from "./better-auth/billing-screen";
+import { BetterAuthOnboarding } from "./better-auth/onboarding";
+import { BetterAuthOrganizationAdvanced } from "./better-auth/organization-advanced";
+import type { AuthFormMode } from "@/lib/types";
 
 /* Better Auth needs no React context of its own. */
-export function ActiveAuthBoundary({ children }: { children: React.ReactNode }) {
-  return <>{children}</>
+export function ActiveAuthBoundary({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return <>{children}</>;
 }
 
-export const ActiveOrgSwitcher = TeamSwitcher
-export const ActiveUserMenu = NavUser
-export const ActiveMemberManagement = BetterAuthMemberManagement
-export const ActiveBillingScreen = BetterAuthBillingScreen
-export const ActiveOrganizationAdvanced = BetterAuthOrganizationAdvanced
-export const ActiveOnboarding = BetterAuthOnboarding
-export const ActiveForgotPasswordScreen = ForgotPasswordForm
-export const ActiveResetPasswordScreen = ResetPasswordForm
+export const ActiveOrgSwitcher = TeamSwitcher;
+export const ActiveUserMenu = NavUser;
+export const ActiveMemberManagement = BetterAuthMemberManagement;
+export const ActiveBillingScreen = BetterAuthBillingScreen;
+export const ActiveOrganizationAdvanced = BetterAuthOrganizationAdvanced;
+export const ActiveOnboarding = BetterAuthOnboarding;
+export const ActiveForgotPasswordScreen = ForgotPasswordForm;
+export const ActiveResetPasswordScreen = ResetPasswordForm;
 
 export function ActiveAuthScreen({
   mode,
   callbackURL,
 }: {
-  mode: AuthFormMode
-  callbackURL: Route
+  mode: AuthFormMode;
+  callbackURL: Route;
 }) {
-  return <AuthForm mode={mode} callbackURL={callbackURL} />
+  return <AuthForm mode={mode} callbackURL={callbackURL} />;
 }

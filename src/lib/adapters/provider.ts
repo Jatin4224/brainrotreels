@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -35,7 +29,7 @@
  *        Contract lives in src/lib/adapters/types.ts.
  */
 
-import { AUTH_PROVIDER_IDS, type AuthProviderId } from './types'
+import { AUTH_PROVIDER_IDS, type AuthProviderId } from "./types";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: DEFAULT_AUTH_PROVIDER
@@ -45,7 +39,7 @@ import { AUTH_PROVIDER_IDS, type AuthProviderId } from './types'
  *        third-party account and no extra env — the template's whole premise.
  * WHERE: Fallback inside resolveAuthProvider below.
  */
-export const DEFAULT_AUTH_PROVIDER: AuthProviderId = 'better-auth'
+export const DEFAULT_AUTH_PROVIDER: AuthProviderId = "better-auth";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: isAuthProviderId
@@ -54,7 +48,7 @@ export const DEFAULT_AUTH_PROVIDER: AuthProviderId = 'better-auth'
  * WHERE: Used by resolveAuthProvider and the env checklist.
  */
 export function isAuthProviderId(value: string): value is AuthProviderId {
-  return (AUTH_PROVIDER_IDS as readonly string[]).includes(value)
+  return (AUTH_PROVIDER_IDS as readonly string[]).includes(value);
 }
 
 /* Read once at module load. `NEXT_PUBLIC_` vars are inlined at build time, so
@@ -62,20 +56,21 @@ export function isAuthProviderId(value: string): value is AuthProviderId {
  * both resolve to the same value, which is what keeps the two halves of the app
  * on one provider. */
 function resolveAuthProvider(): AuthProviderId {
-  const raw = process.env['NEXT_PUBLIC_AUTH_PROVIDER']
-  if (raw === undefined || raw.trim().length === 0) return DEFAULT_AUTH_PROVIDER
+  const raw = process.env["NEXT_PUBLIC_AUTH_PROVIDER"];
+  if (raw === undefined || raw.trim().length === 0)
+    return DEFAULT_AUTH_PROVIDER;
 
-  const normalized = raw.trim().toLowerCase()
+  const normalized = raw.trim().toLowerCase();
   if (!isAuthProviderId(normalized)) {
     /* Fail loudly: a typo here would silently fall back to a DIFFERENT provider
      * than the operator configured — the exact cross-provider mixing this
      * module exists to prevent. */
     throw new Error(
       `[adapters] NEXT_PUBLIC_AUTH_PROVIDER="${raw}" is not a known provider. ` +
-        `Expected one of: ${AUTH_PROVIDER_IDS.join(', ')}.`
-    )
+        `Expected one of: ${AUTH_PROVIDER_IDS.join(", ")}.`,
+    );
   }
-  return normalized
+  return normalized;
 }
 
 /**
@@ -86,7 +81,7 @@ function resolveAuthProvider(): AuthProviderId {
  *        process.env, so there is no way for two call sites to disagree.
  * WHERE: Imported anywhere a provider branch is needed — server and client.
  */
-export const AUTH_PROVIDER: AuthProviderId = resolveAuthProvider()
+export const AUTH_PROVIDER: AuthProviderId = resolveAuthProvider();
 
 /**
  * SOURCE OF TRUTH KEYWORDS: assertProviderActive, PROVIDER_ISOLATION
@@ -105,7 +100,7 @@ export function assertProviderActive(provider: AuthProviderId): void {
     throw new Error(
       `[adapters] The "${provider}" adapter was loaded while ` +
         `NEXT_PUBLIC_AUTH_PROVIDER="${AUTH_PROVIDER}". Providers must never run ` +
-        `side by side. Remove the import that pulled it in, or change the env var.`
-    )
+        `side by side. Remove the import that pulled it in, or change the env var.`,
+    );
   }
 }

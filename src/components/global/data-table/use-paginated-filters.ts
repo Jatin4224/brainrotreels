@@ -1,14 +1,8 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
-'use client'
+"use client";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: usePaginatedFilters, SEARCH_DEBOUNCE_MS,
@@ -27,20 +21,20 @@
  * WHERE: Used by list screens alongside <DataTable>.
  */
 
-import * as React from 'react'
+import * as React from "react";
 
-export const SEARCH_DEBOUNCE_MS = 300
+export const SEARCH_DEBOUNCE_MS = 300;
 
 export interface UsePaginatedFiltersResult<TFilters, TApplied> {
   /** Live values — bind the inputs to these. */
-  filters: TFilters
-  setFilters: (next: TFilters) => void
+  filters: TFilters;
+  setFilters: (next: TFilters) => void;
   /** Debounced and normalised — send these to the server. */
-  applied: TApplied
-  page: number
-  setPage: (page: number) => void
+  applied: TApplied;
+  page: number;
+  setPage: (page: number) => void;
   /** True when any filter is active, for the empty-state branch. */
-  isFiltered: boolean
+  isFiltered: boolean;
 }
 
 /**
@@ -54,42 +48,47 @@ export function usePaginatedFilters<
   TFilters extends Record<string, unknown>,
   TApplied extends Record<string, unknown> = Partial<TFilters>,
 >(options: {
-  defaults: TFilters
+  defaults: TFilters;
   /** Which key is free text. Omit when there is no search field. */
-  searchKey?: keyof TFilters
+  searchKey?: keyof TFilters;
   /** Strips defaults/empties so `isFiltered` and the query stay honest. */
-  normalize: (filters: TFilters) => TApplied
-  debounceMs?: number
+  normalize: (filters: TFilters) => TApplied;
+  debounceMs?: number;
 }): UsePaginatedFiltersResult<TFilters, TApplied> {
-  const { defaults, searchKey, normalize, debounceMs = SEARCH_DEBOUNCE_MS } = options
+  const {
+    defaults,
+    searchKey,
+    normalize,
+    debounceMs = SEARCH_DEBOUNCE_MS,
+  } = options;
 
-  const [filters, setFilters] = React.useState<TFilters>(defaults)
-  const [page, setPage] = React.useState(1)
+  const [filters, setFilters] = React.useState<TFilters>(defaults);
+  const [page, setPage] = React.useState(1);
 
-  const rawSearch = searchKey !== undefined ? filters[searchKey] : undefined
-  const [debouncedSearch, setDebouncedSearch] = React.useState(rawSearch)
+  const rawSearch = searchKey !== undefined ? filters[searchKey] : undefined;
+  const [debouncedSearch, setDebouncedSearch] = React.useState(rawSearch);
 
   React.useEffect(() => {
-    if (searchKey === undefined) return
-    const timer = setTimeout(() => setDebouncedSearch(rawSearch), debounceMs)
-    return () => clearTimeout(timer)
-  }, [rawSearch, searchKey, debounceMs])
+    if (searchKey === undefined) return;
+    const timer = setTimeout(() => setDebouncedSearch(rawSearch), debounceMs);
+    return () => clearTimeout(timer);
+  }, [rawSearch, searchKey, debounceMs]);
 
   const applied = React.useMemo(() => {
-    if (searchKey === undefined) return normalize(filters)
+    if (searchKey === undefined) return normalize(filters);
     /* Annotated rather than asserted: the spread already satisfies TFilters,
      * and an assertion here would be the kind that hides a real mismatch the
      * day the filter shape changes. */
-    const merged: TFilters = { ...filters, [searchKey]: debouncedSearch }
-    return normalize(merged)
-  }, [filters, debouncedSearch, searchKey, normalize])
+    const merged: TFilters = { ...filters, [searchKey]: debouncedSearch };
+    return normalize(merged);
+  }, [filters, debouncedSearch, searchKey, normalize]);
 
   /* PAGE_RESET_DURING_RENDER — see the WHY above. */
-  const filterKey = JSON.stringify(applied)
-  const [lastFilterKey, setLastFilterKey] = React.useState(filterKey)
+  const filterKey = JSON.stringify(applied);
+  const [lastFilterKey, setLastFilterKey] = React.useState(filterKey);
   if (filterKey !== lastFilterKey) {
-    setLastFilterKey(filterKey)
-    setPage(1)
+    setLastFilterKey(filterKey);
+    setPage(1);
   }
 
   return {
@@ -99,5 +98,5 @@ export function usePaginatedFilters<
     page,
     setPage,
     isFiltered: Object.keys(applied).length > 0,
-  }
+  };
 }

@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -17,15 +11,17 @@
  * WHERE: Rendered by sendVerificationEmail in src/services/email.service.ts.
  */
 
-import * as React from 'react'
-import { Text } from '@react-email/components'
-import { BaseLayout, EmailButton, emailStyles } from '../base-layout'
+import * as React from "react";
+import { Text } from "@react-email/components";
+import { BaseLayout, EmailButton, emailStyles } from "../base-layout";
 
 export interface EmailVerificationEmailProps {
-  verificationLink: string
+  verificationLink: string;
 }
 
-export function EmailVerificationEmail({ verificationLink }: EmailVerificationEmailProps) {
+export function EmailVerificationEmail({
+  verificationLink,
+}: EmailVerificationEmailProps) {
   return (
     <BaseLayout preview="Verify your email address">
       <Text style={emailStyles.title}>Verify your email</Text>
@@ -37,7 +33,7 @@ export function EmailVerificationEmail({ verificationLink }: EmailVerificationEm
         Or paste this link into your browser: {verificationLink}
       </Text>
     </BaseLayout>
-  )
+  );
 }
 
-export default EmailVerificationEmail
+export default EmailVerificationEmail;

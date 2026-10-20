@@ -1,14 +1,8 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
-import 'server-only'
+import "server-only";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: mapSubscriptionData, upsertSubscription,
@@ -25,28 +19,32 @@ import 'server-only'
  *        prisma singleton (runs outside the request lifecycle).
  */
 
-import type Stripe from 'stripe'
-import { prisma } from '@/lib/config/prisma'
-import type { PlanKey } from '@/lib/config/plans'
+import type Stripe from "stripe";
+import { prisma } from "@/lib/config/prisma";
+import type { PlanKey } from "@/lib/config/plans";
 
 /* Stripe ids may arrive expanded (object) or as a bare string. */
-export function subscriptionStripeCustomerId(subscription: Stripe.Subscription): string {
-  return typeof subscription.customer === 'string'
+export function subscriptionStripeCustomerId(
+  subscription: Stripe.Subscription,
+): string {
+  return typeof subscription.customer === "string"
     ? subscription.customer
-    : subscription.customer.id
+    : subscription.customer.id;
 }
 
 /** The first item's price id — used to map the subscription back to a plan. */
-export function subscriptionPriceId(subscription: Stripe.Subscription): string | null {
-  return subscription.items.data[0]?.price.id ?? null
+export function subscriptionPriceId(
+  subscription: Stripe.Subscription,
+): string | null {
+  return subscription.items.data[0]?.price.id ?? null;
 }
 
 function toDate(seconds: number | null | undefined): Date | null {
-  return typeof seconds === 'number' ? new Date(seconds * 1000) : null
+  return typeof seconds === "number" ? new Date(seconds * 1000) : null;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null
+  return typeof value === "object" && value !== null;
 }
 
 /* Reads a unix-seconds field that may live on the subscription (older API
@@ -56,27 +54,27 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function readPeriodSeconds(
   subscription: Stripe.Subscription,
   item: Stripe.SubscriptionItem | undefined,
-  key: 'current_period_start' | 'current_period_end'
+  key: "current_period_start" | "current_period_end",
 ): number | null {
   for (const source of [subscription, item]) {
     if (isRecord(source)) {
-      const value = source[key]
-      if (typeof value === 'number') return value
+      const value = source[key];
+      if (typeof value === "number") return value;
     }
   }
-  return null
+  return null;
 }
 
 interface MappedSubscription {
-  plan: string
-  stripeCustomerId: string
-  stripeSubscriptionId: string
-  status: string
-  periodStart: Date | null
-  periodEnd: Date | null
-  cancelAtPeriodEnd: boolean
-  trialStart: Date | null
-  trialEnd: Date | null
+  plan: string;
+  stripeCustomerId: string;
+  stripeSubscriptionId: string;
+  status: string;
+  periodStart: Date | null;
+  periodEnd: Date | null;
+  cancelAtPeriodEnd: boolean;
+  trialStart: Date | null;
+  trialEnd: Date | null;
 }
 
 /**
@@ -89,20 +87,24 @@ interface MappedSubscription {
  */
 export function mapSubscriptionData(
   subscription: Stripe.Subscription,
-  planKey: PlanKey
+  planKey: PlanKey,
 ): MappedSubscription {
-  const item = subscription.items.data[0]
+  const item = subscription.items.data[0];
   return {
     plan: planKey,
     stripeCustomerId: subscriptionStripeCustomerId(subscription),
     stripeSubscriptionId: subscription.id,
     status: subscription.status,
-    periodStart: toDate(readPeriodSeconds(subscription, item, 'current_period_start')),
-    periodEnd: toDate(readPeriodSeconds(subscription, item, 'current_period_end')),
+    periodStart: toDate(
+      readPeriodSeconds(subscription, item, "current_period_start"),
+    ),
+    periodEnd: toDate(
+      readPeriodSeconds(subscription, item, "current_period_end"),
+    ),
     cancelAtPeriodEnd: subscription.cancel_at_period_end,
     trialStart: toDate(subscription.trial_start),
     trialEnd: toDate(subscription.trial_end),
-  }
+  };
 }
 
 /**
@@ -115,17 +117,17 @@ export function mapSubscriptionData(
 export async function upsertSubscription(
   subscription: Stripe.Subscription,
   organizationId: string,
-  planKey: PlanKey
+  planKey: PlanKey,
 ): Promise<void> {
-  const data = mapSubscriptionData(subscription, planKey)
+  const data = mapSubscriptionData(subscription, planKey);
   const existing = await prisma.subscription.findFirst({
     where: { stripeSubscriptionId: subscription.id },
     select: { id: true },
-  })
+  });
 
   if (existing) {
-    await prisma.subscription.update({ where: { id: existing.id }, data })
-    return
+    await prisma.subscription.update({ where: { id: existing.id }, data });
+    return;
   }
 
   await prisma.subscription.create({
@@ -134,13 +136,13 @@ export async function upsertSubscription(
       referenceId: organizationId,
       ...data,
     },
-  })
+  });
 
   /* Keep the org's durable customer handle in sync for payment-method ops. */
   await prisma.organization.update({
     where: { id: organizationId },
     data: { stripeCustomerId: data.stripeCustomerId },
-  })
+  });
 }
 
 /**
@@ -151,6 +153,8 @@ export async function upsertSubscription(
  *        row exists).
  * WHERE: Called by the customer.subscription.deleted webhook handler.
  */
-export async function deleteSubscriptionByStripeId(stripeSubscriptionId: string): Promise<void> {
-  await prisma.subscription.deleteMany({ where: { stripeSubscriptionId } })
+export async function deleteSubscriptionByStripeId(
+  stripeSubscriptionId: string,
+): Promise<void> {
+  await prisma.subscription.deleteMany({ where: { stripeSubscriptionId } });
 }

@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -45,23 +39,23 @@
  * WHERE: Registered in src/inngest/functions/index.ts, served at /api/inngest.
  */
 
-import { inngestClient } from '@/lib/adapters/jobs/inngest/client'
-import { prisma } from '@/lib/config/prisma'
+import { inngestClient } from "@/lib/adapters/jobs/inngest/client";
+import { prisma } from "@/lib/config/prisma";
 
 /**
  * How old an unsettled hold must be before it counts as stranded. Comfortably
  * past the render timeout (45 minutes), so a render legitimately still running
  * is never reported. Grep RENDER_TIMEOUT in project-render.ts.
  */
-const STRANDED_HOLD_AFTER_MS = 3 * 60 * 60 * 1000
+const STRANDED_HOLD_AFTER_MS = 3 * 60 * 60 * 1000;
 
 /** Nothing in this job needs to be precise to the minute; 03:00 UTC is quiet. */
-const RECONCILE_CRON = '0 3 * * *'
+const RECONCILE_CRON = "0 3 * * *";
 
 export const creditsReconcileFunction = inngestClient.createFunction(
   {
-    id: 'credits-reconcile',
-    name: 'Reconcile credit balances against the ledger',
+    id: "credits-reconcile",
+    name: "Reconcile credit balances against the ledger",
     triggers: [{ cron: RECONCILE_CRON }],
   },
   async ({ step }) => {
@@ -74,7 +68,7 @@ export const creditsReconcileFunction = inngestClient.createFunction(
      * a job that loads all of them to add them up is a job that eventually
      * runs out of memory on the night it is most needed.
      */
-    const drift = await step.run('compare-balances', async () => {
+    const drift = await step.run("compare-balances", async () => {
       const rows = await prisma.$queryRaw<
         { organizationId: string; cached: number; actual: number }[]
       >`
@@ -85,7 +79,7 @@ export const creditsReconcileFunction = inngestClient.createFunction(
         LEFT JOIN "credit_ledger" l ON l."organizationId" = o."id"
         GROUP BY o."id", o."creditBalance"
         HAVING o."creditBalance" <> COALESCE(SUM(l."delta"), 0)
-      `
+      `;
 
       for (const row of rows) {
         /* REPORT_DONT_REPAIR — logged at error level because a divergence here
@@ -94,25 +88,30 @@ export const creditsReconcileFunction = inngestClient.createFunction(
         console.error(
           `[credits.reconcile] DRIFT organization=${row.organizationId} ` +
             `cached=${row.cached} ledger=${row.actual} delta=${row.cached - row.actual}`,
-        )
+        );
       }
 
       return rows.map((row) => ({
         organizationId: row.organizationId,
         cached: row.cached,
         actual: row.actual,
-      }))
-    })
+      }));
+    });
 
     /**
      * STRANDED_HOLD — a hold with no commit and no release against it, old
      * enough that the work it was for cannot still be running.
      */
-    const stranded = await step.run('find-stranded-holds', async () => {
-      const cutoff = new Date(Date.now() - STRANDED_HOLD_AFTER_MS)
+    const stranded = await step.run("find-stranded-holds", async () => {
+      const cutoff = new Date(Date.now() - STRANDED_HOLD_AFTER_MS);
 
       const rows = await prisma.$queryRaw<
-        { id: string; organizationId: string; delta: number; refId: string | null }[]
+        {
+          id: string;
+          organizationId: string;
+          delta: number;
+          refId: string | null;
+        }[]
       >`
         SELECT h."id", h."organizationId", h."delta", h."refId"
         FROM "credit_ledger" h
@@ -123,13 +122,13 @@ export const creditsReconcileFunction = inngestClient.createFunction(
             WHERE s."holdId" = h."id"
               AND s."kind" IN ('commit', 'release')
           )
-      `
+      `;
 
       for (const row of rows) {
         console.error(
           `[credits.reconcile] STRANDED HOLD id=${row.id} organization=${row.organizationId} ` +
-            `credits=${Math.abs(row.delta)} ref=${row.refId ?? 'none'}`,
-        )
+            `credits=${Math.abs(row.delta)} ref=${row.refId ?? "none"}`,
+        );
       }
 
       return rows.map((row) => ({
@@ -137,8 +136,8 @@ export const creditsReconcileFunction = inngestClient.createFunction(
         organizationId: row.organizationId,
         credits: Math.abs(row.delta),
         refId: row.refId,
-      }))
-    })
+      }));
+    });
 
     /* Returned as well as logged, so the run's own output in the Inngest
      * dashboard answers "was anything wrong last night" without grepping. */
@@ -148,6 +147,6 @@ export const creditsReconcileFunction = inngestClient.createFunction(
       drift,
       strandedHoldCount: stranded.length,
       stranded,
-    }
+    };
   },
-)
+);

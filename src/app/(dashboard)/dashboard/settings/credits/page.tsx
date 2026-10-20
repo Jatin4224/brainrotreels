@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -25,19 +19,19 @@
  * WHERE: RESOURCES.credits.nav.href.
  */
 
-import type { Metadata } from 'next'
+import type { Metadata } from "next";
 
-import { ContentLayout } from '@/components/global/page-header'
-import { CreditsScreen } from './_components/credits-screen'
+import { ContentLayout } from "@/components/global/page-header";
+import { CreditsScreen } from "./_components/credits-screen";
 
 export const metadata: Metadata = {
-  title: 'Credits',
-}
+  title: "Credits",
+};
 
 export default function CreditsSettingsPage() {
   return (
     <ContentLayout title="Credits">
       <CreditsScreen />
     </ContentLayout>
-  )
+  );
 }

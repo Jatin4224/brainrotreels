@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -29,15 +23,10 @@
  *        src/lib/types.
  */
 
-import { z } from 'zod'
+import { z } from "zod";
 
 export type JsonValue =
-  | string
-  | number
-  | boolean
-  | null
-  | JsonValue[]
-  | { [key: string]: JsonValue }
+  string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
 
 /* The annotation is load-bearing, not decorative — see the WHY above. */
 export const jsonValueSchema: z.ZodType<JsonValue, JsonValue> = z.lazy(() =>
@@ -48,9 +37,12 @@ export const jsonValueSchema: z.ZodType<JsonValue, JsonValue> = z.lazy(() =>
     z.null(),
     z.array(jsonValueSchema),
     z.record(z.string(), jsonValueSchema),
-  ])
-)
+  ]),
+);
 
-export type JsonObject = { [key: string]: JsonValue }
+export type JsonObject = { [key: string]: JsonValue };
 
-export const jsonObjectSchema: z.ZodType<JsonObject, JsonObject> = z.record(z.string(), jsonValueSchema)
+export const jsonObjectSchema: z.ZodType<JsonObject, JsonObject> = z.record(
+  z.string(),
+  jsonValueSchema,
+);

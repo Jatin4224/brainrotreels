@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -30,9 +24,9 @@
  *        `npm run remotion:render`.
  */
 
-import path from 'node:path'
+import path from "node:path";
 
-import { Config } from '@remotion/cli/config'
+import { Config } from "@remotion/cli/config";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: overrideWebpackConfig, PATH_ALIAS_FOR_REMOTION
@@ -55,10 +49,10 @@ Config.overrideWebpackConfig((current) => ({
     ...current.resolve,
     alias: {
       ...current.resolve?.alias,
-      '@': path.resolve(process.cwd(), 'src'),
+      "@": path.resolve(process.cwd(), "src"),
     },
   },
-}))
+}));
 
 /* Where `staticFile()` resolves from. The same folder Next serves, so the
  * fonts and dev media have ONE path that works in the studio, in a local
@@ -69,10 +63,10 @@ Config.overrideWebpackConfig((current) => ({
  * relative path here produced a bundle whose `public/` was simply missing, so
  * `staticFile()` URLs 404'd during the render while the identical URL worked
  * in another invocation. An absolute path cannot do that. */
-Config.setPublicDir(path.resolve(process.cwd(), 'public'))
+Config.setPublicDir(path.resolve(process.cwd(), "public"));
 
-Config.setVideoImageFormat('jpeg')
+Config.setVideoImageFormat("jpeg");
 
 /* A local render is a development artifact that gets re-run constantly;
  * refusing to overwrite would mean deleting the file by hand every time. */
-Config.setOverwriteOutput(true)
+Config.setOverwriteOutput(true);

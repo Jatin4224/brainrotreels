@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -25,28 +19,29 @@
  * WHERE: Registered in src/inngest/functions/index.ts, served at /api/inngest.
  */
 
-import { inngestClient } from '@/lib/adapters/jobs/inngest/client'
+import { inngestClient } from "@/lib/adapters/jobs/inngest/client";
 
 /* Inngest v4 takes two arguments, with the trigger inside options — v3's
  * three-argument `(config, trigger, handler)` form no longer type-checks. */
 export const helloFunction = inngestClient.createFunction(
   {
-    id: 'hello',
-    name: 'Hello (wiring proof)',
-    triggers: [{ event: 'hello/requested' }],
+    id: "hello",
+    name: "Hello (wiring proof)",
+    triggers: [{ event: "hello/requested" }],
   },
   async ({ event, step }) => {
-    const greeted = await step.run('greet', () => {
-      const name = typeof event.data['name'] === 'string' ? event.data['name'] : 'world'
-      return { greeting: `hello, ${name}` }
-    })
+    const greeted = await step.run("greet", () => {
+      const name =
+        typeof event.data["name"] === "string" ? event.data["name"] : "world";
+      return { greeting: `hello, ${name}` };
+    });
 
     /* A second step so the run shows two independently memoised results. */
-    const stamped = await step.run('stamp', () => ({
+    const stamped = await step.run("stamp", () => ({
       ...greeted,
       at: new Date().toISOString(),
-    }))
+    }));
 
-    return stamped
+    return stamped;
   },
-)
+);

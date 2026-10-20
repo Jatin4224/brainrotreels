@@ -1,14 +1,8 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
-'use client'
+"use client";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: useUpgradeNudge, UpgradeNudge, UpgradeNudgeReason,
@@ -35,14 +29,23 @@
  *        one-line pitch.
  */
 
-import { formatCurrency } from '@/lib/utils'
-import { BRANDING, PLANS, getNextPlan, isPaidPlan, type PlanKey } from '@/lib/config'
-import { trpc } from '@/trpc/react-provider'
-import { permissions } from '@/lib/permissions'
-import { useActiveOrganization, useActiveOrganizationId } from '@/hooks/use-active-organization'
-import { getYearlySavings } from './pricing-math'
+import { formatCurrency } from "@/lib/utils";
+import {
+  BRANDING,
+  PLANS,
+  getNextPlan,
+  isPaidPlan,
+  type PlanKey,
+} from "@/lib/config";
+import { trpc } from "@/trpc/react-provider";
+import { permissions } from "@/lib/permissions";
+import {
+  useActiveOrganization,
+  useActiveOrganizationId,
+} from "@/hooks/use-active-organization";
+import { getYearlySavings } from "./pricing-math";
 
-export type UpgradeNudgeReason = 'trial' | 'free' | 'yearly' | 'tier'
+export type UpgradeNudgeReason = "trial" | "free" | "yearly" | "tier";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: UpgradeNudge, UpgradeNudgeVariant, TWO_VOLUMES
@@ -65,111 +68,121 @@ export type UpgradeNudgeReason = 'trial' | 'free' | 'yearly' | 'tier'
  */
 export type UpgradeNudge =
   | {
-      variant: 'inline'
-      reason: 'tier' | 'yearly'
-      targetPlan: PlanKey
+      variant: "inline";
+      reason: "tier" | "yearly";
+      targetPlan: PlanKey;
       /** One line, ready to render. */
-      message: string
+      message: string;
     }
   | {
-      variant: 'card'
-      reason: 'free' | 'trial'
-      targetPlan: PlanKey
+      variant: "card";
+      reason: "free" | "trial";
+      targetPlan: PlanKey;
       /** Tooltip text when the sidebar is collapsed to icons. */
-      message: string
+      message: string;
       /** The plan they are on now — "Free", "Pro trial". */
-      currentPlanLabel: string
-      body: string
-      ctaLabel: string
-    }
+      currentPlanLabel: string;
+      body: string;
+      ctaLabel: string;
+    };
 
-const NUDGE_QUERY_OPTIONS = { staleTime: 5 * 60 * 1000 } as const
+const NUDGE_QUERY_OPTIONS = { staleTime: 5 * 60 * 1000 } as const;
 
 export function useUpgradeNudge(): UpgradeNudge | null {
-  const organizationId = useActiveOrganizationId()
-  const { hasPermission } = useActiveOrganization()
-  const canReadBilling = hasPermission(permissions.BILLING_READ)
+  const organizationId = useActiveOrganizationId();
+  const { hasPermission } = useActiveOrganization();
+  const canReadBilling = hasPermission(permissions.BILLING_READ);
 
   const gatesQuery = trpc.usage.getFeatureGates.useQuery(
-    { organizationId: organizationId ?? '' },
-    { enabled: organizationId !== undefined, ...NUDGE_QUERY_OPTIONS }
-  )
-  const plansQuery = trpc.billing.getAvailablePlans.useQuery(undefined, NUDGE_QUERY_OPTIONS)
+    { organizationId: organizationId ?? "" },
+    { enabled: organizationId !== undefined, ...NUDGE_QUERY_OPTIONS },
+  );
+  const plansQuery = trpc.billing.getAvailablePlans.useQuery(
+    undefined,
+    NUDGE_QUERY_OPTIONS,
+  );
   /* Only a billing reader can be told which interval they are on; for everyone
    * else the yearly branch is simply unreachable and the tier branch answers. */
   const subscriptionQuery = trpc.billing.getSubscription.useQuery(
-    { organizationId: organizationId ?? '' },
-    { enabled: organizationId !== undefined && canReadBilling, ...NUDGE_QUERY_OPTIONS }
-  )
+    { organizationId: organizationId ?? "" },
+    {
+      enabled: organizationId !== undefined && canReadBilling,
+      ...NUDGE_QUERY_OPTIONS,
+    },
+  );
 
-  const gates = gatesQuery.data
-  const plans = plansQuery.data
-  if (!gates || !plans) return null
+  const gates = gatesQuery.data;
+  const plans = plansQuery.data;
+  if (!gates || !plans) return null;
 
-  const tier: PlanKey = gates.tier
+  const tier: PlanKey = gates.tier;
   /* The hidden platform-admin tier is not on the ladder and is not sold. */
-  if (tier === 'portal') return null
+  if (tier === "portal") return null;
 
-  const nextPlan = getNextPlan(tier)
+  const nextPlan = getNextPlan(tier);
 
   /* A trial converts to the plan being trialled — the user is already using
    * that tier, and offering them the one above it would be selling past what
    * they came to buy. Free upgrades to the next rung instead. */
   if (gates.isOnTrial) {
-    return buildCardNudge('trial', tier, `${gates.planName} ${BRANDING.upgradeNudge.trialPlanSuffix}`)
+    return buildCardNudge(
+      "trial",
+      tier,
+      `${gates.planName} ${BRANDING.upgradeNudge.trialPlanSuffix}`,
+    );
   }
 
   if (!isPaidPlan(tier)) {
     /* A free plan with nothing above it is a single-tier product — there is
      * nothing to upgrade TO, so say nothing. */
-    if (!nextPlan) return null
-    return buildCardNudge('free', nextPlan, gates.planName)
+    if (!nextPlan) return null;
+    return buildCardNudge("free", nextPlan, gates.planName);
   }
 
   /* Money back before money out: a monthly payer is offered the yearly discount
    * on the plan they are ALREADY on before being asked to move up a tier. */
-  if (subscriptionQuery.data?.billingInterval === 'monthly') {
+  if (subscriptionQuery.data?.billingInterval === "monthly") {
     /* Undefined when the org's plan is hidden from the catalogue; no prices
      * means no discount to quote, which the next branch handles. */
-    const currentPlan = plans.find((plan) => plan.key === tier)
-    const savings = currentPlan ? getYearlySavings(currentPlan) : null
+    const currentPlan = plans.find((plan) => plan.key === tier);
+    const savings = currentPlan ? getYearlySavings(currentPlan) : null;
     if (savings) {
       return {
-        variant: 'inline',
-        reason: 'yearly',
+        variant: "inline",
+        reason: "yearly",
         /* The same plan, bought for a year instead of a month. */
         targetPlan: tier,
         message: BRANDING.upgradeNudge.yearlyBody.replace(
-          '{amount}',
-          formatCurrency(savings.amount, savings.currency)
+          "{amount}",
+          formatCurrency(savings.amount, savings.currency),
         ),
-      }
+      };
     }
   }
 
   if (nextPlan) {
     return {
-      variant: 'inline',
-      reason: 'tier',
+      variant: "inline",
+      reason: "tier",
       targetPlan: nextPlan,
       message: interpolate(BRANDING.upgradeNudge.tierBody, nextPlan),
-    }
+    };
   }
 
   /* Top plan, billed yearly — they already have everything we sell. */
-  return null
+  return null;
 }
 
 /* The card's three strings all name the same plan, so they are built together
  * from one interpolation rather than three call sites that could drift. */
 function buildCardNudge(
-  reason: 'free' | 'trial',
+  reason: "free" | "trial",
   targetPlan: PlanKey,
-  currentPlanLabel: string
+  currentPlanLabel: string,
 ): UpgradeNudge {
-  const ctaLabel = interpolate(BRANDING.upgradeNudge.cardCtaLabel, targetPlan)
+  const ctaLabel = interpolate(BRANDING.upgradeNudge.cardCtaLabel, targetPlan);
   return {
-    variant: 'card',
+    variant: "card",
     reason,
     targetPlan,
     currentPlanLabel,
@@ -177,9 +190,9 @@ function buildCardNudge(
     ctaLabel,
     /* Collapsed, the card is one icon — the CTA is the only line worth keeping. */
     message: ctaLabel,
-  }
+  };
 }
 
 function interpolate(template: string, plan: PlanKey): string {
-  return template.replace('{targetPlan}', PLANS[plan].name)
+  return template.replace("{targetPlan}", PLANS[plan].name);
 }

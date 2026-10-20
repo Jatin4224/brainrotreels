@@ -1,14 +1,8 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
-'use client'
+"use client";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: PlanSelector, BillingIntervalToggle, PLAN_ICONS,
@@ -33,7 +27,7 @@
  * WHERE: Onboarding plan step + <ChangePlanDialog />.
  */
 
-import * as React from 'react'
+import * as React from "react";
 import {
   CheckIcon,
   PackageIcon,
@@ -42,12 +36,17 @@ import {
   Building2Icon,
   ShieldCheckIcon,
   type LucideIcon,
-} from 'lucide-react'
+} from "lucide-react";
 
-import { PLANS, PLAN_ORDER, type PlanKey, type BillingInterval } from '@/lib/config'
-import type { DowngradeBlockerMap } from '@/lib/feature-gate'
-import { cn } from '@/lib/utils'
-import { Badge } from '@/components/ui/badge'
+import {
+  PLANS,
+  PLAN_ORDER,
+  type PlanKey,
+  type BillingInterval,
+} from "@/lib/config";
+import type { DowngradeBlockerMap } from "@/lib/feature-gate";
+import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
 
 /* Maps PLANS[plan].icon strings to lucide components. */
 const PLAN_ICONS: Record<string, LucideIcon> = {
@@ -56,35 +55,35 @@ const PLAN_ICONS: Record<string, LucideIcon> = {
   Zap: ZapIcon,
   Building: Building2Icon,
   ShieldCheck: ShieldCheckIcon,
-}
+};
 
 export function BillingIntervalToggle({
   interval,
   onIntervalChange,
 }: {
-  interval: BillingInterval
-  onIntervalChange: (interval: BillingInterval) => void
+  interval: BillingInterval;
+  onIntervalChange: (interval: BillingInterval) => void;
 }) {
   return (
     <div className="grid grid-cols-2 gap-3">
-      {(['monthly', 'yearly'] as const).map((value) => {
-        const selected = interval === value
+      {(["monthly", "yearly"] as const).map((value) => {
+        const selected = interval === value;
         return (
           <button
             key={value}
             type="button"
             onClick={() => onIntervalChange(value)}
             className={cn(
-              'rounded-lg border-2 border-muted p-3 text-sm font-semibold capitalize transition-all hover:bg-muted/50',
-              selected && 'border-primary'
+              "rounded-lg border-2 border-muted p-3 text-sm font-semibold capitalize transition-all hover:bg-muted/50",
+              selected && "border-primary",
             )}
           >
             {value}
           </button>
-        )
+        );
       })}
     </div>
-  )
+  );
 }
 
 export function PlanSelector({
@@ -93,31 +92,35 @@ export function PlanSelector({
   includeFree = false,
   blockers,
 }: {
-  selectedPlan: PlanKey
-  onPlanChange: (plan: PlanKey) => void
-  includeFree?: boolean
+  selectedPlan: PlanKey;
+  onPlanChange: (plan: PlanKey) => void;
+  includeFree?: boolean;
   /** Omit where nothing can be blocked (onboarding). */
-  blockers?: DowngradeBlockerMap
+  blockers?: DowngradeBlockerMap;
 }) {
-  const plans = PLAN_ORDER.filter((plan) => PLANS[plan].showPlan && (includeFree || plan !== 'free'))
+  const plans = PLAN_ORDER.filter(
+    (plan) => PLANS[plan].showPlan && (includeFree || plan !== "free"),
+  );
 
   return (
     <div className="flex flex-col gap-4">
       {plans.map((plan) => {
-        const def = PLANS[plan]
-        const isSelected = plan === selectedPlan
-        const Icon = PLAN_ICONS[def.icon] ?? PackageIcon
+        const def = PLANS[plan];
+        const isSelected = plan === selectedPlan;
+        const Icon = PLAN_ICONS[def.icon] ?? PackageIcon;
         /* Only over-cap usage blocks; losing a flag feature is a disclosure the
          * caller renders, not a reason this plan is unreachable. */
-        const blocked = (blockers?.[plan] ?? []).some((blocker) => !blocker.isFeatureLoss)
+        const blocked = (blockers?.[plan] ?? []).some(
+          (blocker) => !blocker.isFeatureLoss,
+        );
         return (
           <button
             key={plan}
             type="button"
             onClick={() => onPlanChange(plan)}
             className={cn(
-              'relative flex items-center gap-4 rounded-lg border-2 border-muted p-4 text-left transition-all hover:bg-muted/50',
-              isSelected && 'border-border bg-muted'
+              "relative flex items-center gap-4 rounded-lg border-2 border-muted p-4 text-left transition-all hover:bg-muted/50",
+              isSelected && "border-border bg-muted",
             )}
           >
             <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/10">
@@ -134,17 +137,19 @@ export function PlanSelector({
                   <Badge variant="secondary" className="text-xs">
                     {def.trialDays}-day trial
                   </Badge>
-                ) : plan === 'free' ? (
+                ) : plan === "free" ? (
                   <Badge variant="secondary" className="text-xs">
                     No card required
                   </Badge>
                 ) : null}
               </div>
             </div>
-            {isSelected ? <CheckIcon className="size-5 shrink-0 text-primary" /> : null}
+            {isSelected ? (
+              <CheckIcon className="size-5 shrink-0 text-primary" />
+            ) : null}
           </button>
-        )
+        );
       })}
     </div>
-  )
+  );
 }

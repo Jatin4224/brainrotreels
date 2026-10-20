@@ -1,14 +1,8 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
-'use client'
+"use client";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: PaymentMethodRow, PaymentMethodRowProps
@@ -21,19 +15,19 @@
  * WHERE: settings/billing BillingTab.
  */
 
-import { CreditCard, Check, Loader2Icon, Trash2 } from 'lucide-react'
+import { CreditCard, Check, Loader2Icon, Trash2 } from "lucide-react";
 
-import type { PaymentMethodSummary } from '@/services/payment.service'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
+import type { PaymentMethodSummary } from "@/services/payment.service";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 
 export interface PaymentMethodRowProps {
-  method: PaymentMethodSummary
-  canManage: boolean
-  onSetDefault: (id: string) => void
-  onDelete: (id: string) => void
-  settingDefault: boolean
-  deleting: boolean
+  method: PaymentMethodSummary;
+  canManage: boolean;
+  onSetDefault: (id: string) => void;
+  onDelete: (id: string) => void;
+  settingDefault: boolean;
+  deleting: boolean;
 }
 
 export function PaymentMethodRow({
@@ -44,7 +38,7 @@ export function PaymentMethodRow({
   settingDefault,
   deleting,
 }: PaymentMethodRowProps) {
-  const brandName = method.brand?.toUpperCase() || 'CARD'
+  const brandName = method.brand?.toUpperCase() || "CARD";
   return (
     <div className="group relative flex flex-col gap-3 rounded-lg border p-4 transition-colors hover:bg-accent/50 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex items-center gap-3">
@@ -108,5 +102,5 @@ export function PaymentMethodRow({
         </div>
       ) : null}
     </div>
-  )
+  );
 }

@@ -1,14 +1,8 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
-'use client'
+"use client";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: MediaLibrary, MediaUpload, UsageMeter, MediaTable,
@@ -34,42 +28,45 @@
  * WHERE: Rendered by /dashboard/media.
  */
 
-import * as React from 'react'
+import * as React from "react";
 
-import { trpc } from '@/trpc/react-provider'
-import { useActiveOrganization, useActiveOrganizationId } from '@/hooks/use-active-organization'
-import { permissions } from '@/lib/permissions'
-import { UPLOAD_BYTES_PER_PLAN, maxUploadBytesForPlan } from '@/lib/types'
-import { MediaUpload } from '@/components/global/media-upload'
-import { UsageMeter } from '@/components/global/usage-meter'
-import { Card, CardContent } from '@/components/ui/card'
-import { MediaTable } from './media-table'
+import { trpc } from "@/trpc/react-provider";
+import {
+  useActiveOrganization,
+  useActiveOrganizationId,
+} from "@/hooks/use-active-organization";
+import { permissions } from "@/lib/permissions";
+import { UPLOAD_BYTES_PER_PLAN, maxUploadBytesForPlan } from "@/lib/types";
+import { MediaUpload } from "@/components/global/media-upload";
+import { UsageMeter } from "@/components/global/usage-meter";
+import { Card, CardContent } from "@/components/ui/card";
+import { MediaTable } from "./media-table";
 
 export function MediaLibrary() {
-  const utils = trpc.useUtils()
-  const organizationId = useActiveOrganizationId()
-  const { hasPermission } = useActiveOrganization()
+  const utils = trpc.useUtils();
+  const organizationId = useActiveOrganizationId();
+  const { hasPermission } = useActiveOrganization();
 
   const subscription = trpc.billing.getSubscription.useQuery(
-    { organizationId: organizationId ?? '' },
-    { enabled: organizationId !== undefined }
-  )
+    { organizationId: organizationId ?? "" },
+    { enabled: organizationId !== undefined },
+  );
 
   /* PER_FILE_CAP_FROM_THE_PLAN — see the file header. */
   const maxBytes =
     subscription.data?.tier === undefined
       ? UPLOAD_BYTES_PER_PLAN.free
-      : maxUploadBytesForPlan(subscription.data.tier)
+      : maxUploadBytesForPlan(subscription.data.tier);
 
-  const canUpload = hasPermission(permissions.ASSETS_CREATE)
+  const canUpload = hasPermission(permissions.ASSETS_CREATE);
 
   const handleUploaded = React.useCallback(() => {
     /* INVALIDATE_LIST_AND_USAGE. Not awaited: the upload hook is already moving
      * on to the next file, and blocking its loop on a refetch would stall the
      * queue behind a network round trip. */
-    void utils.assets.list.invalidate()
-    void utils.usage.invalidate()
-  }, [utils])
+    void utils.assets.list.invalidate();
+    void utils.usage.invalidate();
+  }, [utils]);
 
   return (
     <div className="flex flex-col gap-4">
@@ -92,5 +89,5 @@ export function MediaLibrary() {
 
       <MediaTable organizationId={organizationId} />
     </div>
-  )
+  );
 }

@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -64,8 +58,8 @@
  *        the `validate` step of src/inngest/functions/project-render.ts.
  */
 
-import { hashDoc, type TimelineDoc } from '@/lib/timeline'
-import type { RenderResolution } from '@/lib/types/render'
+import { hashDoc, type TimelineDoc } from "@/lib/timeline";
+import type { RenderResolution } from "@/lib/types/render";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: RENDER_KEY_VERSION
@@ -74,7 +68,7 @@ import type { RenderResolution } from '@/lib/types/render'
  * that has not itself changed. See the file header for why that case cannot
  * be detected and must be declared.
  */
-export const RENDER_KEY_VERSION = 1
+export const RENDER_KEY_VERSION = 1;
 
 /**
  * SOURCE OF TRUTH KEYWORDS: RenderCacheInputs
@@ -87,9 +81,9 @@ export const RENDER_KEY_VERSION = 1
  * WHERE: The single argument of renderCacheKey.
  */
 export interface RenderCacheInputs {
-  doc: TimelineDoc
-  resolution: RenderResolution
-  watermark: boolean
+  doc: TimelineDoc;
+  resolution: RenderResolution;
+  watermark: boolean;
 }
 
 /**
@@ -99,7 +93,7 @@ export interface RenderCacheInputs {
  * WHERE: See the file header.
  */
 export function renderCacheKey(inputs: RenderCacheInputs): string {
-  const { doc, resolution, watermark } = inputs
+  const { doc, resolution, watermark } = inputs;
 
   /* `v1` first so the version is visible at a glance and sorts together, and
    * `wm0`/`wm1` rather than `false`/`true` so the whole key stays short enough
@@ -108,6 +102,6 @@ export function renderCacheKey(inputs: RenderCacheInputs): string {
     `v${RENDER_KEY_VERSION}`,
     hashDoc(doc),
     resolution,
-    watermark ? 'wm1' : 'wm0',
-  ].join('-')
+    watermark ? "wm1" : "wm0",
+  ].join("-");
 }

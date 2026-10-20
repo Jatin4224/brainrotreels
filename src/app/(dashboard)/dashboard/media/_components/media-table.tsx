@@ -1,14 +1,8 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
-'use client'
+"use client";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: MediaTable, DataTable, usePaginatedFilters,
@@ -37,31 +31,36 @@
  * WHERE: Rendered by MediaLibrary.
  */
 
-import * as React from 'react'
-import { FileAudioIcon, FileVideoIcon, ImageIcon } from 'lucide-react'
-import type { inferRouterOutputs } from '@trpc/server'
+import * as React from "react";
+import { FileAudioIcon, FileVideoIcon, ImageIcon } from "lucide-react";
+import type { inferRouterOutputs } from "@trpc/server";
 
-import type { AppRouter } from '@/trpc/routers/_app'
-import { trpc } from '@/trpc/react-provider'
-import { formatBytes } from '@/lib/resources'
+import type { AppRouter } from "@/trpc/routers/_app";
+import { trpc } from "@/trpc/react-provider";
+import { formatBytes } from "@/lib/resources";
 import {
   ASSET_FILTER_DEFAULTS,
   ASSET_PAGE_SIZE,
   mediaFamilyOf,
   normalizeAssetFilters,
   type AssetFilterValues,
-} from '@/lib/types'
-import { DataTable, type DataTableColumn, usePaginatedFilters } from '@/components/global/data-table'
-import { Badge } from '@/components/ui/badge'
-import { Skeleton } from '@/components/ui/skeleton'
-import { MediaFilters, kindLabel, statusLabel } from './media-filters'
-import { MediaRowActions } from './media-row-actions'
+} from "@/lib/types";
+import {
+  DataTable,
+  type DataTableColumn,
+  usePaginatedFilters,
+} from "@/components/global/data-table";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { MediaFilters, kindLabel, statusLabel } from "./media-filters";
+import { MediaRowActions } from "./media-row-actions";
 
-type AssetRow = inferRouterOutputs<AppRouter>['assets']['list']['items'][number]
+type AssetRow =
+  inferRouterOutputs<AppRouter>["assets"]["list"]["items"][number];
 
 /** How often to re-ask while something is still being processed. Long enough
  *  not to hammer the API, short enough that a 10-second ingest is seen. */
-const PROCESSING_POLL_MS = 4000
+const PROCESSING_POLL_MS = 4000;
 
 /**
  * SOURCE OF TRUTH KEYWORDS: ASSET_STATUS_BADGE
@@ -74,12 +73,12 @@ const PROCESSING_POLL_MS = 4000
  * WHERE: The status column below.
  */
 const ASSET_STATUS_BADGE: Readonly<
-  Record<string, 'default' | 'secondary' | 'destructive' | 'outline'>
+  Record<string, "default" | "secondary" | "destructive" | "outline">
 > = {
-  processing: 'default',
-  ready: 'secondary',
-  failed: 'destructive',
-}
+  processing: "default",
+  ready: "secondary",
+  failed: "destructive",
+};
 
 /**
  * SOURCE OF TRUTH KEYWORDS: MediaPreviewCell, SIGNED_THUMB_NOT_NEXT_IMAGE
@@ -94,7 +93,7 @@ const ASSET_STATUS_BADGE: Readonly<
  * WHERE: The first column.
  */
 function MediaPreviewCell({ asset }: { asset: AssetRow }) {
-  const family = mediaFamilyOf(asset.contentType)
+  const family = mediaFamilyOf(asset.contentType);
 
   if (asset.thumbUrl !== null) {
     return (
@@ -105,16 +104,21 @@ function MediaPreviewCell({ asset }: { asset: AssetRow }) {
         loading="lazy"
         className="h-10 w-10 shrink-0 rounded-md border border-border bg-muted object-cover"
       />
-    )
+    );
   }
 
-  const Icon = family === 'audio' ? FileAudioIcon : family === 'image' ? ImageIcon : FileVideoIcon
+  const Icon =
+    family === "audio"
+      ? FileAudioIcon
+      : family === "image"
+        ? ImageIcon
+        : FileVideoIcon;
 
   return (
     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-border bg-muted">
       <Icon className="size-4 text-muted-foreground" />
     </div>
-  )
+  );
 }
 
 /**
@@ -126,16 +130,16 @@ function MediaPreviewCell({ asset }: { asset: AssetRow }) {
  * WHERE: The length column.
  */
 function formatDuration(seconds: number | null): string {
-  if (seconds === null || seconds <= 0) return '—'
-  const whole = Math.round(seconds)
-  const minutes = Math.floor(whole / 60)
-  return `${minutes}:${String(whole % 60).padStart(2, '0')}`
+  if (seconds === null || seconds <= 0) return "—";
+  const whole = Math.round(seconds);
+  const minutes = Math.floor(whole / 60);
+  return `${minutes}:${String(whole % 60).padStart(2, "0")}`;
 }
 
 const columns: readonly DataTableColumn<AssetRow>[] = [
   {
-    id: 'file',
-    header: 'File',
+    id: "file",
+    header: "File",
     cell: (asset) => (
       <div className="flex min-w-0 items-center gap-3">
         <MediaPreviewCell asset={asset} />
@@ -143,42 +147,42 @@ const columns: readonly DataTableColumn<AssetRow>[] = [
           <p className="truncate text-sm font-medium">{asset.filename}</p>
           <p className="truncate text-xs text-muted-foreground">
             {kindLabel(asset.kind)}
-            {asset.organizationId === null ? ' · library' : ''}
+            {asset.organizationId === null ? " · library" : ""}
             {asset.width !== null && asset.height !== null
               ? ` · ${asset.width}×${asset.height}`
-              : ''}
+              : ""}
           </p>
         </div>
       </div>
     ),
   },
   {
-    id: 'size',
-    header: 'Size',
+    id: "size",
+    header: "Size",
     hideOnMobile: true,
-    className: 'text-muted-foreground whitespace-nowrap',
+    className: "text-muted-foreground whitespace-nowrap",
     cell: (asset) => formatBytes(asset.bytes),
   },
   {
-    id: 'length',
-    header: 'Length',
+    id: "length",
+    header: "Length",
     hideOnMobile: true,
-    className: 'text-muted-foreground whitespace-nowrap',
+    className: "text-muted-foreground whitespace-nowrap",
     cell: (asset) => formatDuration(asset.durationSec),
   },
   {
-    id: 'status',
-    header: 'Status',
-    className: 'text-right',
+    id: "status",
+    header: "Status",
+    className: "text-right",
     cell: (asset) => (
       <div className="flex flex-col items-end gap-1">
-        <Badge variant={ASSET_STATUS_BADGE[asset.status] ?? 'outline'}>
+        <Badge variant={ASSET_STATUS_BADGE[asset.status] ?? "outline"}>
           {statusLabel(asset.status)}
         </Badge>
         {/* The readable reason an ingest refused the file, right where the
             customer is looking for it. Truncated in the cell; the full text is
             on the row's title attribute. */}
-        {asset.status === 'failed' && asset.error !== null ? (
+        {asset.status === "failed" && asset.error !== null ? (
           <p
             className="max-w-[18rem] truncate text-xs text-destructive"
             title={asset.error}
@@ -189,22 +193,32 @@ const columns: readonly DataTableColumn<AssetRow>[] = [
       </div>
     ),
   },
-]
+];
 
-export function MediaTable({ organizationId }: { organizationId: string | undefined }) {
-  const { filters, setFilters, applied, page, setPage, isFiltered } = usePaginatedFilters<
-    AssetFilterValues,
-    ReturnType<typeof normalizeAssetFilters>
-  >({
-    defaults: ASSET_FILTER_DEFAULTS,
-    searchKey: 'search',
-    normalize: normalizeAssetFilters,
-  })
+export function MediaTable({
+  organizationId,
+}: {
+  organizationId: string | undefined;
+}) {
+  const { filters, setFilters, applied, page, setPage, isFiltered } =
+    usePaginatedFilters<
+      AssetFilterValues,
+      ReturnType<typeof normalizeAssetFilters>
+    >({
+      defaults: ASSET_FILTER_DEFAULTS,
+      searchKey: "search",
+      normalize: normalizeAssetFilters,
+    });
 
-  const enabled = organizationId !== undefined
+  const enabled = organizationId !== undefined;
 
   const query = trpc.assets.list.useQuery(
-    { organizationId: organizationId ?? '', page, pageSize: ASSET_PAGE_SIZE, ...applied },
+    {
+      organizationId: organizationId ?? "",
+      page,
+      pageSize: ASSET_PAGE_SIZE,
+      ...applied,
+    },
     {
       enabled,
       placeholderData: (previous) => previous,
@@ -213,18 +227,20 @@ export function MediaTable({ organizationId }: { organizationId: string | undefi
        * the interval is re-evaluated after every fetch, so polling stops by
        * itself the moment the last row goes ready. */
       refetchInterval: (query) =>
-        (query.state.data?.items ?? []).some((asset) => asset.status === 'processing')
+        (query.state.data?.items ?? []).some(
+          (asset) => asset.status === "processing",
+        )
           ? PROCESSING_POLL_MS
           : false,
-    }
-  )
+    },
+  );
 
   /* The active organization resolves on the client, so the first paint has no
    * id to query with — a skeleton is the honest state, as on the projects
    * table. An empty grid would read as "you have no media". */
-  if (!enabled) return <Skeleton className="h-64 w-full" />
+  if (!enabled) return <Skeleton className="h-64 w-full" />;
 
-  const data = query.data
+  const data = query.data;
 
   return (
     <DataTable<AssetRow>
@@ -234,7 +250,9 @@ export function MediaTable({ organizationId }: { organizationId: string | undefi
       total={data?.total ?? 0}
       page={page}
       pageSize={ASSET_PAGE_SIZE}
-      {...(data?.totalPages !== undefined ? { totalPages: data.totalPages } : {})}
+      {...(data?.totalPages !== undefined
+        ? { totalPages: data.totalPages }
+        : {})}
       onPageChange={setPage}
       isLoading={query.isPending && data === undefined}
       isFetching={query.isFetching}
@@ -248,7 +266,7 @@ export function MediaTable({ organizationId }: { organizationId: string | undefi
       }
       empty="No media yet. Upload a file to get started."
       emptyFiltered="No media matches these filters."
-      countLabel={['file', 'files']}
+      countLabel={["file", "files"]}
     />
-  )
+  );
 }

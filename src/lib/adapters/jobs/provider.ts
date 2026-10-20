@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -22,21 +16,21 @@
  * WHERE: Used by ./index.ts and asserted at module scope by ./inngest.
  */
 
-import { createProviderSelector } from '../select-provider'
-import { JOBS_PROVIDER_IDS, type JobsProviderId } from './types'
+import { createProviderSelector } from "../select-provider";
+import { JOBS_PROVIDER_IDS, type JobsProviderId } from "./types";
 
-export const DEFAULT_JOBS_PROVIDER: JobsProviderId = 'inngest'
+export const DEFAULT_JOBS_PROVIDER: JobsProviderId = "inngest";
 
 export const jobsSelector = createProviderSelector<JobsProviderId>({
-  label: 'jobs',
-  envVar: 'JOBS_PROVIDER',
-  rawValue: process.env['JOBS_PROVIDER'],
+  label: "jobs",
+  envVar: "JOBS_PROVIDER",
+  rawValue: process.env["JOBS_PROVIDER"],
   ids: JOBS_PROVIDER_IDS,
   fallback: DEFAULT_JOBS_PROVIDER,
-})
+});
 
-export const JOBS_PROVIDER: JobsProviderId = jobsSelector.provider
+export const JOBS_PROVIDER: JobsProviderId = jobsSelector.provider;
 
 export function assertJobsProviderActive(id: JobsProviderId): void {
-  jobsSelector.assertActive(id)
+  jobsSelector.assertActive(id);
 }

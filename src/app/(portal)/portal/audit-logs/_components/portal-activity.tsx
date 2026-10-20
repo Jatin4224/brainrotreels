@@ -1,14 +1,8 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
-'use client'
+"use client";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: PortalActivity
@@ -19,19 +13,19 @@
  * WHERE: Rendered by /portal/audit-logs. Reads trpc.portal.listActivity.
  */
 
-import * as React from 'react'
+import * as React from "react";
 
-import { trpc } from '@/trpc/react-provider'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
-import { Skeleton } from '@/components/ui/skeleton'
+import { trpc } from "@/trpc/react-provider";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export function PortalActivity() {
-  const [page, setPage] = React.useState(1)
-  const { data, isLoading } = trpc.portal.listActivity.useQuery({ page })
+  const [page, setPage] = React.useState(1);
+  const { data, isLoading } = trpc.portal.listActivity.useQuery({ page });
 
-  if (isLoading) return <Skeleton className="h-64 w-full" />
+  if (isLoading) return <Skeleton className="h-64 w-full" />;
   if (!data || data.logs.length === 0) {
     return (
       <Card>
@@ -39,7 +33,7 @@ export function PortalActivity() {
           No activity recorded yet.
         </CardContent>
       </Card>
-    )
+    );
   }
 
   return (
@@ -47,13 +41,17 @@ export function PortalActivity() {
       <Card>
         <CardContent className="flex flex-col divide-y p-0">
           {data.logs.map((log) => (
-            <div key={log.id} className="flex items-center justify-between gap-4 px-4 py-3">
+            <div
+              key={log.id}
+              className="flex items-center justify-between gap-4 px-4 py-3"
+            >
               <div className="min-w-0">
                 <p className="truncate text-sm">
                   {log.description ?? `${log.action} ${log.entity}`}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  {log.user?.name ?? 'Someone'} · {new Date(log.createdAt).toLocaleString()}
+                  {log.user?.name ?? "Someone"} ·{" "}
+                  {new Date(log.createdAt).toLocaleString()}
                 </p>
               </div>
               <div className="flex shrink-0 items-center gap-1">
@@ -72,7 +70,12 @@ export function PortalActivity() {
           Page {data.page} of {data.totalPages || 1}
         </span>
         <div className="flex gap-1">
-          <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={page <= 1}
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+          >
             Previous
           </Button>
           <Button
@@ -86,5 +89,5 @@ export function PortalActivity() {
         </div>
       </div>
     </div>
-  )
+  );
 }

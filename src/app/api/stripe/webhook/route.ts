@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -21,8 +15,8 @@
  *        localhost:3000/api/stripe/webhook`. Uses config/stripe + stripe.service.
  */
 
-import { NextResponse } from 'next/server'
-import type Stripe from 'stripe'
+import { NextResponse } from "next/server";
+import type Stripe from "stripe";
 
 import {
   getStripeClient,
@@ -30,20 +24,20 @@ import {
   isStripeConfigured,
   getPlanByPriceId,
   PLAN_ORDER,
-} from '@/lib/config'
-import type { PlanKey } from '@/lib/config/plans'
+} from "@/lib/config";
+import type { PlanKey } from "@/lib/config/plans";
 import {
   upsertSubscription,
   deleteSubscriptionByStripeId,
   subscriptionPriceId,
-} from '@/services/stripe.service'
-import { markUserFingerprintsAsTrialUsed } from '@/services/card-fingerprint.service'
-import { purchase as purchaseCredits } from '@/services/credits.service'
-import { prisma } from '@/lib/config/prisma'
-import { CREDIT_PACKS, type CreditPackKey } from '@/lib/types/credits'
+} from "@/services/stripe.service";
+import { markUserFingerprintsAsTrialUsed } from "@/services/card-fingerprint.service";
+import { purchase as purchaseCredits } from "@/services/credits.service";
+import { prisma } from "@/lib/config/prisma";
+import { CREDIT_PACKS, type CreditPackKey } from "@/lib/types/credits";
 
 /* Stripe signature verification needs the Node crypto runtime + raw body. */
-export const runtime = 'nodejs'
+export const runtime = "nodejs";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: isUniqueViolation, P2002
@@ -58,29 +52,33 @@ export const runtime = 'nodejs'
  */
 function isUniqueViolation(error: unknown): boolean {
   return (
-    typeof error === 'object' &&
+    typeof error === "object" &&
     error !== null &&
-    'code' in error &&
-    (error as { code?: unknown }).code === 'P2002'
-  )
+    "code" in error &&
+    (error as { code?: unknown }).code === "P2002"
+  );
 }
 
 function isPlanKey(value: string | undefined): value is PlanKey {
-  return value !== undefined && (PLAN_ORDER as readonly string[]).includes(value)
+  return (
+    value !== undefined && (PLAN_ORDER as readonly string[]).includes(value)
+  );
 }
 
 /* Price id is authoritative for the plan; metadata.planKey is the fallback. */
 function resolvePlanKey(subscription: Stripe.Subscription): PlanKey | null {
-  const priceId = subscriptionPriceId(subscription)
-  const fromPrice = priceId ? getPlanByPriceId(priceId) : null
-  if (fromPrice) return fromPrice
-  const fromMeta = subscription.metadata['planKey']
-  return isPlanKey(fromMeta) ? fromMeta : null
+  const priceId = subscriptionPriceId(subscription);
+  const fromPrice = priceId ? getPlanByPriceId(priceId) : null;
+  if (fromPrice) return fromPrice;
+  const fromMeta = subscription.metadata["planKey"];
+  return isPlanKey(fromMeta) ? fromMeta : null;
 }
 
-async function resolveOrganizationId(subscription: Stripe.Subscription): Promise<string | null> {
-  const fromMeta = subscription.metadata['organizationId']
-  if (fromMeta) return fromMeta
+async function resolveOrganizationId(
+  subscription: Stripe.Subscription,
+): Promise<string | null> {
+  const fromMeta = subscription.metadata["organizationId"];
+  if (fromMeta) return fromMeta;
   /* Fallback: an existing row already binds this subscription to an org.
    * `prisma` is now a top-level import — the dedupe insert at the start of
    * POST needs it before any handler runs, so the dynamic import this used to
@@ -88,27 +86,29 @@ async function resolveOrganizationId(subscription: Stripe.Subscription): Promise
   const existing = await prisma.subscription.findFirst({
     where: { stripeSubscriptionId: subscription.id },
     select: { referenceId: true },
-  })
-  return existing?.referenceId ?? null
+  });
+  return existing?.referenceId ?? null;
 }
 
-async function handleSubscriptionUpsert(subscription: Stripe.Subscription): Promise<void> {
-  const organizationId = await resolveOrganizationId(subscription)
-  const planKey = resolvePlanKey(subscription)
+async function handleSubscriptionUpsert(
+  subscription: Stripe.Subscription,
+): Promise<void> {
+  const organizationId = await resolveOrganizationId(subscription);
+  const planKey = resolvePlanKey(subscription);
   if (!organizationId || !planKey) {
     console.warn(
       `[stripe-webhook] could not resolve org/plan for subscription ${subscription.id} ` +
-        `(org=${organizationId}, plan=${planKey}) — skipping`
-    )
-    return
+        `(org=${organizationId}, plan=${planKey}) — skipping`,
+    );
+    return;
   }
-  await upsertSubscription(subscription, organizationId, planKey)
+  await upsertSubscription(subscription, organizationId, planKey);
 
   /* Trial confirmed by Stripe — burn the user's trial eligibility now (not at
    * create time, so a failed/incomplete subscription doesn't consume it). */
-  if (subscription.status === 'trialing') {
-    const userId = subscription.metadata['userId']
-    if (userId) await markUserFingerprintsAsTrialUsed(userId)
+  if (subscription.status === "trialing") {
+    const userId = subscription.metadata["userId"];
+    if (userId) await markUserFingerprintsAsTrialUsed(userId);
   }
 }
 
@@ -126,27 +126,29 @@ async function handleSubscriptionUpsert(subscription: Stripe.Subscription): Prom
  * WHERE: The `payment_intent.succeeded` branch above.
  */
 async function handleCreditTopUp(intent: Stripe.PaymentIntent): Promise<void> {
-  const organizationId = intent.metadata['organizationId']
-  const packKey = intent.metadata['packKey']
-  const credits = Number(intent.metadata['credits'])
+  const organizationId = intent.metadata["organizationId"];
+  const packKey = intent.metadata["packKey"];
+  const credits = Number(intent.metadata["credits"]);
 
   if (!organizationId || !packKey) {
     /* Not a credit purchase — a subscription invoice's intent, or a payment
      * made outside this app. Nothing to do and nothing to report. */
-    return
+    return;
   }
 
   if (!Number.isInteger(credits) || credits <= 0) {
     console.error(
       `[stripe-webhook] credit top-up ${intent.id} carries an unusable credit amount ` +
-        `(${String(intent.metadata['credits'])}) — not granting`,
-    )
-    return
+        `(${String(intent.metadata["credits"])}) — not granting`,
+    );
+    return;
   }
 
   if (!isCreditPackKey(packKey)) {
-    console.error(`[stripe-webhook] credit top-up ${intent.id} names unknown pack "${packKey}"`)
-    return
+    console.error(
+      `[stripe-webhook] credit top-up ${intent.id} names unknown pack "${packKey}"`,
+    );
+    return;
   }
 
   const row = await purchaseCredits(prisma, {
@@ -154,42 +156,54 @@ async function handleCreditTopUp(intent: Stripe.PaymentIntent): Promise<void> {
     amount: credits,
     paymentIntentId: intent.id,
     packKey,
-  })
+  });
 
   if (row === null) {
     /* The router already granted these, which is the normal path. */
-    console.info(`[stripe-webhook] credit top-up ${intent.id} was already granted`)
-    return
+    console.info(
+      `[stripe-webhook] credit top-up ${intent.id} was already granted`,
+    );
+    return;
   }
 
   console.info(
     `[stripe-webhook] granted ${credits} credits to ${organizationId} from ${intent.id}`,
-  )
+  );
 }
 
 function isCreditPackKey(value: string): value is CreditPackKey {
-  return Object.prototype.hasOwnProperty.call(CREDIT_PACKS, value)
+  return Object.prototype.hasOwnProperty.call(CREDIT_PACKS, value);
 }
 
 export async function POST(request: Request): Promise<NextResponse> {
   if (!isStripeConfigured()) {
-    return NextResponse.json({ error: 'Stripe is not configured' }, { status: 503 })
+    return NextResponse.json(
+      { error: "Stripe is not configured" },
+      { status: 503 },
+    );
   }
 
-  const signature = request.headers.get('stripe-signature')
+  const signature = request.headers.get("stripe-signature");
   if (!signature) {
-    return NextResponse.json({ error: 'Missing stripe-signature header' }, { status: 400 })
+    return NextResponse.json(
+      { error: "Missing stripe-signature header" },
+      { status: 400 },
+    );
   }
 
-  const body = await request.text()
-  const stripe = getStripeClient()
+  const body = await request.text();
+  const stripe = getStripeClient();
 
-  let event: Stripe.Event
+  let event: Stripe.Event;
   try {
-    event = stripe.webhooks.constructEvent(body, signature, getStripeWebhookSecret())
+    event = stripe.webhooks.constructEvent(
+      body,
+      signature,
+      getStripeWebhookSecret(),
+    );
   } catch (err) {
-    console.error('[stripe-webhook] signature verification failed:', err)
-    return NextResponse.json({ error: 'Invalid signature' }, { status: 400 })
+    console.error("[stripe-webhook] signature verification failed:", err);
+    return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
   }
 
   /**
@@ -225,25 +239,32 @@ export async function POST(request: Request): Promise<NextResponse> {
    * WHERE: Here, before the switch.
    */
   try {
-    await prisma.stripeEvent.create({ data: { id: event.id, type: event.type } })
+    await prisma.stripeEvent.create({
+      data: { id: event.id, type: event.type },
+    });
   } catch (err) {
     if (isUniqueViolation(err)) {
-      console.info(`[stripe-webhook] ${event.id} (${event.type}) already processed — skipping`)
-      return NextResponse.json({ received: true, duplicate: true })
+      console.info(
+        `[stripe-webhook] ${event.id} (${event.type}) already processed — skipping`,
+      );
+      return NextResponse.json({ received: true, duplicate: true });
     }
-    console.error(`[stripe-webhook] could not record event ${event.id}:`, err)
-    return NextResponse.json({ error: 'Could not record this event' }, { status: 500 })
+    console.error(`[stripe-webhook] could not record event ${event.id}:`, err);
+    return NextResponse.json(
+      { error: "Could not record this event" },
+      { status: 500 },
+    );
   }
 
   try {
     switch (event.type) {
-      case 'customer.subscription.created':
-      case 'customer.subscription.updated':
-        await handleSubscriptionUpsert(event.data.object)
-        break
-      case 'customer.subscription.deleted':
-        await deleteSubscriptionByStripeId(event.data.object.id)
-        break
+      case "customer.subscription.created":
+      case "customer.subscription.updated":
+        await handleSubscriptionUpsert(event.data.object);
+        break;
+      case "customer.subscription.deleted":
+        await deleteSubscriptionByStripeId(event.data.object.id);
+        break;
       /**
        * SOURCE OF TRUTH KEYWORDS: CREDIT_TOP_UP_WEBHOOK, PAYMENT_BEFORE_CREDITS,
        *   REPLAY_SAFE_TOP_UP
@@ -266,25 +287,32 @@ export async function POST(request: Request): Promise<NextResponse> {
        * amount would silently change what a customer gets the first time
        * somebody edits the price in the Stripe dashboard.
        */
-      case 'payment_intent.succeeded':
-        await handleCreditTopUp(event.data.object)
-        break
-      case 'invoice.payment_failed':
+      case "payment_intent.succeeded":
+        await handleCreditTopUp(event.data.object);
+        break;
+      case "invoice.payment_failed":
         /* Stripe Smart Retries + the `past_due` status drive dunning; surface
          * it in logs. Hook a notification email here if desired. */
-        console.warn(`[stripe-webhook] invoice.payment_failed: ${event.data.object.id}`)
-        break
-      case 'customer.subscription.trial_will_end':
-        console.info(`[stripe-webhook] trial_will_end: ${event.data.object.id}`)
-        break
+        console.warn(
+          `[stripe-webhook] invoice.payment_failed: ${event.data.object.id}`,
+        );
+        break;
+      case "customer.subscription.trial_will_end":
+        console.info(
+          `[stripe-webhook] trial_will_end: ${event.data.object.id}`,
+        );
+        break;
       default:
         /* Unhandled event types are acknowledged so Stripe stops retrying. */
-        break
+        break;
     }
   } catch (err) {
-    console.error(`[stripe-webhook] handler error for ${event.type}:`, err)
-    return NextResponse.json({ error: 'Webhook handler failed' }, { status: 500 })
+    console.error(`[stripe-webhook] handler error for ${event.type}:`, err);
+    return NextResponse.json(
+      { error: "Webhook handler failed" },
+      { status: 500 },
+    );
   }
 
-  return NextResponse.json({ received: true })
+  return NextResponse.json({ received: true });
 }

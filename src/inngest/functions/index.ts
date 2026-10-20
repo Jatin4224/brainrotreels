@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -19,11 +13,12 @@
  * WHERE: Consumed by src/app/api/inngest/route.ts.
  */
 
-import { assetIngestFunction } from './asset-ingest'
-import { creditsReconcileFunction } from './credits-reconcile'
-import { helloFunction } from './hello'
-import { projectRenderFunction } from './project-render'
-import { usageResetFunction } from './usage-reset'
+import { assetIngestFunction } from "./asset-ingest";
+import { creditsReconcileFunction } from "./credits-reconcile";
+import { helloFunction } from "./hello";
+import { projectRenderFunction } from "./project-render";
+import { scriptGenerateFunction } from "./script-generate";
+import { usageResetFunction } from "./usage-reset";
 
 export const INNGEST_FUNCTIONS = [
   helloFunction,
@@ -31,4 +26,5 @@ export const INNGEST_FUNCTIONS = [
   assetIngestFunction,
   projectRenderFunction,
   creditsReconcileFunction,
-]
+  scriptGenerateFunction,
+];

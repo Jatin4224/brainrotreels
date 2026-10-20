@@ -1,14 +1,8 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
-'use client'
+"use client";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: ResetPasswordForm
@@ -22,17 +16,17 @@
  *        since it reads searchParams) within AuthShell.
  */
 
-import * as React from 'react'
-import Link from 'next/link'
-import { useSearchParams } from 'next/navigation'
-import { useForm } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import { Loader2Icon, CheckCircle2Icon } from 'lucide-react'
+import * as React from "react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Loader2Icon, CheckCircle2Icon } from "lucide-react";
 
-import { authClient } from '@/lib/better-auth/auth-client'
-import { AUTH_ROUTES } from '@/lib/config'
-import { resetPasswordSchema, type ResetPasswordValues } from '@/lib/types'
-import { Button } from '@/components/ui/button'
+import { authClient } from "@/lib/better-auth/auth-client";
+import { AUTH_ROUTES } from "@/lib/config";
+import { resetPasswordSchema, type ResetPasswordValues } from "@/lib/types";
+import { Button } from "@/components/ui/button";
 import {
   Form,
   FormControl,
@@ -40,33 +34,36 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from '@/components/ui/form'
-import { Input } from '@/components/ui/input'
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
 
 export function ResetPasswordForm() {
-  const searchParams = useSearchParams()
-  const token = searchParams.get('token')
-  const [error, setError] = React.useState<string | null>(null)
-  const [done, setDone] = React.useState(false)
+  const searchParams = useSearchParams();
+  const token = searchParams.get("token");
+  const [error, setError] = React.useState<string | null>(null);
+  const [done, setDone] = React.useState(false);
 
   const form = useForm<ResetPasswordValues>({
     resolver: zodResolver(resetPasswordSchema),
-    defaultValues: { password: '', confirmPassword: '' },
-    mode: 'onTouched',
-  })
+    defaultValues: { password: "", confirmPassword: "" },
+    mode: "onTouched",
+  });
 
   async function onSubmit(values: ResetPasswordValues) {
-    if (!token) return
-    setError(null)
+    if (!token) return;
+    setError(null);
     const { error: authError } = await authClient.resetPassword({
       newPassword: values.password,
       token,
-    })
+    });
     if (authError) {
-      setError(authError.message ?? 'Could not reset your password. The link may have expired.')
-      return
+      setError(
+        authError.message ??
+          "Could not reset your password. The link may have expired.",
+      );
+      return;
     }
-    setDone(true)
+    setDone(true);
   }
 
   if (!token) {
@@ -76,11 +73,14 @@ export function ResetPasswordForm() {
         <p className="text-balance text-sm text-muted-foreground">
           This password reset link is invalid or has expired. Request a new one.
         </p>
-        <Link href={AUTH_ROUTES.forgotPassword} className="text-sm underline underline-offset-4">
+        <Link
+          href={AUTH_ROUTES.forgotPassword}
+          className="text-sm underline underline-offset-4"
+        >
           Request a new link
         </Link>
       </div>
-    )
+    );
   }
 
   if (done) {
@@ -95,14 +95,17 @@ export function ResetPasswordForm() {
             Your password has been updated. Sign in with your new password.
           </p>
         </div>
-        <Link href={AUTH_ROUTES.signIn} className="text-sm underline underline-offset-4">
+        <Link
+          href={AUTH_ROUTES.signIn}
+          className="text-sm underline underline-offset-4"
+        >
           Back to sign in
         </Link>
       </div>
-    )
+    );
   }
 
-  const isBusy = form.formState.isSubmitting
+  const isBusy = form.formState.isSubmitting;
 
   return (
     <div className="flex flex-col gap-6">
@@ -121,7 +124,11 @@ export function ResetPasswordForm() {
         </div>
       ) : null}
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-6" noValidate>
+        <form
+          onSubmit={form.handleSubmit(onSubmit)}
+          className="grid gap-6"
+          noValidate
+        >
           <FormField
             control={form.control}
             name="password"
@@ -167,10 +174,13 @@ export function ResetPasswordForm() {
         </form>
       </Form>
       <div className="text-center text-sm">
-        <Link href={AUTH_ROUTES.signIn} className="underline underline-offset-4">
+        <Link
+          href={AUTH_ROUTES.signIn}
+          className="underline underline-offset-4"
+        >
           Back to sign in
         </Link>
       </div>
     </div>
-  )
+  );
 }

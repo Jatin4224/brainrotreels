@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -49,9 +43,9 @@
  *        src/components/global/media-upload/. Re-exported from src/lib/types.
  */
 
-import { z } from 'zod'
+import { z } from "zod";
 
-import { PLAN_KEYS, type PlanKey } from '@/lib/config/plans'
+import { PLAN_KEYS, type PlanKey } from "@/lib/config/plans";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: ASSET_KINDS, assetKindSchema, AssetKind
@@ -68,20 +62,20 @@ import { PLAN_KEYS, type PlanKey } from '@/lib/config/plans'
  * WHERE: Asset.kind; the media tabs; the asset pickers from Phase 11 onward.
  */
 export const ASSET_KINDS = [
-  'background',
-  'upload',
-  'ai_footage',
-  'image',
-  'audio_tts',
-  'audio_music',
-  'sfx',
-  'render_output',
-  'avatar',
-] as const
+  "background",
+  "upload",
+  "ai_footage",
+  "image",
+  "audio_tts",
+  "audio_music",
+  "sfx",
+  "render_output",
+  "avatar",
+] as const;
 
-export const assetKindSchema = z.enum(ASSET_KINDS)
+export const assetKindSchema = z.enum(ASSET_KINDS);
 
-export type AssetKind = z.infer<typeof assetKindSchema>
+export type AssetKind = z.infer<typeof assetKindSchema>;
 
 /**
  * SOURCE OF TRUTH KEYWORDS: UPLOADABLE_ASSET_KINDS, uploadableAssetKindSchema
@@ -96,11 +90,15 @@ export type AssetKind = z.infer<typeof assetKindSchema>
  *        (kindForContentType) so the two cannot disagree.
  * WHERE: createUploadUrlSchema; the `kind` prop on <MediaUpload>.
  */
-export const UPLOADABLE_ASSET_KINDS = ['upload', 'image', 'audio_music'] as const
+export const UPLOADABLE_ASSET_KINDS = [
+  "upload",
+  "image",
+  "audio_music",
+] as const;
 
-export const uploadableAssetKindSchema = z.enum(UPLOADABLE_ASSET_KINDS)
+export const uploadableAssetKindSchema = z.enum(UPLOADABLE_ASSET_KINDS);
 
-export type UploadableAssetKind = z.infer<typeof uploadableAssetKindSchema>
+export type UploadableAssetKind = z.infer<typeof uploadableAssetKindSchema>;
 
 /**
  * SOURCE OF TRUTH KEYWORDS: ASSET_SOURCES, assetSourceSchema, AssetSource
@@ -113,11 +111,16 @@ export type UploadableAssetKind = z.infer<typeof uploadableAssetKindSchema>
  *        commercial-use terms (an open owner decision for Phase 17).
  * WHERE: Asset.source; the library gating in Phase 11.
  */
-export const ASSET_SOURCES = ['library', 'upload', 'generated', 'stock'] as const
+export const ASSET_SOURCES = [
+  "library",
+  "upload",
+  "generated",
+  "stock",
+] as const;
 
-export const assetSourceSchema = z.enum(ASSET_SOURCES)
+export const assetSourceSchema = z.enum(ASSET_SOURCES);
 
-export type AssetSource = z.infer<typeof assetSourceSchema>
+export type AssetSource = z.infer<typeof assetSourceSchema>;
 
 /**
  * SOURCE OF TRUTH KEYWORDS: ASSET_STATUSES, assetStatusSchema, AssetStatus
@@ -132,11 +135,11 @@ export type AssetSource = z.infer<typeof assetSourceSchema>
  * WHERE: Asset.status; the status chip in the media table; the render
  *        pre-flight from Phase 04.
  */
-export const ASSET_STATUSES = ['processing', 'ready', 'failed'] as const
+export const ASSET_STATUSES = ["processing", "ready", "failed"] as const;
 
-export const assetStatusSchema = z.enum(ASSET_STATUSES)
+export const assetStatusSchema = z.enum(ASSET_STATUSES);
 
-export type AssetStatus = z.infer<typeof assetStatusSchema>
+export type AssetStatus = z.infer<typeof assetStatusSchema>;
 
 /**
  * SOURCE OF TRUTH KEYWORDS: MODERATION_STATUSES, moderationStatusSchema
@@ -149,11 +152,16 @@ export type AssetStatus = z.infer<typeof assetStatusSchema>
  *        `approved` would be a claim nobody checked.
  * WHERE: Asset.moderationStatus; the ingest workflow's moderate step.
  */
-export const MODERATION_STATUSES = ['pending', 'approved', 'rejected', 'skipped'] as const
+export const MODERATION_STATUSES = [
+  "pending",
+  "approved",
+  "rejected",
+  "skipped",
+] as const;
 
-export const moderationStatusSchema = z.enum(MODERATION_STATUSES)
+export const moderationStatusSchema = z.enum(MODERATION_STATUSES);
 
-export type ModerationStatus = z.infer<typeof moderationStatusSchema>
+export type ModerationStatus = z.infer<typeof moderationStatusSchema>;
 
 /**
  * SOURCE OF TRUTH KEYWORDS: VARIANT_NAMES, variantNameSchema, VariantName
@@ -167,11 +175,16 @@ export type ModerationStatus = z.infer<typeof moderationStatusSchema>
  *        Adding a name here means teaching the ingest plan to build it.
  * WHERE: AssetVariant.variant; getAssetVariants; src/lib/media/ingest-plan.ts.
  */
-export const VARIANT_NAMES = ['vertical_1080', 'proxy_480', 'thumb', 'waveform'] as const
+export const VARIANT_NAMES = [
+  "vertical_1080",
+  "proxy_480",
+  "thumb",
+  "waveform",
+] as const;
 
-export const variantNameSchema = z.enum(VARIANT_NAMES)
+export const variantNameSchema = z.enum(VARIANT_NAMES);
 
-export type VariantName = z.infer<typeof variantNameSchema>
+export type VariantName = z.infer<typeof variantNameSchema>;
 
 /**
  * SOURCE OF TRUTH KEYWORDS: MediaFamily, mediaFamilySchema
@@ -185,11 +198,11 @@ export type VariantName = z.infer<typeof variantNameSchema>
  *        accepted format gets half-supported.
  * WHERE: CONTENT_TYPE_ALLOWLIST below; planVariants in src/lib/media.
  */
-export const MEDIA_FAMILIES = ['video', 'image', 'audio'] as const
+export const MEDIA_FAMILIES = ["video", "image", "audio"] as const;
 
-export const mediaFamilySchema = z.enum(MEDIA_FAMILIES)
+export const mediaFamilySchema = z.enum(MEDIA_FAMILIES);
 
-export type MediaFamily = z.infer<typeof mediaFamilySchema>
+export type MediaFamily = z.infer<typeof mediaFamilySchema>;
 
 /**
  * SOURCE OF TRUTH KEYWORDS: CONTENT_TYPE_ALLOWLIST, UPLOAD_CONTENT_TYPES,
@@ -214,30 +227,33 @@ export type MediaFamily = z.infer<typeof mediaFamilySchema>
  *        and the `accept` attribute it builds.
  */
 export const CONTENT_TYPE_ALLOWLIST = {
-  'video/mp4': { family: 'video', extension: 'mp4', kind: 'upload' },
-  'video/quicktime': { family: 'video', extension: 'mov', kind: 'upload' },
-  'video/webm': { family: 'video', extension: 'webm', kind: 'upload' },
-  'image/jpeg': { family: 'image', extension: 'jpg', kind: 'image' },
-  'image/png': { family: 'image', extension: 'png', kind: 'image' },
-  'image/webp': { family: 'image', extension: 'webp', kind: 'image' },
-  'audio/mpeg': { family: 'audio', extension: 'mp3', kind: 'audio_music' },
-  'audio/wav': { family: 'audio', extension: 'wav', kind: 'audio_music' },
+  "video/mp4": { family: "video", extension: "mp4", kind: "upload" },
+  "video/quicktime": { family: "video", extension: "mov", kind: "upload" },
+  "video/webm": { family: "video", extension: "webm", kind: "upload" },
+  "image/jpeg": { family: "image", extension: "jpg", kind: "image" },
+  "image/png": { family: "image", extension: "png", kind: "image" },
+  "image/webp": { family: "image", extension: "webp", kind: "image" },
+  "audio/mpeg": { family: "audio", extension: "mp3", kind: "audio_music" },
+  "audio/wav": { family: "audio", extension: "wav", kind: "audio_music" },
 } as const satisfies Record<
   string,
   { family: MediaFamily; extension: string; kind: UploadableAssetKind }
->
+>;
 
 export const UPLOAD_CONTENT_TYPES = Object.keys(
-  CONTENT_TYPE_ALLOWLIST
-) as readonly UploadContentType[]
+  CONTENT_TYPE_ALLOWLIST,
+) as readonly UploadContentType[];
 
-export type UploadContentType = keyof typeof CONTENT_TYPE_ALLOWLIST
+export type UploadContentType = keyof typeof CONTENT_TYPE_ALLOWLIST;
 
 /* A union schema rather than z.string(), so a refused type fails validation
  * with the list attached instead of reaching a hand-written if. */
 export const uploadContentTypeSchema = z.enum(
-  Object.keys(CONTENT_TYPE_ALLOWLIST) as [UploadContentType, ...UploadContentType[]]
-)
+  Object.keys(CONTENT_TYPE_ALLOWLIST) as [
+    UploadContentType,
+    ...UploadContentType[],
+  ],
+);
 
 /**
  * SOURCE OF TRUTH KEYWORDS: isUploadContentType, mediaFamilyOf,
@@ -251,19 +267,27 @@ export const uploadContentTypeSchema = z.enum(
  * WHERE: The drop zone, the router, the media table's icon, the ingest plan.
  */
 export function isUploadContentType(value: string): value is UploadContentType {
-  return Object.prototype.hasOwnProperty.call(CONTENT_TYPE_ALLOWLIST, value)
+  return Object.prototype.hasOwnProperty.call(CONTENT_TYPE_ALLOWLIST, value);
 }
 
 export function mediaFamilyOf(contentType: string): MediaFamily | null {
-  return isUploadContentType(contentType) ? CONTENT_TYPE_ALLOWLIST[contentType].family : null
+  return isUploadContentType(contentType)
+    ? CONTENT_TYPE_ALLOWLIST[contentType].family
+    : null;
 }
 
-export function kindForContentType(contentType: string): UploadableAssetKind | null {
-  return isUploadContentType(contentType) ? CONTENT_TYPE_ALLOWLIST[contentType].kind : null
+export function kindForContentType(
+  contentType: string,
+): UploadableAssetKind | null {
+  return isUploadContentType(contentType)
+    ? CONTENT_TYPE_ALLOWLIST[contentType].kind
+    : null;
 }
 
 export function extensionForContentType(contentType: string): string | null {
-  return isUploadContentType(contentType) ? CONTENT_TYPE_ALLOWLIST[contentType].extension : null
+  return isUploadContentType(contentType)
+    ? CONTENT_TYPE_ALLOWLIST[contentType].extension
+    : null;
 }
 
 /**
@@ -297,20 +321,20 @@ export const UPLOAD_BYTES_PER_PLAN: Readonly<Record<PlanKey, number>> = {
   pro: 2 * 1024 * 1024 * 1024,
   enterprise: 5 * 1024 * 1024 * 1024,
   portal: 5 * 1024 * 1024 * 1024,
-}
+};
 
 /* Exhaustive over PLAN_KEYS by construction — a new plan without an entry is a
  * compile error on the Record above, which is why the map is not partial. */
 export function maxUploadBytesForPlan(plan: PlanKey): number {
-  return UPLOAD_BYTES_PER_PLAN[plan]
+  return UPLOAD_BYTES_PER_PLAN[plan];
 }
 
 /* The most permissive cap any plan grants. The drop zone uses it as a sanity
  * bound before the plan is known, so a 40 GB drag is rejected instantly rather
  * than after a round trip. */
 export const UPLOAD_BYTES_CEILING = Math.max(
-  ...PLAN_KEYS.map((plan) => UPLOAD_BYTES_PER_PLAN[plan])
-)
+  ...PLAN_KEYS.map((plan) => UPLOAD_BYTES_PER_PLAN[plan]),
+);
 
 /**
  * SOURCE OF TRUTH KEYWORDS: assetFilenameSchema
@@ -327,10 +351,10 @@ export const UPLOAD_BYTES_CEILING = Math.max(
 export const assetFilenameSchema = z
   .string()
   .trim()
-  .min(1, 'Give this file a name.')
-  .max(255, 'That name is too long.')
+  .min(1, "Give this file a name.")
+  .max(255, "That name is too long.")
   .transform((value) => value.split(/[/\\]/).pop() ?? value)
-  .refine((value) => value.length > 0, 'Give this file a name.')
+  .refine((value) => value.length > 0, "Give this file a name.");
 
 /**
  * SOURCE OF TRUTH KEYWORDS: createUploadUrlSchema, CreateUploadUrlValues,
@@ -359,13 +383,13 @@ export const createUploadUrlSchema = z.object({
   contentType: uploadContentTypeSchema,
   bytes: z
     .number()
-    .int('A file size must be a whole number of bytes.')
-    .positive('That file is empty.')
-    .max(UPLOAD_BYTES_CEILING, 'That file is larger than any plan allows.'),
+    .int("A file size must be a whole number of bytes.")
+    .positive("That file is empty.")
+    .max(UPLOAD_BYTES_CEILING, "That file is larger than any plan allows."),
   kind: uploadableAssetKindSchema.optional(),
-})
+});
 
-export type CreateUploadUrlValues = z.infer<typeof createUploadUrlSchema>
+export type CreateUploadUrlValues = z.infer<typeof createUploadUrlSchema>;
 
 /**
  * SOURCE OF TRUTH KEYWORDS: completeUploadSchema, CompleteUploadValues
@@ -390,9 +414,9 @@ export const completeUploadSchema = z.object({
   filename: assetFilenameSchema,
   contentType: uploadContentTypeSchema,
   kind: uploadableAssetKindSchema.optional(),
-})
+});
 
-export type CompleteUploadValues = z.infer<typeof completeUploadSchema>
+export type CompleteUploadValues = z.infer<typeof completeUploadSchema>;
 
 /**
  * SOURCE OF TRUTH KEYWORDS: listAssetsSchema, ASSET_PAGE_SIZE
@@ -403,7 +427,7 @@ export type CompleteUploadValues = z.infer<typeof completeUploadSchema>
  *        rawInput and owns the clamping.
  * WHERE: The media screen and the router.
  */
-export const ASSET_PAGE_SIZE = 24
+export const ASSET_PAGE_SIZE = 24;
 
 export const listAssetsSchema = z.object({
   organizationId: z.string().min(1),
@@ -415,27 +439,27 @@ export const listAssetsSchema = z.object({
    * UI called the grouping. */
   kinds: z.array(assetKindSchema).min(1).optional(),
   status: assetStatusSchema.optional(),
-})
+});
 
-export type ListAssetsValues = z.infer<typeof listAssetsSchema>
+export type ListAssetsValues = z.infer<typeof listAssetsSchema>;
 
 export const getAssetSchema = z.object({
   organizationId: z.string().min(1),
   id: z.string().min(1),
-})
+});
 
 export const renameAssetSchema = z.object({
   organizationId: z.string().min(1),
   id: z.string().min(1),
   filename: assetFilenameSchema,
-})
+});
 
-export type RenameAssetValues = z.infer<typeof renameAssetSchema>
+export type RenameAssetValues = z.infer<typeof renameAssetSchema>;
 
 export const deleteAssetSchema = z.object({
   organizationId: z.string().min(1),
   id: z.string().min(1),
-})
+});
 
 /**
  * SOURCE OF TRUTH KEYWORDS: ASSET_TABS, AssetTabKey, assetTabSchema,
@@ -454,21 +478,25 @@ export const deleteAssetSchema = z.object({
  * WHERE: The media filters component and normalizeAssetFilters.
  */
 export const ASSET_TABS = [
-  { key: 'all', label: 'All', kinds: null },
-  { key: 'uploads', label: 'Uploads', kinds: ['upload', 'image'] },
-  { key: 'backgrounds', label: 'Backgrounds', kinds: ['background', 'ai_footage'] },
-  { key: 'audio', label: 'Audio', kinds: ['audio_music', 'audio_tts', 'sfx'] },
+  { key: "all", label: "All", kinds: null },
+  { key: "uploads", label: "Uploads", kinds: ["upload", "image"] },
+  {
+    key: "backgrounds",
+    label: "Backgrounds",
+    kinds: ["background", "ai_footage"],
+  },
+  { key: "audio", label: "Audio", kinds: ["audio_music", "audio_tts", "sfx"] },
 ] as const satisfies readonly {
-  key: string
-  label: string
-  kinds: readonly AssetKind[] | null
-}[]
+  key: string;
+  label: string;
+  kinds: readonly AssetKind[] | null;
+}[];
 
-export type AssetTabKey = (typeof ASSET_TABS)[number]['key']
+export type AssetTabKey = (typeof ASSET_TABS)[number]["key"];
 
 export const assetTabSchema = z.enum(
-  ASSET_TABS.map((tab) => tab.key) as [AssetTabKey, ...AssetTabKey[]]
-)
+  ASSET_TABS.map((tab) => tab.key) as [AssetTabKey, ...AssetTabKey[]],
+);
 
 /**
  * SOURCE OF TRUTH KEYWORDS: ASSET_FILTER_ALL, assetFilterSchema,
@@ -485,33 +513,33 @@ export const assetTabSchema = z.enum(
  * WHERE: The media toolbar and table under
  *        src/app/(dashboard)/dashboard/media/_components.
  */
-export const ASSET_FILTER_ALL = 'all'
+export const ASSET_FILTER_ALL = "all";
 
-export const ASSET_SEARCH_MAX = 200
+export const ASSET_SEARCH_MAX = 200;
 
 export const assetFilterSchema = z.object({
   search: z.string().trim().max(ASSET_SEARCH_MAX),
   tab: z.string(),
   status: z.string(),
-})
+});
 
-export type AssetFilterValues = z.infer<typeof assetFilterSchema>
+export type AssetFilterValues = z.infer<typeof assetFilterSchema>;
 
 export const ASSET_FILTER_DEFAULTS: AssetFilterValues = {
-  search: '',
-  tab: 'all',
+  search: "",
+  tab: "all",
   status: ASSET_FILTER_ALL,
-}
+};
 
 export function normalizeAssetFilters(values: AssetFilterValues): {
-  search?: string
-  kinds?: AssetKind[]
-  status?: AssetStatus
+  search?: string;
+  kinds?: AssetKind[];
+  status?: AssetStatus;
 } {
-  const parsed = assetFilterSchema.parse(values)
-  const search = parsed.search.trim()
-  const status = assetStatusSchema.safeParse(parsed.status)
-  const tab = ASSET_TABS.find((candidate) => candidate.key === parsed.tab)
+  const parsed = assetFilterSchema.parse(values);
+  const search = parsed.search.trim();
+  const status = assetStatusSchema.safeParse(parsed.status);
+  const tab = ASSET_TABS.find((candidate) => candidate.key === parsed.tab);
 
   /* Keys are omitted rather than set to undefined — `exactOptionalPropertyTypes`
    * is on and the router's input schema uses `.optional()`. */
@@ -519,5 +547,5 @@ export function normalizeAssetFilters(values: AssetFilterValues): {
     ...(search ? { search } : {}),
     ...(tab?.kinds ? { kinds: [...tab.kinds] } : {}),
     ...(status.success ? { status: status.data } : {}),
-  }
+  };
 }

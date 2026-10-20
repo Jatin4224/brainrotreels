@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -58,15 +52,16 @@
  *        src/inngest/functions/project-render.ts and credits-reconcile.ts.
  */
 
-import 'server-only'
+import "server-only";
 
-import type { Prisma } from '@/generated/prisma'
-import { prisma, type DbClient } from '@/lib/config/prisma'
+import type { Prisma } from "@/generated/prisma";
+import { prisma, type DbClient } from "@/lib/config/prisma";
+import { settlementRows } from "@/lib/credits/settlement";
 import {
   SIGN_BY_KIND,
   type CreditLedgerKind,
   type CreditPackKey,
-} from '@/lib/types/credits'
+} from "@/lib/types/credits";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: CreditLedgerRow, LEDGER_LIST_SELECT
@@ -87,11 +82,11 @@ export const LEDGER_LIST_SELECT = {
   holdId: true,
   metadata: true,
   createdAt: true,
-} as const satisfies Prisma.CreditLedgerSelect
+} as const satisfies Prisma.CreditLedgerSelect;
 
 export type CreditLedgerRow = Prisma.CreditLedgerGetPayload<{
-  select: typeof LEDGER_LIST_SELECT
-}>
+  select: typeof LEDGER_LIST_SELECT;
+}>;
 
 /**
  * SOURCE OF TRUTH KEYWORDS: InsufficientCreditsError, REFUSAL_IS_NOT_A_CRASH
@@ -111,14 +106,14 @@ export type CreditLedgerRow = Prisma.CreditLedgerGetPayload<{
  *        render workflow.
  */
 export class InsufficientCreditsError extends Error {
-  readonly required: number
-  readonly available: number
+  readonly required: number;
+  readonly available: number;
 
   constructor(required: number, available: number) {
-    super(`This workspace has ${available} credits and needs ${required}.`)
-    this.name = 'InsufficientCreditsError'
-    this.required = required
-    this.available = available
+    super(`This workspace has ${available} credits and needs ${required}.`);
+    this.name = "InsufficientCreditsError";
+    this.required = required;
+    this.available = available;
   }
 }
 
@@ -145,17 +140,17 @@ export class InsufficientCreditsError extends Error {
 async function appendLedgerRow(
   db: DbClient,
   args: {
-    organizationId: string
-    kind: CreditLedgerKind
+    organizationId: string;
+    kind: CreditLedgerKind;
     /** Always POSITIVE. The sign comes from the kind. */
-    amount: number
-    refId?: string | null
-    holdId?: string | null
-    metadata?: Prisma.InputJsonValue | undefined
+    amount: number;
+    refId?: string | null;
+    holdId?: string | null;
+    metadata?: Prisma.InputJsonValue | undefined;
   },
 ): Promise<CreditLedgerRow> {
-  const magnitude = Math.round(Math.abs(args.amount))
-  const delta = magnitude * SIGN_BY_KIND[args.kind]
+  const magnitude = Math.round(Math.abs(args.amount));
+  const delta = magnitude * SIGN_BY_KIND[args.kind];
 
   const row = await db.creditLedger.create({
     data: {
@@ -167,7 +162,7 @@ async function appendLedgerRow(
       ...(args.metadata !== undefined ? { metadata: args.metadata } : {}),
     },
     select: LEDGER_LIST_SELECT,
-  })
+  });
 
   /* The cache, in the same transaction. `increment` rather than a read-then-
    * write, so two concurrent movements cannot both read the old value and
@@ -176,9 +171,9 @@ async function appendLedgerRow(
   await db.organization.update({
     where: { id: args.organizationId },
     data: { creditBalance: { increment: delta } },
-  })
+  });
 
-  return row
+  return row;
 }
 
 /**
@@ -206,8 +201,8 @@ export async function getBalance(
   const org = await db.organization.findUnique({
     where: { id: organizationId },
     select: { creditBalance: true },
-  })
-  return org?.creditBalance ?? 0
+  });
+  return org?.creditBalance ?? 0;
 }
 
 /**
@@ -227,8 +222,8 @@ export async function sumLedger(
   const result = await db.creditLedger.aggregate({
     where: { organizationId },
     _sum: { delta: true },
-  })
-  return result._sum.delta ?? 0
+  });
+  return result._sum.delta ?? 0;
 }
 
 /**
@@ -266,28 +261,28 @@ export async function hold(
   refId: string,
   metadata?: Prisma.InputJsonValue,
 ): Promise<string> {
-  const required = Math.max(0, Math.round(amount))
+  const required = Math.max(0, Math.round(amount));
 
   /* A zero-cost job still gets a hold row, so the hold/commit/release chain is
    * unbroken and `commit` has something to settle. A missing row would make
    * the commit path branch on "was there a hold", which is a branch that gets
    * it wrong the first time a rate is set to zero. */
   if (required > 0) {
-    const available = await getBalance(organizationId, db)
+    const available = await getBalance(organizationId, db);
     if (available < required) {
-      throw new InsufficientCreditsError(required, available)
+      throw new InsufficientCreditsError(required, available);
     }
   }
 
   const row = await appendLedgerRow(db, {
     organizationId,
-    kind: 'hold',
+    kind: "hold",
     amount: required,
     refId,
     ...(metadata !== undefined ? { metadata } : {}),
-  })
+  });
 
-  return row.id
+  return row.id;
 }
 
 /**
@@ -326,42 +321,52 @@ export async function commit(
 ): Promise<boolean> {
   const holdRow = await db.creditLedger.findUnique({
     where: { id: holdId },
-    select: { id: true, organizationId: true, delta: true, kind: true, refId: true },
-  })
-  if (holdRow === null || holdRow.kind !== 'hold') return false
+    select: {
+      id: true,
+      organizationId: true,
+      delta: true,
+      kind: true,
+      refId: true,
+    },
+  });
+  if (holdRow === null || holdRow.kind !== "hold") return false;
 
-  if (await isSettled(db, holdId)) return false
+  if (await isSettled(db, holdId)) return false;
 
   /* The hold's delta is negative; its magnitude is what was reserved. */
-  const held = Math.abs(holdRow.delta)
-  const actual = Math.max(0, Math.round(actualCost))
+  const held = Math.abs(holdRow.delta);
+  const actual = Math.max(0, Math.round(actualCost));
 
-  if (actual > 0) {
+  /**
+   * SOURCE OF TRUTH KEYWORDS: RELEASE_REVERSES_THE_WHOLE_HOLD, settlementRows,
+   *   NET_IS_THE_ACTUAL_COST
+   *
+   * The arithmetic is in `src/lib/credits/settlement.ts`, pure and unit
+   * tested, because getting it wrong here moves real money and it ALREADY WAS
+   * wrong once: the phase brief describes the compensating release as being
+   * "for the difference", which double-charges every job — the hold has
+   * already deducted the estimate, so `−12 − 9 + 3 = −18` for work that cost
+   * 9. A probe against a real database caught it; review did not.
+   *
+   * The release therefore reverses the hold IN FULL, and the net across hold
+   * plus settlement is exactly the actual cost in every case — including when
+   * the work cost MORE than was held, which is charged in full rather than
+   * silently absorbed.
+   */
+  for (const row of settlementRows(held, actual)) {
     await appendLedgerRow(db, {
       organizationId: holdRow.organizationId,
-      kind: 'commit',
-      amount: actual,
+      kind: row.kind,
+      amount: row.amount,
       refId: holdRow.refId,
       holdId,
-      ...(metadata !== undefined ? { metadata } : {}),
-    })
+      /* Only the commit carries the caller's metadata — it is the row that
+       * describes the work; the release is bookkeeping. */
+      ...(row.kind === "commit" && metadata !== undefined ? { metadata } : {}),
+    });
   }
 
-  /* PARTIAL_RELEASE — the difference goes back. Written even when `actual` is
-   * zero, in which case this releases the entire hold and the chain still
-   * reads as "held, then settled at nothing". */
-  const difference = held - actual
-  if (difference > 0) {
-    await appendLedgerRow(db, {
-      organizationId: holdRow.organizationId,
-      kind: 'release',
-      amount: difference,
-      refId: holdRow.refId,
-      holdId,
-    })
-  }
-
-  return true
+  return true;
 }
 
 /**
@@ -390,25 +395,31 @@ export async function release(
 ): Promise<boolean> {
   const holdRow = await db.creditLedger.findUnique({
     where: { id: holdId },
-    select: { id: true, organizationId: true, delta: true, kind: true, refId: true },
-  })
-  if (holdRow === null || holdRow.kind !== 'hold') return false
+    select: {
+      id: true,
+      organizationId: true,
+      delta: true,
+      kind: true,
+      refId: true,
+    },
+  });
+  if (holdRow === null || holdRow.kind !== "hold") return false;
 
-  if (await isSettled(db, holdId)) return false
+  if (await isSettled(db, holdId)) return false;
 
-  const held = Math.abs(holdRow.delta)
-  if (held === 0) return true
+  const held = Math.abs(holdRow.delta);
+  if (held === 0) return true;
 
   await appendLedgerRow(db, {
     organizationId: holdRow.organizationId,
-    kind: 'release',
+    kind: "release",
     amount: held,
     refId: holdRow.refId,
     holdId,
     ...(metadata !== undefined ? { metadata } : {}),
-  })
+  });
 
-  return true
+  return true;
 }
 
 /**
@@ -423,10 +434,10 @@ export async function release(
  */
 async function isSettled(db: DbClient, holdId: string): Promise<boolean> {
   const existing = await db.creditLedger.findFirst({
-    where: { holdId, kind: { in: ['commit', 'release'] } },
+    where: { holdId, kind: { in: ["commit", "release"] } },
     select: { id: true },
-  })
-  return existing !== null
+  });
+  return existing !== null;
 }
 
 /**
@@ -450,11 +461,11 @@ export async function grant(
 ): Promise<CreditLedgerRow> {
   return appendLedgerRow(db, {
     organizationId,
-    kind: 'grant',
+    kind: "grant",
     amount,
     ...(refId !== undefined ? { refId } : {}),
     metadata: { reason },
-  })
+  });
 }
 
 /**
@@ -479,25 +490,25 @@ export async function grant(
 export async function purchase(
   db: DbClient,
   args: {
-    organizationId: string
-    amount: number
-    paymentIntentId: string
-    packKey: CreditPackKey
+    organizationId: string;
+    amount: number;
+    paymentIntentId: string;
+    packKey: CreditPackKey;
   },
 ): Promise<CreditLedgerRow | null> {
   const existing = await db.creditLedger.findFirst({
-    where: { refId: args.paymentIntentId, kind: 'purchase' },
+    where: { refId: args.paymentIntentId, kind: "purchase" },
     select: { id: true },
-  })
-  if (existing !== null) return null
+  });
+  if (existing !== null) return null;
 
   return appendLedgerRow(db, {
     organizationId: args.organizationId,
-    kind: 'purchase',
+    kind: "purchase",
     amount: args.amount,
     refId: args.paymentIntentId,
     metadata: { packKey: args.packKey },
-  })
+  });
 }
 
 /**
@@ -517,20 +528,20 @@ export async function listLedger(
   const where: Prisma.CreditLedgerWhereInput = {
     organizationId: filters.organizationId,
     ...(filters.kind !== undefined ? { kind: filters.kind } : {}),
-  }
+  };
 
   const [rows, total] = await Promise.all([
     db.creditLedger.findMany({
       where,
       select: LEDGER_LIST_SELECT,
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       skip: page.skip,
       take: page.take,
     }),
     db.creditLedger.count({ where }),
-  ])
+  ]);
 
-  return { rows, total }
+  return { rows, total };
 }
 
 /**
@@ -552,17 +563,20 @@ export async function findOpenHoldForRef(
   refId: string,
 ): Promise<{ id: string; delta: number } | null> {
   const holds = await db.creditLedger.findMany({
-    where: { refId, kind: 'hold' },
+    where: { refId, kind: "hold" },
     select: { id: true, delta: true },
-    orderBy: { createdAt: 'desc' },
-  })
-  if (holds.length === 0) return null
+    orderBy: { createdAt: "desc" },
+  });
+  if (holds.length === 0) return null;
 
   const settled = await db.creditLedger.findMany({
-    where: { holdId: { in: holds.map((row) => row.id) }, kind: { in: ['commit', 'release'] } },
+    where: {
+      holdId: { in: holds.map((row) => row.id) },
+      kind: { in: ["commit", "release"] },
+    },
     select: { holdId: true },
-  })
-  const settledIds = new Set(settled.map((row) => row.holdId))
+  });
+  const settledIds = new Set(settled.map((row) => row.holdId));
 
-  return holds.find((row) => !settledIds.has(row.id)) ?? null
+  return holds.find((row) => !settledIds.has(row.id)) ?? null;
 }

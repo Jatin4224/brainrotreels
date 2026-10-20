@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -19,20 +13,24 @@
  *        sidebar. The create button is passed as a header action.
  */
 
-import type { Metadata } from 'next'
+import type { Metadata } from "next";
 
-import { ContentLayout } from '@/components/global/page-header'
-import { CreateProjectButton } from './_components/create-project-button'
-import { ProjectsTable } from './_components/projects-table'
+import { ContentLayout } from "@/components/global/page-header";
+import { CreateProjectButton } from "./_components/create-project-button";
+import { ProjectsTable } from "./_components/projects-table";
 
 export const metadata: Metadata = {
-  title: 'Projects',
-}
+  title: "Projects",
+};
 
 export default function ProjectsPage() {
   return (
-    <ContentLayout title="Projects" width="full" actions={<CreateProjectButton />}>
+    <ContentLayout
+      title="Projects"
+      width="full"
+      actions={<CreateProjectButton />}
+    >
       <ProjectsTable />
     </ContentLayout>
-  )
+  );
 }

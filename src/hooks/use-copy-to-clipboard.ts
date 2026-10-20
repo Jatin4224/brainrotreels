@@ -1,14 +1,8 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
-'use client'
+"use client";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: useCopyToClipboard, CopyToClipboard, copied,
@@ -32,42 +26,45 @@
  *        action, both under src/app/(dashboard)/dashboard/team/_components.
  */
 
-import * as React from 'react'
+import * as React from "react";
 
 /* Long enough to register as feedback, short enough that the control is back to
  * its resting state before the user looks again. */
-const COPY_FEEDBACK_RESET_MS = 2000
+const COPY_FEEDBACK_RESET_MS = 2000;
 
 export interface CopyToClipboard {
   /** Writes `value`; resolves true on success, false when the browser refused. */
-  copy: (value: string) => Promise<boolean>
+  copy: (value: string) => Promise<boolean>;
   /** True for COPY_FEEDBACK_RESET_MS after a successful copy. */
-  copied: boolean
+  copied: boolean;
 }
 
 export function useCopyToClipboard(): CopyToClipboard {
-  const [copied, setCopied] = React.useState(false)
-  const timeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [copied, setCopied] = React.useState(false);
+  const timeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   React.useEffect(
     () => () => {
-      if (timeoutRef.current !== null) clearTimeout(timeoutRef.current)
+      if (timeoutRef.current !== null) clearTimeout(timeoutRef.current);
     },
-    []
-  )
+    [],
+  );
 
   const copy = React.useCallback(async (value: string): Promise<boolean> => {
     try {
-      await navigator.clipboard.writeText(value)
+      await navigator.clipboard.writeText(value);
     } catch {
       /* Insecure origin, or the user denied clipboard access. */
-      return false
+      return false;
     }
-    setCopied(true)
-    if (timeoutRef.current !== null) clearTimeout(timeoutRef.current)
-    timeoutRef.current = setTimeout(() => setCopied(false), COPY_FEEDBACK_RESET_MS)
-    return true
-  }, [])
+    setCopied(true);
+    if (timeoutRef.current !== null) clearTimeout(timeoutRef.current);
+    timeoutRef.current = setTimeout(
+      () => setCopied(false),
+      COPY_FEEDBACK_RESET_MS,
+    );
+    return true;
+  }, []);
 
-  return { copy, copied }
+  return { copy, copied };
 }

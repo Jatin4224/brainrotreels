@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -33,22 +27,22 @@
  * WHERE: Linked from the projects list row menu.
  */
 
-import type { Metadata } from 'next'
+import type { Metadata } from "next";
 
-import { ContentLayout } from '@/components/global/page-header'
-import { ProjectPreview } from './_components/project-preview'
-import { RenderPanel } from './_components/render-panel'
+import { ContentLayout } from "@/components/global/page-header";
+import { ProjectPreview } from "./_components/project-preview";
+import { RenderPanel } from "./_components/render-panel";
 
 export const metadata: Metadata = {
-  title: 'Preview',
-}
+  title: "Preview",
+};
 
 export default async function ProjectPreviewPage({
   params,
 }: {
-  params: Promise<{ id: string }>
+  params: Promise<{ id: string }>;
 }) {
-  const { id } = await params
+  const { id } = await params;
 
   return (
     <ContentLayout title="Preview">
@@ -61,5 +55,5 @@ export default async function ProjectPreviewPage({
         <RenderPanel projectId={id} />
       </div>
     </ContentLayout>
-  )
+  );
 }

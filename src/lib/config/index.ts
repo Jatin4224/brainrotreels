@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -27,8 +21,8 @@
  * WHERE: Imported broadly across the app and by src/lib/better-auth/auth.ts.
  */
 
-export { prisma } from './prisma'
-export type { DbClient } from './prisma'
+export { prisma } from "./prisma";
+export type { DbClient } from "./prisma";
 export {
   APP_NAME,
   APP_URL,
@@ -36,17 +30,17 @@ export {
   APP_DESCRIPTION,
   APP_METADATA_BASE,
   BRANDING,
-} from './branding'
+} from "./branding";
 export {
   AUTH_ROUTES,
   AUTH_CALLBACK_PARAM,
   resolveAuthCallback,
   authRouteWithCallback,
-} from './auth-routes'
-export type { AuthRouteKey } from './auth-routes'
-export { ROUTES } from './routes'
-export type { AppRouteKey } from './routes'
-export { REGISTRATION_OPEN } from './registration'
+} from "./auth-routes";
+export type { AuthRouteKey } from "./auth-routes";
+export { ROUTES } from "./routes";
+export type { AppRouteKey } from "./routes";
+export { REGISTRATION_OPEN } from "./registration";
 export {
   PLAN_KEYS,
   PLANS,
@@ -55,24 +49,24 @@ export {
   getPlanPriceId,
   getPlanByPriceId,
   getNextPlan,
-} from './plans'
-export type { PlanKey, PlanDefinition, BillingInterval } from './plans'
+} from "./plans";
+export type { PlanKey, PlanDefinition, BillingInterval } from "./plans";
 export {
   getResendClient,
   RESEND_DEFAULT_FROM,
   isResendConfigured,
   isDevEmailFallbackActive,
-} from './resend'
+} from "./resend";
 export {
   getStripeClient,
   isStripeConfigured,
   getStripeWebhookSecret,
   STRIPE_API_VERSION,
-} from './stripe'
+} from "./stripe";
 export {
   portalConfig,
   isPortalEnabled,
   isPortalOwnerEmail,
   PORTAL_PATH,
   portalRoute,
-} from './portal'
+} from "./portal";

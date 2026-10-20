@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -18,15 +12,21 @@
  * WHERE: Route /dashboard under the (dashboard) layout.
  */
 
-import type { Metadata } from 'next'
+import type { Metadata } from "next";
 
-import { ContentLayout } from '@/components/global/page-header'
-import { PlanSetupCard } from '@/components/global/plan-setup-card'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { ContentLayout } from "@/components/global/page-header";
+import { PlanSetupCard } from "@/components/global/plan-setup-card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 
 export const metadata: Metadata = {
-  title: 'Dashboard',
-}
+  title: "Dashboard",
+};
 
 export default function DashboardHomePage() {
   return (
@@ -38,8 +38,9 @@ export default function DashboardHomePage() {
         <CardHeader>
           <CardTitle>Welcome</CardTitle>
           <CardDescription>
-            This is your dashboard. Add your product’s features here — declare them in
-            src/lib/resources.ts and they appear in the sidebar automatically.
+            This is your dashboard. Add your product’s features here — declare
+            them in src/lib/resources.ts and they appear in the sidebar
+            automatically.
           </CardDescription>
         </CardHeader>
         <CardContent className="text-sm text-muted-foreground">
@@ -47,5 +48,5 @@ export default function DashboardHomePage() {
         </CardContent>
       </Card>
     </ContentLayout>
-  )
+  );
 }

@@ -1,14 +1,8 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
-'use client'
+"use client";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: getStripePromise, STRIPE_PUBLISHABLE_KEY,
@@ -22,18 +16,19 @@
  * WHERE: Consumed by the Stripe Elements provider in the billing UI.
  */
 
-import { loadStripe, type Stripe } from '@stripe/stripe-js'
+import { loadStripe, type Stripe } from "@stripe/stripe-js";
 
-const STRIPE_PUBLISHABLE_KEY = process.env['NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY']
+const STRIPE_PUBLISHABLE_KEY =
+  process.env["NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY"];
 
 export function isStripePublishableConfigured(): boolean {
-  return Boolean(STRIPE_PUBLISHABLE_KEY)
+  return Boolean(STRIPE_PUBLISHABLE_KEY);
 }
 
-let stripePromise: Promise<Stripe | null> | null = null
+let stripePromise: Promise<Stripe | null> | null = null;
 
 export function getStripePromise(): Promise<Stripe | null> | null {
-  if (!STRIPE_PUBLISHABLE_KEY) return null
-  if (!stripePromise) stripePromise = loadStripe(STRIPE_PUBLISHABLE_KEY)
-  return stripePromise
+  if (!STRIPE_PUBLISHABLE_KEY) return null;
+  if (!stripePromise) stripePromise = loadStripe(STRIPE_PUBLISHABLE_KEY);
+  return stripePromise;
 }

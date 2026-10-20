@@ -1,14 +1,8 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
-import type { Route } from 'next'
+import type { Route } from "next";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: portalConfig, isPortalEnabled, isPortalOwnerEmail,
@@ -41,19 +35,21 @@ import type { Route } from 'next'
  * WHERE: portalRoute() is used by the portal sidebar; PORTAL_PATH by the portal
  *        layout and the dashboard/onboarding redirects.
  */
-export const PORTAL_PATH = (process.env['PORTAL_PATH_PREFIX'] || '/portal') as Route
+export const PORTAL_PATH = (process.env["PORTAL_PATH_PREFIX"] ||
+  "/portal") as Route;
 
 /* NECESSARY_DESPITE_LINT: see resolveAuthCallback in auth-routes.ts. `Route`
  * is only a literal union once `next build` has generated .next/types; without
  * it the assertion reads as redundant and eslint flags it, but the build fails
  * if it is removed. */
-export const portalRoute = (suffix: string): Route => `${PORTAL_PATH}${suffix}` as Route
+export const portalRoute = (suffix: string): Route =>
+  `${PORTAL_PATH}${suffix}` as Route;
 
 export const portalConfig = {
-  enabled: process.env['PORTAL_ENABLED'] === 'true',
-  initialOwnerEmail: process.env['PORTAL_INITIAL_OWNER_EMAIL'] || '',
+  enabled: process.env["PORTAL_ENABLED"] === "true",
+  initialOwnerEmail: process.env["PORTAL_INITIAL_OWNER_EMAIL"] || "",
   pathPrefix: PORTAL_PATH,
-} as const
+} as const;
 
 /**
  * SOURCE OF TRUTH KEYWORDS: isPortalEnabled
@@ -62,7 +58,7 @@ export const portalConfig = {
  * WHERE: Gate before any portal operation / route.
  */
 export function isPortalEnabled(): boolean {
-  return portalConfig.enabled
+  return portalConfig.enabled;
 }
 
 /**
@@ -75,6 +71,9 @@ export function isPortalEnabled(): boolean {
  * WHERE: portal.service admin resolution + auto-provision.
  */
 export function isPortalOwnerEmail(email: string): boolean {
-  if (!portalConfig.enabled || !portalConfig.initialOwnerEmail) return false
-  return email.toLowerCase().trim() === portalConfig.initialOwnerEmail.toLowerCase().trim()
+  if (!portalConfig.enabled || !portalConfig.initialOwnerEmail) return false;
+  return (
+    email.toLowerCase().trim() ===
+    portalConfig.initialOwnerEmail.toLowerCase().trim()
+  );
 }

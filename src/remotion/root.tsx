@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -37,14 +31,17 @@
  *        TimelineRenderer directly with a real signed-URL map.
  */
 
-import { Composition } from 'remotion'
+import { Composition } from "remotion";
 
-import { planComposition } from '@/lib/render'
-import { resolveWordAnchors, timelineDocSchema } from '@/lib/timeline'
-import { FIXTURES_BY_KIND } from '@/lib/timeline/fixtures'
-import { TIMELINE_COMPOSITION_ID } from '@/lib/types/render'
-import { devAssetMap } from './dev-assets'
-import { TimelineRenderer, type TimelineRendererProps } from './timeline-renderer'
+import { planComposition } from "@/lib/render";
+import { resolveWordAnchors, timelineDocSchema } from "@/lib/timeline";
+import { FIXTURES_BY_KIND } from "@/lib/timeline/fixtures";
+import { TIMELINE_COMPOSITION_ID } from "@/lib/types/render";
+import { devAssetMap } from "./dev-assets";
+import {
+  TimelineRenderer,
+  type TimelineRendererProps,
+} from "./timeline-renderer";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: METADATA_FROM_THE_PROPS, calculateMetadata,
@@ -81,22 +78,22 @@ import { TimelineRenderer, type TimelineRendererProps } from './timeline-rendere
  *        the studio exercises the same code path a render does.
  */
 function metadataFromProps({ props }: { props: TimelineRendererProps }) {
-  const parsed = timelineDocSchema.safeParse(props.doc)
+  const parsed = timelineDocSchema.safeParse(props.doc);
   if (!parsed.success) {
     console.error(
-      '[remotion/root] calculateMetadata could not parse the document; rendering one black frame.',
+      "[remotion/root] calculateMetadata could not parse the document; rendering one black frame.",
       parsed.error.issues.slice(0, 5),
-    )
-    return { durationInFrames: 30, fps: 30, width: 1080, height: 1920 }
+    );
+    return { durationInFrames: 30, fps: 30, width: 1080, height: 1920 };
   }
 
-  const plan = planComposition(parsed.data)
+  const plan = planComposition(parsed.data);
   return {
     durationInFrames: plan.durationInFrames,
     fps: plan.fps,
     width: plan.width,
     height: plan.height,
-  }
+  };
 }
 
 export function RemotionRoot() {
@@ -114,7 +111,7 @@ export function RemotionRoot() {
         defaultProps={{ doc: {}, assets: {}, watermark: false }}
       />
       {Object.entries(FIXTURES_BY_KIND).map(([kind, build]) => {
-        const doc = resolveWordAnchors(build())
+        const doc = resolveWordAnchors(build());
 
         return (
           <Composition
@@ -133,8 +130,8 @@ export function RemotionRoot() {
             calculateMetadata={metadataFromProps}
             defaultProps={{ doc, assets: devAssetMap(doc), watermark: false }}
           />
-        )
+        );
       })}
     </>
-  )
+  );
 }

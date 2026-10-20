@@ -1,14 +1,8 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
-'use client'
+"use client";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: CreateProjectSheetContent, createProjectSchema,
@@ -29,21 +23,21 @@
  * WHERE: Mounted inside the <Sheet> opened by CreateProjectButton.
  */
 
-import * as React from 'react'
-import { useForm, useWatch } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import { Loader2Icon } from 'lucide-react'
-import { toast } from 'sonner'
+import * as React from "react";
+import { useForm, useWatch } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Loader2Icon } from "lucide-react";
+import { toast } from "sonner";
 
-import { trpc } from '@/trpc/react-provider'
+import { trpc } from "@/trpc/react-provider";
 import {
   ASPECT_RATIOS,
   PROJECT_KINDS,
   createProjectSchema,
   type CreateProjectValues,
   type ProjectKind,
-} from '@/lib/types'
-import { Button } from '@/components/ui/button'
+} from "@/lib/types";
+import { Button } from "@/components/ui/button";
 import {
   Form,
   FormControl,
@@ -52,23 +46,23 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from '@/components/ui/form'
-import { Input } from '@/components/ui/input'
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select'
+} from "@/components/ui/select";
 import {
   SheetContent,
   SheetDescription,
   SheetFooter,
   SheetHeader,
   SheetTitle,
-} from '@/components/ui/sheet'
-import { PROJECT_KIND_LABEL } from './project-filters'
+} from "@/components/ui/sheet";
+import { PROJECT_KIND_LABEL } from "./project-filters";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: SOURCE_REF_PER_KIND, SOURCE_FIELD_BY_KIND
@@ -82,83 +76,91 @@ import { PROJECT_KIND_LABEL } from './project-filters'
  * WHERE: The conditional field below.
  */
 const SOURCE_FIELD_BY_KIND: Readonly<
-  Record<ProjectKind, { label: string; placeholder: string; description: string } | null>
+  Record<
+    ProjectKind,
+    { label: string; placeholder: string; description: string } | null
+  >
 > = {
-  'reddit-story': {
-    label: 'Reddit post URL',
-    placeholder: 'https://www.reddit.com/r/AmItheAsshole/comments/...',
-    description: 'The post to narrate. You can paste the story text instead later.',
+  "reddit-story": {
+    label: "Reddit post URL",
+    placeholder: "https://www.reddit.com/r/AmItheAsshole/comments/...",
+    description:
+      "The post to narrate. You can paste the story text instead later.",
   },
   voiceover: {
-    label: 'Topic or article URL',
-    placeholder: 'Why most morning routines fail',
-    description: 'A topic to write from, or a link to summarise.',
+    label: "Topic or article URL",
+    placeholder: "Why most morning routines fail",
+    description: "A topic to write from, or a link to summarise.",
   },
   quiz: {
-    label: 'Quiz topic',
-    placeholder: 'Capital cities of South America',
-    description: 'The subject the questions are generated from.',
+    label: "Quiz topic",
+    placeholder: "Capital cities of South America",
+    description: "The subject the questions are generated from.",
   },
   motion: null,
-}
+};
 
 const ASPECT_LABEL: Readonly<Record<(typeof ASPECT_RATIOS)[number], string>> = {
-  '9:16': '9:16 — vertical (TikTok, Reels, Shorts)',
-  '1:1': '1:1 — square',
-  '16:9': '16:9 — landscape',
-}
+  "9:16": "9:16 — vertical (TikTok, Reels, Shorts)",
+  "1:1": "1:1 — square",
+  "16:9": "16:9 — landscape",
+};
 
 export function CreateProjectSheetContent({
   organizationId,
   onClose,
 }: {
-  organizationId: string
-  onClose: () => void
+  organizationId: string;
+  onClose: () => void;
 }) {
-  const utils = trpc.useUtils()
-  const create = trpc.projects.create.useMutation()
-  const [error, setError] = React.useState<string | null>(null)
+  const utils = trpc.useUtils();
+  const create = trpc.projects.create.useMutation();
+  const [error, setError] = React.useState<string | null>(null);
 
   const form = useForm<CreateProjectValues>({
     resolver: zodResolver(createProjectSchema),
-    mode: 'onTouched',
+    mode: "onTouched",
     defaultValues: {
       organizationId,
-      title: '',
-      kind: 'reddit-story',
-      aspect: '9:16',
-      sourceRef: '',
+      title: "",
+      kind: "reddit-story",
+      aspect: "9:16",
+      sourceRef: "",
     },
-  })
+  });
 
   /* useWatch, not form.watch(): the React Compiler refuses to memoize a
    * component that calls watch(), because it hands back a function whose
    * result it cannot track (see the react-hooks/incompatible-library rule).
    * useWatch is a hook returning a value, so the subscription is safe. */
-  const kind = useWatch({ control: form.control, name: 'kind' })
-  const sourceField = SOURCE_FIELD_BY_KIND[kind]
+  const kind = useWatch({ control: form.control, name: "kind" });
+  const sourceField = SOURCE_FIELD_BY_KIND[kind];
 
   async function onSubmit(values: CreateProjectValues) {
-    setError(null)
+    setError(null);
     try {
       /* A blank source is sent as absent rather than as an empty string: the
        * column is nullable and `''` is not a source. */
-      const sourceRef = values.sourceRef?.trim()
+      const sourceRef = values.sourceRef?.trim();
       const project = await create.mutateAsync({
         organizationId: values.organizationId,
         title: values.title,
         kind: values.kind,
         aspect: values.aspect,
-        ...(sourceRef !== undefined && sourceRef.length > 0 ? { sourceRef } : {}),
-      })
-      await utils.projects.list.invalidate()
+        ...(sourceRef !== undefined && sourceRef.length > 0
+          ? { sourceRef }
+          : {}),
+      });
+      await utils.projects.list.invalidate();
       /* The usage counter the factory bumped drives the plan cards and the
        * create button's own gate, so it has to be refetched too. */
-      await utils.usage.invalidate()
-      toast.success(`"${project.title}" created`)
-      onClose()
+      await utils.usage.invalidate();
+      toast.success(`"${project.title}" created`);
+      onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not create this project.')
+      setError(
+        err instanceof Error ? err.message : "Could not create this project.",
+      );
     }
   }
 
@@ -184,7 +186,11 @@ export function CreateProjectSheetContent({
               <FormItem>
                 <FormLabel>Title</FormLabel>
                 <FormControl>
-                  <Input {...field} placeholder="Gerald the sourdough" autoFocus />
+                  <Input
+                    {...field}
+                    placeholder="Gerald the sourdough"
+                    autoFocus
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -205,7 +211,9 @@ export function CreateProjectSheetContent({
                     <SelectTrigger aria-label="Project format">
                       <SelectValue>
                         {(value) =>
-                          typeof value === 'string' ? kindLabelOf(value) : 'Choose a format'
+                          typeof value === "string"
+                            ? kindLabelOf(value)
+                            : "Choose a format"
                         }
                       </SelectValue>
                     </SelectTrigger>
@@ -237,7 +245,9 @@ export function CreateProjectSheetContent({
                     <SelectTrigger aria-label="Aspect ratio">
                       <SelectValue>
                         {(value) =>
-                          typeof value === 'string' ? aspectLabelOf(value) : 'Choose an aspect'
+                          typeof value === "string"
+                            ? aspectLabelOf(value)
+                            : "Choose an aspect"
                         }
                       </SelectValue>
                     </SelectTrigger>
@@ -265,7 +275,7 @@ export function CreateProjectSheetContent({
                   <FormControl>
                     <Input
                       {...field}
-                      value={field.value ?? ''}
+                      value={field.value ?? ""}
                       placeholder={sourceField.placeholder}
                     />
                   </FormControl>
@@ -288,23 +298,28 @@ export function CreateProjectSheetContent({
         <Button variant="outline" onClick={onClose} disabled={create.isPending}>
           Cancel
         </Button>
-        <Button onClick={form.handleSubmit(onSubmit)} disabled={create.isPending}>
-          {create.isPending ? <Loader2Icon className="size-4 animate-spin" /> : null}
+        <Button
+          onClick={form.handleSubmit(onSubmit)}
+          disabled={create.isPending}
+        >
+          {create.isPending ? (
+            <Loader2Icon className="size-4 animate-spin" />
+          ) : null}
           Create project
         </Button>
       </SheetFooter>
     </SheetContent>
-  )
+  );
 }
 
 /* Widened lookups — see the same note in project-filters.tsx. */
-const KIND_LOOKUP: Readonly<Record<string, string>> = PROJECT_KIND_LABEL
-const ASPECT_LOOKUP: Readonly<Record<string, string>> = ASPECT_LABEL
+const KIND_LOOKUP: Readonly<Record<string, string>> = PROJECT_KIND_LABEL;
+const ASPECT_LOOKUP: Readonly<Record<string, string>> = ASPECT_LABEL;
 
 function kindLabelOf(value: string): string {
-  return KIND_LOOKUP[value] ?? value
+  return KIND_LOOKUP[value] ?? value;
 }
 
 function aspectLabelOf(value: string): string {
-  return ASPECT_LOOKUP[value] ?? value
+  return ASPECT_LOOKUP[value] ?? value;
 }

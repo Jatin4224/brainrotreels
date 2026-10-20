@@ -1,14 +1,8 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
-'use client'
+"use client";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: UpgradeModalProvider, useUpgradeModal,
@@ -40,15 +34,15 @@
  *        Consumed by <FeatureGate /> and by anything calling useUpgradeModal().
  */
 
-import * as React from 'react'
-import { useQueryClient, type QueryClient } from '@tanstack/react-query'
-import { TRPCClientError } from '@trpc/client'
+import * as React from "react";
+import { useQueryClient, type QueryClient } from "@tanstack/react-query";
+import { TRPCClientError } from "@trpc/client";
 
-import { ERROR_CODES } from '@/lib/errors'
-import { isResourceKey, type ResourceKey } from '@/lib/resources'
-import type { PlanKey } from '@/lib/config'
-import { useActiveOrganizationId } from '@/hooks/use-active-organization'
-import { UpgradeModal } from './upgrade-modal'
+import { ERROR_CODES } from "@/lib/errors";
+import { isResourceKey, type ResourceKey } from "@/lib/resources";
+import type { PlanKey } from "@/lib/config";
+import { useActiveOrganizationId } from "@/hooks/use-active-organization";
+import { UpgradeModal } from "./upgrade-modal";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: UpgradeModalRequest
@@ -57,24 +51,25 @@ import { UpgradeModal } from './upgrade-modal'
  * call (a Change Plan button) is the same API as a gate refusal.
  */
 export interface UpgradeModalRequest {
-  resource?: ResourceKey | undefined
+  resource?: ResourceKey | undefined;
   /** Registry copy for the resource; falls back to the generic header. */
-  upgradeMessage?: string | undefined
+  upgradeMessage?: string | undefined;
   /**
    * Plan to open on. Set by a caller whose own label already named one — the
    * sidebar's "Upgrade to Pro" button must land on Pro, not on whatever the
    * modal would have guessed. Omitted, the modal picks the sensible next step.
    */
-  plan?: PlanKey | undefined
+  plan?: PlanKey | undefined;
 }
 
 interface UpgradeModalContextValue {
-  open: (request?: UpgradeModalRequest) => void
-  close: () => void
-  isOpen: boolean
+  open: (request?: UpgradeModalRequest) => void;
+  close: () => void;
+  isOpen: boolean;
 }
 
-const UpgradeModalContext = React.createContext<UpgradeModalContextValue | null>(null)
+const UpgradeModalContext =
+  React.createContext<UpgradeModalContextValue | null>(null);
 
 /**
  * SOURCE OF TRUTH KEYWORDS: useUpgradeModal
@@ -87,17 +82,25 @@ const UpgradeModalContext = React.createContext<UpgradeModalContextValue | null>
  *        "see the plans" affordance.
  */
 export function useUpgradeModal(): UpgradeModalContextValue {
-  const context = React.useContext(UpgradeModalContext)
+  const context = React.useContext(UpgradeModalContext);
   if (!context) {
-    throw new Error('useUpgradeModal must be used inside <UpgradeModalProvider>')
+    throw new Error(
+      "useUpgradeModal must be used inside <UpgradeModalProvider>",
+    );
   }
-  return context
+  return context;
 }
 
-export function UpgradeModalProvider({ children }: { children: React.ReactNode }) {
-  const organizationId = useActiveOrganizationId()
-  const queryClient = useQueryClient()
-  const [request, setRequest] = React.useState<UpgradeModalRequest | null>(null)
+export function UpgradeModalProvider({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const organizationId = useActiveOrganizationId();
+  const queryClient = useQueryClient();
+  const [request, setRequest] = React.useState<UpgradeModalRequest | null>(
+    null,
+  );
 
   const value = React.useMemo<UpgradeModalContextValue>(
     () => ({
@@ -105,28 +108,28 @@ export function UpgradeModalProvider({ children }: { children: React.ReactNode }
       close: () => setRequest(null),
       isOpen: request !== null,
     }),
-    [request]
-  )
+    [request],
+  );
 
   /* Ref so the cache subscription can check "already open" without
    * re-subscribing every time the modal's state changes. */
-  const isOpenRef = React.useRef(false)
+  const isOpenRef = React.useRef(false);
   React.useEffect(() => {
-    isOpenRef.current = request !== null
-  }, [request])
+    isOpenRef.current = request !== null;
+  }, [request]);
 
   React.useEffect(() => {
     const handleError = (error: unknown) => {
-      const upgrade = readUpgradeCause(error)
-      if (!upgrade) return
+      const upgrade = readUpgradeCause(error);
+      if (!upgrade) return;
       /* A batch can fail several calls at once; the first refusal is the one
        * the user acted on, and re-opening would reset the step they're on. */
-      if (isOpenRef.current) return
-      setRequest(upgrade)
-    }
+      if (isOpenRef.current) return;
+      setRequest(upgrade);
+    };
 
-    return subscribeToErrors(queryClient, handleError)
-  }, [queryClient])
+    return subscribeToErrors(queryClient, handleError);
+  }, [queryClient]);
 
   return (
     <UpgradeModalContext.Provider value={value}>
@@ -135,7 +138,7 @@ export function UpgradeModalProvider({ children }: { children: React.ReactNode }
         <UpgradeModal
           open
           onOpenChange={(open) => {
-            if (!open) setRequest(null)
+            if (!open) setRequest(null);
           }}
           organizationId={organizationId}
           resource={request.resource}
@@ -144,7 +147,7 @@ export function UpgradeModalProvider({ children }: { children: React.ReactNode }
         />
       ) : null}
     </UpgradeModalContext.Provider>
-  )
+  );
 }
 
 /**
@@ -156,24 +159,26 @@ export function UpgradeModalProvider({ children }: { children: React.ReactNode }
  */
 function subscribeToErrors(
   queryClient: QueryClient,
-  handleError: (error: unknown) => void
+  handleError: (error: unknown) => void,
 ): () => void {
   const queryUnsubscribe = queryClient.getQueryCache().subscribe((event) => {
-    if (event.type !== 'updated') return
-    if (event.query.state.status !== 'error') return
-    handleError(event.query.state.error)
-  })
+    if (event.type !== "updated") return;
+    if (event.query.state.status !== "error") return;
+    handleError(event.query.state.error);
+  });
 
-  const mutationUnsubscribe = queryClient.getMutationCache().subscribe((event) => {
-    if (event.type !== 'updated' || !event.mutation) return
-    if (event.mutation.state.status !== 'error') return
-    handleError(event.mutation.state.error)
-  })
+  const mutationUnsubscribe = queryClient
+    .getMutationCache()
+    .subscribe((event) => {
+      if (event.type !== "updated" || !event.mutation) return;
+      if (event.mutation.state.status !== "error") return;
+      handleError(event.mutation.state.error);
+    });
 
   return () => {
-    queryUnsubscribe()
-    mutationUnsubscribe()
-  }
+    queryUnsubscribe();
+    mutationUnsubscribe();
+  };
 }
 
 /**
@@ -190,27 +195,33 @@ function subscribeToErrors(
  * WHERE: The observer above.
  */
 function readUpgradeCause(error: unknown): UpgradeModalRequest | null {
-  if (!(error instanceof TRPCClientError)) return null
+  if (!(error instanceof TRPCClientError)) return null;
 
-  const data: unknown = error.data
-  if (data === null || typeof data !== 'object') return null
+  const data: unknown = error.data;
+  if (data === null || typeof data !== "object") return null;
 
-  const cause: unknown = (data as { cause?: unknown }).cause
-  if (cause === null || typeof cause !== 'object') return null
+  const cause: unknown = (data as { cause?: unknown }).cause;
+  if (cause === null || typeof cause !== "object") return null;
 
-  const errorCode = (cause as { errorCode?: unknown }).errorCode
+  const errorCode = (cause as { errorCode?: unknown }).errorCode;
   if (
     errorCode !== ERROR_CODES.USAGE_LIMIT_REACHED &&
     errorCode !== ERROR_CODES.FEATURE_NOT_AVAILABLE
   ) {
-    return null
+    return null;
   }
 
-  const rawResource = (cause as { resource?: unknown }).resource
-  const rawMessage = (cause as { upgradeMessage?: unknown }).upgradeMessage
+  const rawResource = (cause as { resource?: unknown }).resource;
+  const rawMessage = (cause as { upgradeMessage?: unknown }).upgradeMessage;
 
   return {
-    resource: typeof rawResource === 'string' && isResourceKey(rawResource) ? rawResource : undefined,
-    upgradeMessage: typeof rawMessage === 'string' && rawMessage.length > 0 ? rawMessage : undefined,
-  }
+    resource:
+      typeof rawResource === "string" && isResourceKey(rawResource)
+        ? rawResource
+        : undefined,
+    upgradeMessage:
+      typeof rawMessage === "string" && rawMessage.length > 0
+        ? rawMessage
+        : undefined,
+  };
 }

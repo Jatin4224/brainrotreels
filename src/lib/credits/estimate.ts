@@ -1,12 +1,4 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
- */
 
 /**
  * SOURCE OF TRUTH KEYWORDS: estimate, EstimateInput, CostBreakdown,
@@ -45,7 +37,7 @@ import {
   type CostBreakdown,
   type CostLine,
   type CreditableKind,
-} from '@/lib/types/credits'
+} from "@/lib/types/credits";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: PLACEHOLDER_CREDIT_RATES, CREDIT_RATES
@@ -93,14 +85,14 @@ export const CREDIT_RATES = {
   },
   /** Multiplier applied to a render's per-second rate, by output size. */
   resolutionMultiplier: {
-    '720p': 1,
-    '1080p': 1.5,
+    "720p": 1,
+    "1080p": 1.5,
   },
   /** Each generated image, whatever produced it. */
   perAiImage: 4,
   /** Added per second of narration when a premium voice is used. */
   premiumVoiceSurchargePerSecond: 0.03,
-} as const
+} as const;
 
 /**
  * SOURCE OF TRUTH KEYWORDS: EstimateInput, ESTIMATE_TAKES_FACTS
@@ -117,15 +109,15 @@ export const CREDIT_RATES = {
  * WHERE: The single argument of estimate().
  */
 export interface EstimateInput {
-  kind: CreditableKind
+  kind: CreditableKind;
   /** Seconds of output. A render's video length, a TTS clip's narration. */
-  durationSeconds?: number
+  durationSeconds?: number;
   /** Only meaningful for `render`; ignored otherwise. */
-  resolution?: keyof typeof CREDIT_RATES.resolutionMultiplier
+  resolution?: keyof typeof CREDIT_RATES.resolutionMultiplier;
   /** Generated images this job will produce. */
-  aiImages?: number
+  aiImages?: number;
   /** Whether the narration uses a premium voice. */
-  premiumVoice?: boolean
+  premiumVoice?: boolean;
 }
 
 /**
@@ -138,66 +130,70 @@ export function estimate(input: EstimateInput): CostBreakdown {
   const {
     kind,
     durationSeconds = 0,
-    resolution = '1080p',
+    resolution = "1080p",
     aiImages = 0,
     premiumVoice = false,
-  } = input
+  } = input;
 
   /* Guarded rather than trusted. A negative duration is nonsense that would
    * produce a NEGATIVE line and therefore a job that PAYS the customer; a
    * non-finite one (a NaN arriving from a division by a zero frame rate) would
    * propagate silently all the way to a held amount of NaN. Both collapse to
    * the nothing-case, which charges the base rate and no more. */
-  const seconds = Number.isFinite(durationSeconds) && durationSeconds > 0 ? durationSeconds : 0
-  const images = Number.isFinite(aiImages) && aiImages > 0 ? Math.floor(aiImages) : 0
+  const seconds =
+    Number.isFinite(durationSeconds) && durationSeconds > 0
+      ? durationSeconds
+      : 0;
+  const images =
+    Number.isFinite(aiImages) && aiImages > 0 ? Math.floor(aiImages) : 0;
 
-  const lines: { label: string; credits: number }[] = []
+  const lines: { label: string; credits: number }[] = [];
 
-  const base = CREDIT_RATES.base[kind]
+  const base = CREDIT_RATES.base[kind];
   if (base > 0) {
-    lines.push({ label: LABELS[kind], credits: base })
+    lines.push({ label: LABELS[kind], credits: base });
   }
 
   if (seconds > 0) {
     const multiplier =
-      kind === 'render' ? CREDIT_RATES.resolutionMultiplier[resolution] : 1
-    const perSecond = CREDIT_RATES.perSecond[kind] * multiplier
+      kind === "render" ? CREDIT_RATES.resolutionMultiplier[resolution] : 1;
+    const perSecond = CREDIT_RATES.perSecond[kind] * multiplier;
     if (perSecond > 0) {
       lines.push({
         label:
-          kind === 'render'
+          kind === "render"
             ? `${formatSeconds(seconds)} at ${resolution}`
             : formatSeconds(seconds),
         credits: perSecond * seconds,
-      })
+      });
     }
   }
 
   if (images > 0) {
     lines.push({
-      label: `${images} generated image${images === 1 ? '' : 's'}`,
+      label: `${images} generated image${images === 1 ? "" : "s"}`,
       credits: CREDIT_RATES.perAiImage * images,
-    })
+    });
   }
 
   if (premiumVoice && seconds > 0) {
     lines.push({
-      label: 'Premium voice',
+      label: "Premium voice",
       credits: CREDIT_RATES.premiumVoiceSurchargePerSecond * seconds,
-    })
+    });
   }
 
   /* ESTIMATE_ROUNDS_UP — once, at the end, over the real sum. Rounding each
    * line first would turn three 0.4s into 3 credits instead of 2. The LINES
    * are rounded for display only, after the total is already decided, so they
    * always add up to something a customer can check. */
-  const exactTotal = lines.reduce((sum, line) => sum + line.credits, 0)
-  const total = Math.ceil(exactTotal)
+  const exactTotal = lines.reduce((sum, line) => sum + line.credits, 0);
+  const total = Math.ceil(exactTotal);
 
   return {
     total,
     lines: roundLinesToTotal(lines, total),
-  }
+  };
 }
 
 /**
@@ -213,33 +209,33 @@ export function estimate(input: EstimateInput): CostBreakdown {
  *        src/inngest/functions/project-render.ts.
  */
 export function estimateRenderCost(args: {
-  durationSeconds: number
-  resolution: keyof typeof CREDIT_RATES.resolutionMultiplier
+  durationSeconds: number;
+  resolution: keyof typeof CREDIT_RATES.resolutionMultiplier;
 }): CostBreakdown {
   return estimate({
-    kind: 'render',
+    kind: "render",
     durationSeconds: args.durationSeconds,
     resolution: args.resolution,
-  })
+  });
 }
 
 /* The customer-facing name of each kind. Separate from the union so renaming
  * what a customer sees is not a schema change. */
 const LABELS: Readonly<Record<CreditableKind, string>> = {
-  render: 'Render',
-  script: 'Script generation',
-  tts: 'Narration',
-  alignment: 'Caption timing',
-  footage: 'Generated footage',
-}
+  render: "Render",
+  script: "Script generation",
+  tts: "Narration",
+  alignment: "Caption timing",
+  footage: "Generated footage",
+};
 
 function formatSeconds(seconds: number): string {
   /* Whole seconds under a minute, m:ss above — a 95-second render reading
    * "95s" is correct and reads as an error. */
-  if (seconds < 60) return `${Math.round(seconds)}s`
-  const minutes = Math.floor(seconds / 60)
-  const rest = Math.round(seconds % 60)
-  return `${minutes}m ${String(rest).padStart(2, '0')}s`
+  if (seconds < 60) return `${Math.round(seconds)}s`;
+  const minutes = Math.floor(seconds / 60);
+  const rest = Math.round(seconds % 60);
+  return `${minutes}m ${String(rest).padStart(2, "0")}s`;
 }
 
 /**
@@ -260,32 +256,36 @@ function roundLinesToTotal(
   lines: readonly { label: string; credits: number }[],
   total: number,
 ): CostLine[] {
-  if (lines.length === 0) return []
+  if (lines.length === 0) return [];
 
   const rounded: CostLine[] = lines.map((line) => ({
     label: line.label,
     credits: Math.max(0, Math.round(line.credits)),
-  }))
+  }));
 
-  const drift = total - rounded.reduce((sum, line) => sum + line.credits, 0)
-  if (drift === 0) return rounded
+  const drift = total - rounded.reduce((sum, line) => sum + line.credits, 0);
+  if (drift === 0) return rounded;
 
-  let largestIndex = 0
+  let largestIndex = 0;
   for (let i = 1; i < rounded.length; i += 1) {
-    const candidate = rounded[i]
-    const current = rounded[largestIndex]
-    if (candidate !== undefined && current !== undefined && candidate.credits > current.credits) {
-      largestIndex = i
+    const candidate = rounded[i];
+    const current = rounded[largestIndex];
+    if (
+      candidate !== undefined &&
+      current !== undefined &&
+      candidate.credits > current.credits
+    ) {
+      largestIndex = i;
     }
   }
 
-  const target = rounded[largestIndex]
+  const target = rounded[largestIndex];
   if (target !== undefined) {
     rounded[largestIndex] = {
       label: target.label,
       credits: Math.max(0, target.credits + drift),
-    }
+    };
   }
 
-  return rounded
+  return rounded;
 }

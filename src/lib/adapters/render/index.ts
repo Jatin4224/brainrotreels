@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -31,10 +25,10 @@
  * WHERE: src/inngest/functions/project-render.ts.
  */
 
-import 'server-only'
+import "server-only";
 
-import { RENDER_PROVIDER } from './provider'
-import type { RenderAdapter } from './types'
+import { RENDER_PROVIDER } from "./provider";
+import type { RenderAdapter } from "./types";
 
 export type {
   RenderAdapter,
@@ -42,30 +36,32 @@ export type {
   RenderProgressResult,
   RenderProviderId,
   RenderStartResult,
-} from './types'
-export { RENDER_PROVIDER_IDS, RenderProviderError } from './types'
-export { RENDER_PROVIDER, DEFAULT_RENDER_PROVIDER } from './provider'
+} from "./types";
+export { RENDER_PROVIDER_IDS, RenderProviderError } from "./types";
+export { RENDER_PROVIDER, DEFAULT_RENDER_PROVIDER } from "./provider";
 
-let adapterPromise: Promise<RenderAdapter> | null = null
+let adapterPromise: Promise<RenderAdapter> | null = null;
 
 async function loadAdapter(): Promise<RenderAdapter> {
   /* Exhaustive over RenderProviderId — a new id without a case here is a
    * compile error at the `never` branch. */
   switch (RENDER_PROVIDER) {
-    case 'lambda': {
-      const mod = await import('./lambda')
-      return mod.lambdaRenderAdapter
+    case "lambda": {
+      const mod = await import("./lambda");
+      return mod.lambdaRenderAdapter;
     }
     default: {
-      const exhaustive: never = RENDER_PROVIDER
-      throw new Error(`[adapters/render] No adapter registered for "${String(exhaustive)}".`)
+      const exhaustive: never = RENDER_PROVIDER;
+      throw new Error(
+        `[adapters/render] No adapter registered for "${String(exhaustive)}".`,
+      );
     }
   }
 }
 
 export async function getRenderAdapter(): Promise<RenderAdapter> {
   if (!adapterPromise) {
-    adapterPromise = loadAdapter()
+    adapterPromise = loadAdapter();
   }
-  return adapterPromise
+  return adapterPromise;
 }

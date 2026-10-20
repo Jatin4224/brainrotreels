@@ -1,14 +1,8 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
-import 'server-only'
+import "server-only";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: resolveExistingStripeCustomerId, ensureStripeCustomer,
@@ -27,10 +21,10 @@ import 'server-only'
  *        getStripeClient and to Prisma for the customer handle + subscription.
  */
 
-import { cache } from 'react'
+import { cache } from "react";
 
-import { getStripeClient, isStripeConfigured } from '@/lib/config/stripe'
-import { prisma } from '@/lib/config/prisma'
+import { getStripeClient, isStripeConfigured } from "@/lib/config/stripe";
+import { prisma } from "@/lib/config/prisma";
 import {
   PLANS,
   PLAN_ORDER,
@@ -38,16 +32,16 @@ import {
   isPaidPlan,
   type BillingInterval,
   type PlanKey,
-} from '@/lib/config/plans'
-import type { AvailablePlan, PlanPrice } from '@/lib/types'
+} from "@/lib/config/plans";
+import type { AvailablePlan, PlanPrice } from "@/lib/types";
 
 export interface PaymentMethodSummary {
-  id: string
-  brand: string | null
-  last4: string | null
-  expMonth: number | null
-  expYear: number | null
-  isDefault: boolean
+  id: string;
+  brand: string | null;
+  last4: string | null;
+  expMonth: number | null;
+  expYear: number | null;
+  isDefault: boolean;
 }
 
 /**
@@ -58,20 +52,20 @@ export interface PaymentMethodSummary {
  * WHERE: Used by ensureStripeCustomer and payment-method reads.
  */
 export async function resolveExistingStripeCustomerId(
-  organizationId: string
+  organizationId: string,
 ): Promise<string | null> {
   const org = await prisma.organization.findUnique({
     where: { id: organizationId },
     select: { stripeCustomerId: true },
-  })
-  if (org?.stripeCustomerId) return org.stripeCustomerId
+  });
+  if (org?.stripeCustomerId) return org.stripeCustomerId;
 
   const subscription = await prisma.subscription.findFirst({
     where: { referenceId: organizationId, stripeCustomerId: { not: null } },
-    orderBy: { createdAt: 'desc' },
+    orderBy: { createdAt: "desc" },
     select: { stripeCustomerId: true },
-  })
-  return subscription?.stripeCustomerId ?? null
+  });
+  return subscription?.stripeCustomerId ?? null;
 }
 
 /**
@@ -83,18 +77,18 @@ export async function resolveExistingStripeCustomerId(
  */
 export async function ensureStripeCustomer(
   organizationId: string,
-  params: { email: string; name: string }
+  params: { email: string; name: string },
 ): Promise<string> {
-  const stripe = getStripeClient()
-  const existing = await resolveExistingStripeCustomerId(organizationId)
+  const stripe = getStripeClient();
+  const existing = await resolveExistingStripeCustomerId(organizationId);
   if (existing) {
     /* Verify the customer still exists in Stripe — it may have been deleted in
      * the dashboard, leaving a stale id on the org/subscription. If so, fall
      * through and create a fresh one. */
     try {
-      const customer = await stripe.customers.retrieve(existing)
-      const isDeleted = 'deleted' in customer && customer.deleted === true
-      if (!isDeleted) return existing
+      const customer = await stripe.customers.retrieve(existing);
+      const isDeleted = "deleted" in customer && customer.deleted === true;
+      if (!isDeleted) return existing;
     } catch {
       /* Not found / retrieval failed — create a fresh customer below. */
     }
@@ -104,13 +98,13 @@ export async function ensureStripeCustomer(
     email: params.email,
     name: params.name,
     metadata: { organizationId },
-  })
+  });
 
   await prisma.organization.update({
     where: { id: organizationId },
     data: { stripeCustomerId: customer.id },
-  })
-  return customer.id
+  });
+  return customer.id;
 }
 
 /**
@@ -120,21 +114,22 @@ export async function ensureStripeCustomer(
  * WHERE: billing.getPaymentMethods.
  */
 export async function listPaymentMethods(
-  organizationId: string
+  organizationId: string,
 ): Promise<PaymentMethodSummary[]> {
-  const customerId = await resolveExistingStripeCustomerId(organizationId)
-  if (!customerId) return []
+  const customerId = await resolveExistingStripeCustomerId(organizationId);
+  if (!customerId) return [];
 
-  const stripe = getStripeClient()
+  const stripe = getStripeClient();
   const [customer, methods] = await Promise.all([
     stripe.customers.retrieve(customerId),
-    stripe.paymentMethods.list({ customer: customerId, type: 'card' }),
-  ])
+    stripe.paymentMethods.list({ customer: customerId, type: "card" }),
+  ]);
 
   const defaultId =
-    !('deleted' in customer) && typeof customer.invoice_settings?.default_payment_method === 'string'
+    !("deleted" in customer) &&
+    typeof customer.invoice_settings?.default_payment_method === "string"
       ? customer.invoice_settings.default_payment_method
-      : null
+      : null;
 
   return methods.data.map((pm) => ({
     id: pm.id,
@@ -143,7 +138,7 @@ export async function listPaymentMethods(
     expMonth: pm.card?.exp_month ?? null,
     expYear: pm.card?.exp_year ?? null,
     isDefault: pm.id === defaultId,
-  }))
+  }));
 }
 
 /**
@@ -156,14 +151,14 @@ export async function listPaymentMethods(
 export async function attachPaymentMethod(
   customerId: string,
   paymentMethodId: string,
-  makeDefault: boolean
+  makeDefault: boolean,
 ): Promise<void> {
-  const stripe = getStripeClient()
-  await stripe.paymentMethods.attach(paymentMethodId, { customer: customerId })
+  const stripe = getStripeClient();
+  await stripe.paymentMethods.attach(paymentMethodId, { customer: customerId });
   if (makeDefault) {
     await stripe.customers.update(customerId, {
       invoice_settings: { default_payment_method: paymentMethodId },
-    })
+    });
   }
 }
 
@@ -174,12 +169,12 @@ export async function attachPaymentMethod(
  */
 export async function setDefaultPaymentMethod(
   customerId: string,
-  paymentMethodId: string
+  paymentMethodId: string,
 ): Promise<void> {
-  const stripe = getStripeClient()
+  const stripe = getStripeClient();
   await stripe.customers.update(customerId, {
     invoice_settings: { default_payment_method: paymentMethodId },
-  })
+  });
 }
 
 /**
@@ -196,17 +191,17 @@ export async function setDefaultPaymentMethod(
  */
 export async function detachPaymentMethod(
   customerId: string,
-  paymentMethodId: string
+  paymentMethodId: string,
 ): Promise<boolean> {
-  const stripe = getStripeClient()
-  const paymentMethod = await stripe.paymentMethods.retrieve(paymentMethodId)
+  const stripe = getStripeClient();
+  const paymentMethod = await stripe.paymentMethods.retrieve(paymentMethodId);
   const ownerCustomerId =
-    typeof paymentMethod.customer === 'string'
+    typeof paymentMethod.customer === "string"
       ? paymentMethod.customer
-      : paymentMethod.customer?.id ?? null
-  if (ownerCustomerId !== customerId) return false
-  await stripe.paymentMethods.detach(paymentMethodId)
-  return true
+      : (paymentMethod.customer?.id ?? null);
+  if (ownerCustomerId !== customerId) return false;
+  await stripe.paymentMethods.detach(paymentMethodId);
+  return true;
 }
 
 /**
@@ -218,8 +213,8 @@ export async function detachPaymentMethod(
 export async function getOrganizationSubscription(organizationId: string) {
   return prisma.subscription.findFirst({
     where: { referenceId: organizationId },
-    orderBy: { createdAt: 'desc' },
-  })
+    orderBy: { createdAt: "desc" },
+  });
 }
 
 /**
@@ -251,46 +246,47 @@ export const listPlanPrices = cache(async (): Promise<AvailablePlan[]> => {
    * loading window, and without the TTL that would be one provider round trip
    * per configured price PER PAGE LOAD. Prices change on the order of months;
    * five minutes of staleness costs nothing and a redeploy clears it. */
-  const now = Date.now()
-  if (planPriceCache && planPriceCache.expiresAt > now) return planPriceCache.value
+  const now = Date.now();
+  if (planPriceCache && planPriceCache.expiresAt > now)
+    return planPriceCache.value;
 
-  const plans = await fetchPlanPrices()
-  planPriceCache = { expiresAt: now + PLAN_PRICE_TTL_MS, value: plans }
-  return plans
-})
+  const plans = await fetchPlanPrices();
+  planPriceCache = { expiresAt: now + PLAN_PRICE_TTL_MS, value: plans };
+  return plans;
+});
 
-const PLAN_PRICE_TTL_MS = 5 * 60 * 1000
-let planPriceCache: { expiresAt: number; value: AvailablePlan[] } | null = null
+const PLAN_PRICE_TTL_MS = 5 * 60 * 1000;
+let planPriceCache: { expiresAt: number; value: AvailablePlan[] } | null = null;
 
 async function fetchPlanPrices(): Promise<AvailablePlan[]> {
-  const configured = isStripeConfigured()
-  const stripe = configured ? getStripeClient() : null
+  const configured = isStripeConfigured();
+  const stripe = configured ? getStripeClient() : null;
 
   /* One retrieve per configured price id, all in flight together. A price that
    * no longer exists in the account resolves to null rather than rejecting the
    * whole grid. */
   const readPrice = async (
     plan: PlanKey,
-    interval: BillingInterval
+    interval: BillingInterval,
   ): Promise<PlanPrice | null> => {
-    const priceId = getPlanPriceId(plan, interval)
-    if (!priceId || !stripe) return null
+    const priceId = getPlanPriceId(plan, interval);
+    if (!priceId || !stripe) return null;
     try {
-      const price = await stripe.prices.retrieve(priceId)
-      if (price.unit_amount === null) return null
-      return { amount: price.unit_amount, currency: price.currency, interval }
+      const price = await stripe.prices.retrieve(priceId);
+      if (price.unit_amount === null) return null;
+      return { amount: price.unit_amount, currency: price.currency, interval };
     } catch {
-      return null
+      return null;
     }
-  }
+  };
 
   return Promise.all(
     PLAN_ORDER.map(async (plan): Promise<AvailablePlan> => {
-      const def = PLANS[plan]
+      const def = PLANS[plan];
       const [monthlyPrice, yearlyPrice] = await Promise.all([
-        readPrice(plan, 'monthly'),
-        readPrice(plan, 'yearly'),
-      ])
+        readPrice(plan, "monthly"),
+        readPrice(plan, "yearly"),
+      ]);
       return {
         key: plan,
         name: def.name,
@@ -301,7 +297,7 @@ async function fetchPlanPrices(): Promise<AvailablePlan[]> {
         isFree: !isPaidPlan(plan),
         monthlyPrice,
         yearlyPrice,
-      }
-    })
-  )
+      };
+    }),
+  );
 }

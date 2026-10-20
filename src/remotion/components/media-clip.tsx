@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -44,10 +38,15 @@
  *        items and by overlay items whose render is `media`.
  */
 
-import { Loop, OffthreadVideo, useCurrentFrame, useVideoConfig } from 'remotion'
-import { z } from 'zod'
+import {
+  Loop,
+  OffthreadVideo,
+  useCurrentFrame,
+  useVideoConfig,
+} from "remotion";
+import { z } from "zod";
 
-import type { RenderItemProps } from '@/lib/types'
+import type { RenderItemProps } from "@/lib/types";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: mediaClipPropsSchema, PARSE_AT_THE_COMPONENT
@@ -68,7 +67,7 @@ import type { RenderItemProps } from '@/lib/types'
  */
 const mediaClipPropsSchema = z.object({
   assetId: z.string().min(1).optional(),
-  fit: z.enum(['cover', 'contain', 'fill']).default('cover'),
+  fit: z.enum(["cover", "contain", "fill"]).default("cover"),
   loop: z.boolean().default(false),
   muted: z.boolean().default(true),
   gain: z.number().min(0).max(4).optional(),
@@ -93,65 +92,67 @@ const mediaClipPropsSchema = z.object({
     .partial()
     .passthrough()
     .optional(),
-})
+});
 
 /** How much a Ken Burns drift scales by over the item's whole span. 8% is
  *  enough to read as motion on a phone without turning into a zoom. */
-const KEN_BURNS_DEFAULT_SCALE = 1.08
+const KEN_BURNS_DEFAULT_SCALE = 1.08;
 
 export function MediaClip({ item, assets, frames, canvas }: RenderItemProps) {
-  const frame = useCurrentFrame()
-  const { fps } = useVideoConfig()
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
 
-  const parsed = mediaClipPropsSchema.safeParse(item)
-  if (!parsed.success) return null
+  const parsed = mediaClipPropsSchema.safeParse(item);
+  if (!parsed.success) return null;
 
-  const { assetId, fit, loop, muted, gain, box, props } = parsed.data
-  if (assetId === undefined) return null
+  const { assetId, fit, loop, muted, gain, box, props } = parsed.data;
+  if (assetId === undefined) return null;
 
-  const asset = assets[assetId]
+  const asset = assets[assetId];
   /* MISSING_ASSET_DRAWS_NOTHING — see the file header. */
-  if (asset === undefined || asset.url === null) return null
+  if (asset === undefined || asset.url === null) return null;
 
-  const url = asset.url
+  const url = asset.url;
 
   /* An overlay's box is normalized (1 = full width), so it becomes pixels
    * here — the one place the canvas size enters the component. A video item
    * has no box and fills the frame. */
   const layout: React.CSSProperties =
     box === undefined
-      ? { position: 'absolute', inset: 0 }
+      ? { position: "absolute", inset: 0 }
       : {
-          position: 'absolute',
+          position: "absolute",
           left: box.x * canvas.width,
           top: box.y * canvas.height,
           width: box.w * canvas.width,
           ...(box.h !== undefined ? { height: box.h * canvas.height } : {}),
-        }
+        };
 
   /* KEN_BURNS — a linear drift computed from the frame, so it is a pure
    * function of time and identical on every run. Deliberately linear rather
    * than eased: an eased drift needs an easing curve in the document to be
    * reproducible, and that belongs to Phase 16's motion work. */
-  const kenBurns = props?.kenBurns === true
-  const scaleTo = props?.kenBurnsScale ?? KEN_BURNS_DEFAULT_SCALE
+  const kenBurns = props?.kenBurns === true;
+  const scaleTo = props?.kenBurnsScale ?? KEN_BURNS_DEFAULT_SCALE;
   /* `frame` is already item-relative — the walker mounts this inside the
    * item's own Sequence (FRAMES_ARE_RELATIVE_INSIDE on RenderItemProps), so
    * subtracting `frames.from` here would push every progress negative. */
   const progress =
     frames.durationInFrames <= 1
       ? 0
-      : Math.min(1, Math.max(0, frame / (frames.durationInFrames - 1)))
-  const transform = kenBurns ? `scale(${1 + (scaleTo - 1) * progress})` : undefined
+      : Math.min(1, Math.max(0, frame / (frames.durationInFrames - 1)));
+  const transform = kenBurns
+    ? `scale(${1 + (scaleTo - 1) * progress})`
+    : undefined;
 
   const mediaStyle: React.CSSProperties = {
-    width: '100%',
-    height: '100%',
+    width: "100%",
+    height: "100%",
     objectFit: fit,
     ...(transform !== undefined ? { transform } : {}),
-  }
+  };
 
-  if (asset.kind === 'image') {
+  if (asset.kind === "image") {
     return (
       <div style={layout}>
         {/* A plain <img>, not next/image: this tree is rendered by Remotion's
@@ -160,23 +161,31 @@ export function MediaClip({ item, assets, frames, canvas }: RenderItemProps) {
         {/* eslint-disable-next-line @next/next/no-img-element -- see above */}
         <img src={url} alt="" style={mediaStyle} />
       </div>
-    )
+    );
   }
 
   /* LOOP_VIA_REMOTION_LOOP. Without a known source length there is nothing to
    * loop against (LOOP_IS_A_MODULO), so the clip plays once and holds. */
-  const sourceLength = asset.durationInSeconds
+  const sourceLength = asset.durationInSeconds;
   const shouldLoop =
-    loop && sourceLength !== undefined && sourceLength > 0 && frames.durationInFrames / fps > sourceLength
+    loop &&
+    sourceLength !== undefined &&
+    sourceLength > 0 &&
+    frames.durationInFrames / fps > sourceLength;
 
-  const volume = muted ? 0 : (gain ?? 1)
+  const volume = muted ? 0 : (gain ?? 1);
 
   if (!shouldLoop) {
     return (
       <div style={layout}>
-        <OffthreadVideo src={url} muted={muted} volume={volume} style={mediaStyle} />
+        <OffthreadVideo
+          src={url}
+          muted={muted}
+          volume={volume}
+          style={mediaStyle}
+        />
       </div>
-    )
+    );
   }
 
   /* Remotion's own <Loop>, not a hand-rolled list of sequences and not the
@@ -185,13 +194,18 @@ export function MediaClip({ item, assets, frames, canvas }: RenderItemProps) {
    * number — the element's own `loop` has an internal playhead that Remotion's
    * out-of-order frame rendering cannot rely on. It also trims the final
    * repetition to the parent sequence for free. */
-  const sourceFrames = Math.max(1, Math.round(sourceLength * fps))
+  const sourceFrames = Math.max(1, Math.round(sourceLength * fps));
 
   return (
     <div style={layout}>
       <Loop durationInFrames={sourceFrames} layout="none">
-        <OffthreadVideo src={url} muted={muted} volume={volume} style={mediaStyle} />
+        <OffthreadVideo
+          src={url}
+          muted={muted}
+          volume={volume}
+          style={mediaStyle}
+        />
       </Loop>
     </div>
-  )
+  );
 }

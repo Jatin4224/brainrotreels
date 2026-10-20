@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -18,23 +12,24 @@
  *        getClientIp from src/lib/rate-limit.ts.
  */
 
-import 'server-only'
-import { headers } from 'next/headers'
-import { getClientIp } from '@/lib/rate-limit'
+import "server-only";
+import { headers } from "next/headers";
+import { getClientIp } from "@/lib/rate-limit";
 
 export interface ForensicData {
-  ipAddress: string | null
-  userAgent: string | null
+  ipAddress: string | null;
+  userAgent: string | null;
 }
 
 /* Audit-log forensic capture. ipAddress / userAgent are write-only — never
  * returned by service-layer selects (see AUDIT_LOG_SAFE_SELECT). */
 export async function getRequestForensics(): Promise<ForensicData> {
-  const requestHeaders = await headers()
-  const rawUserAgent = requestHeaders.get('user-agent')
-  const userAgent = rawUserAgent && rawUserAgent.length > 0 ? rawUserAgent : null
+  const requestHeaders = await headers();
+  const rawUserAgent = requestHeaders.get("user-agent");
+  const userAgent =
+    rawUserAgent && rawUserAgent.length > 0 ? rawUserAgent : null;
   return {
     ipAddress: getClientIp(requestHeaders),
     userAgent,
-  }
+  };
 }

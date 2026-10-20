@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -24,7 +18,7 @@
  * WHERE: <PricingCard /> via <UpgradeContent />, and useUpgradeNudge.
  */
 
-import type { AvailablePlan } from '@/lib/types'
+import type { AvailablePlan } from "@/lib/types";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: YearlySavings
@@ -33,9 +27,9 @@ import type { AvailablePlan } from '@/lib/types'
  * `amount` is in MINOR units, like every other price in the app.
  */
 export interface YearlySavings {
-  percent: number
-  amount: number
-  currency: string
+  percent: number;
+  amount: number;
+  currency: string;
 }
 
 /**
@@ -50,19 +44,19 @@ export interface YearlySavings {
  * WHERE: useUpgradeNudge (the money in the sidebar line) and calculateSavings.
  */
 export function getYearlySavings(plan: AvailablePlan): YearlySavings | null {
-  const monthly = plan.monthlyPrice
-  const yearly = plan.yearlyPrice
-  if (!monthly?.amount || !yearly?.amount) return null
+  const monthly = plan.monthlyPrice;
+  const yearly = plan.yearlyPrice;
+  if (!monthly?.amount || !yearly?.amount) return null;
 
-  const monthlyTotal = monthly.amount * 12
-  const amount = monthlyTotal - yearly.amount
-  if (amount <= 0) return null
+  const monthlyTotal = monthly.amount * 12;
+  const amount = monthlyTotal - yearly.amount;
+  if (amount <= 0) return null;
 
   return {
     amount,
     percent: Math.round((amount / monthlyTotal) * 100),
     currency: yearly.currency,
-  }
+  };
 }
 
 /**
@@ -72,5 +66,5 @@ export function getYearlySavings(plan: AvailablePlan): YearlySavings | null {
  * the pricing card hides its badge on 0, so it wants a number, not a null.
  */
 export function calculateSavings(plan: AvailablePlan): number {
-  return getYearlySavings(plan)?.percent ?? 0
+  return getYearlySavings(plan)?.percent ?? 0;
 }

@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -43,10 +37,10 @@
  *        (Phase 15). Reuses projectKindSchema from src/lib/types/project.
  */
 
-import { z } from 'zod'
+import { z } from "zod";
 
-import { jsonValueSchema } from '@/lib/types/json'
-import { projectKindSchema } from '@/lib/types/project'
+import { jsonValueSchema } from "@/lib/types/json";
+import { projectKindSchema } from "@/lib/types/project";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: TIMELINE_DOC_VERSION
@@ -57,17 +51,17 @@ import { projectKindSchema } from '@/lib/types/project'
  *        chain reaches exactly this number.
  * WHERE: migrate.ts, the generators, Timeline.docVersion in Prisma.
  */
-export const TIMELINE_DOC_VERSION = 4
+export const TIMELINE_DOC_VERSION = 4;
 
 /* Identifiers inside the document. Short and opaque — these are handles a
  * generator mints, not user-visible text. */
-const idSchema = z.string().trim().min(1).max(120)
+const idSchema = z.string().trim().min(1).max(120);
 
 /* Seconds, as a float. Negative is meaningless for a start and a duration of
  * zero is an item that cannot be seen, so both are refused in validate() with a
  * field-level error rather than here, where the message would be a raw zod
  * issue the editor cannot attach to a clip. */
-const secondsSchema = z.number().finite()
+const secondsSchema = z.number().finite();
 
 /**
  * SOURCE OF TRUTH KEYWORDS: WordAnchor, wordAnchorSchema, TimeValue,
@@ -84,13 +78,13 @@ const secondsSchema = z.number().finite()
 export const wordAnchorSchema = z.union([
   z.object({ wordIndex: z.number().int().min(0) }).strict(),
   z.object({ word: z.string().min(1) }).strict(),
-])
+]);
 
-export type WordAnchor = z.infer<typeof wordAnchorSchema>
+export type WordAnchor = z.infer<typeof wordAnchorSchema>;
 
-export const timeValueSchema = z.union([secondsSchema, wordAnchorSchema])
+export const timeValueSchema = z.union([secondsSchema, wordAnchorSchema]);
 
-export type TimeValue = z.infer<typeof timeValueSchema>
+export type TimeValue = z.infer<typeof timeValueSchema>;
 
 /**
  * SOURCE OF TRUTH KEYWORDS: TimingMode, timingModeSchema
@@ -103,9 +97,9 @@ export type TimeValue = z.infer<typeof timeValueSchema>
  * WHERE: Written by generators ('anchored') and by resolveWordAnchors()
  *        ('resolved'); read by validate() and by the renderer.
  */
-export const timingModeSchema = z.enum(['anchored', 'resolved'])
+export const timingModeSchema = z.enum(["anchored", "resolved"]);
 
-export type TimingMode = z.infer<typeof timingModeSchema>
+export type TimingMode = z.infer<typeof timingModeSchema>;
 
 /**
  * SOURCE OF TRUTH KEYWORDS: WordToken, wordTokenSchema
@@ -127,9 +121,9 @@ export const wordTokenSchema = z
     e: secondsSchema,
     speaker: idSchema.optional(),
   })
-  .strict()
+  .strict();
 
-export type WordToken = z.infer<typeof wordTokenSchema>
+export type WordToken = z.infer<typeof wordTokenSchema>;
 
 export const canvasSpecSchema = z
   .object({
@@ -137,9 +131,9 @@ export const canvasSpecSchema = z
     height: z.number().int().positive(),
     fps: z.number().int().positive().max(120),
   })
-  .strict()
+  .strict();
 
-export type CanvasSpec = z.infer<typeof canvasSpecSchema>
+export type CanvasSpec = z.infer<typeof canvasSpecSchema>;
 
 export const styleSpecSchema = z
   .object({
@@ -147,11 +141,11 @@ export const styleSpecSchema = z
     captionStyleId: idSchema,
     /* Which platform's UI chrome to stay clear of. Phase 08 turns this into
      * actual inset pixels; here it is only the choice. */
-    safeZone: z.enum(['tiktok', 'reels', 'shorts', 'none']),
+    safeZone: z.enum(["tiktok", "reels", "shorts", "none"]),
   })
-  .strict()
+  .strict();
 
-export type StyleSpec = z.infer<typeof styleSpecSchema>
+export type StyleSpec = z.infer<typeof styleSpecSchema>;
 
 /**
  * SOURCE OF TRUTH KEYWORDS: NormalizedBox, normalizedBoxSchema, CANVAS_BOUNDS
@@ -171,9 +165,9 @@ export const normalizedBoxSchema = z
     w: z.number().finite(),
     h: z.number().finite().optional(),
   })
-  .strict()
+  .strict();
 
-export type NormalizedBox = z.infer<typeof normalizedBoxSchema>
+export type NormalizedBox = z.infer<typeof normalizedBoxSchema>;
 
 /**
  * SOURCE OF TRUTH KEYWORDS: RENDER_KINDS, RenderKind, renderKindSchema
@@ -186,21 +180,21 @@ export type NormalizedBox = z.infer<typeof normalizedBoxSchema>
  * WHERE: Scene, video and overlay items. The renderer's switch (Phase 03).
  */
 export const RENDER_KINDS = [
-  'media',
-  'motion',
-  'quizCard',
-  'redditCard',
-  'characterOverlay',
-  'text',
-] as const
+  "media",
+  "motion",
+  "quizCard",
+  "redditCard",
+  "characterOverlay",
+  "text",
+] as const;
 
-export const renderKindSchema = z.enum(RENDER_KINDS)
+export const renderKindSchema = z.enum(RENDER_KINDS);
 
-export type RenderKind = z.infer<typeof renderKindSchema>
+export type RenderKind = z.infer<typeof renderKindSchema>;
 
 /* Editor-only label. Excluded from hashDoc() because renaming a track must not
  * invalidate a cached render — see CACHE_IRRELEVANT_FIELDS in hash.ts. */
-const labelSchema = z.string().trim().max(200).optional()
+const labelSchema = z.string().trim().max(200).optional();
 
 /* Every item shares these three. `start` and `duration` are TimeValues, which
  * is what makes the document two-formed. */
@@ -209,7 +203,7 @@ const itemBaseShape = {
   start: timeValueSchema,
   duration: timeValueSchema,
   label: labelSchema,
-}
+};
 
 export const sceneElementSchema = z
   .object({
@@ -223,18 +217,18 @@ export const sceneElementSchema = z
      * animation. Typed as JSON rather than `unknown`, which is banned. */
     props: z.record(z.string(), jsonValueSchema).optional(),
   })
-  .strict()
+  .strict();
 
-export type SceneElement = z.infer<typeof sceneElementSchema>
+export type SceneElement = z.infer<typeof sceneElementSchema>;
 
 export const sceneSpecSchema = z
   .object({
     layout: z.string().trim().min(1).max(60),
     elements: z.array(sceneElementSchema),
   })
-  .strict()
+  .strict();
 
-export type SceneSpec = z.infer<typeof sceneSpecSchema>
+export type SceneSpec = z.infer<typeof sceneSpecSchema>;
 
 /**
  * SOURCE OF TRUTH KEYWORDS: VideoItem, videoItemSchema
@@ -251,15 +245,15 @@ export const videoItemSchema = z
   .object({
     ...itemBaseShape,
     assetId: idSchema,
-    fit: z.enum(['cover', 'contain', 'fill']).default('cover'),
+    fit: z.enum(["cover", "contain", "fill"]).default("cover"),
     loop: z.boolean().default(false),
     muted: z.boolean().default(true),
     gain: z.number().min(0).max(4).optional(),
-    render: z.literal('media').default('media'),
+    render: z.literal("media").default("media"),
   })
-  .strict()
+  .strict();
 
-export type VideoItem = z.infer<typeof videoItemSchema>
+export type VideoItem = z.infer<typeof videoItemSchema>;
 
 /**
  * SOURCE OF TRUTH KEYWORDS: SceneItem, sceneItemSchema
@@ -276,9 +270,9 @@ export const sceneItemSchema = z
     render: renderKindSchema,
     scene: sceneSpecSchema,
   })
-  .strict()
+  .strict();
 
-export type SceneItem = z.infer<typeof sceneItemSchema>
+export type SceneItem = z.infer<typeof sceneItemSchema>;
 
 /**
  * SOURCE OF TRUTH KEYWORDS: AudioItem, audioItemSchema
@@ -298,9 +292,9 @@ export const audioItemSchema = z
     duck: z.boolean().default(false),
     loop: z.boolean().default(false),
   })
-  .strict()
+  .strict();
 
-export type AudioItem = z.infer<typeof audioItemSchema>
+export type AudioItem = z.infer<typeof audioItemSchema>;
 
 /**
  * SOURCE OF TRUTH KEYWORDS: CaptionItem, captionItemSchema, WORD_RANGE_NOT_TEXT
@@ -329,9 +323,9 @@ export const captionItemSchema = z
     start: timeValueSchema.optional(),
     duration: timeValueSchema.optional(),
   })
-  .strict()
+  .strict();
 
-export type CaptionItem = z.infer<typeof captionItemSchema>
+export type CaptionItem = z.infer<typeof captionItemSchema>;
 
 /**
  * SOURCE OF TRUTH KEYWORDS: OverlayItem, overlayItemSchema
@@ -347,16 +341,16 @@ export type CaptionItem = z.infer<typeof captionItemSchema>
 export const overlayItemSchema = z
   .object({
     ...itemBaseShape,
-    render: renderKindSchema.default('media'),
+    render: renderKindSchema.default("media"),
     z: z.number().int(),
     box: normalizedBoxSchema,
     assetId: idSchema.optional(),
     text: z.string().optional(),
     props: z.record(z.string(), jsonValueSchema).optional(),
   })
-  .strict()
+  .strict();
 
-export type OverlayItem = z.infer<typeof overlayItemSchema>
+export type OverlayItem = z.infer<typeof overlayItemSchema>;
 
 /**
  * SOURCE OF TRUTH KEYWORDS: TRACK_TYPES, TrackType, Track, trackSchema
@@ -368,55 +362,81 @@ export type OverlayItem = z.infer<typeof overlayItemSchema>
  *        repeated on every item.
  * WHERE: doc.tracks. Walked by the renderer in array order, bottom-most first.
  */
-export const TRACK_TYPES = ['video', 'scene', 'audio', 'caption', 'overlay'] as const
+export const TRACK_TYPES = [
+  "video",
+  "scene",
+  "audio",
+  "caption",
+  "overlay",
+] as const;
 
-export const trackTypeSchema = z.enum(TRACK_TYPES)
+export const trackTypeSchema = z.enum(TRACK_TYPES);
 
-export type TrackType = z.infer<typeof trackTypeSchema>
+export type TrackType = z.infer<typeof trackTypeSchema>;
 
 export const videoTrackSchema = z
-  .object({ id: idSchema, type: z.literal('video'), label: labelSchema, items: z.array(videoItemSchema) })
-  .strict()
+  .object({
+    id: idSchema,
+    type: z.literal("video"),
+    label: labelSchema,
+    items: z.array(videoItemSchema),
+  })
+  .strict();
 
 export const sceneTrackSchema = z
-  .object({ id: idSchema, type: z.literal('scene'), label: labelSchema, items: z.array(sceneItemSchema) })
-  .strict()
+  .object({
+    id: idSchema,
+    type: z.literal("scene"),
+    label: labelSchema,
+    items: z.array(sceneItemSchema),
+  })
+  .strict();
 
 export const audioTrackSchema = z
-  .object({ id: idSchema, type: z.literal('audio'), label: labelSchema, items: z.array(audioItemSchema) })
-  .strict()
+  .object({
+    id: idSchema,
+    type: z.literal("audio"),
+    label: labelSchema,
+    items: z.array(audioItemSchema),
+  })
+  .strict();
 
 export const captionTrackSchema = z
   .object({
     id: idSchema,
-    type: z.literal('caption'),
+    type: z.literal("caption"),
     label: labelSchema,
     /* Overrides doc.style.captionStyleId for this lane only — a second caption
      * track exists so a translation can be styled differently. */
     styleId: idSchema.optional(),
     items: z.array(captionItemSchema),
   })
-  .strict()
+  .strict();
 
 export const overlayTrackSchema = z
-  .object({ id: idSchema, type: z.literal('overlay'), label: labelSchema, items: z.array(overlayItemSchema) })
-  .strict()
+  .object({
+    id: idSchema,
+    type: z.literal("overlay"),
+    label: labelSchema,
+    items: z.array(overlayItemSchema),
+  })
+  .strict();
 
-export const trackSchema = z.discriminatedUnion('type', [
+export const trackSchema = z.discriminatedUnion("type", [
   videoTrackSchema,
   sceneTrackSchema,
   audioTrackSchema,
   captionTrackSchema,
   overlayTrackSchema,
-])
+]);
 
-export type Track = z.infer<typeof trackSchema>
+export type Track = z.infer<typeof trackSchema>;
 
-export type VideoTrack = z.infer<typeof videoTrackSchema>
-export type SceneTrack = z.infer<typeof sceneTrackSchema>
-export type AudioTrack = z.infer<typeof audioTrackSchema>
-export type CaptionTrack = z.infer<typeof captionTrackSchema>
-export type OverlayTrack = z.infer<typeof overlayTrackSchema>
+export type VideoTrack = z.infer<typeof videoTrackSchema>;
+export type SceneTrack = z.infer<typeof sceneTrackSchema>;
+export type AudioTrack = z.infer<typeof audioTrackSchema>;
+export type CaptionTrack = z.infer<typeof captionTrackSchema>;
+export type OverlayTrack = z.infer<typeof overlayTrackSchema>;
 
 /**
  * SOURCE OF TRUTH KEYWORDS: TrackItem, AnyTimedItem
@@ -427,7 +447,8 @@ export type OverlayTrack = z.infer<typeof overlayTrackSchema>
  *        `type`, never by sniffing fields.
  * WHERE: ops.ts, validate.ts, anchors.ts.
  */
-export type TrackItem = VideoItem | SceneItem | AudioItem | CaptionItem | OverlayItem
+export type TrackItem =
+  VideoItem | SceneItem | AudioItem | CaptionItem | OverlayItem;
 
 export const speakerSchema = z
   .object({
@@ -435,9 +456,9 @@ export const speakerSchema = z
     avatarId: idSchema.optional(),
     displayName: z.string().trim().max(120).optional(),
   })
-  .strict()
+  .strict();
 
-export type Speaker = z.infer<typeof speakerSchema>
+export type Speaker = z.infer<typeof speakerSchema>;
 
 /**
  * SOURCE OF TRUTH KEYWORDS: AssetRef, assetRefSchema, ASSET_HANDLE_INDIRECTION
@@ -455,15 +476,15 @@ export type Speaker = z.infer<typeof speakerSchema>
 export const assetRefSchema = z
   .object({
     assetId: idSchema,
-    kind: z.enum(['video', 'audio', 'image', 'font']),
-    license: z.enum(['owned', 'licensed', 'stock', 'generated', 'unknown']),
+    kind: z.enum(["video", "audio", "image", "font"]),
+    license: z.enum(["owned", "licensed", "stock", "generated", "unknown"]),
     durationInSeconds: z.number().positive().optional(),
     width: z.number().int().positive().optional(),
     height: z.number().int().positive().optional(),
   })
-  .strict()
+  .strict();
 
-export type AssetRef = z.infer<typeof assetRefSchema>
+export type AssetRef = z.infer<typeof assetRefSchema>;
 
 /**
  * SOURCE OF TRUTH KEYWORDS: timelineDocSchema, TimelineDoc
@@ -482,7 +503,7 @@ export const timelineDocSchema = z
   .object({
     version: z.literal(TIMELINE_DOC_VERSION),
     kind: projectKindSchema,
-    timing: timingModeSchema.default('anchored'),
+    timing: timingModeSchema.default("anchored"),
     canvas: canvasSpecSchema,
     style: styleSpecSchema,
     words: z.array(wordTokenSchema),
@@ -490,6 +511,6 @@ export const timelineDocSchema = z
     speakers: z.record(z.string(), speakerSchema),
     assets: z.record(z.string(), assetRefSchema),
   })
-  .strict()
+  .strict();
 
-export type TimelineDoc = z.infer<typeof timelineDocSchema>
+export type TimelineDoc = z.infer<typeof timelineDocSchema>;

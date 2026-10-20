@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -25,31 +19,35 @@
  * WHERE: Registered in src/inngest/functions/index.ts.
  */
 
-import { inngestClient } from '@/lib/adapters/jobs/inngest/client'
-import { currentPeriodStart, periodicResourceKeys } from '@/lib/usage-period'
-import { resetPeriodicUsage } from '@/services/usage.service'
+import { inngestClient } from "@/lib/adapters/jobs/inngest/client";
+import { currentPeriodStart, periodicResourceKeys } from "@/lib/usage-period";
+import { resetPeriodicUsage } from "@/services/usage.service";
 
 export const usageResetFunction = inngestClient.createFunction(
   {
-    id: 'usage-reset',
-    name: 'Reset periodic usage counters',
-    triggers: [{ cron: '0 * * * *' }],
+    id: "usage-reset",
+    name: "Reset periodic usage counters",
+    triggers: [{ cron: "0 * * * *" }],
   },
   async ({ step }) => {
-    const resourceKeys = await step.run('collect-periodic-resources', () =>
+    const resourceKeys = await step.run("collect-periodic-resources", () =>
       periodicResourceKeys(),
-    )
+    );
 
     if (resourceKeys.length === 0) {
-      return { reset: 0, resources: [] }
+      return { reset: 0, resources: [] };
     }
 
-    const periodStart = currentPeriodStart()
+    const periodStart = currentPeriodStart();
 
-    const reset = await step.run('reset-counters', () =>
+    const reset = await step.run("reset-counters", () =>
       resetPeriodicUsage(resourceKeys, periodStart),
-    )
+    );
 
-    return { reset, resources: resourceKeys, periodStart: periodStart.toISOString() }
+    return {
+      reset,
+      resources: resourceKeys,
+      periodStart: periodStart.toISOString(),
+    };
   },
-)
+);

@@ -1,14 +1,8 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
-'use client'
+"use client";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: MediaRowActions, RenameAssetDialog, assets.update,
@@ -33,15 +27,15 @@
  * WHERE: Passed to <DataTable rowActions> by MediaTable.
  */
 
-import * as React from 'react'
-import { Loader2Icon, MoreHorizontal, Pencil, Trash2 } from 'lucide-react'
-import { toast } from 'sonner'
+import * as React from "react";
+import { Loader2Icon, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 
-import { trpc } from '@/trpc/react-provider'
-import { useActiveOrganization } from '@/hooks/use-active-organization'
-import { permissions } from '@/lib/permissions'
-import { assetFilenameSchema } from '@/lib/types'
-import { formatBytes } from '@/lib/resources'
+import { trpc } from "@/trpc/react-provider";
+import { useActiveOrganization } from "@/hooks/use-active-organization";
+import { permissions } from "@/lib/permissions";
+import { assetFilenameSchema } from "@/lib/types";
+import { formatBytes } from "@/lib/resources";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -51,8 +45,8 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
-import { Button } from '@/components/ui/button'
+} from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -60,50 +54,60 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog'
+} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 export interface MediaRowActionsProps {
-  organizationId: string
+  organizationId: string;
   asset: {
-    id: string
-    filename: string
-    bytes: number
-    organizationId: string | null
-  }
+    id: string;
+    filename: string;
+    bytes: number;
+    organizationId: string | null;
+  };
 }
 
-export function MediaRowActions({ organizationId, asset }: MediaRowActionsProps) {
-  const utils = trpc.useUtils()
-  const { hasPermission } = useActiveOrganization()
-  const [renaming, setRenaming] = React.useState(false)
-  const [confirmingDelete, setConfirmingDelete] = React.useState(false)
+export function MediaRowActions({
+  organizationId,
+  asset,
+}: MediaRowActionsProps) {
+  const utils = trpc.useUtils();
+  const { hasPermission } = useActiveOrganization();
+  const [renaming, setRenaming] = React.useState(false);
+  const [confirmingDelete, setConfirmingDelete] = React.useState(false);
 
-  const remove = trpc.assets.delete.useMutation()
+  const remove = trpc.assets.delete.useMutation();
 
-  const canUpdate = hasPermission(permissions.ASSETS_UPDATE)
-  const canDelete = hasPermission(permissions.ASSETS_DELETE)
+  const canUpdate = hasPermission(permissions.ASSETS_UPDATE);
+  const canDelete = hasPermission(permissions.ASSETS_DELETE);
 
   /* LIBRARY_ROWS_HAVE_NO_ACTIONS — see the file header. */
-  if (asset.organizationId === null) return null
-  if (!canUpdate && !canDelete) return null
+  if (asset.organizationId === null) return null;
+  if (!canUpdate && !canDelete) return null;
 
   async function handleDelete() {
     try {
-      await remove.mutateAsync({ organizationId, id: asset.id })
+      await remove.mutateAsync({ organizationId, id: asset.id });
       /* STORAGE_REFETCH_AFTER_DELETE — the list AND the quota. */
-      await Promise.all([utils.assets.list.invalidate(), utils.usage.invalidate()])
-      setConfirmingDelete(false)
-      toast.success(`"${asset.filename}" deleted · ${formatBytes(asset.bytes)} freed`)
+      await Promise.all([
+        utils.assets.list.invalidate(),
+        utils.usage.invalidate(),
+      ]);
+      setConfirmingDelete(false);
+      toast.success(
+        `"${asset.filename}" deleted · ${formatBytes(asset.bytes)} freed`,
+      );
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Could not delete this file.')
+      toast.error(
+        err instanceof Error ? err.message : "Could not delete this file.",
+      );
     }
   }
 
@@ -112,7 +116,11 @@ export function MediaRowActions({ organizationId, asset }: MediaRowActionsProps)
       <DropdownMenu>
         <DropdownMenuTrigger
           render={
-            <Button variant="ghost" size="icon" aria-label={`Actions for ${asset.filename}`}>
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label={`Actions for ${asset.filename}`}
+            >
               {remove.isPending ? (
                 <Loader2Icon className="size-4 animate-spin" />
               ) : (
@@ -152,31 +160,38 @@ export function MediaRowActions({ organizationId, asset }: MediaRowActionsProps)
       <AlertDialog open={confirmingDelete} onOpenChange={setConfirmingDelete}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete &ldquo;{asset.filename}&rdquo;?</AlertDialogTitle>
+            <AlertDialogTitle>
+              Delete &ldquo;{asset.filename}&rdquo;?
+            </AlertDialogTitle>
             <AlertDialogDescription>
               {/* Said plainly because it is true and surprising: the derived
                   versions go too, and any video already using this file will
                   lose it. There is no recycle bin. */}
-              The file and every version made from it are removed for good, and{' '}
-              {formatBytes(asset.bytes)} is returned to your storage. Projects using this
-              file will no longer be able to render it. This cannot be undone.
+              The file and every version made from it are removed for good, and{" "}
+              {formatBytes(asset.bytes)} is returned to your storage. Projects
+              using this file will no longer be able to render it. This cannot
+              be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={remove.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={remove.isPending}>
+              Cancel
+            </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDelete}
               disabled={remove.isPending}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {remove.isPending ? <Loader2Icon className="size-4 animate-spin" /> : null}
+              {remove.isPending ? (
+                <Loader2Icon className="size-4 animate-spin" />
+              ) : null}
               Delete file
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </>
-  )
+  );
 }
 
 /**
@@ -195,31 +210,39 @@ function RenameAssetDialog({
   asset,
   onClose,
 }: {
-  organizationId: string
-  asset: { id: string; filename: string }
-  onClose: () => void
+  organizationId: string;
+  asset: { id: string; filename: string };
+  onClose: () => void;
 }) {
-  const utils = trpc.useUtils()
-  const rename = trpc.assets.update.useMutation()
-  const [filename, setFilename] = React.useState(asset.filename)
-  const [error, setError] = React.useState<string | null>(null)
+  const utils = trpc.useUtils();
+  const rename = trpc.assets.update.useMutation();
+  const [filename, setFilename] = React.useState(asset.filename);
+  const [error, setError] = React.useState<string | null>(null);
 
-  const parsed = assetFilenameSchema.safeParse(filename)
-  const validationMessage = parsed.success ? null : (parsed.error.issues[0]?.message ?? null)
+  const parsed = assetFilenameSchema.safeParse(filename);
+  const validationMessage = parsed.success
+    ? null
+    : (parsed.error.issues[0]?.message ?? null);
 
   async function handleSave() {
     if (!parsed.success) {
-      setError(validationMessage)
-      return
+      setError(validationMessage);
+      return;
     }
-    setError(null)
+    setError(null);
     try {
-      await rename.mutateAsync({ organizationId, id: asset.id, filename: parsed.data })
-      await utils.assets.list.invalidate()
-      toast.success('File renamed')
-      onClose()
+      await rename.mutateAsync({
+        organizationId,
+        id: asset.id,
+        filename: parsed.data,
+      });
+      await utils.assets.list.invalidate();
+      toast.success("File renamed");
+      onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not rename this file.')
+      setError(
+        err instanceof Error ? err.message : "Could not rename this file.",
+      );
     }
   }
 
@@ -253,12 +276,16 @@ function RenameAssetDialog({
         </Button>
         <Button
           onClick={handleSave}
-          disabled={rename.isPending || !parsed.success || filename === asset.filename}
+          disabled={
+            rename.isPending || !parsed.success || filename === asset.filename
+          }
         >
-          {rename.isPending ? <Loader2Icon className="size-4 animate-spin" /> : null}
+          {rename.isPending ? (
+            <Loader2Icon className="size-4 animate-spin" />
+          ) : null}
           Save
         </Button>
       </DialogFooter>
     </DialogContent>
-  )
+  );
 }

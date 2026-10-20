@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -45,7 +39,7 @@
  *        Phase 08).
  */
 
-import { continueRender, delayRender, staticFile } from 'remotion'
+import { continueRender, delayRender, staticFile } from "remotion";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: RENDER_FONT_FAMILY
@@ -56,20 +50,20 @@ import { continueRender, delayRender, staticFile } from 'remotion'
  * as unstyled text during development, not as a system font that looks close
  * enough to ship.
  */
-export const RENDER_FONT_FAMILY = 'GeistRender'
+export const RENDER_FONT_FAMILY = "GeistRender";
 
 /* Mirrors the two weights copied into public/fonts. 400 for body, 700 for the
  * emphatic short-form text this product mostly draws. */
-const FACES: readonly { weight: '400' | '700'; file: string }[] = [
-  { weight: '400', file: 'fonts/geist-sans-400.woff2' },
-  { weight: '700', file: 'fonts/geist-sans-700.woff2' },
-]
+const FACES: readonly { weight: "400" | "700"; file: string }[] = [
+  { weight: "400", file: "fonts/geist-sans-400.woff2" },
+  { weight: "700", file: "fonts/geist-sans-700.woff2" },
+];
 
 /* Module-scoped so a composition that mounts repeatedly — which the Player
  * does on every prop change — registers each face once. `document.fonts.add`
  * is idempotent per FontFace object, not per family, so without this the set
  * grows on every remount. */
-let loaded = false
+let loaded = false;
 
 /**
  * SOURCE OF TRUTH KEYWORDS: loadRenderFonts, FONT_BLOCKS_THE_FIRST_FRAME
@@ -82,21 +76,26 @@ let loaded = false
  * WHERE: TimelineRenderer's body.
  */
 export function loadRenderFonts(): void {
-  if (loaded) return
-  if (typeof document === 'undefined' || typeof FontFace === 'undefined') return
-  loaded = true
+  if (loaded) return;
+  if (typeof document === "undefined" || typeof FontFace === "undefined")
+    return;
+  loaded = true;
 
-  const handle = delayRender(`Loading ${RENDER_FONT_FAMILY}`)
+  const handle = delayRender(`Loading ${RENDER_FONT_FAMILY}`);
 
   Promise.all(
     FACES.map(async ({ weight, file }) => {
-      const face = new FontFace(RENDER_FONT_FAMILY, `url(${staticFile(file)})`, {
-        weight,
-        style: 'normal',
-      })
-      await face.load()
-      document.fonts.add(face)
-    })
+      const face = new FontFace(
+        RENDER_FONT_FAMILY,
+        `url(${staticFile(file)})`,
+        {
+          weight,
+          style: "normal",
+        },
+      );
+      await face.load();
+      document.fonts.add(face);
+    }),
   )
     .then(() => continueRender(handle))
     .catch((error: unknown) => {
@@ -104,7 +103,10 @@ export function loadRenderFonts(): void {
        * outcome; a render stuck at 0% until a Lambda timeout is a worse one,
        * and it is the one that costs money without producing anything. The log
        * line is what makes the bad outcome diagnosable. */
-      console.error(`[remotion/fonts] Could not load ${RENDER_FONT_FAMILY}:`, error)
-      continueRender(handle)
-    })
+      console.error(
+        `[remotion/fonts] Could not load ${RENDER_FONT_FAMILY}:`,
+        error,
+      );
+      continueRender(handle);
+    });
 }

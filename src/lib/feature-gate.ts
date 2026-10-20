@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -32,8 +26,8 @@
  *        Tier comes from src/lib/adapters.
  */
 
-import { cache } from 'react'
-import { prisma } from '@/lib/config/prisma'
+import { cache } from "react";
+import { prisma } from "@/lib/config/prisma";
 import {
   RESOURCES,
   formatLimitValue,
@@ -45,38 +39,38 @@ import {
   type LimitResourceKey,
   type FlagResourceKey,
   type ResourceKey,
-} from '@/lib/resources'
-import { getAuthAdapter, type AdapterTier } from '@/lib/adapters'
-import { getUsageMetrics } from '@/services/usage.service'
-import { effectiveUsage } from './usage-period'
-import { PLAN_ORDER, type PlanKey } from '@/lib/config/plans'
+} from "@/lib/resources";
+import { getAuthAdapter, type AdapterTier } from "@/lib/adapters";
+import { getUsageMetrics } from "@/services/usage.service";
+import { effectiveUsage } from "./usage-period";
+import { PLAN_ORDER, type PlanKey } from "@/lib/config/plans";
 
 type FeatureGateCheckResult = {
-  allowed: boolean
-  reason?: string
-  currentUsage?: number
-  limit?: number
+  allowed: boolean;
+  reason?: string;
+  currentUsage?: number;
+  limit?: number;
   /* The plan the refusal was measured against, and the registry's own sentence
    * about what to do next. Both travel with the refusal so protectedProcedure
    * can put them on the structured error WITHOUT re-resolving the tier. */
-  plan: PlanKey
-  upgradeMessage: string
-}
+  plan: PlanKey;
+  upgradeMessage: string;
+};
 
 type UsageMetricsData = {
-  resourceKey: LimitResourceKey
-  currentUsage: number
-  limit: number | null
-  available: number | null
-  percentage: number | null
-}
+  resourceKey: LimitResourceKey;
+  currentUsage: number;
+  limit: number | null;
+  available: number | null;
+  percentage: number | null;
+};
 
 export type FeatureGateData = {
-  usage: number
-  limit: number | null
-  atLimit: boolean
-  isUnlimited: boolean
-  featureName: string
+  usage: number;
+  limit: number | null;
+  atLimit: boolean;
+  isUnlimited: boolean;
+  featureName: string;
   /**
    * SOURCE OF TRUTH KEYWORDS: upgradeMessage, UPGRADE_COPY_FROM_REGISTRY
    *
@@ -87,8 +81,8 @@ export type FeatureGateData = {
    * next plan client-side. Written once on the registry entry; see
    * getUpgradeMessage in src/lib/resources.ts.
    */
-  upgradeMessage: string
-}
+  upgradeMessage: string;
+};
 
 /**
  * SOURCE OF TRUTH KEYWORDS: OrganizationTier
@@ -100,7 +94,7 @@ export type FeatureGateData = {
  *        provider issues a different kind of id.
  * WHERE: Returned by getOrganizationTier; consumed by the billing router.
  */
-export type OrganizationTier = AdapterTier
+export type OrganizationTier = AdapterTier;
 
 /**
  * SOURCE OF TRUTH KEYWORDS: getOrganizationTier, PROVIDER_NEUTRAL_ENTITLEMENT
@@ -119,46 +113,52 @@ export type OrganizationTier = AdapterTier
  */
 export const getOrganizationTier = cache(
   async (organizationId: string): Promise<OrganizationTier> => {
-    const adapter = await getAuthAdapter()
-    return adapter.entitlement.getTier(organizationId)
-  }
-)
+    const adapter = await getAuthAdapter();
+    return adapter.entitlement.getTier(organizationId);
+  },
+);
 
 const getAllUsageMetrics = cache(async (organizationId: string) => {
-  const tier = await getOrganizationTier(organizationId)
+  const tier = await getOrganizationTier(organizationId);
   const metrics = await prisma.usageMetrics.findMany({
     where: { organizationId },
-  })
+  });
 
-  const entries = LIMIT_RESOURCE_KEYS.map((resourceKey): [LimitResourceKey, UsageMetricsData] => {
-    const metric = metrics.find((m) => m.featureKey === resourceKey)
-    /* PERIODIC_USAGE — see checkFeatureGate. The UI must agree with the
-     * server's gate, so the same staleness rule is applied here. */
-    const currentUsage = effectiveUsage(
-      resourceKey,
-      metric?.currentUsage ?? 0,
-      metric?.lastResetAt,
-    )
-    const limit = getResourceLimitForPlan(resourceKey, tier.tier)
-    const isUnlimited = !Number.isFinite(limit)
-
-    return [
-      resourceKey,
-      {
+  const entries = LIMIT_RESOURCE_KEYS.map(
+    (resourceKey): [LimitResourceKey, UsageMetricsData] => {
+      const metric = metrics.find((m) => m.featureKey === resourceKey);
+      /* PERIODIC_USAGE — see checkFeatureGate. The UI must agree with the
+       * server's gate, so the same staleness rule is applied here. */
+      const currentUsage = effectiveUsage(
         resourceKey,
-        currentUsage,
-        limit: isUnlimited ? null : limit,
-        available: isUnlimited ? null : Math.max(0, limit - currentUsage),
-        percentage: isUnlimited || limit === 0 ? null : (currentUsage / limit) * 100,
-      },
-    ]
-  })
+        metric?.currentUsage ?? 0,
+        metric?.lastResetAt,
+      );
+      const limit = getResourceLimitForPlan(resourceKey, tier.tier);
+      const isUnlimited = !Number.isFinite(limit);
+
+      return [
+        resourceKey,
+        {
+          resourceKey,
+          currentUsage,
+          limit: isUnlimited ? null : limit,
+          available: isUnlimited ? null : Math.max(0, limit - currentUsage),
+          percentage:
+            isUnlimited || limit === 0 ? null : (currentUsage / limit) * 100,
+        },
+      ];
+    },
+  );
   /* `Object.fromEntries` returns `Record<string, UsageMetricsData>` — TS can't
    * narrow the key union from the input tuple type. The cast forges the key
    * back to LimitResourceKey, which is sound here because `entries` is built
    * from LIMIT_RESOURCE_KEYS (every key in the union, no extras). */
-  return Object.fromEntries(entries) as Record<LimitResourceKey, UsageMetricsData>
-})
+  return Object.fromEntries(entries) as Record<
+    LimitResourceKey,
+    UsageMetricsData
+  >;
+});
 
 /**
  * SOURCE OF TRUTH KEYWORDS: getFeatureGates, FeatureGateData
@@ -172,18 +172,19 @@ export const getFeatureGates = cache(async (organizationId: string) => {
   const [tierData, usageMetrics] = await Promise.all([
     getOrganizationTier(organizationId),
     getAllUsageMetrics(organizationId),
-  ])
+  ]);
 
-  const gates: Partial<Record<ResourceKey, FeatureGateData>> = {}
+  const gates: Partial<Record<ResourceKey, FeatureGateData>> = {};
 
   for (const resourceKey of LIMIT_RESOURCE_KEYS) {
-    const def = RESOURCES[resourceKey]
-    const metrics = usageMetrics[resourceKey]
-    const limit = getResourceLimitForPlan(resourceKey, tierData.tier)
-    const isUnlimited = !Number.isFinite(limit)
-    const usage = metrics?.currentUsage ?? 0
-    const blockedByTrial = tierData.isOnTrial && !def.limit.availableOnFreeTrial
-    const atLimit = blockedByTrial || (!isUnlimited && usage >= limit)
+    const def = RESOURCES[resourceKey];
+    const metrics = usageMetrics[resourceKey];
+    const limit = getResourceLimitForPlan(resourceKey, tierData.tier);
+    const isUnlimited = !Number.isFinite(limit);
+    const usage = metrics?.currentUsage ?? 0;
+    const blockedByTrial =
+      tierData.isOnTrial && !def.limit.availableOnFreeTrial;
+    const atLimit = blockedByTrial || (!isUnlimited && usage >= limit);
 
     gates[resourceKey] = {
       usage,
@@ -192,13 +193,13 @@ export const getFeatureGates = cache(async (organizationId: string) => {
       isUnlimited,
       featureName: def.name,
       upgradeMessage: getUpgradeMessage(resourceKey, tierData.tier),
-    }
+    };
   }
 
   for (const resourceKey of FLAG_RESOURCE_KEYS) {
-    const def = RESOURCES[resourceKey]
-    const enabled = getResourceFlagForPlan(resourceKey, tierData.tier)
-    const blockedByTrial = tierData.isOnTrial && !def.flag.availableOnFreeTrial
+    const def = RESOURCES[resourceKey];
+    const enabled = getResourceFlagForPlan(resourceKey, tierData.tier);
+    const blockedByTrial = tierData.isOnTrial && !def.flag.availableOnFreeTrial;
 
     gates[resourceKey] = {
       usage: 0,
@@ -207,7 +208,7 @@ export const getFeatureGates = cache(async (organizationId: string) => {
       isUnlimited: false,
       featureName: def.name,
       upgradeMessage: getUpgradeMessage(resourceKey, tierData.tier),
-    }
+    };
   }
 
   return {
@@ -215,8 +216,8 @@ export const getFeatureGates = cache(async (organizationId: string) => {
     planName: tierData.planName,
     isOnTrial: tierData.isOnTrial,
     gates,
-  }
-})
+  };
+});
 
 /**
  * SOURCE OF TRUTH KEYWORDS: checkFeatureGate
@@ -233,11 +234,11 @@ export const getFeatureGates = cache(async (organizationId: string) => {
 export async function checkFeatureGate(
   organizationId: string,
   resourceKey: LimitResourceKey,
-  incrementBy: number = 1
+  incrementBy: number = 1,
 ): Promise<FeatureGateCheckResult> {
-  const def = RESOURCES[resourceKey]
-  const tier = await getOrganizationTier(organizationId)
-  const upgradeMessage = getUpgradeMessage(resourceKey, tier.tier)
+  const def = RESOURCES[resourceKey];
+  const tier = await getOrganizationTier(organizationId);
+  const upgradeMessage = getUpgradeMessage(resourceKey, tier.tier);
 
   if (tier.isOnTrial && !def.limit.availableOnFreeTrial) {
     return {
@@ -245,13 +246,14 @@ export async function checkFeatureGate(
       reason: `${def.name} is not available during your free trial. Upgrade to a paid plan to access it.`,
       plan: tier.tier,
       upgradeMessage,
-    }
+    };
   }
 
-  const limit = getResourceLimitForPlan(resourceKey, tier.tier)
-  if (!Number.isFinite(limit)) return { allowed: true, plan: tier.tier, upgradeMessage }
+  const limit = getResourceLimitForPlan(resourceKey, tier.tier);
+  if (!Number.isFinite(limit))
+    return { allowed: true, plan: tier.tier, upgradeMessage };
 
-  const metrics = await getUsageMetrics(organizationId, resourceKey)
+  const metrics = await getUsageMetrics(organizationId, resourceKey);
   /* PERIODIC_USAGE: a counter from a closed window reads as zero. The
    * usage.reset cron tidies the rows, but the gate must be correct whether or
    * not it has run — a stalled cron would otherwise leave every customer on a
@@ -260,7 +262,7 @@ export async function checkFeatureGate(
     resourceKey,
     metrics?.currentUsage ?? 0,
     metrics?.lastResetAt,
-  )
+  );
 
   if (currentUsage + incrementBy > limit) {
     return {
@@ -270,10 +272,16 @@ export async function checkFeatureGate(
       limit,
       plan: tier.tier,
       upgradeMessage,
-    }
+    };
   }
 
-  return { allowed: true, currentUsage, limit, plan: tier.tier, upgradeMessage }
+  return {
+    allowed: true,
+    currentUsage,
+    limit,
+    plan: tier.tier,
+    upgradeMessage,
+  };
 }
 
 /**
@@ -291,17 +299,19 @@ export async function checkFeatureGate(
  */
 export async function checkBooleanFeature(
   organizationId: string,
-  resourceKey: FlagResourceKey
+  resourceKey: FlagResourceKey,
 ): Promise<{ enabled: boolean; plan: PlanKey; upgradeMessage: string }> {
-  const def = RESOURCES[resourceKey]
-  const tier = await getOrganizationTier(organizationId)
-  const upgradeMessage = getUpgradeMessage(resourceKey, tier.tier)
-  const blockedByTrial = tier.isOnTrial && !def.flag.availableOnFreeTrial
+  const def = RESOURCES[resourceKey];
+  const tier = await getOrganizationTier(organizationId);
+  const upgradeMessage = getUpgradeMessage(resourceKey, tier.tier);
+  const blockedByTrial = tier.isOnTrial && !def.flag.availableOnFreeTrial;
   return {
-    enabled: blockedByTrial ? false : getResourceFlagForPlan(resourceKey, tier.tier),
+    enabled: blockedByTrial
+      ? false
+      : getResourceFlagForPlan(resourceKey, tier.tier),
     plan: tier.tier,
     upgradeMessage,
-  }
+  };
 }
 
 /**
@@ -326,17 +336,17 @@ export async function checkBooleanFeature(
  *        the billing screen.
  */
 export interface DowngradeBlocker {
-  resource: ResourceKey
+  resource: ResourceKey;
   /** Display name from the registry entry. */
-  name: string
+  name: string;
   /** What the organization is using now, pre-formatted for display. */
-  current: string
+  current: string;
   /** What the target plan permits, pre-formatted, or null for a flag. */
-  allowed: string | null
+  allowed: string | null;
   /** How many units must go before the downgrade can proceed. Null for flags. */
-  excess: number | null
+  excess: number | null;
   /** True when the target plan drops the feature entirely rather than capping it. */
-  isFeatureLoss: boolean
+  isFeatureLoss: boolean;
 }
 
 /* Every limit resource whose usage exceeds what `plan` permits, in the shape the
@@ -346,15 +356,15 @@ export interface DowngradeBlocker {
  * LIMIT_RESOURCE_KEYS — it names no resource. */
 function collectLimitExcess(
   usageMetrics: Record<LimitResourceKey, UsageMetricsData>,
-  plan: PlanKey
+  plan: PlanKey,
 ): DowngradeBlocker[] {
-  const excess: DowngradeBlocker[] = []
+  const excess: DowngradeBlocker[] = [];
 
   for (const resourceKey of LIMIT_RESOURCE_KEYS) {
-    const def = RESOURCES[resourceKey]
-    const usage = usageMetrics[resourceKey]?.currentUsage ?? 0
-    const allowed = getResourceLimitForPlan(resourceKey, plan)
-    if (!Number.isFinite(allowed) || usage <= allowed) continue
+    const def = RESOURCES[resourceKey];
+    const usage = usageMetrics[resourceKey]?.currentUsage ?? 0;
+    const allowed = getResourceLimitForPlan(resourceKey, plan);
+    if (!Number.isFinite(allowed) || usage <= allowed) continue;
 
     excess.push({
       resource: resourceKey,
@@ -363,45 +373,52 @@ function collectLimitExcess(
       allowed: formatLimitValue(allowed, def.name, def.limit),
       excess: usage - allowed,
       isFeatureLoss: false,
-    })
+    });
   }
 
-  return excess
+  return excess;
 }
 
 export const getDowngradeBlockers = cache(
-  async (organizationId: string, targetPlan: PlanKey): Promise<DowngradeBlocker[]> => {
+  async (
+    organizationId: string,
+    targetPlan: PlanKey,
+  ): Promise<DowngradeBlocker[]> => {
     const [tier, usageMetrics] = await Promise.all([
       getOrganizationTier(organizationId),
       getAllUsageMetrics(organizationId),
-    ])
+    ]);
 
     /* Only a move DOWN can strand a tenant over its cap. */
-    if (PLAN_ORDER.indexOf(targetPlan) >= PLAN_ORDER.indexOf(tier.tier)) return []
+    if (PLAN_ORDER.indexOf(targetPlan) >= PLAN_ORDER.indexOf(tier.tier))
+      return [];
 
-    const blockers: DowngradeBlocker[] = collectLimitExcess(usageMetrics, targetPlan)
+    const blockers: DowngradeBlocker[] = collectLimitExcess(
+      usageMetrics,
+      targetPlan,
+    );
 
     for (const resourceKey of FLAG_RESOURCE_KEYS) {
-      const def = RESOURCES[resourceKey]
-      const haveNow = getResourceFlagForPlan(resourceKey, tier.tier)
-      const haveAfter = getResourceFlagForPlan(resourceKey, targetPlan)
+      const def = RESOURCES[resourceKey];
+      const haveNow = getResourceFlagForPlan(resourceKey, tier.tier);
+      const haveAfter = getResourceFlagForPlan(resourceKey, targetPlan);
       /* Losing a feature is not something the user can "clean up" — it is
        * surfaced so the consequence is explicit, not so it can be resolved. */
-      if (!haveNow || haveAfter) continue
+      if (!haveNow || haveAfter) continue;
 
       blockers.push({
         resource: resourceKey,
         name: def.name,
-        current: 'Included',
+        current: "Included",
         allowed: null,
         excess: null,
         isFeatureLoss: true,
-      })
+      });
     }
 
-    return blockers
-  }
-)
+    return blockers;
+  },
+);
 
 /**
  * SOURCE OF TRUTH KEYWORDS: DowngradeBlockerMap, getDowngradeBlockerMap,
@@ -422,7 +439,7 @@ export const getDowngradeBlockers = cache(
  * WHERE: Exposed through the usage router; consumed by <ChangePlanDialog />.
  *        ENFORCEMENT is separate and server-side, in billing.upgradeOrganization.
  */
-export type DowngradeBlockerMap = Partial<Record<PlanKey, DowngradeBlocker[]>>
+export type DowngradeBlockerMap = Partial<Record<PlanKey, DowngradeBlocker[]>>;
 
 /**
  * SOURCE OF TRUTH KEYWORDS: getPlanOverages, PlanOverageState, OVER_PLAN_STATE,
@@ -454,26 +471,24 @@ export const getPlanOverages = cache(
     const [tier, usageMetrics] = await Promise.all([
       getOrganizationTier(organizationId),
       getAllUsageMetrics(organizationId),
-    ])
-    return collectLimitExcess(usageMetrics, tier.tier)
-  }
-)
+    ]);
+    return collectLimitExcess(usageMetrics, tier.tier);
+  },
+);
 
 export const getDowngradeBlockerMap = cache(
   async (organizationId: string): Promise<DowngradeBlockerMap> => {
     const entries = await Promise.all(
-      PLAN_ORDER.map(
-        async (plan): Promise<[PlanKey, DowngradeBlocker[]]> => [
-          plan,
-          await getDowngradeBlockers(organizationId, plan),
-        ]
-      )
-    )
+      PLAN_ORDER.map(async (plan): Promise<[PlanKey, DowngradeBlocker[]]> => [
+        plan,
+        await getDowngradeBlockers(organizationId, plan),
+      ]),
+    );
     /* Built by reduce rather than Object.fromEntries: fromEntries widens the key
      * back to `string`, which is the typing this map exists to avoid. */
     return entries.reduce<DowngradeBlockerMap>((map, [plan, blockers]) => {
-      map[plan] = blockers
-      return map
-    }, {})
-  }
-)
+      map[plan] = blockers;
+      return map;
+    }, {});
+  },
+);

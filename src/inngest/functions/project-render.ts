@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -86,32 +80,37 @@
  *        `renders.retry`.
  */
 
-import { NonRetriableError } from 'inngest'
-import { z } from 'zod'
+import { NonRetriableError } from "inngest";
+import { z } from "zod";
 
-import { inngestClient } from '@/lib/adapters/jobs/inngest/client'
-import { getMediaAdapter } from '@/lib/adapters/media'
-import { MediaProcessingError } from '@/lib/adapters/media/types'
-import { getRenderAdapter, RenderProviderError } from '@/lib/adapters/render'
-import { getStorageAdapter, renderKey } from '@/lib/adapters/storage'
-import { prisma } from '@/lib/config/prisma'
-import { APP_URL } from '@/lib/config/branding'
-import { getRemotionWebhookSecret } from '@/lib/adapters/render/lambda/config'
+import { inngestClient } from "@/lib/adapters/jobs/inngest/client";
+import { getMediaAdapter } from "@/lib/adapters/media";
+import { MediaProcessingError } from "@/lib/adapters/media/types";
+import { getRenderAdapter, RenderProviderError } from "@/lib/adapters/render";
+import { getStorageAdapter, renderKey } from "@/lib/adapters/storage";
+import { prisma } from "@/lib/config/prisma";
+import { APP_URL } from "@/lib/config/branding";
+import { getRemotionWebhookSecret } from "@/lib/adapters/render/lambda/config";
+import { downloadUrlToFile, uploadFile, withStagingDir } from "@/lib/media";
 import {
-  downloadUrlToFile,
-  uploadFile,
-  withStagingDir,
-} from '@/lib/media'
-import { collectAssetHandles, planComposition, renderCacheKey } from '@/lib/render'
-import { resolveWordAnchors, tryMigrate, validate, type TimelineDoc } from '@/lib/timeline'
+  collectAssetHandles,
+  planComposition,
+  renderCacheKey,
+} from "@/lib/render";
+import {
+  resolveWordAnchors,
+  tryMigrate,
+  validate,
+  type TimelineDoc,
+} from "@/lib/timeline";
 import {
   assetUrlMapSchema,
   renderResolutionSchema,
   type AssetUrlMap,
   type RenderResolution,
-} from '@/lib/types/render'
-import { signDocumentAssets } from '@/services/assets.service'
-import { findProjectWithTimeline } from '@/services/projects.service'
+} from "@/lib/types/render";
+import { signDocumentAssets } from "@/services/assets.service";
+import { findProjectWithTimeline } from "@/services/projects.service";
 import {
   completeRender,
   createRenderOutputAsset,
@@ -119,15 +118,15 @@ import {
   findRenderById,
   markRenderProgress,
   markRenderStarted,
-} from '@/services/renders.service'
-import { estimateRenderCost } from '@/lib/credits'
+} from "@/services/renders.service";
+import { estimateRenderCost } from "@/lib/credits";
 import {
   InsufficientCreditsError,
   commit,
   findOpenHoldForRef,
   hold,
   release,
-} from '@/services/credits.service'
+} from "@/services/credits.service";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: renderRequestedEventSchema, EVENT_PAYLOAD_PARSED
@@ -147,7 +146,7 @@ const renderRequestedEventSchema = z.object({
   /* Carried for the log line and the idempotency key, NOT trusted as the
    * attempt number — the row's own `attempts` is the authority. */
   attempt: z.number().int().positive().optional(),
-})
+});
 
 /**
  * SOURCE OF TRUTH KEYWORDS: renderFinishedEventSchema, WEBHOOK_RELAY_PAYLOAD
@@ -168,10 +167,10 @@ const renderRequestedEventSchema = z.object({
  */
 const renderFinishedEventSchema = z.object({
   renderId: z.string().min(1),
-  outcome: z.enum(['success', 'error', 'timeout']),
+  outcome: z.enum(["success", "error", "timeout"]),
   outputUrl: z.string().min(1).nullable(),
   error: z.string().nullable(),
-})
+});
 
 /**
  * SOURCE OF TRUTH KEYWORDS: failureEventSchema, inngest/function.failed
@@ -187,7 +186,7 @@ const failureEventSchema = z.object({
   data: z.object({
     event: z.object({ data: renderRequestedEventSchema }),
   }),
-})
+});
 
 /**
  * SOURCE OF TRUTH KEYWORDS: preflightFactsSchema, STEP_RESULTS_ARE_JSON
@@ -217,20 +216,20 @@ const preflightFactsSchema = z.object({
   width: z.number().int().positive(),
   height: z.number().int().positive(),
   durationInSeconds: z.number().positive(),
-})
+});
 
-type PreflightFacts = z.infer<typeof preflightFactsSchema>
+type PreflightFacts = z.infer<typeof preflightFactsSchema>;
 
 /** How long a render may take before it is written off. The phase's figure. */
-const RENDER_TIMEOUT = '45m'
+const RENDER_TIMEOUT = "45m";
 
 /** The signed-URL TTL must outlive this; see FINAL_URL_TTL_SECONDS (6 hours). */
 
 export const projectRenderFunction = inngestClient.createFunction(
   {
-    id: 'project-render',
-    name: 'Render a project in the cloud',
-    triggers: [{ event: 'render/requested' }],
+    id: "project-render",
+    name: "Render a project in the cloud",
+    triggers: [{ event: "render/requested" }],
     /* Two attempts, not the default four. Every attempt of this workflow can
      * START A PAID RENDER, so the arithmetic is different from an ingest's:
      * the failures worth retrying here are reaching the provider at all, which
@@ -242,7 +241,7 @@ export const projectRenderFunction = inngestClient.createFunction(
      * provider's functions, not in this container — but not unbounded, because
      * `renders.create` is cheap and a stuck client could otherwise have a
      * hundred renders in flight before the monthly cap noticed. */
-    concurrency: { key: 'event.data.organizationId', limit: 2 },
+    concurrency: { key: "event.data.organizationId", limit: 2 },
     /**
      * A run that exhausts its retries still has to leave the row honest, or
      * the customer watches a progress bar that will never move again. This is
@@ -250,29 +249,31 @@ export const projectRenderFunction = inngestClient.createFunction(
      * written their own message by the time they are raised.
      */
     onFailure: async ({ event }) => {
-      const parsed = failureEventSchema.safeParse(event)
+      const parsed = failureEventSchema.safeParse(event);
       if (!parsed.success) {
-        console.error('[project.render] Failure handler could not read the original event.')
-        return
+        console.error(
+          "[project.render] Failure handler could not read the original event.",
+        );
+        return;
       }
       await failRenderAndRelease(
         prisma,
         parsed.data.data.event.data.renderId,
-        'failed',
-        'Rendering this video did not finish. Please try again.',
-      )
+        "failed",
+        "Rendering this video did not finish. Please try again.",
+      );
     },
   },
   async ({ event, step }) => {
-    const input = renderRequestedEventSchema.safeParse(event.data)
+    const input = renderRequestedEventSchema.safeParse(event.data);
     if (!input.success) {
       /* A malformed event cannot be fixed by retrying it, and there is no id
        * to mark failed — so the only useful thing is to stop loudly. */
       throw new NonRetriableError(
         `[project.render] Event payload is not valid: ${input.error.message}`,
-      )
+      );
     }
-    const { renderId } = input.data
+    const { renderId } = input.data;
 
     // ───────────────────────────────────────────────────────────────────────
     // [1] VALIDATE — is this request still something we should pay for?
@@ -280,10 +281,10 @@ export const projectRenderFunction = inngestClient.createFunction(
     //     cache key, and refuses anything that has changed underneath.
     //     Everything downstream may assume the document renders.
     // ───────────────────────────────────────────────────────────────────────
-    const facts = await step.run('validate', async () => {
-      const loaded = await loadRenderInputs(renderId)
+    const facts = await step.run("validate", async () => {
+      const loaded = await loadRenderInputs(renderId);
 
-      const plan = planComposition(loaded.doc)
+      const plan = planComposition(loaded.doc);
 
       return {
         organizationId: loaded.render.organizationId,
@@ -295,20 +296,20 @@ export const projectRenderFunction = inngestClient.createFunction(
         width: plan.width,
         height: plan.height,
         durationInSeconds: plan.durationInSeconds,
-      }
-    })
+      };
+    });
 
-    const preflight = preflightFactsSchema.parse(facts)
+    const preflight = preflightFactsSchema.parse(facts);
 
     // ───────────────────────────────────────────────────────────────────────
     // [2] RESOLVE ASSETS — PREFLIGHT_BEFORE_PAYING. Sign a long-lived URL per
     //     asset and prove each object is really in the bucket, before a single
     //     Lambda is invoked.
     // ───────────────────────────────────────────────────────────────────────
-    const signed = await step.run('resolve-assets', async () => {
-      const loaded = await loadRenderInputs(renderId)
+    const signed = await step.run("resolve-assets", async () => {
+      const loaded = await loadRenderInputs(renderId);
 
-      const handles = collectAssetHandles(loaded.doc)
+      const handles = collectAssetHandles(loaded.doc);
 
       /* `final` is the whole point of the quality parameter: it reads the
        * `vertical_1080` masters rather than the proxies the browser scrubs,
@@ -319,15 +320,15 @@ export const projectRenderFunction = inngestClient.createFunction(
         prisma,
         handles,
         loaded.render.organizationId,
-        'final',
-      )
+        "final",
+      );
 
-      await assertAssetsAreFetchable(assets)
+      await assertAssetsAreFetchable(assets);
 
-      return assets
-    })
+      return assets;
+    });
 
-    const assets = assetUrlMapSchema.parse(signed)
+    const assets = assetUrlMapSchema.parse(signed);
 
     // ───────────────────────────────────────────────────────────────────────
     // [3] HOLD CREDITS — HOLD_IN_THE_WORKFLOW. The money is reserved here,
@@ -342,17 +343,19 @@ export const projectRenderFunction = inngestClient.createFunction(
      * a replayed step gets its own fresh locals. One lookup rule, reachable
      * from everywhere, beats a value that half the paths do not have. The step
      * still returns it so it shows in the run's own output when debugging. */
-    await step.run('hold-credits', () => holdRenderCredits(renderId, preflight))
+    await step.run("hold-credits", () =>
+      holdRenderCredits(renderId, preflight),
+    );
 
     // ───────────────────────────────────────────────────────────────────────
     // [4] START RENDER — one provider round-trip, its own step. Returns as
     //     soon as the render is accepted; see
     //     START_AND_AWAIT_ARE_DIFFERENT_STEPS.
     // ───────────────────────────────────────────────────────────────────────
-    await step.run('start-render', async () => {
-      const loaded = await loadRenderInputs(renderId)
+    await step.run("start-render", async () => {
+      const loaded = await loadRenderInputs(renderId);
 
-      const secret = getRemotionWebhookSecret()
+      const secret = getRemotionWebhookSecret();
       if (secret === null) {
         /* Permanent: without a secret the provider sends the literal string
          * `NO_SECRET_PROVIDED` as its signature, the webhook refuses it, and
@@ -362,17 +365,17 @@ export const projectRenderFunction = inngestClient.createFunction(
         await failRenderAndRelease(
           prisma,
           renderId,
-          'failed',
-          'This video could not be rendered. Please contact support — the renderer is misconfigured.',
-        )
+          "failed",
+          "This video could not be rendered. Please contact support — the renderer is misconfigured.",
+        );
         throw new NonRetriableError(
-          '[project.render] REMOTION_WEBHOOK_SECRET is not set, so a render could not report back.',
-        )
+          "[project.render] REMOTION_WEBHOOK_SECRET is not set, so a render could not report back.",
+        );
       }
 
-      const adapter = await getRenderAdapter()
+      const adapter = await getRenderAdapter();
 
-      let started
+      let started;
       try {
         started = await adapter.start(loaded.doc, {
           assets,
@@ -388,53 +391,65 @@ export const projectRenderFunction = inngestClient.createFunction(
            * lives. Note the consequence in development: localhost is not
            * reachable from AWS, so a local render needs a tunnel — recorded
            * in the setup checklist's help text for this integration. */
-          webhookUrl: `${APP_URL.replace(/\/$/, '')}/api/webhooks/remotion`,
+          webhookUrl: `${APP_URL.replace(/\/$/, "")}/api/webhooks/remotion`,
           webhookSecret: secret,
           /* How the callback finds this row. The provider knows its own render
            * id and nothing about a `Render`; this travels out and comes home. */
           customData: { renderId },
-        })
+        });
       } catch (error) {
         if (error instanceof RenderProviderError) {
-          console.error(`[project.render] ${renderId} start failed:`, error.detail)
+          console.error(
+            `[project.render] ${renderId} start failed:`,
+            error.detail,
+          );
           if (error.permanent) {
-            await failRenderAndRelease(prisma, renderId, 'failed', error.message)
-            throw new NonRetriableError(error.message)
+            await failRenderAndRelease(
+              prisma,
+              renderId,
+              "failed",
+              error.message,
+            );
+            throw new NonRetriableError(error.message);
           }
           /* Transient — thrown plainly so Inngest retries with backoff. The row
            * stays `queued`, which is the truth: nothing has started. */
-          throw error
+          throw error;
         }
-        throw error
+        throw error;
       }
 
       /* The status filter inside this is what makes it safe — a render
        * cancelled while the provider call was in flight is not dragged back to
        * `rendering`. A count of zero is worth knowing about but is not a
        * failure: the provider has accepted the work either way. */
-      const moved = await markRenderStarted(prisma, renderId, started.providerRenderId)
+      const moved = await markRenderStarted(
+        prisma,
+        renderId,
+        started.providerRenderId,
+      );
       if (moved === 0) {
         console.warn(
           `[project.render] ${renderId} was no longer queued when the provider accepted it; ` +
-            'leaving its current status alone.',
-        )
+            "leaving its current status alone.",
+        );
       }
 
-      return { providerRenderId: started.providerRenderId }
-    })
+      return { providerRenderId: started.providerRenderId };
+    });
 
     // ───────────────────────────────────────────────────────────────────────
     // [4] WAIT — WAIT_DONT_POLL. The run suspends here, costing nothing, until
     //     the webhook relays the provider's callback or the timeout elapses.
     // ───────────────────────────────────────────────────────────────────────
-    const finished = await step.waitForEvent('await-render', {
-      event: 'render/finished',
+    const finished = await step.waitForEvent("await-render", {
+      event: "render/finished",
       timeout: RENDER_TIMEOUT,
       /* Matched on the renderId so one waiting run cannot be resumed by
        * another render's callback. Without this, two concurrent renders in one
        * workspace would race and each could finalize the other's output. */
       if: `async.data.renderId == "${renderId}"`,
-    })
+    });
 
     // ───────────────────────────────────────────────────────────────────────
     // [5] FINALIZE — store the output as an asset, or record why there is
@@ -445,46 +460,50 @@ export const projectRenderFunction = inngestClient.createFunction(
        * by itself mean the render failed — a dropped webhook looks identical
        * from here — so the one sanctioned use of getProgress asks the provider
        * directly before writing anything off (PROGRESS_IS_FOR_THE_TIMEOUT_PATH). */
-      return await step.run('finalize-timeout', () => resolveTimedOutRender(renderId, preflight))
+      return await step.run("finalize-timeout", () =>
+        resolveTimedOutRender(renderId, preflight),
+      );
     }
 
-    const outcome = renderFinishedEventSchema.safeParse(finished.data)
+    const outcome = renderFinishedEventSchema.safeParse(finished.data);
     if (!outcome.success) {
       /* The webhook is ours, so this is a bug in our own relay rather than
        * untrusted input — but the render has already been paid for, so it must
        * still land on the row as a readable failure rather than as a run that
        * vanished. */
-      return await step.run('finalize-unreadable', async () => {
+      return await step.run("finalize-unreadable", async () => {
         await failRenderAndRelease(
           prisma,
           renderId,
-          'failed',
-          'This render finished but its result could not be read. Please contact support.',
-        )
+          "failed",
+          "This render finished but its result could not be read. Please contact support.",
+        );
         throw new NonRetriableError(
           `[project.render] The render.finished event did not parse: ${outcome.error.message}`,
-        )
-      })
+        );
+      });
     }
 
-    if (outcome.data.outcome !== 'success' || outcome.data.outputUrl === null) {
-      return await step.run('finalize-failed', async () => {
+    if (outcome.data.outcome !== "success" || outcome.data.outputUrl === null) {
+      return await step.run("finalize-failed", async () => {
         await failRenderAndRelease(
           prisma,
           renderId,
-          outcome.data.outcome === 'timeout' ? 'timedOut' : 'failed',
+          outcome.data.outcome === "timeout" ? "timedOut" : "failed",
           outcome.data.error ??
-            'This video could not be rendered. Please try again, or contact support if it keeps failing.',
-        )
-        return { renderId, status: outcome.data.outcome }
-      })
+            "This video could not be rendered. Please try again, or contact support if it keeps failing.",
+        );
+        return { renderId, status: outcome.data.outcome };
+      });
     }
 
-    const outputUrl = outcome.data.outputUrl
+    const outputUrl = outcome.data.outputUrl;
 
-    return await step.run('finalize', () => storeRenderOutput(renderId, outputUrl, preflight))
+    return await step.run("finalize", () =>
+      storeRenderOutput(renderId, outputUrl, preflight),
+    );
   },
-)
+);
 
 /**
  * SOURCE OF TRUTH KEYWORDS: loadRenderInputs, KEY_MISMATCH_IS_A_STALE_RENDER,
@@ -515,93 +534,100 @@ export const projectRenderFunction = inngestClient.createFunction(
  * WHERE: Steps 1, 2 and 3 above.
  */
 async function loadRenderInputs(renderId: string): Promise<{
-  render: NonNullable<Awaited<ReturnType<typeof findRenderById>>>
-  doc: TimelineDoc
-  resolution: RenderResolution
+  render: NonNullable<Awaited<ReturnType<typeof findRenderById>>>;
+  doc: TimelineDoc;
+  resolution: RenderResolution;
 }> {
-  const render = await findRenderById(prisma, renderId)
+  const render = await findRenderById(prisma, renderId);
   if (render === null) {
     /* The row was deleted while the event was in flight — the project went
      * with it, most likely. Nothing to mark failed and nothing to retry. */
-    throw new NonRetriableError(`[project.render] Render ${renderId} no longer exists.`)
+    throw new NonRetriableError(
+      `[project.render] Render ${renderId} no longer exists.`,
+    );
   }
 
-  const resolution = renderResolutionSchema.safeParse(render.resolution)
+  const resolution = renderResolutionSchema.safeParse(render.resolution);
   if (!resolution.success) {
-    await failRenderAndRelease(prisma, renderId, 'failed', 'This render asked for an unsupported quality.')
+    await failRenderAndRelease(
+      prisma,
+      renderId,
+      "failed",
+      "This render asked for an unsupported quality.",
+    );
     throw new NonRetriableError(
       `[project.render] Render ${renderId} has resolution "${render.resolution}".`,
-    )
+    );
   }
 
   const project = await findProjectWithTimeline(
     prisma,
     render.organizationId,
     render.projectId,
-  )
+  );
   if (project === null || project.timeline === null) {
     await failRenderAndRelease(
       prisma,
       renderId,
-      'failed',
-      'The project this render belongs to no longer has a timeline.',
-    )
+      "failed",
+      "The project this render belongs to no longer has a timeline.",
+    );
     throw new NonRetriableError(
       `[project.render] Project ${render.projectId} has no timeline to render.`,
-    )
+    );
   }
 
-  const migrated = tryMigrate(project.timeline.doc)
+  const migrated = tryMigrate(project.timeline.doc);
   if (!migrated.ok) {
     await failRenderAndRelease(
       prisma,
       renderId,
-      'failed',
-      'This timeline was written in a format this version cannot open, so it cannot be rendered.',
-    )
+      "failed",
+      "This timeline was written in a format this version cannot open, so it cannot be rendered.",
+    );
     throw new NonRetriableError(
       `[project.render] Timeline for ${render.projectId} could not be migrated.`,
-    )
+    );
   }
 
   /* Resolve, THEN validate — the same order as `projects.preview` and
    * `renders.create`, because an anchored document has no absolute times and
    * validating one would reject every voiceover project. */
-  const resolved = resolveWordAnchors(migrated.doc)
-  const validated = validate(resolved)
+  const resolved = resolveWordAnchors(migrated.doc);
+  const validated = validate(resolved);
   if (!validated.ok) {
     await failRenderAndRelease(
       prisma,
       renderId,
-      'failed',
-      `This timeline cannot be rendered: ${validated.errors[0]?.message ?? 'it is not valid.'}`,
-    )
+      "failed",
+      `This timeline cannot be rendered: ${validated.errors[0]?.message ?? "it is not valid."}`,
+    );
     throw new NonRetriableError(
       `[project.render] Timeline for ${render.projectId} is not valid: ` +
-        `${validated.errors.map((issue) => `${issue.path}: ${issue.code}`).join('; ')}`,
-    )
+        `${validated.errors.map((issue) => `${issue.path}: ${issue.code}`).join("; ")}`,
+    );
   }
 
   const currentKey = renderCacheKey({
     doc: validated.doc,
     resolution: resolution.data,
     watermark: render.watermark,
-  })
+  });
   if (currentKey !== render.docHash) {
     /* KEY_MISMATCH_IS_A_STALE_RENDER — see the WHY above. */
     await failRenderAndRelease(
       prisma,
       renderId,
-      'failed',
-      'This project changed after the render was requested. Please render it again.',
-    )
+      "failed",
+      "This project changed after the render was requested. Please render it again.",
+    );
     throw new NonRetriableError(
       `[project.render] ${renderId} was requested for key ${render.docHash} but the project now ` +
         `hashes to ${currentKey}. Refusing to store a render under a key it does not match.`,
-    )
+    );
   }
 
-  return { render, doc: validated.doc, resolution: resolution.data }
+  return { render, doc: validated.doc, resolution: resolution.data };
 }
 
 /**
@@ -630,58 +656,61 @@ async function loadRenderInputs(renderId: string): Promise<{
 async function assertAssetsAreFetchable(assets: AssetUrlMap): Promise<void> {
   const unresolved = Object.entries(assets)
     .filter(([, asset]) => asset.url === null)
-    .map(([handle]) => handle)
+    .map(([handle]) => handle);
 
   if (unresolved.length > 0) {
     throw new RenderProviderError(
       `This video is missing ${unresolved.length} of its media files and cannot be rendered. ` +
-        'Re-upload or replace them, then try again.',
+        "Re-upload or replace them, then try again.",
       {
-        detail: `[project.render] Unresolved asset handles: ${unresolved.join(', ')}.`,
+        detail: `[project.render] Unresolved asset handles: ${unresolved.join(", ")}.`,
         permanent: true,
       },
-    )
+    );
   }
 
-  const storage = await getStorageAdapter()
+  const storage = await getStorageAdapter();
   const rows = await prisma.assetVariant.findMany({
     where: {
-      asset: { id: { in: Object.values(assets).map((asset) => asset.assetId) } },
+      asset: {
+        id: { in: Object.values(assets).map((asset) => asset.assetId) },
+      },
     },
     select: { assetId: true, variant: true, storageKey: true },
-  })
+  });
 
-  const keyFor = new Map<string, string>()
-  for (const row of rows) keyFor.set(`${row.assetId}:${row.variant}`, row.storageKey)
+  const keyFor = new Map<string, string>();
+  for (const row of rows)
+    keyFor.set(`${row.assetId}:${row.variant}`, row.storageKey);
 
-  const missing: string[] = []
+  const missing: string[] = [];
   for (const [handle, asset] of Object.entries(assets)) {
     /* An asset resolved to its OWN object rather than a variant has
      * `variant: null`; there is no variant row to look a key up by, and the
      * URL came straight from `Asset.storageKey`, which the row proves exists
      * as a record. The HEAD below is about variants, which are produced by a
      * workflow that can fail halfway. */
-    if (asset.variant === null) continue
+    if (asset.variant === null) continue;
 
-    const key = keyFor.get(`${asset.assetId}:${asset.variant}`)
+    const key = keyFor.get(`${asset.assetId}:${asset.variant}`);
     if (key === undefined) {
-      missing.push(handle)
-      continue
+      missing.push(handle);
+      continue;
     }
 
-    const head = await storage.head(key)
-    if (head === null) missing.push(handle)
+    const head = await storage.head(key);
+    if (head === null) missing.push(handle);
   }
 
   if (missing.length > 0) {
     throw new RenderProviderError(
       `This video is missing ${missing.length} of its media files and cannot be rendered. ` +
-        'Re-upload or replace them, then try again.',
+        "Re-upload or replace them, then try again.",
       {
-        detail: `[project.render] Asset handles whose objects are absent from storage: ${missing.join(', ')}.`,
+        detail: `[project.render] Asset handles whose objects are absent from storage: ${missing.join(", ")}.`,
         permanent: true,
       },
-    )
+    );
   }
 }
 
@@ -724,40 +753,50 @@ async function storeRenderOutput(
   outputUrl: string,
   preflight: PreflightFacts,
 ): Promise<{ renderId: string; outputAssetId: string; bytes: number }> {
-  const render = await findRenderById(prisma, renderId)
+  const render = await findRenderById(prisma, renderId);
   if (render === null) {
-    throw new NonRetriableError(`[project.render] Render ${renderId} no longer exists.`)
+    throw new NonRetriableError(
+      `[project.render] Render ${renderId} no longer exists.`,
+    );
   }
 
   /* Already finalised — a duplicate webhook, which is normal at-least-once
    * behaviour rather than a fault. Returning rather than throwing keeps the
    * run green; `completeRender`'s status filter would have refused the write
    * anyway, but doing the copy twice would have cost the bandwidth first. */
-  if (render.status === 'completed' && render.outputAssetId !== null) {
-    return { renderId, outputAssetId: render.outputAssetId, bytes: 0 }
+  if (render.status === "completed" && render.outputAssetId !== null) {
+    return { renderId, outputAssetId: render.outputAssetId, bytes: 0 };
   }
 
   return withStagingDir(async (dir) => {
-    const videoPath = dir.file('output.mp4')
-    const posterPath = dir.file('poster.jpg')
+    const videoPath = dir.file("output.mp4");
+    const posterPath = dir.file("poster.jpg");
 
-    const bytes = await downloadUrlToFile(outputUrl, videoPath, 'the rendered video')
+    const bytes = await downloadUrlToFile(
+      outputUrl,
+      videoPath,
+      "the rendered video",
+    );
 
     const videoKey = renderKey(
       render.organizationId,
       render.projectId,
       render.id,
-      'output.mp4',
-    )
-    await uploadFile({ localPath: videoPath, storageKey: videoKey, contentType: 'video/mp4' })
+      "output.mp4",
+    );
+    await uploadFile({
+      localPath: videoPath,
+      storageKey: videoKey,
+      contentType: "video/mp4",
+    });
 
     /* POSTER_FROM_THE_OUTPUT. Best-effort: a render with no thumbnail is a
      * tile that falls back to an icon, which is a cosmetic loss — failing the
      * whole finalize over it would throw away a video that rendered perfectly
      * and has already been paid for. */
-    let posterKey: string | null = null
+    let posterKey: string | null = null;
     try {
-      const media = await getMediaAdapter()
+      const media = await getMediaAdapter();
       await media.extractFrame({
         inputPath: videoPath,
         outputPath: posterPath,
@@ -766,22 +805,26 @@ async function storeRenderOutput(
          * broken render. */
         atSec: Math.min(0.1, preflight.durationInSeconds / 2),
         width: preflight.width,
-      })
+      });
       posterKey = renderKey(
         render.organizationId,
         render.projectId,
         render.id,
-        'poster.jpg',
-      )
+        "poster.jpg",
+      );
       await uploadFile({
         localPath: posterPath,
         storageKey: posterKey,
-        contentType: 'image/jpeg',
-      })
+        contentType: "image/jpeg",
+      });
     } catch (error) {
-      posterKey = null
-      const detail = error instanceof MediaProcessingError ? error.detail : String(error)
-      console.error(`[project.render] ${renderId} poster extraction failed:`, detail)
+      posterKey = null;
+      const detail =
+        error instanceof MediaProcessingError ? error.detail : String(error);
+      console.error(
+        `[project.render] ${renderId} poster extraction failed:`,
+        detail,
+      );
     }
 
     /* ASSETS_AND_STATUS_IN_ONE_TRANSACTION — see the WHY above. */
@@ -790,12 +833,12 @@ async function storeRenderOutput(
         organizationId: render.organizationId,
         filename: `render-${render.id}.mp4`,
         storageKey: videoKey,
-        contentType: 'video/mp4',
+        contentType: "video/mp4",
         bytes,
         durationSec: preflight.durationInSeconds,
         width: preflight.width,
         height: preflight.height,
-      })
+      });
 
       const posterAsset =
         posterKey === null
@@ -804,18 +847,18 @@ async function storeRenderOutput(
               organizationId: render.organizationId,
               filename: `render-${render.id}-poster.jpg`,
               storageKey: posterKey,
-              contentType: 'image/jpeg',
+              contentType: "image/jpeg",
               /* Not measured: the poster is not charged to any quota and
                  nothing sizes a layout from it, so a HEAD to learn a number
                  with no reader would be a round-trip for nothing. */
               bytes: 0,
               width: preflight.width,
-            })
+            });
 
       const moved = await completeRender(tx, render.id, {
         outputAssetId: outputAsset.id,
         posterAssetId: posterAsset?.id ?? null,
-      })
+      });
       if (moved === 0) {
         /* Something terminal happened to the row between the read at the top
          * of this function and now — a timeout write, most likely. Rolling the
@@ -823,7 +866,7 @@ async function storeRenderOutput(
          * render that is not completed, which nothing would ever clean up. */
         throw new NonRetriableError(
           `[project.render] ${renderId} was no longer rendering when its output was stored.`,
-        )
+        );
       }
 
       /**
@@ -852,15 +895,15 @@ async function storeRenderOutput(
       const actual = estimateRenderCost({
         durationSeconds: preflight.durationInSeconds,
         resolution: preflight.resolution,
-      })
+      });
 
-      const openHold = await findOpenHoldForRef(tx, render.id)
+      const openHold = await findOpenHoldForRef(tx, render.id);
       if (openHold !== null) {
         await commit(tx, openHold.id, actual.total, {
-          kind: 'render',
+          kind: "render",
           renderId: render.id,
           breakdown: actual.lines,
-        })
+        });
       }
 
       /* Phase 04 left these null and said Phase 05 would fill them. This is
@@ -872,11 +915,16 @@ async function storeRenderOutput(
           creditsCharged: actual.total,
           costBreakdown: { total: actual.total, lines: actual.lines },
         },
-      })
+      });
 
-      return { renderId, outputAssetId: outputAsset.id, bytes, creditsCharged: actual.total }
-    })
-  })
+      return {
+        renderId,
+        outputAssetId: outputAsset.id,
+        bytes,
+        creditsCharged: actual.total,
+      };
+    });
+  });
 }
 
 /**
@@ -905,9 +953,11 @@ async function resolveTimedOutRender(
   renderId: string,
   preflight: PreflightFacts,
 ): Promise<{ renderId: string; status: string }> {
-  const render = await findRenderById(prisma, renderId)
+  const render = await findRenderById(prisma, renderId);
   if (render === null) {
-    throw new NonRetriableError(`[project.render] Render ${renderId} no longer exists.`)
+    throw new NonRetriableError(
+      `[project.render] Render ${renderId} no longer exists.`,
+    );
   }
 
   if (render.providerRenderId === null) {
@@ -917,48 +967,48 @@ async function resolveTimedOutRender(
     await failRenderAndRelease(
       prisma,
       renderId,
-      'timedOut',
-      'This render never started. Please try again.',
-    )
-    return { renderId, status: 'timedOut' }
+      "timedOut",
+      "This render never started. Please try again.",
+    );
+    return { renderId, status: "timedOut" };
   }
 
-  const adapter = await getRenderAdapter()
-  const progress = await adapter.getProgress(render.providerRenderId)
+  const adapter = await getRenderAdapter();
+  const progress = await adapter.getProgress(render.providerRenderId);
 
-  if (progress.status === 'completed' && progress.outputUrl !== null) {
+  if (progress.status === "completed" && progress.outputUrl !== null) {
     console.warn(
       `[project.render] ${renderId} completed but its webhook never arrived; ` +
-        'storing the output from the timeout path.',
-    )
-    await storeRenderOutput(renderId, progress.outputUrl, preflight)
-    return { renderId, status: 'completed' }
+        "storing the output from the timeout path.",
+    );
+    await storeRenderOutput(renderId, progress.outputUrl, preflight);
+    return { renderId, status: "completed" };
   }
 
-  if (progress.status === 'failed') {
+  if (progress.status === "failed") {
     await failRenderAndRelease(
       prisma,
       renderId,
-      'failed',
-      progress.error ?? 'This video could not be rendered. Please try again.',
+      "failed",
+      progress.error ?? "This video could not be rendered. Please try again.",
       progress.progress,
-    )
-    return { renderId, status: 'failed' }
+    );
+    return { renderId, status: "failed" };
   }
 
   /* Still going after the whole window. The last known progress is written
    * with it so the row says how far it got rather than implying it never
    * moved — which is the difference between "the renderer is slow" and "the
    * renderer is dead" for whoever reads this next. */
-  await markRenderProgress(prisma, renderId, progress.progress)
+  await markRenderProgress(prisma, renderId, progress.progress);
   await failRenderAndRelease(
     prisma,
     renderId,
-    'timedOut',
-    'This render took longer than 45 minutes and was stopped. You can try it once more.',
+    "timedOut",
+    "This render took longer than 45 minutes and was stopped. You can try it once more.",
     progress.progress,
-  )
-  return { renderId, status: 'timedOut' }
+  );
+  return { renderId, status: "timedOut" };
 }
 
 /**
@@ -995,16 +1045,16 @@ async function resolveTimedOutRender(
 async function failRenderAndRelease(
   db: typeof prisma,
   renderId: string,
-  status: 'failed' | 'timedOut',
+  status: "failed" | "timedOut",
   error: string,
   progress?: number,
 ): Promise<void> {
-  await failRender(db, renderId, status, error, progress)
+  await failRender(db, renderId, status, error, progress);
 
   try {
-    const open = await findOpenHoldForRef(db, renderId)
+    const open = await findOpenHoldForRef(db, renderId);
     if (open !== null) {
-      await release(db, open.id, { reason: `render ${status}` })
+      await release(db, open.id, { reason: `render ${status}` });
     }
   } catch (releaseError) {
     /* The render is already honest on the row; the money is not. Logged rather
@@ -1013,7 +1063,7 @@ async function failRenderAndRelease(
     console.error(
       `[project.render] ${renderId} was marked ${status} but its credit hold could not be released:`,
       releaseError,
-    )
+    );
   }
 }
 
@@ -1054,37 +1104,37 @@ async function holdRenderCredits(
   renderId: string,
   preflight: PreflightFacts,
 ): Promise<string> {
-  const existing = await findOpenHoldForRef(prisma, renderId)
+  const existing = await findOpenHoldForRef(prisma, renderId);
   if (existing !== null) {
     /* A retry of this step. The money is already reserved; reusing the hold is
      * what keeps commit/release able to settle exactly one thing. */
-    return existing.id
+    return existing.id;
   }
 
   const cost = estimateRenderCost({
     durationSeconds: preflight.durationInSeconds,
     resolution: preflight.resolution,
-  })
+  });
 
   try {
     return await hold(prisma, preflight.organizationId, cost.total, renderId, {
-      kind: 'render',
+      kind: "render",
       resolution: preflight.resolution,
       durationSeconds: preflight.durationInSeconds,
       breakdown: cost.lines,
-    })
+    });
   } catch (error) {
     if (error instanceof InsufficientCreditsError) {
       await failRenderAndRelease(
         prisma,
         renderId,
-        'failed',
+        "failed",
         `This render needs ${error.required} credits and this workspace has ${error.available}. Top up and try again.`,
-      )
+      );
       throw new NonRetriableError(
         `[project.render] ${renderId} could not be held: ${error.message}`,
-      )
+      );
     }
-    throw error
+    throw error;
   }
 }

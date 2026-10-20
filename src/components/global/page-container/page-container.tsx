@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -28,9 +22,9 @@
  *        be used directly inside a page that renders its own chrome.
  */
 
-import * as React from 'react'
+import * as React from "react";
 
-import { cn } from '@/lib/utils'
+import { cn } from "@/lib/utils";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: PAGE_CONTAINER_WIDTHS, PageContainerWidth
@@ -43,24 +37,24 @@ import { cn } from '@/lib/utils'
  */
 export const PAGE_CONTAINER_WIDTHS = {
   /* Reading width — a single column of prose, a focused form. */
-  sm: 'max-w-3xl',
+  sm: "max-w-3xl",
   /* The app default — comfortable for cards, settings, and lists. */
-  default: 'max-w-5xl',
+  default: "max-w-5xl",
   /* Dense dashboards: multi-column grids, charts. */
-  lg: 'max-w-7xl',
+  lg: "max-w-7xl",
   /* Opt-out: no cap, content spans the page (wide tables, boards). */
-  full: '',
-} as const
+  full: "",
+} as const;
 
-export type PageContainerWidth = keyof typeof PAGE_CONTAINER_WIDTHS
+export type PageContainerWidth = keyof typeof PAGE_CONTAINER_WIDTHS;
 
-export interface PageContainerProps extends React.ComponentProps<'div'> {
+export interface PageContainerProps extends React.ComponentProps<"div"> {
   /** Max content width from the shared scale. Defaults to `'default'`. */
-  width?: PageContainerWidth
+  width?: PageContainerWidth;
 }
 
 export function PageContainer({
-  width = 'default',
+  width = "default",
   className,
   children,
   ...props
@@ -71,13 +65,13 @@ export function PageContainer({
        stretch the container past its max-width instead of scrolling. */
     <div
       className={cn(
-        'mx-auto flex w-full min-w-0 flex-1 flex-col',
+        "mx-auto flex w-full min-w-0 flex-1 flex-col",
         PAGE_CONTAINER_WIDTHS[width],
-        className
+        className,
       )}
       {...props}
     >
       {children}
     </div>
-  )
+  );
 }

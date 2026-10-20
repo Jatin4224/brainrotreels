@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -24,51 +18,51 @@
  * WHERE: Used only by ./index.ts. eslint forbids the S3 SDK elsewhere.
  */
 
-import { S3Client } from '@aws-sdk/client-s3'
+import { S3Client } from "@aws-sdk/client-s3";
 
-import { assertStorageProviderActive } from '../provider'
+import { assertStorageProviderActive } from "../provider";
 
-assertStorageProviderActive('r2')
+assertStorageProviderActive("r2");
 
-const accountId = process.env['R2_ACCOUNT_ID']?.trim()
-const accessKeyId = process.env['R2_ACCESS_KEY_ID']?.trim()
-const secretAccessKey = process.env['R2_SECRET_ACCESS_KEY']?.trim()
-const bucket = process.env['R2_BUCKET']?.trim()
+const accountId = process.env["R2_ACCOUNT_ID"]?.trim();
+const accessKeyId = process.env["R2_ACCESS_KEY_ID"]?.trim();
+const secretAccessKey = process.env["R2_SECRET_ACCESS_KEY"]?.trim();
+const bucket = process.env["R2_BUCKET"]?.trim();
 
 /** The CDN origin for public library objects. Optional. */
-export const R2_PUBLIC_URL = process.env['R2_PUBLIC_URL']?.trim() ?? ''
+export const R2_PUBLIC_URL = process.env["R2_PUBLIC_URL"]?.trim() ?? "";
 
 export function isR2Configured(): boolean {
-  return Boolean(accountId && accessKeyId && secretAccessKey && bucket)
+  return Boolean(accountId && accessKeyId && secretAccessKey && bucket);
 }
 
 export function getR2Bucket(): string {
   if (!bucket) {
     throw new Error(
-      '[storage/r2] R2_BUCKET is not set. Add the R2_* variables to .env — see .env.example.',
-    )
+      "[storage/r2] R2_BUCKET is not set. Add the R2_* variables to .env — see .env.example.",
+    );
   }
-  return bucket
+  return bucket;
 }
 
-let client: S3Client | null = null
+let client: S3Client | null = null;
 
 export function getR2Client(): S3Client {
-  if (client) return client
+  if (client) return client;
 
   if (!accountId || !accessKeyId || !secretAccessKey) {
     throw new Error(
-      '[storage/r2] R2 is not configured. Set R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, ' +
-        'R2_SECRET_ACCESS_KEY and R2_BUCKET in .env — see .env.example.',
-    )
+      "[storage/r2] R2 is not configured. Set R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, " +
+        "R2_SECRET_ACCESS_KEY and R2_BUCKET in .env — see .env.example.",
+    );
   }
 
   client = new S3Client({
-    region: 'auto',
+    region: "auto",
     endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
     credentials: { accessKeyId, secretAccessKey },
     forcePathStyle: true,
-  })
+  });
 
-  return client
+  return client;
 }
