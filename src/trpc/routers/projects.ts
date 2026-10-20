@@ -44,18 +44,21 @@ import { permissions } from '@/lib/permissions'
 import { checkFeatureGate } from '@/lib/feature-gate'
 import { ERROR_CODES } from '@/lib/errors'
 import { incrementUsage } from '@/services/usage.service'
+import { signDocumentAssets } from '@/services/assets.service'
 import {
   findProjectForOrganization,
   findProjectWithTimeline,
   listProjects,
 } from '@/services/projects.service'
-import { TimelineMigrationError, tryMigrate } from '@/lib/timeline'
+import { TimelineMigrationError, resolveWordAnchors, tryMigrate } from '@/lib/timeline'
+import { collectAssetHandles, planComposition } from '@/lib/render'
 import {
   createProjectSchema,
   deleteProjectSchema,
   duplicateProjectSchema,
   getProjectSchema,
   listProjectsSchema,
+  previewProjectSchema,
   renameProjectSchema,
 } from '@/lib/types'
 
@@ -131,6 +134,71 @@ export const projectsRouter = createTRPCRouter({
       return {
         ...rest,
         timeline: { doc: migrated.doc, revision: timeline.revision, updatedAt: timeline.updatedAt },
+        timelineErrors: [],
+      }
+    }),
+
+  /**
+   * SOURCE OF TRUTH KEYWORDS: projects.preview, RESOLVE_THEN_SIGN,
+   *   PREVIEW_IS_A_READ, planComposition, signDocumentAssets
+   *
+   * WHAT:  Everything needed to PLAY a project: its document resolved to
+   *        absolute times, a signed URL per asset, and the composition's
+   *        canvas and frame count.
+   * WHY:   A separate procedure from `get`, because the two answer different
+   *        questions and cost different amounts. `get` returns a project for a
+   *        screen to list or rename; this one signs a URL per asset and is
+   *        therefore the expensive read — putting it on `get` would make every
+   *        projects list page pay for media it never shows.
+   *
+   *        RESOLVE_THEN_SIGN, in that order and for a reason: the document is
+   *        migrated, then run through `resolveWordAnchors()` so every time is
+   *        an absolute second, and only then are assets signed. A renderer
+   *        handed an anchored document draws nothing (SKIP_UNRESOLVED_ITEM), so
+   *        signing first would mean paying for URLs nothing can use. Resolution
+   *        is also what makes `planComposition` able to state a frame count.
+   *
+   *        The quality defaults to `preview`, which reads `proxy_480` — the
+   *        pairing that keeps the browser responsive while the final render
+   *        uses the master. A caller asking for `final` gets longer-lived URLs
+   *        against the full-size variants; Phase 04's pre-flight is the caller
+   *        that will.
+   *
+   *        PREVIEW_IS_A_READ: a query, so the factory writes no audit row and
+   *        bumps no counter. Watching your own video is not an event worth
+   *        recording, and Phase 04's `renders.create` is where a BILLED action
+   *        starts.
+   * WHERE: The player on /dashboard/projects/[id]/preview.
+   */
+  preview: protectedProcedure({ requirePermission: permissions.PROJECTS_READ })
+    .input(previewProjectSchema)
+    .query(async ({ ctx, input }) => {
+      const project = await findProjectWithTimeline(ctx.db, input.organizationId, input.id)
+      if (!project) throw new TRPCError({ code: 'NOT_FOUND', message: 'Project not found' })
+
+      const { timeline, ...rest } = project
+      if (timeline === null) {
+        return { project: rest, doc: null, assets: {}, composition: null, timelineErrors: [] }
+      }
+
+      const migrated = tryMigrate(timeline.doc)
+      if (!migrated.ok) {
+        return { project: rest, doc: null, assets: {}, composition: null, timelineErrors: migrated.errors }
+      }
+
+      const resolved = resolveWordAnchors(migrated.doc)
+      const assets = await signDocumentAssets(
+        ctx.db,
+        collectAssetHandles(resolved),
+        input.organizationId,
+        input.quality ?? 'preview'
+      )
+
+      return {
+        project: rest,
+        doc: resolved,
+        assets,
+        composition: planComposition(resolved),
         timelineErrors: [],
       }
     }),

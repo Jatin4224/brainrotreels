@@ -531,7 +531,8 @@ lists all of it.
 
 ## Where to go next
 
-`docs/phases/03-render-core.md` — Remotion, and the first time a variant is actually consumed. The
+`docs/13-phase3.md` — Remotion, and the first time a variant is actually consumed (the phase
+brief itself is `docs/phases/03-render-core.md`). The
 pairing to carry over is `vertical_1080` for the render and `proxy_480` for the browser preview;
 that is the whole reason the two match.
 

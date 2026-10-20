@@ -50,6 +50,13 @@ import {
   isOwnedByOrganization,
 } from '@/lib/adapters/storage'
 import { prisma, type DbClient } from '@/lib/config/prisma'
+import {
+  TTL_BY_QUALITY,
+  VARIANT_BY_QUALITY,
+  type AssetUrlMap,
+  type RenderQuality,
+  type ResolvedAsset,
+} from '@/lib/types/render'
 import type { Prisma } from '@/generated/prisma'
 import {
   variantNameSchema,
@@ -542,4 +549,105 @@ export async function sumAssetBytes(db: DbClient, organizationId: string): Promi
     _sum: { bytes: true },
   })
   return result._sum.bytes ?? 0
+}
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: signDocumentAssets, AUDIO_HAS_NO_VIDEO_VARIANT,
+ *   VARIANT_WITH_FALLBACK, ONE_QUERY_PER_DOCUMENT, SIGNING_BOUNDARY
+ *
+ * WHAT:  Resolves every asset handle in a timeline document to a signed URL at
+ *        the requested quality, as the map the Remotion composition is handed.
+ * WHY:   ONE_QUERY_PER_DOCUMENT. The handles arrive together, so the rows are
+ *        read in ONE `findMany` rather than a query per handle — a document
+ *        with twenty clips would otherwise open twenty round-trips on every
+ *        preview load, which is the n+1 that makes a player feel broken.
+ *        Signing itself is local HMAC and costs nothing per asset.
+ *
+ *        VARIANT_WITH_FALLBACK: the quality picks a variant
+ *        (VARIANT_BY_QUALITY — `proxy_480` to scrub, `vertical_1080` to
+ *        render), and a missing variant falls back to the ORIGINAL object
+ *        rather than failing. Two ordinary situations need that, and only one
+ *        of them is a problem:
+ *
+ *          AUDIO_HAS_NO_VIDEO_VARIANT — the ingest builds a waveform for audio
+ *          and nothing else (see planVariants), so narration and music have no
+ *          proxy and no master BY DESIGN. For them the original IS the right
+ *          object, and this is the normal path, not a degradation.
+ *
+ *          An ingest that has not finished yet, where the original exists and
+ *          the variants do not. The preview then plays the full-size file —
+ *          heavier than it should be, but playable, which beats a silent gap.
+ *
+ *        The returned `variant` field records which of the two happened, so a
+ *        caller can tell a deliberate fallback from an accidental one without
+ *        guessing from the file size.
+ *
+ *        Scoped through assetScopeWhere, so a document referencing another
+ *        workspace's asset id resolves to `url: null` rather than to that
+ *        workspace's media — the document is data, and a stored id is not
+ *        authority to read it. Every URL additionally goes through
+ *        signScopedKey's own key check (SIGNING_BOUNDARY).
+ * WHERE: `projects.preview` in src/trpc/routers/projects.ts; the render
+ *        pre-flight in Phase 04, which asks for `final`.
+ */
+export async function signDocumentAssets(
+  db: DbClient,
+  handles: readonly { handle: string; ref: { assetId: string; kind: ResolvedAsset['kind'] } }[],
+  organizationId: string,
+  quality: RenderQuality
+): Promise<AssetUrlMap> {
+  const map: AssetUrlMap = {}
+  if (handles.length === 0) return map
+
+  const wanted = VARIANT_BY_QUALITY[quality]
+  const ttl = TTL_BY_QUALITY[quality]
+
+  const rows = await db.asset.findMany({
+    where: {
+      id: { in: [...new Set(handles.map((entry) => entry.ref.assetId))] },
+      ...assetScopeWhere(organizationId),
+    },
+    include: { variants: true },
+  })
+
+  const byId = new Map(rows.map((row) => [row.id, row]))
+
+  for (const { handle, ref } of handles) {
+    const row = byId.get(ref.assetId)
+
+    /* A handle whose row is missing, deleted, or belongs to another workspace.
+     * Null, not an exception: MISSING_ASSET_IS_NOT_AN_ERROR — the renderer
+     * draws a gap and the rest of the video still renders. */
+    if (row === undefined) {
+      map[handle] = { assetId: ref.assetId, kind: ref.kind, url: null, variant: null }
+      continue
+    }
+
+    const variantRow = row.variants.find((candidate) => candidate.variant === wanted)
+    const key = variantRow?.storageKey ?? row.storageKey
+    const url = await signScopedKey(key, organizationId, ttl)
+
+    map[handle] = {
+      assetId: row.id,
+      kind: ref.kind,
+      url,
+      variant: variantRow === undefined ? null : wanted,
+      /* Dimensions come from the VARIANT when there is one — a proxy is 480
+       * wide and the row's own width is the master's, and a component sizing
+       * against the wrong one would letterbox its own media. */
+      ...(row.durationSec !== null ? { durationInSeconds: row.durationSec } : {}),
+      ...(variantRow?.width != null
+        ? { width: variantRow.width }
+        : row.width !== null
+          ? { width: row.width }
+          : {}),
+      ...(variantRow?.height != null
+        ? { height: variantRow.height }
+        : row.height !== null
+          ? { height: row.height }
+          : {}),
+    }
+  }
+
+  return map
 }

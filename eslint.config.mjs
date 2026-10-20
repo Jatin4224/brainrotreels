@@ -222,6 +222,57 @@ const eslintConfig = defineConfig([
     },
   },
   {
+    // RENDER_DETERMINISM — a frame must be a pure function of the document and
+    // the frame number. Phase 04 reuses a render whenever the document hash
+    // matches, so a component that reads the clock or a random number makes a
+    // CACHED render differ from a fresh one — two customers paying for the
+    // same video and getting different files, with nothing in the document to
+    // explain it. Remotion also renders frames out of order and in parallel
+    // across processes, so these values are not even stable WITHIN one render.
+    // determinism.test.ts asserts the same thing, because a lint rule is
+    // skippable and this one must not be.
+    files: ['src/remotion/**/*.ts', 'src/remotion/**/*.tsx', 'src/lib/render/**/*.ts'],
+    rules: {
+      'no-restricted-properties': [
+        'error',
+        {
+          object: 'Date',
+          property: 'now',
+          message:
+            'RENDER_DETERMINISM: a render must not read the clock. Derive timing from useCurrentFrame() and the document.',
+        },
+        {
+          object: 'Math',
+          property: 'random',
+          message:
+            'RENDER_DETERMINISM: a render must not be random. Seed any variation from the document (an item id, an index) so it reproduces.',
+        },
+        {
+          object: 'performance',
+          property: 'now',
+          message:
+            'RENDER_DETERMINISM: a render must not read the clock. Derive timing from useCurrentFrame().',
+        },
+      ],
+      'no-restricted-globals': [
+        'error',
+        {
+          name: 'crypto',
+          message:
+            'RENDER_DETERMINISM: random ids make two renders of one document differ. Use an id from the document instead.',
+        },
+      ],
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "NewExpression[callee.name='Date'][arguments.length=0]",
+          message:
+            'RENDER_DETERMINISM: `new Date()` reads the clock, so the same document would render differently each time. Take the time from the document.',
+        },
+      ],
+    },
+  },
+  {
     // The purity guard has to READ the module's files to prove what they
     // import, so it is the one file under src/lib/timeline/ that may touch
     // node:fs. The database and provider fences above still apply — a test is
