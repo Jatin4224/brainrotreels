@@ -8,7 +8,8 @@ worse than an empty box.
 - [x] Phase 01: Timeline document — all checks met; verified end to end 2026-10-19.
 - [ ] Phase 02: Media assets and storage — built; **blocked on R2 credentials** for the ingest
       round-trip. See the note below for exactly which checks are met and which are untested.
-- [ ] Phase 03: Render core
+- [ ] Phase 03: Render core — built and rendering; the Player has no real document to mount
+      until generation exists (Phase 06/09). See the note below.
 - [ ] Phase 04: Cloud rendering
 - [ ] Phase 05: Credits and entitlements
 - [ ] Phase 06: Script generation
@@ -263,3 +264,130 @@ outstanding from Phase 00, and the key convention still assumes it.
 **Also deferred:** one throwaway QA account remains — `qa-phase02-media@example.com` and its
 auto-created workspace. It owns no assets and no projects; the user and org rows remain, as
 Phase 01's do.
+
+### Phase 03 — 2026-10-20
+
+Built: `src/remotion/` (the `TimelineRenderer` composition, the component registry, `MediaClip`,
+`TextOverlay`, `AudioClip`, the bundled-font loader, the dev asset map and the studio root),
+`src/lib/render/` (the pure frame plan, the ducking curve and the forward-compatibility
+sanitiser), `projects.preview` plus `signDocumentAssets`, the preview page at
+`/dashboard/projects/[id]/preview`, a determinism eslint fence over both folders, and
+`remotion.config.ts`. 42 new tests; the suite is 381 and green, `tsc --noEmit`, `eslint` and
+`next build` are clean.
+
+Remotion 4.0.536 was added (`remotion`, `@remotion/player`, `@remotion/cli`) plus
+`@fontsource/geist-sans` as a dev dependency — the source of the two woff2 files copied into
+`public/fonts/`, so the render font is the same Geist the app UI uses and is versioned by the
+lockfile rather than downloaded.
+
+**Decisions worth knowing about, because none of them were in the phase file:**
+
+- **The plan is a pure module, separate from the composition.** `src/lib/render/` takes a
+  document and returns a frame-addressed draw list, importing no React and no Remotion. That is
+  what makes the interesting questions testable without a browser — visibility windows, stacking
+  order, frame conversion — and Phase 15's editor needs the same answers for its ruler without
+  importing a composition. Grep `PLAN_IS_PURE`.
+- **Tracks composite by TYPE first, then by document order.** `LAYER_ORDER` is a fixed per-type
+  floor (video → scene → overlay → caption) because a generator is free to list its tracks in any
+  order, and the Reddit fixture already puts its scene track before its audio. Sorting globally by
+  `z` was the alternative and it is wrong: only overlays declare `z`, so everything else would
+  collapse to one depth. Ties break on document position, so the sort is total — an unstable draw
+  order would mean two different videos from one document hash, which is what Phase 04 caches on.
+- **A `render` value outside the schema's union no longer blanks the video.** `timelineDocSchema`
+  is `.strict()` with a closed enum, which is right for everything that WRITES a document and
+  wrong for the thing that renders one: a document from a newer release would fail the whole parse
+  on one unrecognised overlay. `dropUnknownRenderKinds` removes those items before the parse and
+  logs them, so the rest still renders. Grep `ONE_BAD_ITEM_IS_NOT_A_BAD_DOCUMENT`. The other half
+  — a kind that IS in the union but has no component yet, like `redditCard` — was already handled
+  by the registry's own fallback. Both were probed in a real render.
+- **Components receive ITEM-RELATIVE frames.** The walker mounts every item in its own
+  `<Sequence from={…}>`, so `useCurrentFrame()` inside a component starts at 0 for that item. This
+  is written on `RenderItemProps` as `FRAMES_ARE_RELATIVE_INSIDE` because the first version of
+  MediaClip subtracted the offset again and pushed every Ken Burns progress negative.
+- **Looping uses Remotion's `<Loop>` for video and explicit sequences for ducked audio.** `<Loop>`
+  mounts the repetition belonging to the current frame, which keeps a frame a pure function of its
+  number — the element's own `loop` attribute has an internal playhead that out-of-order frame
+  rendering cannot rely on. Ducked audio cannot use `<Loop>` at all: its children cannot tell which
+  repetition they are, so a ducking curve inside one would reset every few seconds and duck against
+  the wrong part of the narration. Grep `EXPLICIT_REPETITIONS_FOR_DUCKED_LOOPS`.
+- **Ducking is computed from where the narration actually is.** The document stores `duck: true`,
+  never a curve, so re-recording a line re-ducks the music with no document change. Narration is
+  identified by an audio item naming a `speaker` — not by a track called "narration", which would
+  make the mix depend on a label the editor lets a customer rename. An item that asks to be ducked
+  is excluded from its own windows, so it cannot duck against itself.
+- **Crop/pad, mute and Ken Burns all read from the document**, never from a constant in a
+  component. `fit` defaults to `cover`; Ken Burns is opt-in through the item's open `props` bag and
+  is a LINEAR drift, because an eased one needs a curve in the document to be reproducible and that
+  belongs to Phase 16.
+- **`TextOverlay` is the one component allowed to hardcode colour**, and it is documented as the
+  exception rather than a lapse: these pixels are composited by a headless browser with no
+  stylesheet, no CSS variables and no dark mode, so a theme token would render as the browser
+  default — black text on dark gameplay footage. Phase 08 moves the values into the document's own
+  palette. Grep `RENDER_COLOURS_ARE_LITERAL`.
+- **`createElement`, not JSX, for the registry dispatch.** Assigning a looked-up component to a
+  capitalised local trips `react-hooks/static-components`: the compiler cannot tell a registry
+  lookup from a component built during render. `createElement` states the dispatch is dynamic, and
+  the identity really is stable because the registry is a module constant. The render output was
+  byte-identical before and after that change.
+- **Two guards on determinism, deliberately doubled.** An eslint rule over `src/remotion/**` and
+  `src/lib/render/**` bans `Date.now`, `Math.random`, `performance.now`, `crypto` and bare
+  `new Date()`; `determinism.test.ts` asserts the same thing by reading the files, because a lint
+  rule is skippable and this one must not be. The test strips comments first — every file on this
+  path names the forbidden calls in the comments explaining why they are forbidden.
+
+**Verified end to end (2026-10-20).**
+
+- **A real local render.** `npm run remotion:render` produces `out/reddit-story.mp4`: H.264 +
+  AAC, **1080×1920, 30fps, 228 frames, 7.6s**, from a document-derived duration with nothing
+  hard-coded. A frame pulled out of it shows the background video filling 9:16 and the text
+  overlay in the bundled font — looked at, not inferred.
+- **Determinism, byte-for-byte.** Rendering the same document twice produced **byte-identical
+  MP4s** — stronger than the brief's "identical frames". The `createElement` refactor afterwards
+  produced a file identical to the pre-refactor render too.
+- **Both determinism guards were probed** with a throwaway `Math.random()` in a component: eslint
+  rejected it by rule name and the test failed naming the file. Both pass again after the revert.
+- **Missing tracks render correctly.** All four fixtures render: `voiceover` (no music bed, and
+  ANCHORED, so it also exercises `resolveWordAnchors` before rendering), `quiz` (no overlay track)
+  and `motion` (no video and no audio at all — no spine). Mean frame luma confirms they are real
+  frames, not black ones.
+- **Unknown render kinds, in a real render.** A probe document carrying both `someFutureThing`
+  (outside the union) and `redditCard` (in the union, no component) logged one warning each —
+  *"Dropped 1 item(s)… The rest of the video still renders"* and *"No component for render kind
+  'redditCard' — drawing nothing"* — and rendering continued.
+- **Browser playback.** The Remotion studio plays `reddit-story` at 1080×1920/30fps with the
+  video decoded (`readyState: 4`, 540×960, playing at 3.4s), **two audio elements mounted**, and
+  **both font faces reporting `GeistRender:loaded`**. Zero console errors, zero failed requests.
+- **The preview page works** against a real project: the route is gated, the page renders, and
+  `projects.preview` returns 200 while correctly distinguishing "no timeline" from "broken
+  timeline". The QA project was deleted afterwards.
+
+**NOT verified, and why.**
+
+- **The `<Player>` has never been handed a real document**, because nothing in the product can
+  create a `Timeline` row yet — `projects.create` writes the project only, and generation is
+  Phase 06/09. The preview page therefore always shows its empty state today. The composition it
+  would mount is the same one the CLI renders and the studio plays, both verified above, so what
+  is untested is the binding in `project-preview.tsx`, not the rendering.
+- **No render has ever used a real R2 asset**, for the same reason Phase 02 is unticked: no `R2_*`
+  credentials. Every render so far resolves its media through the dev asset map, so
+  `signDocumentAssets` has been exercised only against an empty handle list.
+- **Pixel snapshots are the local render, not the test suite.** The three-frame snapshots are
+  taken against the PLAN. A pixel snapshot needs a headless browser, takes tens of seconds and
+  breaks on a Chrome or ffmpeg bump that changes nothing about this product; the plan is where the
+  decisions that can actually be wrong live.
+
+**Two wrinkles worth knowing about.**
+
+- `remotion render --props=<file>` builds a bundle whose `public/` is missing, so `staticFile()`
+  URLs 404 under that flag while the identical URL resolves in a normal render. The probe above
+  worked around it. It does not affect `npm run remotion:render`, the studio, the Player, or
+  Phase 04's Lambda path (which uses a deployed site rather than this CLI bundle).
+- The studio reports *"Can't save default props"* for every composition, because they are
+  registered in a `.map()` over `FIXTURES_BY_KIND` rather than as static literals. That only stops
+  the studio writing prop edits back into `root.tsx`; rendering and the Player are unaffected, and
+  the loop is what makes a fifth project kind appear in the studio with no edit.
+
+**One licensing note for the owner.** Remotion is free for individuals and small teams but
+requires a paid company licence beyond that — see remotion.dev/license. `architecture.md` committed
+to Remotion, so this is a cost to confirm rather than a decision to revisit, and it lands before
+Phase 04 deploys a renderer.

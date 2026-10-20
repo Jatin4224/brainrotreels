@@ -30,7 +30,8 @@
  */
 
 import * as React from 'react'
-import { Copy, Loader2Icon, MoreHorizontal, Pencil, Trash2 } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { Copy, Loader2Icon, MoreHorizontal, Pencil, PlayIcon, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { trpc } from '@/trpc/react-provider'
@@ -73,6 +74,7 @@ export interface ProjectRowActionsProps {
 
 export function ProjectRowActions({ organizationId, project }: ProjectRowActionsProps) {
   const utils = trpc.useUtils()
+  const router = useRouter()
   const { hasPermission } = useActiveOrganization()
   const [renaming, setRenaming] = React.useState(false)
   const [confirmingDelete, setConfirmingDelete] = React.useState(false)
@@ -129,6 +131,15 @@ export function ProjectRowActions({ organizationId, project }: ProjectRowActions
           }
         />
         <DropdownMenuContent align="end">
+          {/* First, and available to anyone who can READ the project — watching
+              a video is not an edit. The route is typed, so a rename of the
+              page fails the build rather than shipping a dead menu item. */}
+          <DropdownMenuItem
+            onClick={() => router.push(`/dashboard/projects/${project.id}/preview`)}
+          >
+            <PlayIcon className="size-4" />
+            Preview
+          </DropdownMenuItem>
           {canUpdate ? (
             <DropdownMenuItem onClick={() => setRenaming(true)}>
               <Pencil className="size-4" />

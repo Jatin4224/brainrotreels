@@ -14,6 +14,8 @@
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
     "db:generate": "prisma generate",
+    "remotion:studio": "remotion studio src/remotion/index.ts",
+    "remotion:render": "remotion render src/remotion/index.ts reddit-story out/reddit-story.mp4",
     "postinstall": "prisma generate"
   },
   "dependencies": {
@@ -28,6 +30,7 @@
     "@radix-ui/react-slot": "^1.2.4",
     "@react-email/components": "^1.0.12",
     "@react-email/render": "^2.0.9",
+    "@remotion/player": "^4.0.536",
     "@stripe/react-stripe-js": "^6.6.0",
     "@stripe/stripe-js": "^9.8.0",
     "@tanstack/react-query": "^5.100.9",
@@ -53,6 +56,7 @@
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "react-hook-form": "^7.75.0",
+    "remotion": "^4.0.536",
     "resend": "^6.16.0",
     "server-only": "^0.0.1",
     "shadcn": "^4.12.0",
@@ -63,6 +67,8 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@fontsource/geist-sans": "^5.3.0",
+    "@remotion/cli": "^4.0.536",
     "@tailwindcss/postcss": "^4",
     "@types/canvas-confetti": "^1.9.0",
     "@types/node": "^20",
