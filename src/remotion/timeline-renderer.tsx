@@ -57,6 +57,7 @@ import { dropUnknownRenderKinds, planTimeline, type PlannedItem } from '@/lib/re
 import { timelineDocSchema, type TimelineDoc } from '@/lib/timeline'
 import type { AssetUrlMap, RenderItemProps } from '@/lib/types'
 import { AudioClip } from './components/audio-clip'
+import { Watermark } from './components/watermark'
 import { loadRenderFonts } from './fonts'
 import { resolveRenderComponent } from './registry'
 
@@ -69,9 +70,18 @@ export type TimelineRendererProps = {
   /** A resolved document, as JSON — see PARSE_ONCE_AT_THE_BOUNDARY. */
   doc: Record<string, unknown>
   assets: AssetUrlMap
+  /**
+   * WATERMARK_IS_A_PROP. Set by the render pre-flight from the workspace's
+   * `watermarkFree` entitlement, never by a generator and never from the
+   * document — see the note on `timelineRendererPropsSchema` in
+   * src/lib/types/render.ts for the three ways a document field would go
+   * wrong. Optional and defaulting to false, because the studio and the CLI
+   * render fixtures with no workspace behind them.
+   */
+  watermark?: boolean
 }
 
-export function TimelineRenderer({ doc, assets }: TimelineRendererProps) {
+export function TimelineRenderer({ doc, assets, watermark = false }: TimelineRendererProps) {
   /* Before the first frame, not in an effect — an effect would run after
    * frame 0 had already been captured with the fallback face. */
   loadRenderFonts()
@@ -131,6 +141,12 @@ export function TimelineRenderer({ doc, assets }: TimelineRendererProps) {
           />
         </Sequence>
       ))}
+
+      {/* LAST, and therefore on top of every track. Outside the walk rather
+          than inside it, because an item in the plan composites by LAYER_ORDER
+          and could be painted over by any full-frame clip — see
+          WATERMARK_IS_NOT_A_TRACK_ITEM. */}
+      {watermark ? <Watermark canvas={timeline.canvas} /> : null}
     </AbsoluteFill>
   )
 }

@@ -86,6 +86,30 @@ const eslintConfig = defineConfig([
               message:
                 'PROVIDER_ISOLATION: spawn processes only inside src/lib/adapters/media/ffmpeg/**. Elsewhere, use getMediaAdapter() from @/lib/adapters/media — and call it from a workflow step, never from a route or a tRPC handler.',
             },
+            // Render seam. @remotion/lambda drags the AWS SDK and the whole
+            // Remotion bundler in with it, so it must never be evaluated in a
+            // process that is not rendering — and certainly never reach a page
+            // bundle. Starting a render also has a BILL attached, which is why
+            // it may only be reached from a workflow step: the gates that
+            // authorise it live in the procedure layer, and a route or a
+            // component calling the provider directly would bypass every one
+            // of them. See LAMBDA_IS_RIGHT_FOR_RENDERING.
+            //
+            // `remotion` and `@remotion/player` are deliberately NOT fenced:
+            // they are the composition and the preview player, which are app
+            // code under src/remotion/ and a client component respectively.
+            {
+              group: [
+                '@remotion/lambda',
+                '@remotion/lambda/*',
+                '@remotion/lambda/**',
+                '@remotion/lambda-client',
+                '@remotion/lambda-client/*',
+                '@remotion/lambda-client/**',
+              ],
+              message:
+                'PROVIDER_ISOLATION: import the Remotion Lambda SDK only inside src/lib/adapters/render/lambda/**. Elsewhere, use getRenderAdapter() from @/lib/adapters/render — and call it from a workflow step, never from a route or a tRPC handler.',
+            },
           ],
         },
       ],
@@ -121,6 +145,10 @@ const eslintConfig = defineConfig([
       // stays pure and tool-free so the decisions it makes can be unit tested
       // without a binary installed.
       'src/lib/adapters/media/ffmpeg/**/*.ts',
+      // Render seam. Only the lambda folder may speak to Remotion Lambda;
+      // cache-key.ts and the frame plan stay pure so the decisions that can
+      // actually be wrong are unit testable with no AWS account.
+      'src/lib/adapters/render/lambda/**/*.ts',
     ],
     rules: {
       'no-restricted-imports': [

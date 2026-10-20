@@ -33,6 +33,7 @@ import { devRouter } from './dev'
 import { userRouter } from './user'
 import { projectsRouter } from './projects'
 import { assetsRouter } from './assets'
+import { rendersRouter } from './renders'
 
 /**
  * SOURCE OF TRUTH KEYWORDS: appRouter, AppRouter
@@ -47,6 +48,7 @@ export const appRouter = createTRPCRouter({
   organization: organizationRouter,
   projects: projectsRouter,
   assets: assetsRouter,
+  renders: rendersRouter,
   usage: usageRouter,
   auditLogs: auditLogsRouter,
   member: memberRouter,

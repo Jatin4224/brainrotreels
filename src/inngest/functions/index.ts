@@ -21,6 +21,12 @@
 
 import { assetIngestFunction } from './asset-ingest'
 import { helloFunction } from './hello'
+import { projectRenderFunction } from './project-render'
 import { usageResetFunction } from './usage-reset'
 
-export const INNGEST_FUNCTIONS = [helloFunction, usageResetFunction, assetIngestFunction]
+export const INNGEST_FUNCTIONS = [
+  helloFunction,
+  usageResetFunction,
+  assetIngestFunction,
+  projectRenderFunction,
+]

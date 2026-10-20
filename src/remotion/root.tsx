@@ -40,17 +40,81 @@
 import { Composition } from 'remotion'
 
 import { planComposition } from '@/lib/render'
-import { resolveWordAnchors } from '@/lib/timeline'
+import { resolveWordAnchors, timelineDocSchema } from '@/lib/timeline'
 import { FIXTURES_BY_KIND } from '@/lib/timeline/fixtures'
+import { TIMELINE_COMPOSITION_ID } from '@/lib/types/render'
 import { devAssetMap } from './dev-assets'
-import { TimelineRenderer } from './timeline-renderer'
+import { TimelineRenderer, type TimelineRendererProps } from './timeline-renderer'
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: METADATA_FROM_THE_PROPS, calculateMetadata,
+ *   ONE_PRODUCTION_COMPOSITION, DURATION_FROM_THE_DOCUMENT
+ *
+ * WHAT:  Derives a composition's canvas and frame count from the document it
+ *        is actually being handed.
+ *
+ * WHY:   METADATA_FROM_THE_PROPS, and it is the piece without which a cloud
+ *        render is silently wrong. A `<Composition>` declares its
+ *        `durationInFrames`, `fps`, `width` and `height` at REGISTRATION time
+ *        — when the bundle is built, long before anybody asks for a render —
+ *        so a composition registered from a fixture renders every document at
+ *        the FIXTURE's length. A 60-second project handed to a composition
+ *        registered from a 7.6-second fixture produces 7.6 seconds of video:
+ *        it succeeds, it is paid for, and the only symptom is a video that
+ *        stops mid-sentence.
+ *
+ *        `calculateMetadata` is the hook that runs with the real
+ *        `inputProps` in hand, so the answer comes from `planComposition()` on
+ *        the document being rendered. It is the same function the preview page
+ *        and the local CLI already use, which is what keeps all three
+ *        agreeing (DURATION_FROM_THE_DOCUMENT).
+ *
+ *        The document is PARSED here rather than trusted, because props arrive
+ *        as JSON across a network on the Lambda path and this runs before the
+ *        component does. A document that will not parse falls back to one
+ *        second at the canvas the schema defaults to, so the render produces a
+ *        black frame and the component logs the reason
+ *        (BAD_DOCUMENT_DRAWS_BLACK) — rather than this throwing, which on
+ *        Lambda is a render that consumed its budget and produced nothing to
+ *        look at.
+ * WHERE: The production composition below, and every fixture composition, so
+ *        the studio exercises the same code path a render does.
+ */
+function metadataFromProps({ props }: { props: TimelineRendererProps }) {
+  const parsed = timelineDocSchema.safeParse(props.doc)
+  if (!parsed.success) {
+    console.error(
+      '[remotion/root] calculateMetadata could not parse the document; rendering one black frame.',
+      parsed.error.issues.slice(0, 5),
+    )
+    return { durationInFrames: 30, fps: 30, width: 1080, height: 1920 }
+  }
+
+  const plan = planComposition(parsed.data)
+  return {
+    durationInFrames: plan.durationInFrames,
+    fps: plan.fps,
+    width: plan.width,
+    height: plan.height,
+  }
+}
 
 export function RemotionRoot() {
   return (
     <>
+      {/* ONE_PRODUCTION_COMPOSITION — the id a cloud render names. It carries
+          no document of its own: every dimension comes from the props it is
+          handed, and `defaultProps` is the empty shape only so the studio can
+          list it. Rendering it with no props draws one black frame, which is
+          the honest result of being asked to render nothing. */}
+      <Composition
+        id={TIMELINE_COMPOSITION_ID}
+        component={TimelineRenderer}
+        calculateMetadata={metadataFromProps}
+        defaultProps={{ doc: {}, assets: {}, watermark: false }}
+      />
       {Object.entries(FIXTURES_BY_KIND).map(([kind, build]) => {
         const doc = resolveWordAnchors(build())
-        const plan = planComposition(doc)
 
         return (
           <Composition
@@ -60,11 +124,14 @@ export function RemotionRoot() {
              * somebody can guess rather than an index. */
             id={kind}
             component={TimelineRenderer}
-            durationInFrames={plan.durationInFrames}
-            fps={plan.fps}
-            width={plan.width}
-            height={plan.height}
-            defaultProps={{ doc, assets: devAssetMap(doc) }}
+            /* The same derivation as the production composition, rather than
+             * the fixture's own numbers computed here. It is the same answer
+             * for an unedited fixture, and it means the studio exercises the
+             * code path a cloud render depends on — so a bug in
+             * METADATA_FROM_THE_PROPS shows up locally instead of only in a
+             * paid render. */
+            calculateMetadata={metadataFromProps}
+            defaultProps={{ doc, assets: devAssetMap(doc), watermark: false }}
           />
         )
       })}

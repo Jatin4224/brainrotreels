@@ -94,6 +94,43 @@ export function useFeatureGate(resource: ResourceKey): FeatureGateData | null {
 }
 
 /**
+ * SOURCE OF TRUTH KEYWORDS: usePlanTier, PLAN_FROM_THE_GATE_QUERY
+ *
+ * WHAT:  The plan the active workspace is on, or null while it resolves.
+ * WHY:   PLAN_FROM_THE_GATE_QUERY. `usage.getFeatureGates` already returns the
+ *        tier alongside the gates, and it is already cached for five minutes
+ *        by every gated button on the screen — so a screen that needs the plan
+ *        itself should read it from THAT query rather than adding a second
+ *        round-trip that can disagree with it.
+ *
+ *        It exists because a per-plan ENTITLEMENT SET cannot be a registry
+ *        `flag`: a flag is a boolean, and "which resolutions may this plan
+ *        render at" is a set (see RESOLUTION_PER_PLAN). Such a screen needs
+ *        the plan key to look the set up, which `useFeatureGate` deliberately
+ *        does not expose because a gate is about one resource.
+ *
+ *        Still UX only. The server re-checks every entitlement this is used to
+ *        render — a disabled option is a courtesy, never a boundary.
+ * WHERE: The render panel's resolution options. Three older call sites read
+ *        `gatesQuery.data?.tier` by hand and predate this hook; they are
+ *        unchanged and should move onto it when they are next touched.
+ */
+export function usePlanTier(): FeatureGatesData['tier'] | null {
+  const organizationId = useActiveOrganizationId()
+  const input = organizationId ? { organizationId } : undefined
+
+  const { data } = trpc.usage.getFeatureGates.useQuery(
+    input ?? { organizationId: '' },
+    {
+      enabled: input !== undefined,
+      ...FEATURE_GATES_QUERY_OPTIONS,
+    }
+  )
+
+  return data?.tier ?? null
+}
+
+/**
  * SOURCE OF TRUTH KEYWORDS: FeatureGate
  *
  * WHAT:  Wraps a single child element, intercepts onClick when at-limit, and

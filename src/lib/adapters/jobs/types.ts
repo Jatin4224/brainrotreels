@@ -39,6 +39,26 @@ export const JOB_EVENT_NAMES = [
   'project/requested',
   'project/cancelled',
   'render/requested',
+  /**
+   * RENDER_FINISHED_IS_DOMAIN_VERB. Sent by
+   * src/app/api/webhooks/remotion/route.ts, NOT by app code: it is the render
+   * provider telling us a render ended, relayed onto the queue so the waiting
+   * workflow can resume. It is the one event here whose producer is a webhook
+   * rather than a router, which is exactly why it exists — a `waitForEvent`
+   * needs an event, and the webhook has nowhere else to put the news.
+   *
+   * Phase 04's brief calls this `remotion/render.finished`. It is NOT named
+   * that, for two reasons. The shape rule in select-provider.test.ts requires
+   * `domain/verb` with no dots — a convention worth more than one literal from
+   * a brief, because it is what keeps every event name greppable and
+   * machine-checkable. And the domain here is `render`, not `remotion`: the
+   * event means "a render finished", which is true whatever renders it, and
+   * naming it after the current provider would put a vendor in a contract that
+   * exists precisely so the vendor can be swapped (see the render adapter
+   * seam). The webhook ROUTE is still provider-specific and still named after
+   * Remotion; the event it relays is not.
+   */
+  'render/finished',
   'asset/uploaded',
   'footage/requested',
   'line/changed',

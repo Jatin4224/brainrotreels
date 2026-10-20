@@ -253,6 +253,84 @@ export const RESOURCES = {
       createUploadUrl: { count: 60, window: '1 m' },
     },
   },
+  /**
+   * SOURCE OF TRUTH KEYWORDS: RESOURCES.renders, PERIODIC_RENDERS,
+   *   RENDERS_HAVE_NO_DELETE, renders.create
+   *
+   * Paid cloud renders. `limit` is PERIODIC (`period: 'month'`), which is the
+   * one field here that cannot be guessed from the rest: a render is consumed
+   * rather than held, so the cap has to refill, and `periodicResourceKeys()`
+   * in src/lib/usage-period.ts picks this entry up with no cron wiring — the
+   * Phase 00 `usage.reset` workflow already iterates whatever declares it.
+   * Declaring it absolute (the default) would hand a free workspace five
+   * renders for the lifetime of the account.
+   *
+   * RENDERS_HAVE_NO_DELETE, and that is deliberate rather than unfinished.
+   * `delete` is absent from the permission list because the factory
+   * auto-DECREMENTS a limit resource's counter on `<resource>.delete`
+   * (section 13 of src/trpc/procedures/protected.ts) — so a delete verb would
+   * refund the monthly quota every time a customer tidied up their render
+   * history, which is a free render for the price of two clicks. The output is
+   * an Asset and is deleted through `assets.delete` like any other media.
+   *
+   * The audit template is keyed `create`, which is the path verb here
+   * (`renders.create`) — unlike `assets`, where the mutation that creates the
+   * row is called `completeUpload`. See the note on that entry for why the key
+   * has to be the PATH verb and not the CRUD word.
+   */
+  renders: {
+    name: 'Renders',
+    description: 'Videos rendered per month',
+    permissions: ['create', 'read'],
+    limit: {
+      perPlan: { free: 5, starter: 100, pro: 1000, enterprise: 'unlimited', portal: 'unlimited' },
+      upgradeMessage: 'Upgrade to {nextPlan} to render more videos each month',
+      availableOnFreeTrial: true,
+      unit: 'renders',
+      period: 'month',
+    },
+    audit: {
+      describe: {
+        create: 'Started a render for project {input.projectId}',
+        retry: 'Retried render {input.id}',
+      },
+    },
+    /* A render is the most expensive thing a customer can trigger, and the
+     * plan cap is a MONTHLY number — it does nothing about thirty renders in
+     * one minute from a stuck client, which on an unlimited plan is unbounded
+     * spend. The monthly quota is the budget; this is the blast radius. */
+    rateLimit: {
+      create: { count: 10, window: '1 m' },
+      retry: { count: 5, window: '1 m' },
+    },
+  },
+
+  /**
+   * SOURCE OF TRUTH KEYWORDS: RESOURCES.watermarkFree, WATERMARK_BY_ENTITLEMENT
+   *
+   * WATERMARK_BY_ENTITLEMENT. A flag with no `permissions` and no `nav`, which
+   * is the registry's shape for a pure plan entitlement: nothing calls
+   * `watermarkFree.*`, so there is no procedure path for the factory's flag
+   * gate (section 10) to fire on. It is read directly, exactly once, by
+   * `checkBooleanFeature(organizationId, 'watermarkFree')` in the render
+   * pre-flight — see WATERMARK_IS_DECIDED_BEFORE_THE_RENDER in
+   * src/inngest/functions/project-render.ts for why that is the only place
+   * allowed to ask, and why a generator must never put the answer in a
+   * document.
+   *
+   * `availableOnFreeTrial: false` on purpose: a trial that shipped
+   * watermark-free exports would make the trial the product.
+   */
+  watermarkFree: {
+    name: 'Watermark-free export',
+    description: 'Export finished videos without the watermark',
+    flag: {
+      perPlan: { free: false, starter: true, pro: true, enterprise: true, portal: true },
+      availableOnFreeTrial: false,
+      upgradeMessage: 'Upgrade to {nextPlan} to export without the watermark',
+    },
+  },
+
   invitation: {
     name: 'Invitations',
     description: 'Send invites and cancel pending invitations',

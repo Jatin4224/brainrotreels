@@ -12,12 +12,17 @@
  * SOURCE OF TRUTH KEYWORDS: RenderQuality, renderQualitySchema,
  *   RESOLVED_ASSET, ResolvedAsset, AssetUrlMap, assetUrlMapSchema,
  *   TimelineRendererProps, timelineRendererPropsSchema, RenderItemProps,
- *   VARIANT_BY_QUALITY, previewProjectSchema, URL_NEVER_IN_THE_DOCUMENT
+ *   VARIANT_BY_QUALITY, previewProjectSchema, URL_NEVER_IN_THE_DOCUMENT,
+ *   RENDER_STATUSES, renderStatusSchema, RENDER_RESOLUTIONS,
+ *   SCALE_BY_RESOLUTION, RESOLUTION_PER_PLAN, createRenderSchema,
+ *   RENDER_ATTEMPT_LIMIT, LOCKED_NOT_HIDDEN
  *
  * WHAT:  The contract between a timeline document and the Remotion composition
  *        that draws it: which variant each quality reads, the signed-URL map
  *        the composition is handed, and the props every render component
- *        receives.
+ *        receives — plus, from Phase 04 down the second half of the file, the
+ *        vocabulary of a CLOUD render: its status, its output size, and the
+ *        input schema of every `renders.*` procedure.
  * WHY:   URL_NEVER_IN_THE_DOCUMENT. `doc.assets` holds Asset row ids and
  *        licences, never URLs — `assetRefSchema` in src/lib/timeline/schema.ts
  *        says so, because a URL is signed per request and a stored one is a
@@ -43,6 +48,7 @@
 
 import { z } from 'zod'
 
+import type { PlanKey } from '@/lib/config/plans'
 import { variantNameSchema, type VariantName } from './asset'
 
 /**
@@ -62,6 +68,28 @@ import { variantNameSchema, type VariantName } from './asset'
  *        for.
  * WHERE: `projects.preview`; the render pre-flight in Phase 04.
  */
+/**
+ * SOURCE OF TRUTH KEYWORDS: TIMELINE_COMPOSITION_ID, ONE_PRODUCTION_COMPOSITION
+ *
+ * WHAT:  The id of the composition a CLOUD render targets.
+ * WHY:   ONE_PRODUCTION_COMPOSITION. The studio registers one composition per
+ *        fixture (FIXTURES_ARE_THE_COMPOSITIONS in src/remotion/root.tsx),
+ *        which is right for development and wrong for a render: those
+ *        compositions carry a fixture's document as their default props and,
+ *        before Phase 04, took their duration from it. A cloud render names
+ *        THIS id instead — a composition with no document of its own, whose
+ *        canvas and frame count are computed from the props it is handed.
+ *
+ *        It lives here rather than in src/remotion/ because the adapter that
+ *        names it must not import a React module: `@/lib/adapters/render` runs
+ *        in a workflow with no DOM, and importing src/remotion/index.ts would
+ *        execute `registerRoot`. One string, two consumers, neither importing
+ *        the other.
+ * WHERE: Registered in src/remotion/root.tsx; named by
+ *        src/lib/adapters/render/lambda.
+ */
+export const TIMELINE_COMPOSITION_ID = 'timeline'
+
 export const RENDER_QUALITIES = ['preview', 'final'] as const
 
 export const renderQualitySchema = z.enum(RENDER_QUALITIES)
@@ -167,6 +195,22 @@ export const timelineRendererPropsSchema = z
   .object({
     doc: z.record(z.string(), z.unknown()),
     assets: assetUrlMapSchema,
+    /**
+     * WATERMARK_IS_A_PROP, not a document field, and that distinction is the
+     * whole of the phase's rule 7. It is an ENTITLEMENT — the answer depends
+     * on the plan the workspace is on at the moment the render starts, which
+     * is not a property of the video being made. Putting it in the document
+     * would mean a generator decided it (which the phase forbids outright), a
+     * downgrade could be escaped by re-rendering an old document, and the
+     * value would be covered by `hashDoc` instead of by the cache key, so an
+     * upgrade would be served the watermarked file it had already paid for.
+     *
+     * Optional, defaulting to false at the component, because the studio and
+     * the CLI render a fixture with no workspace behind it. The only thing
+     * that may set it true is the pre-flight in
+     * src/inngest/functions/project-render.ts.
+     */
+    watermark: z.boolean().optional(),
   })
   .strict()
 
@@ -234,3 +278,202 @@ export const previewProjectSchema = z.object({
 })
 
 export type PreviewProjectValues = z.infer<typeof previewProjectSchema>
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: RENDER_STATUSES, renderStatusSchema, RenderStatus,
+ *   RENDER_TERMINAL_STATUSES, isTerminalRenderStatus, STRING_NOT_ENUM
+ *
+ * WHAT:  The lifecycle of a Render row.
+ * WHY:   STRING_NOT_ENUM, the same reason as every other status union in this
+ *        folder: `Render.status` is a Prisma `String` column, so this is the
+ *        only thing between a typo and a row no screen can interpret.
+ *
+ *        `failed` and `timedOut` are SEPARATE states although both mean "no
+ *        video". They are different failures with different owners: `failed`
+ *        carries a provider error about this document — a composition that
+ *        threw, media that could not be fetched — and is usually the
+ *        customer's to fix; `timedOut` means the render never reported back
+ *        inside the window and says nothing about the document at all, which
+ *        is an operator's problem. Collapsing them would make the second kind
+ *        invisible, and it is the kind that indicates the renderer itself is
+ *        unhealthy.
+ *
+ *        `queued` is the DEFAULT and is load-bearing: `renders.create` returns
+ *        before anything has been started (RENDER_STARTS_OUTSIDE_THE_REQUEST),
+ *        so the honest initial state is "accepted, not yet running".
+ * WHERE: Render.status; the render panel's progress copy; the workflow's
+ *        terminal writes in src/services/renders.service.ts.
+ */
+export const RENDER_STATUSES = ['queued', 'rendering', 'completed', 'failed', 'timedOut'] as const
+
+export const renderStatusSchema = z.enum(RENDER_STATUSES)
+
+export type RenderStatus = z.infer<typeof renderStatusSchema>
+
+/** No further transition is possible from these; nothing may overwrite them. */
+export const RENDER_TERMINAL_STATUSES: readonly RenderStatus[] = [
+  'completed',
+  'failed',
+  'timedOut',
+]
+
+export function isTerminalRenderStatus(status: string): boolean {
+  return (RENDER_TERMINAL_STATUSES as readonly string[]).includes(status)
+}
+
+/** The two states a retry is allowed from — see RETRY_ONCE in the renders router. */
+export const RENDER_RETRYABLE_STATUSES: readonly RenderStatus[] = ['failed', 'timedOut']
+
+export function isRetryableRenderStatus(status: string): boolean {
+  return (RENDER_RETRYABLE_STATUSES as readonly string[]).includes(status)
+}
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: RENDER_ATTEMPT_LIMIT, RETRY_ONCE
+ *
+ * WHAT:  How many times one Render row may be sent to the provider.
+ * WHY:   Two: the original and exactly one retry, which is what the phase
+ *        asks for. The limit is a counted column rather than a boolean so the
+ *        rule is checkable after a restart and visible to an operator reading
+ *        the row — `attempts: 2` says plainly that the retry has been spent.
+ *        Unbounded retries on a paid render is a customer holding a button
+ *        down and an invoice nobody authorised.
+ * WHERE: `renders.retry` in src/trpc/routers/renders.ts.
+ */
+export const RENDER_ATTEMPT_LIMIT = 2
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: RENDER_RESOLUTIONS, renderResolutionSchema,
+ *   RenderResolution, SCALE_BY_RESOLUTION
+ *
+ * WHAT:  The output sizes a customer may ask for, and the scale factor each
+ *        one means.
+ * WHY:   A resolution is expressed as a SCALE of the document's own canvas,
+ *        never as a pixel size. The document already states its canvas
+ *        (`CANVAS_BY_ASPECT`), and every normalized box, font size and overlay
+ *        position in the composition is resolved against it — so rendering at
+ *        a different width by changing the canvas would move everything on
+ *        screen. Remotion's `scale` multiplies the rasterised output instead,
+ *        which is the one knob that changes the file without changing the
+ *        picture.
+ *
+ *        `1080p` is therefore scale 1 — the 9:16 canvas is already 1080x1920 —
+ *        and `720p` is two thirds of it. Written as a fraction rather than as
+ *        720/1080 because the factor must hold for the 1:1 and 16:9 canvases
+ *        Phase 15 allows, where "720p" is not a height of 720 at all.
+ * WHERE: createRenderSchema; the download options on the render panel; the
+ *        `scale` passed to the render adapter.
+ */
+export const RENDER_RESOLUTIONS = ['720p', '1080p'] as const
+
+export const renderResolutionSchema = z.enum(RENDER_RESOLUTIONS)
+
+export type RenderResolution = z.infer<typeof renderResolutionSchema>
+
+export const SCALE_BY_RESOLUTION: Readonly<Record<RenderResolution, number>> = {
+  '720p': 2 / 3,
+  '1080p': 1,
+}
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: RESOLUTION_PER_PLAN, LOCKED_NOT_HIDDEN,
+ *   resolutionsForPlan, isResolutionAllowedForPlan, bestResolutionForPlan
+ *
+ * WHAT:  Which output sizes each plan may render at.
+ * WHY:   LOCKED_NOT_HIDDEN is the phase's own rule and it is a product
+ *        decision, not a UI one: the render panel renders EVERY resolution in
+ *        RENDER_RESOLUTIONS and disables the ones this plan does not include,
+ *        because a hidden option cannot be upgraded towards. A customer who
+ *        never sees `1080p` has no reason to pay for it.
+ *
+ *        Why this is not a `flag` in RESOURCES: a flag is a boolean, and this
+ *        is a SET per plan. Modelling it as `hd1080` + `hd720` flags would put
+ *        two registry entries in a relationship nothing enforces — a plan
+ *        could end up with 1080p and not 720p — whereas a record over the
+ *        resolution union cannot express that. `watermarkFree` IS genuinely
+ *        boolean, which is why that one does live in the registry.
+ *
+ *        Free renders at 720p only. That is the deliberate pairing with the
+ *        watermark: a free export is good enough to prove the product works
+ *        and not good enough to publish.
+ * WHERE: The render panel's option list, and re-checked server-side by
+ *        `renders.create` — a disabled radio is a courtesy, not a boundary.
+ */
+export const RESOLUTION_PER_PLAN: Readonly<Record<PlanKey, readonly RenderResolution[]>> = {
+  free: ['720p'],
+  starter: ['720p', '1080p'],
+  pro: ['720p', '1080p'],
+  enterprise: ['720p', '1080p'],
+  portal: ['720p', '1080p'],
+}
+
+export function resolutionsForPlan(plan: PlanKey): readonly RenderResolution[] {
+  return RESOLUTION_PER_PLAN[plan]
+}
+
+export function isResolutionAllowedForPlan(plan: PlanKey, resolution: RenderResolution): boolean {
+  return RESOLUTION_PER_PLAN[plan].includes(resolution)
+}
+
+/** The highest resolution a plan includes — the sensible default to preselect. */
+export function bestResolutionForPlan(plan: PlanKey): RenderResolution {
+  const allowed = RESOLUTION_PER_PLAN[plan]
+  /* Ordered by RENDER_RESOLUTIONS rather than by the per-plan array, so the
+   * answer does not depend on how someone happened to type the list above. */
+  const best = [...RENDER_RESOLUTIONS].reverse().find((candidate) => allowed.includes(candidate))
+  /* Checked rather than asserted: an empty per-plan list is a configuration
+   * mistake, and quietly falling back to 1080p would hand it away for free. */
+  if (best === undefined) {
+    throw new Error(`[types/render] No render resolution is enabled for the "${plan}" plan.`)
+  }
+  return best
+}
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: createRenderSchema, CreateRenderValues,
+ *   listRendersSchema, getRenderSchema, retryRenderSchema, RENDER_PAGE_SIZE,
+ *   NO_WATERMARK_INPUT
+ *
+ * WHAT:  The input contract of every `renders.*` procedure.
+ * WHY:   `resolution` is REQUIRED rather than defaulted, for the same reason
+ *        `createProjectSchema.aspect` is (see ./project): a zod `.default()`
+ *        makes a schema's input and output types differ, which breaks React
+ *        Hook Form's resolver typing outright. The client preselects
+ *        `bestResolutionForPlan` instead, which is a better default anyway —
+ *        it is the one the customer is paying for.
+ *
+ *        NO_WATERMARK_INPUT: there is deliberately no `watermark` field. The
+ *        watermark is an entitlement the server resolves
+ *        (WATERMARK_BY_ENTITLEMENT); accepting it as input would mean the only
+ *        thing between `watermark: false` from a free workspace and a clean
+ *        export is a handler remembering to ignore it.
+ * WHERE: src/trpc/routers/renders.ts and the render panel.
+ */
+export const RENDER_PAGE_SIZE = 10
+
+export const createRenderSchema = z.object({
+  organizationId: z.string().min(1),
+  projectId: z.string().min(1),
+  resolution: renderResolutionSchema,
+})
+
+export type CreateRenderValues = z.infer<typeof createRenderSchema>
+
+export const listRendersSchema = z.object({
+  organizationId: z.string().min(1),
+  /* Optional: the render panel asks for one project's history, and a
+   * workspace-wide activity view asks for all of it. */
+  projectId: z.string().min(1).optional(),
+  status: renderStatusSchema.optional(),
+})
+
+export type ListRendersValues = z.infer<typeof listRendersSchema>
+
+export const getRenderSchema = z.object({
+  organizationId: z.string().min(1),
+  id: z.string().min(1),
+})
+
+export const retryRenderSchema = getRenderSchema
+
+export type RetryRenderValues = z.infer<typeof retryRenderSchema>

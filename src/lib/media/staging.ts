@@ -104,10 +104,42 @@ export async function downloadToFile(storageKey: string, destinationPath: string
   const storage = await getStorageAdapter()
   const url = await storage.signedGetUrl(storageKey, STAGING_GET_TTL_SECONDS)
 
+  return downloadUrlToFile(url, destinationPath, `object "${storageKey}"`)
+}
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: downloadUrlToFile, FOREIGN_BYTES, OUTPUT_IS_COPIED_NOT_SERVED
+ *
+ * WHAT:  Fetches an arbitrary URL to a local path and returns its byte count.
+ * WHY:   OUTPUT_IS_COPIED_NOT_SERVED. A cloud render leaves its MP4 in the
+ *        RENDER PROVIDER's bucket, not ours, so the finalize step has to pull
+ *        bytes from a URL that no storage adapter knows about — which
+ *        `downloadToFile` cannot do, because it starts by signing a key.
+ *        Factored out rather than duplicated so both callers share the one
+ *        buffering decision and the one error shape.
+ *
+ *        FOREIGN_BYTES: the URL is the provider's, so `label` exists to keep
+ *        the failure readable. "Could not download object orgs/x/y" and "could
+ *        not download the rendered video" send an operator to completely
+ *        different places, and a raw provider URL in the message is a long
+ *        signed string that tells them neither.
+ *
+ *        Buffers the whole body, with the same bound and the same caveat as
+ *        `downloadToFile`: a vertical render of a short-form video is tens of
+ *        megabytes, which is well inside a worker's memory. If renders ever
+ *        get long enough for that to stop being true, this is the line to
+ *        change — and it will be the same change in one place for both.
+ * WHERE: The finalize step of src/inngest/functions/project-render.ts.
+ */
+export async function downloadUrlToFile(
+  url: string,
+  destinationPath: string,
+  label = 'the requested file',
+): Promise<number> {
   const response = await fetch(url)
   if (!response.ok) {
     throw new Error(
-      `[media/staging] Could not download "${storageKey}": ${response.status} ${response.statusText}`
+      `[media/staging] Could not download ${label}: ${response.status} ${response.statusText}`,
     )
   }
 

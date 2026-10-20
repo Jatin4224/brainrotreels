@@ -195,6 +195,7 @@ model Organization {
   activityLogs      ActivityLog[]
   projects          Project[]
   assets            Asset[]
+  renders           Render[]
 
   @@map("organization")
 }
@@ -437,6 +438,7 @@ model Project {
   parent       Project?     @relation("ProjectVersions", fields: [parentId], references: [id])
   versions     Project[]    @relation("ProjectVersions")
   timeline     Timeline?
+  renders      Render[]
 
   @@index([organizationId])
   @@index([organizationId, createdAt])
@@ -559,4 +561,66 @@ model AssetVariant {
   @@unique([assetId, variant])
   @@index([assetId])
   @@map("asset_variant")
+}
+
+// ============================================================================
+// RENDERING — one row per paid render, keyed so an unchanged project is free
+// ============================================================================
+
+/// Render — one attempt to turn a project's timeline into a video file.
+///
+/// `docHash` IS THE CACHE KEY AND IT IS NOT JUST THE DOCUMENT'S HASH. It is
+/// built by renderCacheKey() in src/lib/render/cache-key.ts, which folds
+/// hashDoc(doc) together with every setting that changes the PIXELS — the
+/// resolution and the watermark. The column keeps the brief's name because
+/// that is what the phase and the architecture call it, but storing a bare
+/// hashDoc() here would be a correctness bug with a bill attached, twice over:
+/// a 720p render would satisfy a later request for 1080p, and a free
+/// workspace's watermarked output would be handed back after it upgraded. The
+/// whole point of `@@unique([projectId, docHash])` is that reuse is correct
+/// rather than best-effort, and it is only correct if the key says everything
+/// about the output.
+///
+/// `providerRenderId` IS UNIQUE, which is what makes the retry rule in step 8
+/// of the phase enforceable rather than aspirational: a retry must start a
+/// FRESH provider render and overwrite this column, because reusing the old id
+/// would collide and because a second webhook for the old id must not be able
+/// to resurrect a render that was already marked failed.
+///
+/// `status` is String, not a Prisma enum — this schema has zero enum blocks and
+/// the validated union lives in src/lib/types/render.ts (renderStatusSchema).
+///
+/// `creditsCharged` and `costBreakdown` stay NULL in this phase. Phase 05 owns
+/// them; writing a number here now would be a charge nothing audited.
+///
+/// SOURCE OF TRUTH KEYWORD: Render
+model Render {
+  id               String    @id @default(cuid())
+  organizationId   String
+  projectId        String
+  providerRenderId String?   @unique
+  docHash          String
+  status           String    @default("queued") // queued | rendering | completed | failed | timedOut
+  progress         Float     @default(0)
+  resolution       String    @default("1080p") // 720p | 1080p
+  watermark        Boolean   @default(true)
+  outputAssetId    String?
+  posterAssetId    String?
+  attempts         Int       @default(1)
+  creditsCharged   Int? // populated in Phase 05
+  costBreakdown    Json?
+  error            String?
+  startedAt        DateTime?
+  finishedAt       DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project      Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, docHash])
+  @@index([organizationId])
+  @@index([projectId])
+  @@index([organizationId, createdAt])
+  @@map("render")
 }

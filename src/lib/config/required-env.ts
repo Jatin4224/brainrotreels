@@ -230,6 +230,33 @@ export const OPTIONAL_ENV: readonly OptionalEnvVar[] = [
       { key: 'FFPROBE_PATH', label: 'ffprobe path (blank ⇒ found on PATH)', optional: true },
     ],
   },
+  /* Cloud rendering. A third media row rather than part of the other two,
+   * because it fails at a different point again and the fix is in a different
+   * cloud: without R2 nothing can be uploaded, without ffmpeg nothing can be
+   * prepared, and without this nothing can be EXPORTED. Everything else in the
+   * product works meanwhile — a customer can generate, preview and edit, and
+   * only the render button refuses. */
+  {
+    id: 'render',
+    label: 'Cloud rendering (Remotion Lambda)',
+    purpose:
+      'Needed before anyone can export a finished video. The browser preview and the editor work without it — they render in the page — but the Render button will refuse, because producing the actual MP4 happens in the cloud, split across many functions so a long video does not take as long to make as it does to watch.',
+    help:
+      'Install the Remotion CLI, then deploy the function and the site: `npx remotion lambda functions deploy` and `npx remotion lambda sites create src/remotion/index.ts --site-name=<name>`. ' +
+      'Put the function name, the bucket it created and the region below. REMOTION_SITE_VERSION is the version suffix of the site you deployed — bump it on each deploy and renders already in flight keep working against the version they started on, which is also how you roll back. ' +
+      'REMOTION_WEBHOOK_SECRET is any long random string; the renderer signs its callback with it and the webhook refuses a call it cannot verify, so a render cannot finish without it. ' +
+      'Note for local development: the renderer calls back to NEXT_PUBLIC_APP_URL, and AWS cannot reach localhost — point a tunnel at your dev server and set that variable to the tunnel URL, or renders will start and then time out.',
+    icon: 'Clapperboard',
+    link: { label: 'Remotion Lambda setup guide', url: 'https://www.remotion.dev/docs/lambda/setup' },
+    keys: [
+      { key: 'REMOTION_AWS_REGION', label: 'AWS region' },
+      { key: 'REMOTION_FUNCTION_NAME', label: 'Deployed function name' },
+      { key: 'REMOTION_SITE_NAME', label: 'Deployed site name' },
+      { key: 'REMOTION_SITE_VERSION', label: 'Site version (bump per deploy)' },
+      { key: 'REMOTION_BUCKET_NAME', label: 'Remotion S3 bucket' },
+      { key: 'REMOTION_WEBHOOK_SECRET', label: 'Webhook signing secret' },
+    ],
+  },
 ]
 
 export interface OptionalEnvKeyStatus extends OptionalEnvKey {
