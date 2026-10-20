@@ -27,6 +27,7 @@
 import {
   CheckIcon,
   CircleIcon,
+  ClapperboardIcon,
   CreditCardIcon,
   DatabaseIcon,
   ExternalLinkIcon,
@@ -50,6 +51,7 @@ const SETUP_ICONS: Record<string, LucideIcon> = {
   CreditCard: CreditCardIcon,
   HardDrive: HardDriveIcon,
   Film: FilmIcon,
+  Clapperboard: ClapperboardIcon,
 }
 
 function iconFor(name: string): LucideIcon {

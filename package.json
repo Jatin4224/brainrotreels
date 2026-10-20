@@ -30,6 +30,8 @@
     "@radix-ui/react-slot": "^1.2.4",
     "@react-email/components": "^1.0.12",
     "@react-email/render": "^2.0.9",
+    "@remotion/lambda": "^4.0.536",
+    "@remotion/lambda-client": "^4.0.536",
     "@remotion/player": "^4.0.536",
     "@stripe/react-stripe-js": "^6.6.0",
     "@stripe/stripe-js": "^9.8.0",

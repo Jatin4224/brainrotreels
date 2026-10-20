@@ -40,6 +40,7 @@ export type { VariantPlan } from './ingest-plan'
 export {
   MEDIA_STAGING_PREFIX,
   downloadToFile,
+  downloadUrlToFile,
   uploadFile,
   withStagingDir,
 } from './staging'

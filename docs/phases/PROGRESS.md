@@ -10,8 +10,11 @@ worse than an empty box.
       round-trip. See the note below for exactly which checks are met and which are untested.
 - [ ] Phase 03: Render core — built and rendering; the Player has no real document to mount
       until generation exists (Phase 06/09). See the note below.
-- [ ] Phase 04: Cloud rendering
-- [ ] Phase 05: Credits and entitlements
+- [ ] Phase 04: Cloud rendering — built; **blocked on an AWS account** for the Lambda deploy, so no
+      render has ever run in the cloud. See the note below for exactly which checks are met and
+      which are untested.
+- [ ] Phase 05: Credits and entitlements — built; **blocked on the Neon database being unreachable**
+      and on Phase 04's AWS gap, so no credit has ever moved. Rates are PLACEHOLDERS. See the note.
 - [ ] Phase 06: Script generation
 - [ ] Phase 07: Voices and TTS
 - [ ] Phase 08: Alignment and captions
@@ -391,3 +394,360 @@ lockfile rather than downloaded.
 requires a paid company licence beyond that — see remotion.dev/license. `architecture.md` committed
 to Remotion, so this is a cost to confirm rather than a decision to revisit, and it lands before
 Phase 04 deploys a renderer.
+
+### Phase 04 — 2026-10-20
+
+Built: the `renders` and `watermarkFree` registry entries, the `Render` model and its migration
+(**not applied** — see below), the Phase 04 half of `src/lib/types/render.ts` (status, resolution,
+per-plan entitlements, every input schema), `src/lib/render/cache-key.ts`, the `render` adapter seam
+(`src/lib/adapters/render/` — contract, selector, Remotion Lambda implementation, webhook helpers),
+`renders.service.ts`, the `renders` router (`create` / `list` / `get` / `retry`), the
+`project.render` workflow, the signed webhook at `/api/webhooks/remotion`, the `Watermark`
+component, a production `timeline` composition with `calculateMetadata`, the `usePlanTier` hook and
+the export panel on the preview page. 29 new tests; the suite is 410 and green, `tsc --noEmit`,
+`eslint` and `next build` are clean.
+
+`@remotion/lambda` and `@remotion/lambda-client` were added at 4.0.536, pinned to the Remotion
+version Phase 03 chose. **npm needed `--legacy-peer-deps`**: a plain `npm install` crashes with
+`Cannot read properties of null (reading 'edgesOut')` while resolving `better-auth`'s peers. That is
+an npm/arborist bug, not a conflict in this tree, and it reproduces on the unmodified lockfile — but
+it means CI's `npm ci` should be watched on the first run after this branch.
+
+**Three deliberate corrections to the phase brief.** Each one is a place where following the brief
+literally would have produced a bug, and each is documented at the code it affects:
+
+- **The watermark is resolved at `renders.create`, not in `finalize`** (the brief's step 7). It
+  cannot be resolved in `finalize`: it is a composition prop, so it decides PIXELS, and by
+  `finalize` the frames already exist. It also has to be fixed before the cache key is computed —
+  if the workflow re-resolved it and the plan had changed in between, the file produced would not
+  match the key it is stored under, and the next request would be served a render whose watermark
+  state its key denies. Resolved once, written to the row, read from the row by the workflow. The
+  entitlement is still the only source, which is what step 7 was protecting. Grep
+  `WATERMARK_RESOLVED_ONCE`.
+- **The MP4 and poster are stored by the workflow's `finalize` step, not by the webhook** (the
+  brief's step 6). The webhook verifies and relays; that is all. Three reasons, all pointing the
+  same way: the copy is tens of megabytes plus an ffmpeg invocation, which is precisely the work
+  `FFMPEG_RUNS_IN_A_CONTAINER` says must not happen in a serverless function; Remotion retries a
+  webhook that does not return 2xx, so a slow copy produces a second delivery while the first is
+  still running; and if the copy failed there the event would never be sent, so the workflow would
+  wait out its full 45 minutes and record `timedOut` — reporting a storage failure as a render
+  timeout, which sends whoever investigates to the wrong system. Grep `FINALIZE_DOES_THE_COPY`.
+- **The event is `render/finished`, not `remotion/render.finished`.** The brief's name has a dot
+  and a vendor in it; `select-provider.test.ts` has enforced `domain/verb` since Phase 00, and the
+  domain here is `render` — the event means "a render finished", which stays true whatever renders
+  it. The webhook ROUTE is still provider-specific and still named after Remotion. The existing
+  test caught this, which is the whole reason it exists.
+
+**Decisions worth knowing about, because none of them were in the phase file:**
+
+- **`Render.docHash` is NOT `hashDoc(doc)`.** It is `renderCacheKey()`, which folds the document
+  hash together with the resolution and the watermark. The brief's `@@unique([projectId, docHash])`
+  is described as what makes reuse "correct rather than best-effort", and that is only true if the
+  key says everything about the FILE — `hashDoc` says everything about the DOCUMENT, which is a
+  different claim. Storing a bare document hash breaks in both directions: a 720p render would
+  satisfy a later request for 1080p, and a free workspace's watermarked output would be handed back
+  after it upgraded, so the first thing a new subscriber does returns the file they just paid to
+  replace. The key is readable rather than re-hashed (`v1-a1b2c3d4e5f60718-1080p-wm0`) so support
+  can read a row without running code. `cache-key.test.ts` has a `satisfies` guard that fails to
+  compile if a field is added to the inputs without a decision about the key.
+- **A reused render has to CANCEL the factory's counter bump, or reuse is not free.** The factory
+  auto-increments on any successful `<resource>.create` and cannot see that the handler returned an
+  existing row instead of making one — so without the correction, re-downloading an unchanged video
+  would spend a render from the monthly quota, which is exactly what the reuse rule exists to
+  prevent. The handler calls `incrementUsage(..., -1)` and the factory's `+1` lands on top inside
+  the same transaction, netting zero. It is deliberately not `decrementUsage`, which floors at
+  zero: a render made in January is still reusable in February, when the periodic counter has been
+  reset to 0, and flooring there would charge the customer 1 for a render that cost nothing. One
+  caveat is stated rather than hidden in the code — the factory's GATE runs before the handler, so
+  a workspace already at its cap is refused even on a reuse. It does not bite in practice: nothing
+  has to call `create` to get an existing video, because the panel reads `renders.list` and
+  `renders.get`, both plain queries with no limit gate. Grep `REUSE_COSTS_NOTHING`.
+- **`RENDER_KEY_VERSION` exists for the case the scheme cannot otherwise express**: a change to
+  `src/remotion/` that changes the picture without changing any document — a font swap, a fixed
+  overlay position, a bug in the ducking curve. Every existing render would otherwise be reused and
+  no customer would ever see the fix. Bumping it invalidates the whole cache deliberately.
+- **`calculateMetadata` was missing and a cloud render would have been silently truncated.** A
+  `<Composition>` fixes its `durationInFrames` at REGISTRATION time, so the Phase 03 compositions
+  render every document at the length of the fixture they were registered from. A 60-second project
+  would have produced 7.6 seconds of video — it succeeds, it is billed, and the only symptom is a
+  video that stops mid-sentence. The new `timeline` composition derives everything from its props,
+  and the fixture compositions were moved onto the same function so the studio exercises the path a
+  paid render depends on. Grep `METADATA_FROM_THE_PROPS`.
+- **`renders` declares no `delete` permission, deliberately.** The procedure factory
+  auto-DECREMENTS a limit resource's counter on `<resource>.delete`, so a delete verb would refund
+  the monthly quota every time someone tidied their render history — a free render for two clicks.
+  The output is an Asset and is deleted through `assets.delete` like any other media. Grep
+  `RENDERS_HAVE_NO_DELETE`.
+- **Resolution-by-plan is a `Record`, not a registry `flag`.** A flag is a boolean and this is a
+  SET per plan; modelling it as `hd1080` + `hd720` flags would put two entries in a relationship
+  nothing enforces (a plan with 1080p and not 720p). `watermarkFree` IS genuinely boolean, which is
+  why that one is in the registry. Free is 720p + watermark: good enough to prove the product
+  works, not good enough to publish.
+- **A resolution is a `scale`, never a forced width.** The composition resolves every normalized
+  box and font size against the document's own canvas, so changing the canvas would MOVE things on
+  screen. `720p` is two thirds, written as a fraction rather than 720/1080 because it has to hold
+  for the 1:1 and 16:9 canvases Phase 15 allows.
+- **The webhook's signature is over the RE-STRINGIFIED body, not the raw bytes.** This is the one
+  place the route differs from the Stripe webhook it is otherwise modelled on: Stripe signs the raw
+  body, so that handler must not parse first; Remotion signs `JSON.stringify(body)`, so this one
+  must. "Follow the Stripe webhook" would have led straight to a handler that rejects every genuine
+  call, so it is written down at the top of the route and asserted in `webhook.test.ts`. Grep
+  `SIGNATURE_IS_OVER_RESTRINGIFIED_JSON`.
+- **The webhook payload schema is NOT `.strict()`**, which inverts the rule everywhere else in this
+  codebase and is right here because somebody else writes that object. The provider adds fields in
+  minor versions, and a strict schema would reject a whole payload for a field nobody reads —
+  stalling every render in flight on the next provider upgrade.
+- **The workflow re-reads the row and re-derives the cache key in every step that needs the
+  document.** The document can be edited between the request and the render (Phase 15's editor, a
+  regeneration), and rendering the CURRENT document under the OLD key would poison the cache
+  permanently: that key would thereafter return a video of a document it does not describe, and no
+  re-render could dislodge it because the row already says `completed`. The run refuses and the
+  customer re-requests. Grep `KEY_MISMATCH_IS_A_STALE_RENDER`.
+- **Every asset is HEAD-checked against the bucket before a single Lambda is invoked.** Signing is
+  local HMAC and SUCCEEDS for an object that is not there, so a row pointing at a deleted object
+  yields a perfectly valid URL that 404s inside the renderer forty minutes later. `signDocumentAssets`
+  returning `url: null` is right for a PREVIEW (a hole beats a blank screen) and wrong for a render
+  somebody is being charged for. Grep `PREFLIGHT_BEFORE_PAYING`.
+- **A timeout asks the provider before writing the render off.** From inside the wait, a render that
+  died and a render that finished while our webhook was briefly unreachable look identical, and they
+  call for opposite actions — writing `timedOut` without asking throws away a video that exists and
+  has been paid for, then invites the customer to spend their one retry re-rendering it. This is the
+  only sanctioned `getProgress` call: one question at the end of the window, not a loop. Grep
+  `A_DROPPED_WEBHOOK_IS_NOT_A_FAILED_RENDER`.
+- **The poster is a frame extracted from the output file, not a second `renderStillOnLambda` call.**
+  A still render is a second paid invocation for one image and — because it renders the composition
+  again rather than reading the video — it could disagree with the frame actually in the output. The
+  file is already on local disk in `finalize`, so the extraction is nearly free, and it is
+  best-effort: a missing thumbnail is cosmetic and must not throw away a video that rendered.
+- **Render output bytes are NOT charged to the `storage` quota**, consistently with `AssetVariant`.
+  What a plan caps about renders is HOW MANY; charging both would let five free renders exhaust a
+  quota meant for uploads, with no way for the customer to tell which cap they hit. Grep
+  `RENDERS_ARE_NOT_METERED_ON_STORAGE`.
+- **Every terminal write filters on the status it expects** (`updateMany`, not `update`). Two live
+  bugs depend on it, both ordinary consequences of an at-least-once webhook and a parallel renderer:
+  a late webhook resurrecting a render already marked `timedOut` (whose retry is now rendering the
+  same thing twice), and a progress write arriving after completion and stranding the UI on a
+  spinner over a video that exists. Grep `TERMINAL_IS_FINAL`.
+- **`renders.retry` costs no quota, and `attempts` is what stops that being unlimited.** The factory
+  bumps the counter on `create` and nothing else, so a retry is free by construction — which is
+  correct, because the first attempt failed through no choice of the customer's. The limit is
+  enforced twice: a readable refusal in the router, and an `attempts: { lt: limit }` filter inside
+  the service so two simultaneous clicks produce one retry rather than two renders.
+- **`renders` carries a per-minute rate limit** on top of the monthly cap. The plan cap is a MONTHLY
+  number and does nothing about thirty renders in one minute from a stuck client, which on an
+  unlimited plan is unbounded spend. The monthly quota is the budget; this is the blast radius.
+- **The watermark needed its own background, and a real render is what proved it.** The first
+  version used near-white text with a soft shadow, copying `TextOverlay`. Rendered against the test
+  pattern it vanished completely into a white vertical band. That is not cosmetic for a watermark
+  specifically: a mark that disappears over pale footage is a free export for anyone whose video has
+  a bright bottom third, which is most screen recordings and every white-background explainer. It
+  now sits on a translucent dark pill and is inset from the bottom by 6% of the height, far enough
+  that cropping it out costs a visible slice of the video. Grep
+  `WATERMARK_NEEDS_ITS_OWN_BACKGROUND`.
+
+**Verified end to end (2026-10-20).**
+
+- **The local render still works and is byte-identical to Phase 03's.** `npm run remotion:render`
+  produces the same 228-frame, 1080×1920, 30fps MP4 with the same **sha256** as the renders taken
+  before any of this phase's changes. The `calculateMetadata` refactor therefore changed the
+  composition's plumbing and not one pixel of its output.
+- **The watermark composites, and was looked at rather than inferred.** A render with it forced on
+  produces a different file (1,339,424 bytes vs 1,288,169), and a frame pulled out of it shows the
+  mark on its pill over the footage. The first attempt's invisibility was found this way too — the
+  frame is the only thing that could have shown it.
+- **All four determinism guards still pass.** The eslint rule and `determinism.test.ts` both cover
+  the new `Watermark` component; it is static by construction and reads nothing outside its props.
+- **The webhook's signature check was probed against a running server**, with a real HMAC built the
+  way Remotion builds it:
+  - no signature → **400** *"Missing render webhook signature"*
+  - wrong secret → **400** *"Invalid signature"*, logged server-side
+  - body that is not JSON → **400**
+  - no `REMOTION_WEBHOOK_SECRET` configured → **503**, because with no secret there is no way to
+    tell a genuine call from a forged one and accepting anything would be worse than refusing
+    everything
+  - **correct signature → 200** `{"received":true,"acted":true}`, and `render/finished` was
+    confirmed on the Inngest queue by GraphQL. That is the full relay: verify → translate → enqueue.
+- **Both workflows are registered and served.** `/api/inngest` reports **6 functions** (four
+  declared plus two failure handlers), and the Inngest dev server lists `rotreels-project-render`
+  and `rotreels-project-render-failure` by name.
+- `next build` succeeds with `/api/webhooks/remotion` and the preview route present.
+
+**NOT verified, and this is why the box is unticked — needs an AWS account.** No `REMOTION_*`
+variables are set and nothing has been deployed, so **no render has ever run in the cloud** and
+every check below is untested:
+
+- A 60-second project rendering on Lambda and the workflow completing without a polling step. The
+  `waitForEvent` is in place and the relay that resumes it has been proven end to end, but the two
+  halves have never been joined by a real render.
+- Re-rendering an unchanged project returning the existing output. The reuse logic is unit-tested
+  against the cache key and the query is in place, but no `Render` row has ever reached `completed`.
+- A deliberately broken composition failing cleanly with a stored error.
+- A render exceeding the timeout being marked `timedOut` and retried once.
+- Deploying a new site version not breaking a render in flight. The versioned serve URL is composed
+  from `REMOTION_SITE_VERSION` and resolved once per render, which is the mechanism — but nothing
+  has deployed two versions.
+- A free workspace's output carrying the watermark and a paid one not. The component is proven in a
+  local render; the ENTITLEMENT path from `checkBooleanFeature` through the row to the prop has not
+  run.
+- ~~The migration has NOT been applied.~~ **Applied 2026-10-20**, before Phase 05 started, so the
+  two phases' schema changes stay separable. `prisma migrate status` reports the database up to
+  date and `migrate diff` reports no drift. The `render` table is reachable with all 19 columns and
+  both unique constraints the logic depends on — `render_projectId_docHash_key` (what makes reuse
+  correct) and `render_providerRenderId_key` (what makes "one retry with a fresh id"
+  enforceable). It is empty, which is expected: nothing can finish a render without AWS.
+- **R2 is still unconfigured**, carried over from Phase 02, so `finalize` has never copied an output
+  into a bucket and `signAssetUrl` has never produced a download link.
+
+**Also deferred / worth an owner decision:**
+
+- **The Remotion company licence.** Phase 03 raised it as a cost to confirm; this is the phase where
+  it starts running on infrastructure at scale. See remotion.dev/license.
+- **Local development needs a tunnel.** The renderer calls back to `NEXT_PUBLIC_APP_URL` and AWS
+  cannot reach localhost, so a local render will start and then time out without one. Recorded in
+  `.env.example` and in the setup checklist's help text.
+- **Three older call sites read `gatesQuery.data?.tier` by hand** and predate the new `usePlanTier`
+  hook. They are unchanged — moving them is a refactor with no behaviour change and did not belong
+  in this phase — but they should move onto it when next touched.
+- No throwaway QA account was created this phase; the webhook probes needed no authenticated
+  session. `REMOTION_WEBHOOK_SECRET` was added to `.env` for the duration of the probe and the file
+  was restored from a backup afterwards — `git diff .env` is clean.
+
+### Phase 05 — 2026-10-21
+
+Built: the `CreditLedger` and `StripeEvent` models plus `Organization.creditBalance` and their
+migration (**applied**), the `credits` registry entry, `src/lib/types/credits.ts`,
+`src/lib/credits/estimate.ts` (the pure tariff), `credits.service.ts` (hold / commit / release /
+grant / purchase / getBalance), the `credits` router, hold-commit-release wired through
+`project.render`, the insufficient-credits refusal in `renders.create`, `renders.estimate`, the
+Stripe event-dedupe gate, the `credits.reconcile` cron, the credits screen, and the cost on the
+render button. 13 new tests; the suite is 423 and green, `tsc --noEmit`, `eslint` and `next build`
+are clean.
+
+**⚠ THE CREDIT RATES ARE PLACEHOLDERS AND NOBODY HAS PRICED THEM.** `CREDIT_RATES` in
+`src/lib/credits/estimate.ts` is internally consistent and shaped like a real tariff — a flat base
+per job, a per-second rate, 1080p dearer than 720p, a premium-voice surcharge — but no number in it
+has been compared against what a Lambda render, a TTS second or a generated image actually costs,
+or against what the plans sell for. The same is true of the three pack sizes in `CREDIT_PACKS`.
+This was flagged before the phase started and built to the stated fallback: the rates are in ONE
+constant and the maths is a pure function, so setting real prices is one edit to one object with no
+arithmetic scattered anywhere else. **Do not charge anybody until that edit happens.**
+
+**Decisions worth knowing about, because none of them were in the phase file:**
+
+- **`renders.create` refuses on the estimate; the WORKFLOW places the hold.** The phase implies both
+  happen together. They must not: a hold placed in the request would sit inside that request's
+  10-second Prisma transaction, and a request that timed out *after* holding would strand the money
+  with no workflow in existence to release it. Separating them means the hold and everything that
+  can release it live in the same durable run. The cost of the gap is that a balance can move
+  between the two, which is why the hold path handles `InsufficientCreditsError` as a permanent
+  failure rather than assuming the earlier check still holds. Grep `HOLD_IN_THE_WORKFLOW`.
+- **There is no bare `failRender` call left in the render workflow.** Thirteen paths can end a
+  render badly — a missing secret, a broken document, a stale cache key, a provider refusal, a
+  timeout, an unreadable webhook, the failure handler — and every one has to refund. "Remember to
+  call release too" is a rule that holds until somebody adds the fourteenth path, so all thirteen
+  now go through `failRenderAndRelease`, and refunding is not something a caller can omit. Grep
+  `NO_PATH_FORGETS_THE_REFUND`.
+- **The hold is found by RENDER ID, not carried as a holdId.** Most of the paths that settle it
+  cannot have been handed one — `onFailure` receives only the original event, and a replayed step
+  gets fresh locals. One lookup rule reachable from everywhere beats a value half the paths do not
+  have. `findOpenHoldForRef` is also what makes the hold step idempotent: an Inngest retry that
+  placed a SECOND hold would leave the first unsettled forever, the customer quietly short, with
+  the ledger and the cache still agreeing — so reconcile would report nothing. Grep `ORPHANED_HOLD`.
+- **`commit` re-estimates from the real output rather than charging the held amount.** Today they
+  are equal because a render's duration is known before it starts. They stop being equal the moment
+  anything makes the real length differ from the planned one, and `commit` already handles that —
+  it writes the actual and releases the difference. Charging the hold instead would make every
+  estimate a flat price and hide the divergence permanently. Grep `CHARGE_WHAT_IT_COST`.
+- **The charge, the asset rows and the `completed` status commit in ONE transaction.** A committed
+  charge with no video, or a video with no charge, are both reachable the moment those are two
+  transactions — and the first is a customer paying for nothing, which is the exact thing this
+  phase exists to prevent. `Render.creditsCharged` and `costBreakdown`, left null by Phase 04, are
+  filled in that same transaction so the number on the render and the number in the ledger cannot
+  disagree.
+- **The Stripe dedupe INSERT is the check.** `StripeEvent`'s primary key is the event id, so the
+  database refuses the second write — rather than a read-then-write, where two concurrent
+  deliveries of one event both read "not seen" and both proceed. It is recorded BEFORE the handlers
+  run, which takes a deliberate trade: an event that fails mid-handler is never retried, because it
+  is already marked seen. That is the right direction — money that was *not* granted is recoverable
+  by hand, money granted twice is not. Grep `STRIPE_EVENT_DEDUPE`.
+- **A top-up is granted twice over, on purpose.** `credits.purchase` writes the ledger row in the
+  same request that charges the card, AND `payment_intent.succeeded` grants it again if that
+  request died in between. Both are safe because `purchase` is keyed on the payment intent id and
+  refuses a second row for one it has seen. The two close different holes — the event table stops
+  one *delivery* being processed twice, the refId stops two *different* events being read as one
+  top-up — and a replayed grant is unrecoverable, so it is worth two locks.
+- **SCA is a refusal, not a retry.** A card that comes back `requires_action` is reported as a
+  failed top-up rather than being carried through a client-side confirmation step. Handling 3-D
+  Secure properly needs that step; pretending a pending payment succeeded would grant credits for
+  money that may never arrive. Worth revisiting when a real card population exists. Grep
+  `SCA_IS_A_REFUSAL_FOR_NOW`.
+- **`credits` declares neither `limit` nor `flag` in the registry**, which looks like an omission
+  and is the opposite. The registry's `limit` is a counter with a `UsageMetrics` row behind it, and
+  declaring one here would make the factory gate and bump a second, parallel number that disagrees
+  with the ledger within one failed render. `purchase` is also its own permission rather than
+  `create`, because the factory auto-gates on the path verb `create` — and because spending real
+  money is genuinely a different authority from making things.
+- **`reconcile` reports and does not repair.** The cache can only diverge from the ledger if a
+  transaction boundary is wrong in code; healing the number would remove the only evidence the bug
+  exists while it kept producing it. It also hunts STRANDED HOLDS separately, because that failure
+  leaves the ledger and the cache in perfect agreement — both say the money is gone — while the
+  customer is short and no render ever used it. Balance reconciliation alone would never see it.
+  Both halves are SQL aggregates rather than rows read into the process: the ledger is append-only
+  and unbounded, and a job that loads it all to add it up fails on the night it is most needed.
+- **The balance shown is spendable, not gross.** A hold IS a negative ledger row, so holds are
+  already deducted and no caller has to remember to subtract anything in flight.
+- **The render button switches to "Top up credits" when the balance is short**, and clicking it
+  navigates to the credits screen rather than firing a request the server will refuse. A disabled
+  "Render (12 credits)" tells a customer they cannot proceed but not what to do about it.
+
+**Verified.**
+
+- **The estimator is covered by 13 tests**, written against PROPERTIES rather than the placeholder
+  numbers — the total is always a whole number, never negative, longer costs more, 1080p costs more
+  than 720p, the lines always add up to the total, the resolution multiplier applies only to
+  renders, and a NaN/negative/Infinite duration collapses to the base charge instead of producing a
+  charge nobody intended. That last set matters: a zero frame rate divides to Infinity and a broken
+  document produces NaN, and a NaN total would be held, committed and shown to a customer without
+  anything throwing.
+- **`next build` succeeds** with `/dashboard/settings/credits` present, and the full suite is 423
+  green with `tsc` and `eslint` clean.
+- **The migration is applied.** `prisma migrate status` reports the database up to date and
+  `migrate diff` reports no drift; `credit_ledger`, `stripe_event` and `organization.creditBalance`
+  were each confirmed reachable through the client immediately after applying.
+
+**NOT verified, and this is why the box is unticked.**
+
+**The Neon database went unreachable partway through this phase** — TCP connects on 5432 but
+Postgres does not answer, and it stayed down across every retry since. It was healthy when the
+migration applied, so this is on Neon's side (a suspended project or exhausted free-tier compute),
+not something in this branch. Everything below needs it back:
+
+- A forced render failure returning the exact credits held.
+- A render costing less than estimated committing the real cost and releasing the remainder.
+- Committing the same hold twice being refused.
+- Replaying a Stripe webhook twice adding credits once, and the trial fingerprint being marked once.
+- `credits.reconcile` reporting zero drift after a day of mixed activity.
+- Rendering with too few credits being refused before any provider call. The refusal is wired and
+  the error contract is the pre-existing `INSUFFICIENT_CREDITS` cause, but no request has run.
+
+Note that the first five of those are ALSO blocked by Phase 04's own gap — there is still no AWS
+account, so no render has ever completed, which means no hold has ever been committed by a real
+render rather than by a probe. The credit paths through `project.render` are therefore reachable
+only by driving the workflow directly.
+
+**Deliberately not committed:** no database-backed test file. The existing 24 test files are pure
+units and nothing in the suite touches Prisma; adding a DB-backed test would start a new pattern
+(CLAUDE.md rule 1) and make `npm test` depend on a live database. The ledger semantics were going
+to be proven by a throwaway probe against the real database the way Phase 04's webhook was — that
+probe is what the outage blocked.
+
+**Also outstanding:**
+
+- **The credit rates and pack sizes need real prices** before anyone is charged. See the warning at
+  the top of this note.
+- **Phase 04's AWS deploy, R2 credentials and the Remotion licence** are all still open and now
+  block Phase 05's verification as well as their own.
+- **A plan's monthly credit allowance is not wired.** `grant` exists and is the right mechanism, but
+  nothing calls it on a subscription renewal — so today credits only arrive by purchase. The phase
+  brief does not ask for the allowance and the registry has no field for it; it is a product
+  decision that belongs with the pricing one.

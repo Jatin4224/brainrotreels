@@ -29,6 +29,7 @@
  */
 
 import { PLAN_ORDER, PLANS, isPaidPlan } from './plans'
+import { CREDIT_PACKS } from '@/lib/types/credits'
 import { AUTH_PROVIDER } from '@/lib/adapters/provider'
 
 export interface RequiredEnvVar {
@@ -165,6 +166,19 @@ const STRIPE_PRICE_KEYS: OptionalEnvKey[] = PLAN_ORDER.filter(isPaidPlan).flatMa
   }))
 )
 
+/* Credit-pack price ids, DERIVED from the pack table so the checklist can
+ * never list a pack that does not exist or miss one that does. Marked optional
+ * for the same reason the plan prices are: you only need a price for the packs
+ * you actually sell, and a pack with no price is simply not purchasable (see
+ * PACK_PRICE_IS_ENV_DRIVEN in src/lib/types/credits.ts). */
+const CREDIT_PACK_PRICE_KEYS: OptionalEnvKey[] = (
+  Object.keys(CREDIT_PACKS) as (keyof typeof CREDIT_PACKS)[]
+).map((pack) => ({
+  key: CREDIT_PACKS[pack].priceEnvKey,
+  label: `${CREDIT_PACKS[pack].label} price (${CREDIT_PACKS[pack].credits.toLocaleString('en-US')} credits)`,
+  optional: true,
+}))
+
 /* Fail-soft integrations. Adding one here surfaces it on the setup checklist as
  * an informational row; it NEVER affects hasMissingRequiredEnv (never blocks).
  *
@@ -187,6 +201,7 @@ export const OPTIONAL_ENV: readonly OptionalEnvVar[] = [
       { key: 'NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY', label: 'Publishable key' },
       { key: 'STRIPE_WEBHOOK_SECRET', label: 'Webhook signing secret' },
       ...STRIPE_PRICE_KEYS,
+      ...CREDIT_PACK_PRICE_KEYS,
     ],
   },
   /* Media. Two rows rather than one, because they fail at different points and
@@ -228,6 +243,33 @@ export const OPTIONAL_ENV: readonly OptionalEnvVar[] = [
     keys: [
       { key: 'FFMPEG_PATH', label: 'ffmpeg path (blank ⇒ found on PATH)', optional: true },
       { key: 'FFPROBE_PATH', label: 'ffprobe path (blank ⇒ found on PATH)', optional: true },
+    ],
+  },
+  /* Cloud rendering. A third media row rather than part of the other two,
+   * because it fails at a different point again and the fix is in a different
+   * cloud: without R2 nothing can be uploaded, without ffmpeg nothing can be
+   * prepared, and without this nothing can be EXPORTED. Everything else in the
+   * product works meanwhile — a customer can generate, preview and edit, and
+   * only the render button refuses. */
+  {
+    id: 'render',
+    label: 'Cloud rendering (Remotion Lambda)',
+    purpose:
+      'Needed before anyone can export a finished video. The browser preview and the editor work without it — they render in the page — but the Render button will refuse, because producing the actual MP4 happens in the cloud, split across many functions so a long video does not take as long to make as it does to watch.',
+    help:
+      'Install the Remotion CLI, then deploy the function and the site: `npx remotion lambda functions deploy` and `npx remotion lambda sites create src/remotion/index.ts --site-name=<name>`. ' +
+      'Put the function name, the bucket it created and the region below. REMOTION_SITE_VERSION is the version suffix of the site you deployed — bump it on each deploy and renders already in flight keep working against the version they started on, which is also how you roll back. ' +
+      'REMOTION_WEBHOOK_SECRET is any long random string; the renderer signs its callback with it and the webhook refuses a call it cannot verify, so a render cannot finish without it. ' +
+      'Note for local development: the renderer calls back to NEXT_PUBLIC_APP_URL, and AWS cannot reach localhost — point a tunnel at your dev server and set that variable to the tunnel URL, or renders will start and then time out.',
+    icon: 'Clapperboard',
+    link: { label: 'Remotion Lambda setup guide', url: 'https://www.remotion.dev/docs/lambda/setup' },
+    keys: [
+      { key: 'REMOTION_AWS_REGION', label: 'AWS region' },
+      { key: 'REMOTION_FUNCTION_NAME', label: 'Deployed function name' },
+      { key: 'REMOTION_SITE_NAME', label: 'Deployed site name' },
+      { key: 'REMOTION_SITE_VERSION', label: 'Site version (bump per deploy)' },
+      { key: 'REMOTION_BUCKET_NAME', label: 'Remotion S3 bucket' },
+      { key: 'REMOTION_WEBHOOK_SECRET', label: 'Webhook signing secret' },
     ],
   },
 ]

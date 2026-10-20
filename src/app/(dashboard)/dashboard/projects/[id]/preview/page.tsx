@@ -37,6 +37,7 @@ import type { Metadata } from 'next'
 
 import { ContentLayout } from '@/components/global/page-header'
 import { ProjectPreview } from './_components/project-preview'
+import { RenderPanel } from './_components/render-panel'
 
 export const metadata: Metadata = {
   title: 'Preview',
@@ -51,7 +52,14 @@ export default async function ProjectPreviewPage({
 
   return (
     <ContentLayout title="Preview">
-      <ProjectPreview projectId={id} />
+      {/* The player and the export panel side by side on a wide screen and
+          stacked on a phone. Two independent client components rather than one:
+          the player mounts a Remotion tree and the panel polls a query, and
+          neither needs anything from the other. */}
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
+        <ProjectPreview projectId={id} />
+        <RenderPanel projectId={id} />
+      </div>
     </ContentLayout>
   )
 }

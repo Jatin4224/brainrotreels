@@ -25,6 +25,8 @@
 
 export { DUCK_LEVEL, DUCK_RAMP_SECONDS, duckingVolumeAt } from './ducking'
 export type { FrameWindow } from './ducking'
+export { RENDER_KEY_VERSION, renderCacheKey } from './cache-key'
+export type { RenderCacheInputs } from './cache-key'
 export { dropUnknownRenderKinds } from './sanitise'
 export type { SanitiseResult } from './sanitise'
 export {

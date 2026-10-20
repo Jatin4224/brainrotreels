@@ -27,6 +27,8 @@ These docs explain how this boilerplate is shaped and why. The README tells you 
 11. `11-phase1.md` — the timeline document: the contract every generator, editor and renderer shares
 12. `12-phase2.md` — media assets: uploads, signed URLs, the ingest job, and where ffmpeg runs
 13. `13-phase3.md` — render core: one composition, the component registry, and determinism
+14. `14-phase4.md` — cloud rendering: Lambda, webhooks instead of polling, and why render reuse is a cache-key problem
+15. `15-phase5.md` — credits: a ledger rather than a counter, and how a failed render gives the money back
 
 ## If you only have five minutes
 

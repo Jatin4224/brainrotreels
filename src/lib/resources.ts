@@ -253,6 +253,135 @@ export const RESOURCES = {
       createUploadUrl: { count: 60, window: '1 m' },
     },
   },
+  /**
+   * SOURCE OF TRUTH KEYWORDS: RESOURCES.renders, PERIODIC_RENDERS,
+   *   RENDERS_HAVE_NO_DELETE, renders.create
+   *
+   * Paid cloud renders. `limit` is PERIODIC (`period: 'month'`), which is the
+   * one field here that cannot be guessed from the rest: a render is consumed
+   * rather than held, so the cap has to refill, and `periodicResourceKeys()`
+   * in src/lib/usage-period.ts picks this entry up with no cron wiring — the
+   * Phase 00 `usage.reset` workflow already iterates whatever declares it.
+   * Declaring it absolute (the default) would hand a free workspace five
+   * renders for the lifetime of the account.
+   *
+   * RENDERS_HAVE_NO_DELETE, and that is deliberate rather than unfinished.
+   * `delete` is absent from the permission list because the factory
+   * auto-DECREMENTS a limit resource's counter on `<resource>.delete`
+   * (section 13 of src/trpc/procedures/protected.ts) — so a delete verb would
+   * refund the monthly quota every time a customer tidied up their render
+   * history, which is a free render for the price of two clicks. The output is
+   * an Asset and is deleted through `assets.delete` like any other media.
+   *
+   * The audit template is keyed `create`, which is the path verb here
+   * (`renders.create`) — unlike `assets`, where the mutation that creates the
+   * row is called `completeUpload`. See the note on that entry for why the key
+   * has to be the PATH verb and not the CRUD word.
+   */
+  renders: {
+    name: 'Renders',
+    description: 'Videos rendered per month',
+    permissions: ['create', 'read'],
+    limit: {
+      perPlan: { free: 5, starter: 100, pro: 1000, enterprise: 'unlimited', portal: 'unlimited' },
+      upgradeMessage: 'Upgrade to {nextPlan} to render more videos each month',
+      availableOnFreeTrial: true,
+      unit: 'renders',
+      period: 'month',
+    },
+    audit: {
+      describe: {
+        create: 'Started a render for project {input.projectId}',
+        retry: 'Retried render {input.id}',
+      },
+    },
+    /* A render is the most expensive thing a customer can trigger, and the
+     * plan cap is a MONTHLY number — it does nothing about thirty renders in
+     * one minute from a stuck client, which on an unlimited plan is unbounded
+     * spend. The monthly quota is the budget; this is the blast radius. */
+    rateLimit: {
+      create: { count: 10, window: '1 m' },
+      retry: { count: 5, window: '1 m' },
+    },
+  },
+
+  /**
+   * SOURCE OF TRUTH KEYWORDS: RESOURCES.watermarkFree, WATERMARK_BY_ENTITLEMENT
+   *
+   * WATERMARK_BY_ENTITLEMENT. A flag with no `permissions` and no `nav`, which
+   * is the registry's shape for a pure plan entitlement: nothing calls
+   * `watermarkFree.*`, so there is no procedure path for the factory's flag
+   * gate (section 10) to fire on. It is read directly, exactly once, by
+   * `checkBooleanFeature(organizationId, 'watermarkFree')` in the render
+   * pre-flight — see WATERMARK_IS_DECIDED_BEFORE_THE_RENDER in
+   * src/inngest/functions/project-render.ts for why that is the only place
+   * allowed to ask, and why a generator must never put the answer in a
+   * document.
+   *
+   * `availableOnFreeTrial: false` on purpose: a trial that shipped
+   * watermark-free exports would make the trial the product.
+   */
+  watermarkFree: {
+    name: 'Watermark-free export',
+    description: 'Export finished videos without the watermark',
+    flag: {
+      perPlan: { free: false, starter: true, pro: true, enterprise: true, portal: true },
+      availableOnFreeTrial: false,
+      upgradeMessage: 'Upgrade to {nextPlan} to export without the watermark',
+    },
+  },
+
+  /**
+   * SOURCE OF TRUTH KEYWORDS: RESOURCES.credits, CREDITS_HAVE_NO_LIMIT,
+   *   credits.purchase, LEDGER_NOT_A_COUNTER
+   *
+   * The credit balance and its history.
+   *
+   * CREDITS_HAVE_NO_LIMIT, and this is the entry's whole point — it declares
+   * NEITHER `limit` NOR `flag`. That looks like an omission and is the
+   * opposite: the registry's `limit` is a COUNTER with a `UsageMetrics` row
+   * behind it, which can only increment on create and decrement on delete.
+   * Credits need a hold, a partial commit and a refund, and a counter has no
+   * vocabulary for any of them. Declaring a limit here would make the factory
+   * gate and bump a second, parallel number that disagrees with the ledger
+   * within one failed render.
+   *
+   * So the balance lives in `CreditLedger` + `Organization.creditBalance`, and
+   * the refusal is thrown by hand with `ERROR_CODES.INSUFFICIENT_CREDITS`
+   * rather than by the factory. The two systems sit side by side on purpose:
+   * countable product objects (`projects`, `renders`, `storage`) keep the
+   * automatic gates; variable-cost work (render minutes, TTS seconds,
+   * generated footage) goes on the ledger. Grep LEDGER_NOT_A_COUNTER.
+   *
+   * `purchase` is a permission of its own rather than `create`, for two
+   * reasons that both matter: the factory auto-gates and auto-counts on the
+   * path verb `create`, which must not happen here, and spending real money is
+   * genuinely a different authority from making things — a workspace can
+   * reasonably let a member render while reserving top-ups to whoever owns the
+   * card. The audit template is keyed by that same PATH verb.
+   */
+  credits: {
+    name: 'Credits',
+    description: 'Credit balance and purchase history',
+    permissions: ['read', 'purchase'],
+    category: 'Billing',
+    nav: {
+      label: 'Credits',
+      href: '/dashboard/settings/credits',
+      icon: 'CreditCard',
+      section: 'settings',
+      requirePermission: 'credits:read',
+    },
+    audit: {
+      describe: { purchase: 'Purchased {input.packKey} credits' },
+    },
+    /* Each attempt is a real payment-intent round trip against a real card.
+     * A loop here is both a Stripe bill and a fraud signal on the account. */
+    rateLimit: {
+      purchase: { count: 10, window: '1 m' },
+    },
+  },
+
   invitation: {
     name: 'Invitations',
     description: 'Send invites and cancel pending invitations',

@@ -87,6 +87,10 @@ describe('jobs seam', () => {
       'project/requested',
       'project/cancelled',
       'render/requested',
+      /* Phase 04's webhook relay. Asserted here because it is the one event
+       * whose producer is a route rather than a router, so nothing else in the
+       * test suite would notice it being renamed. */
+      'render/finished',
       'asset/uploaded',
       'footage/requested',
       'line/changed',

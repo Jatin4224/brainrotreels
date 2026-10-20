@@ -20,7 +20,15 @@
  */
 
 import { assetIngestFunction } from './asset-ingest'
+import { creditsReconcileFunction } from './credits-reconcile'
 import { helloFunction } from './hello'
+import { projectRenderFunction } from './project-render'
 import { usageResetFunction } from './usage-reset'
 
-export const INNGEST_FUNCTIONS = [helloFunction, usageResetFunction, assetIngestFunction]
+export const INNGEST_FUNCTIONS = [
+  helloFunction,
+  usageResetFunction,
+  assetIngestFunction,
+  projectRenderFunction,
+  creditsReconcileFunction,
+]
