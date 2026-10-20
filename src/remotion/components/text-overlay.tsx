@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -45,10 +39,10 @@
  * WHERE: Registered as `text` in src/remotion/registry.ts.
  */
 
-import { z } from 'zod'
+import { z } from "zod";
 
-import type { RenderItemProps } from '@/lib/types'
-import { RENDER_FONT_FAMILY } from '../fonts'
+import type { RenderItemProps } from "@/lib/types";
+import { RENDER_FONT_FAMILY } from "../fonts";
 
 const textOverlayPropsSchema = z.object({
   text: z.string().optional(),
@@ -62,7 +56,7 @@ const textOverlayPropsSchema = z.object({
     .optional(),
   props: z
     .object({
-      align: z.enum(['left', 'center', 'right']).optional(),
+      align: z.enum(["left", "center", "right"]).optional(),
       /* A fraction of the canvas HEIGHT, not a pixel size — see
        * PIXELS_FROM_NORMALIZED_BOX. 0.035 of 1920 is ~67px. */
       sizeRatio: z.number().min(0.005).max(0.2).optional(),
@@ -71,49 +65,54 @@ const textOverlayPropsSchema = z.object({
     .partial()
     .passthrough()
     .optional(),
-})
+});
 
-const DEFAULT_SIZE_RATIO = 0.035
+const DEFAULT_SIZE_RATIO = 0.035;
 
 /* The composited palette for this phase. Deliberately only two values, both
  * chosen to stay legible over arbitrary footage: near-white text with a dark
  * shadow behind it. Phase 08 replaces this with doc.style.paletteId. */
-const TEXT_COLOR = '#f5f5f5'
-const TEXT_SHADOW = '0 2px 12px rgba(0, 0, 0, 0.75)'
+const TEXT_COLOR = "#f5f5f5";
+const TEXT_SHADOW = "0 2px 12px rgba(0, 0, 0, 0.75)";
 
 export function TextOverlay({ item, canvas }: RenderItemProps) {
-  const parsed = textOverlayPropsSchema.safeParse(item)
-  if (!parsed.success) return null
+  const parsed = textOverlayPropsSchema.safeParse(item);
+  if (!parsed.success) return null;
 
-  const { text, box, props } = parsed.data
+  const { text, box, props } = parsed.data;
   /* An empty string is not a missing value, but it draws nothing either way —
    * and a document with a blank badge is a generator bug worth seeing as a
    * gap rather than as an invisible element with a shadow. */
-  if (text === undefined || text.trim().length === 0) return null
+  if (text === undefined || text.trim().length === 0) return null;
 
-  const align = props?.align ?? 'center'
-  const sizeRatio = props?.sizeRatio ?? DEFAULT_SIZE_RATIO
-  const weight = props?.weight ?? 700
+  const align = props?.align ?? "center";
+  const sizeRatio = props?.sizeRatio ?? DEFAULT_SIZE_RATIO;
+  const weight = props?.weight ?? 700;
 
   const layout: React.CSSProperties =
     box === undefined
-      ? { position: 'absolute', inset: 0, display: 'flex', alignItems: 'flex-end' }
+      ? {
+          position: "absolute",
+          inset: 0,
+          display: "flex",
+          alignItems: "flex-end",
+        }
       : {
-          position: 'absolute',
+          position: "absolute",
           left: box.x * canvas.width,
           top: box.y * canvas.height,
           width: box.w * canvas.width,
           ...(box.h !== undefined ? { height: box.h * canvas.height } : {}),
-          display: 'flex',
-          alignItems: 'center',
-        }
+          display: "flex",
+          alignItems: "center",
+        };
 
   return (
     <div style={layout}>
       <p
         style={{
           margin: 0,
-          width: '100%',
+          width: "100%",
           fontFamily: RENDER_FONT_FAMILY,
           fontWeight: weight,
           fontSize: sizeRatio * canvas.height,
@@ -123,11 +122,11 @@ export function TextOverlay({ item, canvas }: RenderItemProps) {
           textShadow: TEXT_SHADOW,
           /* A long call-to-action must wrap rather than overflow its box and
            * bleed off the frame. */
-          overflowWrap: 'break-word',
+          overflowWrap: "break-word",
         }}
       >
         {text}
       </p>
     </div>
-  )
+  );
 }

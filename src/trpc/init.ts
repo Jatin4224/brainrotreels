@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -30,12 +24,16 @@
  *        on src/lib/adapters (identity + tenancy) and src/lib/config (prisma).
  */
 
-import { cache } from 'react'
-import { headers } from 'next/headers'
-import { TRPCError } from '@trpc/server'
-import { prisma } from '@/lib/config'
-import { getAuthAdapter, type AdapterSession, type AdapterUser } from '@/lib/adapters'
-import type { StructuredErrorCause } from '@/lib/errors'
+import { cache } from "react";
+import { headers } from "next/headers";
+import { TRPCError } from "@trpc/server";
+import { prisma } from "@/lib/config";
+import {
+  getAuthAdapter,
+  type AdapterSession,
+  type AdapterUser,
+} from "@/lib/adapters";
+import type { StructuredErrorCause } from "@/lib/errors";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: createTRPCContext, Context
@@ -64,95 +62,107 @@ import type { StructuredErrorCause } from '@/lib/errors'
  *        consumed by protectedProcedure and the organization router.
  */
 export interface ContextOrganization {
-  id: string
-  name: string
-  slug: string
-  logo: string | null
-  role: string
-  permissions: string[]
-  hasFullAccess: boolean
-  createdAt: Date
+  id: string;
+  name: string;
+  slug: string;
+  logo: string | null;
+  role: string;
+  permissions: string[];
+  hasFullAccess: boolean;
+  createdAt: Date;
 }
 
 export const createTRPCContext = cache(async () => {
   /* Awaited up front so request-scoped headers (proxy.ts stamps) are
    * accessible from any lazy resolver below. */
-  await headers()
+  await headers();
 
-  let user: AdapterUser | null = null
-  let session: AdapterSession | null = null
-  let authResolved = false
+  let user: AdapterUser | null = null;
+  let session: AdapterSession | null = null;
+  let authResolved = false;
 
   /* Auth resolution is LAZY: every provider's session read touches `cookies()`,
    * which is illegal during static rendering. `baseProcedure` skips it; only
    * `authProcedure`/`protectedProcedure` trigger it. */
   const resolveAuth = cache(async () => {
-    if (authResolved) return
-    const adapter = await getAuthAdapter()
-    const resolved = await adapter.identity.getSession()
-    session = resolved
-    user = resolved?.user ?? null
-    authResolved = true
-  })
+    if (authResolved) return;
+    const adapter = await getAuthAdapter();
+    const resolved = await adapter.identity.getSession();
+    session = resolved;
+    user = resolved?.user ?? null;
+    authResolved = true;
+  });
 
-  const getUserOrganizationsLazy = cache(async (): Promise<ContextOrganization[]> => {
-    if (!user?.id) return []
-    const adapter = await getAuthAdapter()
-    const memberships = await adapter.tenancy.getMemberships(user.id)
-    if (!memberships.length) return []
+  const getUserOrganizationsLazy = cache(
+    async (): Promise<ContextOrganization[]> => {
+      if (!user?.id) return [];
+      const adapter = await getAuthAdapter();
+      const memberships = await adapter.tenancy.getMemberships(user.id);
+      if (!memberships.length) return [];
 
-    return Promise.all(
-      memberships.map(async (membership): Promise<ContextOrganization> => {
-        const base = {
-          id: membership.organization.id,
-          name: membership.organization.name,
-          slug: membership.organization.slug,
-          logo: membership.organization.logo,
-          role: membership.role,
-          hasFullAccess: membership.hasFullAccess,
-          createdAt: membership.createdAt,
-        }
+      return Promise.all(
+        memberships.map(async (membership): Promise<ContextOrganization> => {
+          const base = {
+            id: membership.organization.id,
+            name: membership.organization.name,
+            slug: membership.organization.slug,
+            logo: membership.organization.logo,
+            role: membership.role,
+            hasFullAccess: membership.hasFullAccess,
+            createdAt: membership.createdAt,
+          };
 
-        /* Full-access members get the empty-array sentinel — the permission
-         * gate never reads it, so resolving their grants would be wasted work. */
-        if (membership.hasFullAccess) return { ...base, permissions: [] }
+          /* Full-access members get the empty-array sentinel — the permission
+           * gate never reads it, so resolving their grants would be wasted work. */
+          if (membership.hasFullAccess) return { ...base, permissions: [] };
 
-        const permissions = await adapter.tenancy.resolvePermissions(
-          membership.organizationId,
-          membership.role
-        )
-        return { ...base, permissions }
-      })
-    )
-  })
+          const permissions = await adapter.tenancy.resolvePermissions(
+            membership.organizationId,
+            membership.role,
+          );
+          return { ...base, permissions };
+        }),
+      );
+    },
+  );
 
   /* Active-org resolution: session's active org → first full-access membership
    * → first membership. Add custom-domain or query-param overrides above the
    * session branch when the app needs them. */
-  const getActiveOrganizationLazy = cache(async (): Promise<ContextOrganization | null> => {
-    const organizations = await getUserOrganizationsLazy()
-    if (!organizations.length) return null
+  const getActiveOrganizationLazy = cache(
+    async (): Promise<ContextOrganization | null> => {
+      const organizations = await getUserOrganizationsLazy();
+      if (!organizations.length) return null;
 
-    const activeOrgId = session?.activeOrganizationId ?? null
-    if (activeOrgId) {
-      const match = organizations.find((org) => org.id === activeOrgId)
-      if (match) return match
-    }
+      const activeOrgId = session?.activeOrganizationId ?? null;
+      if (activeOrgId) {
+        const match = organizations.find((org) => org.id === activeOrgId);
+        if (match) return match;
+      }
 
-    return organizations.find((org) => org.hasFullAccess) ?? organizations[0] ?? null
-  })
+      return (
+        organizations.find((org) => org.hasFullAccess) ??
+        organizations[0] ??
+        null
+      );
+    },
+  );
 
   return {
     prisma,
-    get session() { return session },
-    get user() { return user },
+    get session() {
+      return session;
+    },
+    get user() {
+      return user;
+    },
     resolveAuth,
     getUserOrganizations: getUserOrganizationsLazy,
     getActiveOrganization: getActiveOrganizationLazy,
-  }
-})
+  };
+});
 
-export type Context = Awaited<ReturnType<typeof createTRPCContext>>
+export type Context = Awaited<ReturnType<typeof createTRPCContext>>;
 
 /**
  * SOURCE OF TRUTH KEYWORDS: createStructuredError
@@ -165,16 +175,16 @@ export type Context = Awaited<ReturnType<typeof createTRPCContext>>
  */
 export function createStructuredError(
   code:
-    | 'UNAUTHORIZED'
-    | 'FORBIDDEN'
-    | 'PRECONDITION_FAILED'
-    | 'BAD_REQUEST'
-    | 'NOT_FOUND'
-    | 'INTERNAL_SERVER_ERROR',
+    | "UNAUTHORIZED"
+    | "FORBIDDEN"
+    | "PRECONDITION_FAILED"
+    | "BAD_REQUEST"
+    | "NOT_FOUND"
+    | "INTERNAL_SERVER_ERROR",
   message: string,
-  cause: StructuredErrorCause
+  cause: StructuredErrorCause,
 ): TRPCError {
-  return new TRPCError({ code, message, cause })
+  return new TRPCError({ code, message, cause });
 }
 
 /**
@@ -186,5 +196,5 @@ export function createStructuredError(
  *        procedures module a private implementation detail.
  * WHERE: Imported by every file in src/trpc/routers/*.
  */
-export { router as createTRPCRouter } from './procedures'
-export { baseProcedure, authProcedure, protectedProcedure } from './procedures'
+export { router as createTRPCRouter } from "./procedures";
+export { baseProcedure, authProcedure, protectedProcedure } from "./procedures";

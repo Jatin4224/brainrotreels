@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -21,15 +15,15 @@
  * WHERE: RESOURCES.organizationSettings.nav.href.
  */
 
-import type { Metadata } from 'next'
+import type { Metadata } from "next";
 
-import { ContentLayout } from '@/components/global/page-header'
-import { OrganizationTab } from './_components/organization-tab'
-import { OrganizationAdvanced } from '@/components/global/providers/server'
+import { ContentLayout } from "@/components/global/page-header";
+import { OrganizationTab } from "./_components/organization-tab";
+import { OrganizationAdvanced } from "@/components/global/providers/server";
 
 export const metadata: Metadata = {
-  title: 'Organization',
-}
+  title: "Organization",
+};
 
 export default function OrganizationSettingsPage() {
   return (
@@ -41,5 +35,5 @@ export default function OrganizationSettingsPage() {
         <OrganizationAdvanced />
       </div>
     </ContentLayout>
-  )
+  );
 }

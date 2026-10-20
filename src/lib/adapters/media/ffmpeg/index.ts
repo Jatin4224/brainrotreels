@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -38,21 +32,21 @@
  *        node:child_process to this folder.
  */
 
-import 'server-only'
+import "server-only";
 
-import { z } from 'zod'
+import { z } from "zod";
 
-import { assertMediaProviderActive } from '../provider'
+import { assertMediaProviderActive } from "../provider";
 import {
   MediaProcessingError,
   type MediaAdapter,
   type MediaProbe,
   type TranscodeFit,
   type TranscodeRequest,
-} from '../types'
-import { ffmpegBinary, ffprobeBinary, runTool } from './binaries'
+} from "../types";
+import { ffmpegBinary, ffprobeBinary, runTool } from "./binaries";
 
-assertMediaProviderActive('ffmpeg')
+assertMediaProviderActive("ffmpeg");
 
 /**
  * SOURCE OF TRUTH KEYWORDS: ffprobeJsonSchema, PARSED_NOT_CAST
@@ -73,10 +67,12 @@ assertMediaProviderActive('ffmpeg')
  * what every caller below already handles. */
 const ffprobeNumber = z
   .union([z.number(), z.string()])
-  .transform((value) => (typeof value === 'number' ? value : Number.parseFloat(value)))
+  .transform((value) =>
+    typeof value === "number" ? value : Number.parseFloat(value),
+  )
   .refine((value) => Number.isFinite(value))
   .optional()
-  .catch(undefined)
+  .catch(undefined);
 
 const ffprobeStreamSchema = z.object({
   codec_type: z.string().optional(),
@@ -90,7 +86,7 @@ const ffprobeStreamSchema = z.object({
    * "0/0" on some containers, so r_frame_rate is tried first. */
   r_frame_rate: z.string().optional(),
   avg_frame_rate: z.string().optional(),
-})
+});
 
 const ffprobeJsonSchema = z.object({
   format: z
@@ -101,7 +97,7 @@ const ffprobeJsonSchema = z.object({
     })
     .optional(),
   streams: z.array(ffprobeStreamSchema).optional(),
-})
+});
 
 /**
  * SOURCE OF TRUTH KEYWORDS: parseFrameRate
@@ -114,12 +110,18 @@ const ffprobeJsonSchema = z.object({
  * WHERE: probe() below.
  */
 function parseFrameRate(value: string | undefined): number | null {
-  if (value === undefined) return null
-  const [numerator, denominator] = value.split('/')
-  const top = Number.parseFloat(numerator ?? '')
-  const bottom = denominator === undefined ? 1 : Number.parseFloat(denominator)
-  if (!Number.isFinite(top) || !Number.isFinite(bottom) || bottom === 0 || top === 0) return null
-  return top / bottom
+  if (value === undefined) return null;
+  const [numerator, denominator] = value.split("/");
+  const top = Number.parseFloat(numerator ?? "");
+  const bottom = denominator === undefined ? 1 : Number.parseFloat(denominator);
+  if (
+    !Number.isFinite(top) ||
+    !Number.isFinite(bottom) ||
+    bottom === 0 ||
+    top === 0
+  )
+    return null;
+  return top / bottom;
 }
 
 /**
@@ -132,12 +134,12 @@ function parseFrameRate(value: string | undefined): number | null {
  * WHERE: transcode() below.
  */
 function fitFilter(width: number, height: number, fit: TranscodeFit): string {
-  if (fit === 'crop') {
+  if (fit === "crop") {
     return [
       `scale=${width}:${height}:force_original_aspect_ratio=increase`,
       `crop=${width}:${height}`,
-      'setsar=1',
-    ].join(',')
+      "setsar=1",
+    ].join(",");
   }
 
   return [
@@ -145,8 +147,8 @@ function fitFilter(width: number, height: number, fit: TranscodeFit): string {
     /* Centre the content and fill the rest with black. `ow`/`oh` are the pad
      * output dimensions, so this expression is independent of the source. */
     `pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2:black`,
-    'setsar=1',
-  ].join(',')
+    "setsar=1",
+  ].join(",");
 }
 
 /**
@@ -165,47 +167,53 @@ function fitFilter(width: number, height: number, fit: TranscodeFit): string {
  */
 export function parseProbeOutput(stdout: string): MediaProbe {
   {
-    let raw: unknown
+    let raw: unknown;
     try {
-      raw = JSON.parse(stdout)
+      raw = JSON.parse(stdout);
     } catch {
       throw new MediaProcessingError(
-        'This file could not be read as audio or video.',
-        stdout.slice(0, 500)
-      )
+        "This file could not be read as audio or video.",
+        stdout.slice(0, 500),
+      );
     }
 
-    const parsed = ffprobeJsonSchema.safeParse(raw)
+    const parsed = ffprobeJsonSchema.safeParse(raw);
     if (!parsed.success) {
       throw new MediaProcessingError(
-        'This file could not be read as audio or video.',
-        parsed.error.message
-      )
+        "This file could not be read as audio or video.",
+        parsed.error.message,
+      );
     }
 
-    const streams = parsed.data.streams ?? []
-    const videoStream = streams.find((stream) => stream.codec_type === 'video')
-    const audioStream = streams.find((stream) => stream.codec_type === 'audio')
+    const streams = parsed.data.streams ?? [];
+    const videoStream = streams.find((stream) => stream.codec_type === "video");
+    const audioStream = streams.find((stream) => stream.codec_type === "audio");
 
     /* Format duration first — a container knows its own length even when a
      * stream does not report one. */
-    const duration = parsed.data.format?.duration ?? videoStream?.duration ?? audioStream?.duration
+    const duration =
+      parsed.data.format?.duration ??
+      videoStream?.duration ??
+      audioStream?.duration;
 
-    const videoWidth = videoStream?.width
-    const videoHeight = videoStream?.height
+    const videoWidth = videoStream?.width;
+    const videoHeight = videoStream?.height;
     const fps =
-      parseFrameRate(videoStream?.r_frame_rate) ?? parseFrameRate(videoStream?.avg_frame_rate)
+      parseFrameRate(videoStream?.r_frame_rate) ??
+      parseFrameRate(videoStream?.avg_frame_rate);
 
     return {
-      containerFormat: parsed.data.format?.format_name ?? 'unknown',
+      containerFormat: parsed.data.format?.format_name ?? "unknown",
       /* A still image reports no duration, and 0 would be a lie that reads as
        * a real length downstream. */
       durationSec: duration !== undefined && duration > 0 ? duration : null,
       bytes: parsed.data.format?.size ?? 0,
       video:
-        videoStream !== undefined && videoWidth !== undefined && videoHeight !== undefined
+        videoStream !== undefined &&
+        videoWidth !== undefined &&
+        videoHeight !== undefined
           ? {
-              codec: videoStream.codec_name ?? 'unknown',
+              codec: videoStream.codec_name ?? "unknown",
               width: videoWidth,
               height: videoHeight,
               /* 0 rather than null: a stream that reports no rate is a still
@@ -216,86 +224,104 @@ export function parseProbeOutput(stdout: string): MediaProbe {
       audio:
         audioStream !== undefined
           ? {
-              codec: audioStream.codec_name ?? 'unknown',
+              codec: audioStream.codec_name ?? "unknown",
               channels: audioStream.channels ?? 0,
               sampleRate: audioStream.sample_rate ?? 0,
             }
           : null,
-    }
+    };
   }
 }
 
 export const ffmpegMediaAdapter: MediaAdapter = {
-  id: 'ffmpeg',
+  id: "ffmpeg",
 
   async probe(filePath: string): Promise<MediaProbe> {
     const stdout = await runTool(
       ffprobeBinary(),
-      ['-v', 'error', '-print_format', 'json', '-show_format', '-show_streams', filePath],
-      'This file could not be read as audio or video.'
-    )
-    return parseProbeOutput(stdout)
+      [
+        "-v",
+        "error",
+        "-print_format",
+        "json",
+        "-show_format",
+        "-show_streams",
+        filePath,
+      ],
+      "This file could not be read as audio or video.",
+    );
+    return parseProbeOutput(stdout);
   },
 
   async transcode(request: TranscodeRequest): Promise<void> {
-    const { inputPath, outputPath, width, height, fit, crf, fps, muted, encode } = request
-    const filter = fitFilter(width, height, fit)
+    const {
+      inputPath,
+      outputPath,
+      width,
+      height,
+      fit,
+      crf,
+      fps,
+      muted,
+      encode,
+    } = request;
+    const filter = fitFilter(width, height, fit);
 
-    if (encode === 'still') {
+    if (encode === "still") {
       await runTool(
         ffmpegBinary(),
         [
-          '-y',
-          '-i',
+          "-y",
+          "-i",
           inputPath,
-          '-vf',
+          "-vf",
           filter,
-          '-frames:v',
-          '1',
+          "-frames:v",
+          "1",
           /* 2 is ffmpeg's near-lossless JPEG quality; this rendition is what a
              render composites, so it is not the place to save bytes. */
-          '-q:v',
-          '2',
+          "-q:v",
+          "2",
           outputPath,
         ],
-        'This image could not be converted.'
-      )
-      return
+        "This image could not be converted.",
+      );
+      return;
     }
 
     await runTool(
       ffmpegBinary(),
       [
-        '-y',
-        '-i',
+        "-y",
+        "-i",
         inputPath,
-        '-vf',
+        "-vf",
         filter,
-        ...(fps !== undefined ? ['-r', String(fps)] : []),
-        '-c:v',
-        'libx264',
-        '-preset',
+        ...(fps !== undefined ? ["-r", String(fps)] : []),
+        "-c:v",
+        "libx264",
+        "-preset",
         /* `veryfast` rather than `medium`: this runs per upload on a worker
          * that is also serving other ingests, and the size difference on
          * short-form clips is single-digit percent. */
-        'veryfast',
-        '-crf',
+        "veryfast",
+        "-crf",
         String(crf),
         /* yuv420p is the only pixel format every browser and Remotion decode
          * path agrees on; a 10-bit or 4:2:2 source that keeps its own format
          * produces a file that plays on the worker and nowhere else. */
-        '-pix_fmt',
-        'yuv420p',
+        "-pix_fmt",
+        "yuv420p",
         ...(muted === true
-          ? ['-an']
-          : ['-c:a', 'aac', '-b:a', '128k', '-ar', '48000']),
+          ? ["-an"]
+          : ["-c:a", "aac", "-b:a", "128k", "-ar", "48000"]),
         /* FASTSTART — see the file header. */
-        '-movflags',
-        '+faststart',
+        "-movflags",
+        "+faststart",
         outputPath,
       ],
-      'This video could not be converted. Its format may not be supported.'
-    )
+      "This video could not be converted. Its format may not be supported.",
+    );
   },
 
   async extractFrame({ inputPath, outputPath, atSec, width }): Promise<void> {
@@ -305,42 +331,47 @@ export const ffmpegMediaAdapter: MediaAdapter = {
         /* `-ss` BEFORE `-i` seeks by keyframe without decoding everything up to
          * that point — on a two-minute source that is the difference between a
          * poster frame in 50ms and one in 20 seconds. */
-        '-ss',
+        "-ss",
         atSec.toFixed(3),
-        '-i',
+        "-i",
         inputPath,
-        '-frames:v',
-        '1',
+        "-frames:v",
+        "1",
         /* -2 keeps the aspect ratio and rounds to an even number, which the
            encoder requires. */
-        '-vf',
+        "-vf",
         `scale=${width}:-2`,
-        '-q:v',
-        '4',
+        "-q:v",
+        "4",
         outputPath,
       ],
-      'A preview image could not be made for this file.'
-    )
+      "A preview image could not be made for this file.",
+    );
   },
 
-  async renderWaveform({ inputPath, outputPath, width, height }): Promise<void> {
+  async renderWaveform({
+    inputPath,
+    outputPath,
+    width,
+    height,
+  }): Promise<void> {
     await runTool(
       ffmpegBinary(),
       [
-        '-y',
-        '-i',
+        "-y",
+        "-i",
         inputPath,
-        '-filter_complex',
+        "-filter_complex",
         /* A fixed mid-grey, not a theme token: this is a PNG's pixel data, so
          * there is no CSS to read. Mid-grey is the one value legible against
          * both the light and the dark editor background, which is why the
          * waveform is not drawn in the brand colour. */
         `showwavespic=s=${width}x${height}:colors=#9ca3af`,
-        '-frames:v',
-        '1',
+        "-frames:v",
+        "1",
         outputPath,
       ],
-      'A waveform could not be drawn for this audio.'
-    )
+      "A waveform could not be drawn for this audio.",
+    );
   },
-}
+};

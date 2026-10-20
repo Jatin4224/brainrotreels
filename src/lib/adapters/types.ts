@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -34,7 +28,7 @@
  *        keys come from src/lib/config/plans.ts.
  */
 
-import type { PlanKey } from '@/lib/config/plans'
+import type { PlanKey } from "@/lib/config/plans";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: AUTH_PROVIDER_IDS, AuthProviderId
@@ -50,9 +44,9 @@ import type { PlanKey } from '@/lib/config/plans'
  *        than a refactor.
  * WHERE: Read by src/lib/adapters/provider.ts and the env checklist.
  */
-export const AUTH_PROVIDER_IDS = ['better-auth'] as const
+export const AUTH_PROVIDER_IDS = ["better-auth"] as const;
 
-export type AuthProviderId = (typeof AUTH_PROVIDER_IDS)[number]
+export type AuthProviderId = (typeof AUTH_PROVIDER_IDS)[number];
 
 /**
  * SOURCE OF TRUTH KEYWORDS: AdapterUser
@@ -64,11 +58,11 @@ export type AuthProviderId = (typeof AUTH_PROVIDER_IDS)[number]
  * WHERE: Carried on AdapterSession; surfaced to the app via the tRPC context.
  */
 export interface AdapterUser {
-  id: string
-  email: string
-  name: string
-  image: string | null
-  emailVerified: boolean
+  id: string;
+  email: string;
+  name: string;
+  image: string | null;
+  emailVerified: boolean;
 }
 
 /**
@@ -84,8 +78,8 @@ export interface AdapterUser {
  * WHERE: Returned by IdentityAdapter.getSession(); consumed by src/trpc/init.ts.
  */
 export interface AdapterSession {
-  user: AdapterUser
-  activeOrganizationId: string | null
+  user: AdapterUser;
+  activeOrganizationId: string | null;
 }
 
 /**
@@ -95,10 +89,10 @@ export interface AdapterSession {
  * WHERE: Nested inside AdapterMembership.
  */
 export interface AdapterOrganization {
-  id: string
-  name: string
-  slug: string
-  logo: string | null
+  id: string;
+  name: string;
+  slug: string;
+  logo: string | null;
 }
 
 /**
@@ -117,13 +111,13 @@ export interface AdapterOrganization {
  *        src/trpc/init.ts and src/trpc/procedures/protected.ts.
  */
 export interface AdapterMembership {
-  organizationId: string
-  organization: AdapterOrganization
+  organizationId: string;
+  organization: AdapterOrganization;
   /** Provider-native role string — display + permission lookup only. */
-  role: string
+  role: string;
   /** Normalized full-access flag. NEVER compare `role` in app code. */
-  hasFullAccess: boolean
-  createdAt: Date
+  hasFullAccess: boolean;
+  createdAt: Date;
 }
 
 /**
@@ -140,16 +134,16 @@ export interface AdapterMembership {
  *        src/lib/feature-gate.ts.
  */
 export interface AdapterTier {
-  tier: PlanKey
-  planName: string
-  isOnTrial: boolean
+  tier: PlanKey;
+  planName: string;
+  isOnTrial: boolean;
   subscription: {
-    id: string
-    status: string
-    periodEnd: Date | null
-    cancelAtPeriodEnd: boolean
-    subscriptionId: string | null
-  } | null
+    id: string;
+    status: string;
+    periodEnd: Date | null;
+    cancelAtPeriodEnd: boolean;
+    subscriptionId: string | null;
+  } | null;
 }
 
 /**
@@ -163,7 +157,7 @@ export interface AdapterTier {
  */
 export interface IdentityAdapter {
   /** Resolve the current request's session, or null when signed out. */
-  getSession(): Promise<AdapterSession | null>
+  getSession(): Promise<AdapterSession | null>;
 }
 
 /**
@@ -182,15 +176,15 @@ export interface IdentityAdapter {
  */
 export interface AdapterMemberRow {
   /** Member id, or the invitation id for a pending row. */
-  id: string
+  id: string;
   /** Null for a pending invitation — nobody has accepted it yet. */
-  userId: string | null
-  name: string
-  email: string
-  image: string | null
-  role: string
-  isPending: boolean
-  invitationId: string | null
+  userId: string | null;
+  name: string;
+  email: string;
+  image: string | null;
+  role: string;
+  isPending: boolean;
+  invitationId: string | null;
   /**
    * COPYABLE_INVITE_LINK. The accept URL for a pending row, or null — for an
    * accepted member, and for a provider that owns invitations and therefore
@@ -199,7 +193,7 @@ export interface AdapterMemberRow {
    * place a link for an ALREADY-ISSUED invitation can be read, since invite and
    * resend only return one at the moment they run.
    */
-  invitationLink: string | null
+  invitationLink: string | null;
 }
 
 /**
@@ -213,8 +207,8 @@ export interface AdapterMemberRow {
  * WHERE: Returned by TenancyAdapter.inviteMember / resendInvitation.
  */
 export interface AdapterInvitationResult {
-  invitationId: string
-  invitationLink: string | null
+  invitationId: string;
+  invitationLink: string | null;
 }
 
 /**
@@ -233,18 +227,18 @@ export interface AdapterInvitationResult {
  */
 export interface TenancyAdapter {
   /** Every organization membership for a user, newest first. */
-  getMemberships(userId: string): Promise<AdapterMembership[]>
+  getMemberships(userId: string): Promise<AdapterMembership[]>;
   /**
    * Flatten a role into `resource:action` permission strings for one org.
    * Full-access members short-circuit before this is ever called.
    */
-  resolvePermissions(organizationId: string, role: string): Promise<string[]>
+  resolvePermissions(organizationId: string, role: string): Promise<string[]>;
 
   /**
    * The organization's roster — accepted members first, then pending invites.
    * PROVIDER_NEUTRAL_MEMBERSHIP: exists so the Teams UI is written once.
    */
-  listMembers(organizationId: string): Promise<AdapterMemberRow[]>
+  listMembers(organizationId: string): Promise<AdapterMemberRow[]>;
   /**
    * Invite by email. `role` is the APP's role name. The provider that OWNS
    * invitations also sends the email, so `invitationLink` is null there — the
@@ -252,46 +246,55 @@ export interface TenancyAdapter {
    * inviter can copy it.
    */
   inviteMember(params: {
-    organizationId: string
-    email: string
-    role: string
-    inviterUserId: string
-    inviterName: string
-    organizationName: string
-  }): Promise<AdapterInvitationResult>
+    organizationId: string;
+    email: string;
+    role: string;
+    inviterUserId: string;
+    inviterName: string;
+    organizationName: string;
+  }): Promise<AdapterInvitationResult>;
   /** Withdraw a pending invitation. */
-  cancelInvitation(params: { organizationId: string; invitationId: string }): Promise<void>
+  cancelInvitation(params: {
+    organizationId: string;
+    invitationId: string;
+  }): Promise<void>;
   /**
    * Re-issue a pending invitation. Returns the invitation id, which MAY differ
    * from the original: a provider with no resend endpoint has to revoke and
    * re-create.
    */
   resendInvitation(params: {
-    organizationId: string
-    invitationId: string
-    inviterUserId: string
-    inviterName: string
-    organizationName: string
-  }): Promise<AdapterInvitationResult>
+    organizationId: string;
+    invitationId: string;
+    inviterUserId: string;
+    inviterName: string;
+    organizationName: string;
+  }): Promise<AdapterInvitationResult>;
   /** Change an accepted member's role. `memberId` is the row id from listMembers. */
   updateMemberRole(params: {
-    organizationId: string
-    memberId: string
-    role: string
-  }): Promise<void>
+    organizationId: string;
+    memberId: string;
+    role: string;
+  }): Promise<void>;
   /** Remove an accepted member from the organization. */
-  removeMember(params: { organizationId: string; memberId: string }): Promise<void>
+  removeMember(params: {
+    organizationId: string;
+    memberId: string;
+  }): Promise<void>;
 
   /** Rename / re-logo the organization. */
   updateOrganization(params: {
-    organizationId: string
-    name: string
-    logo?: string | null
-  }): Promise<void>
+    organizationId: string;
+    name: string;
+    logo?: string | null;
+  }): Promise<void>;
   /** Delete the organization and everything scoped to it. */
-  deleteOrganization(params: { organizationId: string }): Promise<void>
+  deleteOrganization(params: { organizationId: string }): Promise<void>;
   /** The caller leaves the organization (without deleting it). */
-  leaveOrganization(params: { organizationId: string; userId: string }): Promise<void>
+  leaveOrganization(params: {
+    organizationId: string;
+    userId: string;
+  }): Promise<void>;
 }
 
 /**
@@ -307,7 +310,7 @@ export interface TenancyAdapter {
  * WHERE: Implemented per provider; called by src/lib/feature-gate.ts.
  */
 export interface EntitlementAdapter {
-  getTier(organizationId: string): Promise<AdapterTier>
+  getTier(organizationId: string): Promise<AdapterTier>;
 }
 
 /**
@@ -328,9 +331,9 @@ export interface EntitlementAdapter {
  */
 export interface AdapterCapabilities {
   /** A single transferable owner, vs. many equal admins. */
-  ownershipTransfer: boolean
+  ownershipTransfer: boolean;
   /** Invitations are sent AND accepted by the provider rather than this app. */
-  providerInvitations: boolean
+  providerInvitations: boolean;
   /**
    * Organizations are created by THIS APP writing its own tables (Better Auth),
    * rather than by the provider. False means the app must never create an org
@@ -338,9 +341,8 @@ export interface AdapterCapabilities {
    * a locally-created org would be invisible and the user would loop forever in
    * onboarding.
    */
-  appManagedOrganizations: boolean
+  appManagedOrganizations: boolean;
 }
-
 
 /**
  * SOURCE OF TRUTH KEYWORDS: AuthAdapter, PROVIDER_NEUTRAL_CONTRACT
@@ -353,9 +355,9 @@ export interface AdapterCapabilities {
  * WHERE: Returned by getAuthAdapter() in src/lib/adapters/index.ts.
  */
 export interface AuthAdapter {
-  id: AuthProviderId
-  capabilities: AdapterCapabilities
-  identity: IdentityAdapter
-  tenancy: TenancyAdapter
-  entitlement: EntitlementAdapter
+  id: AuthProviderId;
+  capabilities: AdapterCapabilities;
+  identity: IdentityAdapter;
+  tenancy: TenancyAdapter;
+  entitlement: EntitlementAdapter;
 }

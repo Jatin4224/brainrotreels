@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -29,61 +23,82 @@
  * WHERE: migrate.test.ts.
  */
 
-import type { JsonObject } from '@/lib/types/json'
+import type { JsonObject } from "@/lib/types/json";
 
 export function legacyV1Fixture(): JsonObject {
   return {
     version: 1,
-    kind: 'reddit-story',
+    kind: "reddit-story",
     /* Flat, pre-`canvas`. */
     width: 1080,
     height: 1920,
     fps: 30,
     words: [
-      { text: 'AITA', start: 0, end: 0.32, speaker: 'A' },
-      { text: 'for', start: 0.32, end: 0.46, speaker: 'A' },
-      { text: 'naming', start: 0.46, end: 0.88, speaker: 'A' },
-      { text: 'my', start: 0.88, end: 1.02, speaker: 'A' },
-      { text: 'sourdough', start: 1.02, end: 1.64, speaker: 'A' },
-      { text: 'Gerald', start: 1.64, end: 2.2, speaker: 'A' },
+      { text: "AITA", start: 0, end: 0.32, speaker: "A" },
+      { text: "for", start: 0.32, end: 0.46, speaker: "A" },
+      { text: "naming", start: 0.46, end: 0.88, speaker: "A" },
+      { text: "my", start: 0.88, end: 1.02, speaker: "A" },
+      { text: "sourdough", start: 1.02, end: 1.64, speaker: "A" },
+      { text: "Gerald", start: 1.64, end: 2.2, speaker: "A" },
     ],
     tracks: [
       {
-        id: 'bg',
-        type: 'video',
+        id: "bg",
+        type: "video",
         items: [
-          { id: 'i1', start: 0, duration: 2.2, assetId: 'bg_loop_01', fit: 'cover', loop: true, muted: true },
+          {
+            id: "i1",
+            start: 0,
+            duration: 2.2,
+            assetId: "bg_loop_01",
+            fit: "cover",
+            loop: true,
+            muted: true,
+          },
         ],
       },
       {
-        id: 'cards',
-        type: 'scene',
+        id: "cards",
+        type: "scene",
         items: [
           {
-            id: 's1',
+            id: "s1",
             start: 0,
             duration: 2.2,
             /* v3 and earlier called the component family `kind`. */
-            kind: 'redditCard',
+            kind: "redditCard",
             scene: {
-              layout: 'stack-center',
-              elements: [{ id: 'e1', kind: 'title', text: 'AITA for naming my sourdough Gerald?' }],
+              layout: "stack-center",
+              elements: [
+                {
+                  id: "e1",
+                  kind: "title",
+                  text: "AITA for naming my sourdough Gerald?",
+                },
+              ],
             },
           },
         ],
       },
       {
-        id: 'narration',
-        type: 'audio',
+        id: "narration",
+        type: "audio",
         items: [
-          { id: 'a1', start: 0, duration: 2.2, assetId: 'narration_old', speaker: 'A', gain: 1 },
+          {
+            id: "a1",
+            start: 0,
+            duration: 2.2,
+            assetId: "narration_old",
+            speaker: "A",
+            gain: 1,
+          },
         ],
       },
       {
-        id: 'captions',
-        type: 'caption',
-        items: [{ id: 'c1', startWord: 0, endWord: 5, position: { y: 0.7 } }],
+        id: "captions",
+        type: "caption",
+        items: [{ id: "c1", startWord: 0, endWord: 5, position: { y: 0.7 } }],
       },
     ],
-  }
+  };
 }

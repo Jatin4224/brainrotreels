@@ -59,6 +59,20 @@ export const JOB_EVENT_NAMES = [
    * Remotion; the event it relays is not.
    */
   'render/finished',
+  /**
+   * SCRIPT_IS_ITS_OWN_EVENT. Sent by `scripts.generate` once the source text
+   * has been extracted, so the model call — which takes tens of seconds at the
+   * effort this product asks for — happens in a durable run rather than inside
+   * the request's 10-second Prisma transaction.
+   *
+   * Distinct from `project/requested`, which Phase 09 uses for the WHOLE
+   * pipeline (script → voices → TTS → align → timeline). This one is the
+   * script step alone, and it exists because the script is editable on its own
+   * long before that pipeline is built: a customer regenerates a script
+   * without re-synthesising audio. Phase 09 composes this step rather than
+   * replacing it.
+   */
+  'script/requested',
   'asset/uploaded',
   'footage/requested',
   'line/changed',

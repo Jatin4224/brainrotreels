@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -35,9 +29,9 @@
  *        Re-exported from src/lib/types.
  */
 
-import { z } from 'zod'
+import { z } from "zod";
 
-import { jsonObjectSchema } from './json'
+import { jsonObjectSchema } from "./json";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: PROJECT_KINDS, projectKindSchema, ProjectKind
@@ -48,11 +42,16 @@ import { jsonObjectSchema } from './json'
  *        at the callsite is how two sources of truth get born.
  * WHERE: Project.kind, TimelineDoc.kind, the create-project form.
  */
-export const PROJECT_KINDS = ['reddit-story', 'voiceover', 'quiz', 'motion'] as const
+export const PROJECT_KINDS = [
+  "reddit-story",
+  "voiceover",
+  "quiz",
+  "motion",
+] as const;
 
-export const projectKindSchema = z.enum(PROJECT_KINDS)
+export const projectKindSchema = z.enum(PROJECT_KINDS);
 
-export type ProjectKind = z.infer<typeof projectKindSchema>
+export type ProjectKind = z.infer<typeof projectKindSchema>;
 
 /**
  * SOURCE OF TRUTH KEYWORDS: PROJECT_STATUSES, projectStatusSchema, ProjectStatus
@@ -64,16 +63,16 @@ export type ProjectKind = z.infer<typeof projectKindSchema>
  * WHERE: Project.status; the status badge on the projects list.
  */
 export const PROJECT_STATUSES = [
-  'draft',
-  'generating',
-  'ready',
-  'failed',
-  'cancelled',
-] as const
+  "draft",
+  "generating",
+  "ready",
+  "failed",
+  "cancelled",
+] as const;
 
-export const projectStatusSchema = z.enum(PROJECT_STATUSES)
+export const projectStatusSchema = z.enum(PROJECT_STATUSES);
 
-export type ProjectStatus = z.infer<typeof projectStatusSchema>
+export type ProjectStatus = z.infer<typeof projectStatusSchema>;
 
 /**
  * SOURCE OF TRUTH KEYWORDS: ASPECT_RATIOS, aspectRatioSchema, AspectRatio,
@@ -86,27 +85,30 @@ export type ProjectStatus = z.infer<typeof projectStatusSchema>
  *        re-tuned per size. 1080-wide is the short-form standard.
  * WHERE: Project.aspect; consumed when a generator builds a TimelineDoc canvas.
  */
-export const ASPECT_RATIOS = ['9:16', '1:1', '16:9'] as const
+export const ASPECT_RATIOS = ["9:16", "1:1", "16:9"] as const;
 
-export const aspectRatioSchema = z.enum(ASPECT_RATIOS)
+export const aspectRatioSchema = z.enum(ASPECT_RATIOS);
 
-export type AspectRatio = z.infer<typeof aspectRatioSchema>
+export type AspectRatio = z.infer<typeof aspectRatioSchema>;
 
 export const CANVAS_BY_ASPECT: Readonly<
-  Record<AspectRatio, { readonly width: number; readonly height: number; readonly fps: number }>
+  Record<
+    AspectRatio,
+    { readonly width: number; readonly height: number; readonly fps: number }
+  >
 > = {
-  '9:16': { width: 1080, height: 1920, fps: 30 },
-  '1:1': { width: 1080, height: 1080, fps: 30 },
-  '16:9': { width: 1920, height: 1080, fps: 30 },
-}
+  "9:16": { width: 1080, height: 1920, fps: 30 },
+  "1:1": { width: 1080, height: 1080, fps: 30 },
+  "16:9": { width: 1920, height: 1080, fps: 30 },
+};
 
 /* One definition for both create and rename — a title the create form accepts
  * and the rename form rejects would be a bug nobody notices until a render. */
 export const projectTitleSchema = z
   .string()
   .trim()
-  .min(1, 'Give your project a title.')
-  .max(200, 'That title is too long.')
+  .min(1, "Give your project a title.")
+  .max(200, "That title is too long.");
 
 /**
  * SOURCE OF TRUTH KEYWORDS: createProjectSchema, CreateProjectValues
@@ -133,9 +135,9 @@ export const createProjectSchema = z.object({
    * chosen kind reads. Phase 06 is what interprets it. */
   sourceRef: z.string().trim().max(2048).optional(),
   settings: jsonObjectSchema.optional(),
-})
+});
 
-export type CreateProjectValues = z.infer<typeof createProjectSchema>
+export type CreateProjectValues = z.infer<typeof createProjectSchema>;
 
 /**
  * SOURCE OF TRUTH KEYWORDS: listProjectsSchema, PROJECT_PAGE_SIZE
@@ -148,7 +150,7 @@ export type CreateProjectValues = z.infer<typeof createProjectSchema>
  *        src/trpc/routers/audit-logs.ts.
  * WHERE: The projects list screen and the router.
  */
-export const PROJECT_PAGE_SIZE = 20
+export const PROJECT_PAGE_SIZE = 20;
 
 export const listProjectsSchema = z.object({
   organizationId: z.string().min(1),
@@ -157,9 +159,9 @@ export const listProjectsSchema = z.object({
   search: z.string().trim().max(200).optional(),
   kind: projectKindSchema.optional(),
   status: projectStatusSchema.optional(),
-})
+});
 
-export type ListProjectsValues = z.infer<typeof listProjectsSchema>
+export type ListProjectsValues = z.infer<typeof listProjectsSchema>;
 
 /**
  * SOURCE OF TRUTH KEYWORDS: PROJECT_FILTER_ALL, projectFilterSchema,
@@ -179,33 +181,33 @@ export type ListProjectsValues = z.infer<typeof listProjectsSchema>
  * WHERE: The projects toolbar and table under
  *        src/app/(dashboard)/dashboard/projects/_components.
  */
-export const PROJECT_FILTER_ALL = 'all'
+export const PROJECT_FILTER_ALL = "all";
 
-export const PROJECT_SEARCH_MAX = 200
+export const PROJECT_SEARCH_MAX = 200;
 
 export const projectFilterSchema = z.object({
   search: z.string().trim().max(PROJECT_SEARCH_MAX),
   kind: z.string(),
   status: z.string(),
-})
+});
 
-export type ProjectFilterValues = z.infer<typeof projectFilterSchema>
+export type ProjectFilterValues = z.infer<typeof projectFilterSchema>;
 
 export const PROJECT_FILTER_DEFAULTS: ProjectFilterValues = {
-  search: '',
+  search: "",
   kind: PROJECT_FILTER_ALL,
   status: PROJECT_FILTER_ALL,
-}
+};
 
 export function normalizeProjectFilters(values: ProjectFilterValues): {
-  search?: string
-  kind?: ProjectKind
-  status?: ProjectStatus
+  search?: string;
+  kind?: ProjectKind;
+  status?: ProjectStatus;
 } {
-  const parsed = projectFilterSchema.parse(values)
-  const search = parsed.search.trim()
-  const kind = projectKindSchema.safeParse(parsed.kind)
-  const status = projectStatusSchema.safeParse(parsed.status)
+  const parsed = projectFilterSchema.parse(values);
+  const search = parsed.search.trim();
+  const kind = projectKindSchema.safeParse(parsed.kind);
+  const status = projectStatusSchema.safeParse(parsed.status);
 
   /* Keys are omitted rather than set to undefined — `exactOptionalPropertyTypes`
    * is on, and the router's input schema uses `.optional()`. */
@@ -213,26 +215,26 @@ export function normalizeProjectFilters(values: ProjectFilterValues): {
     ...(search ? { search } : {}),
     ...(kind.success ? { kind: kind.data } : {}),
     ...(status.success ? { status: status.data } : {}),
-  }
+  };
 }
 
 export const getProjectSchema = z.object({
   organizationId: z.string().min(1),
   id: z.string().min(1),
-})
+});
 
 export const renameProjectSchema = z.object({
   organizationId: z.string().min(1),
   id: z.string().min(1),
   title: projectTitleSchema,
-})
+});
 
-export type RenameProjectValues = z.infer<typeof renameProjectSchema>
+export type RenameProjectValues = z.infer<typeof renameProjectSchema>;
 
 export const deleteProjectSchema = z.object({
   organizationId: z.string().min(1),
   id: z.string().min(1),
-})
+});
 
 export const duplicateProjectSchema = z.object({
   organizationId: z.string().min(1),
@@ -240,6 +242,6 @@ export const duplicateProjectSchema = z.object({
   /* Omitted means "Copy of <original>", resolved server-side where the
    * original title is already loaded. */
   title: projectTitleSchema.optional(),
-})
+});
 
-export type DuplicateProjectValues = z.infer<typeof duplicateProjectSchema>
+export type DuplicateProjectValues = z.infer<typeof duplicateProjectSchema>;

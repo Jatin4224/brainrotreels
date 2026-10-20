@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -23,24 +17,24 @@
  *        getCachedSession; routes via AUTH_ROUTES / PORTAL_PATH.
  */
 
-import type { Metadata } from 'next'
-import { redirect } from 'next/navigation'
+import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 
-import { getServerSession } from '@/lib/adapters/session'
-import { AUTH_ROUTES, PORTAL_PATH, isPortalOwnerEmail } from '@/lib/config'
-import { Onboarding } from '@/components/global/providers/server'
+import { getServerSession } from "@/lib/adapters/session";
+import { AUTH_ROUTES, PORTAL_PATH, isPortalOwnerEmail } from "@/lib/config";
+import { Onboarding } from "@/components/global/providers/server";
 
 export const metadata: Metadata = {
-  title: 'Get started',
-}
+  title: "Get started",
+};
 
 export default async function OnboardingPage() {
-  const session = await getServerSession()
-  if (!session) redirect(AUTH_ROUTES.signIn)
+  const session = await getServerSession();
+  if (!session) redirect(AUTH_ROUTES.signIn);
 
   /* Platform-admin owner shouldn't create a tenant org — send them to /portal,
    * which bootstraps their portal workspace. */
-  if (isPortalOwnerEmail(session.user.email)) redirect(PORTAL_PATH)
+  if (isPortalOwnerEmail(session.user.email)) redirect(PORTAL_PATH);
 
   /* ONBOARDING_IS_THE_ONLY_FUNNEL: this route stays reachable WITH an existing
    * organization under every provider, on purpose — the sidebar switcher's
@@ -49,5 +43,5 @@ export default async function OnboardingPage() {
    * The post-sign-up duplicate is prevented upstream instead: sign-up lands on
    * the dashboard, and the dashboard layout only sends users here when they
    * genuinely have no organization. */
-  return <Onboarding />
+  return <Onboarding />;
 }

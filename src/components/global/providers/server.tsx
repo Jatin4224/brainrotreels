@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -33,10 +27,10 @@
  *        Billing pages. Client components receive these as props/children.
  */
 
-import type * as React from 'react'
-import type { Route } from 'next'
+import type * as React from "react";
+import type { Route } from "next";
 
-import type { AuthFormMode } from '@/lib/types'
+import type { AuthFormMode } from "@/lib/types";
 
 import {
   ActiveAuthBoundary,
@@ -49,7 +43,7 @@ import {
   ActiveOrgSwitcher,
   ActiveResetPasswordScreen,
   ActiveUserMenu,
-} from '@providers-active'
+} from "@providers-active";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: AuthBoundary
@@ -62,17 +56,17 @@ import {
  * WHERE: Mounted by src/app/layout.tsx around TRPCReactProvider.
  */
 export function AuthBoundary({ children }: { children: React.ReactNode }) {
-  return <ActiveAuthBoundary>{children}</ActiveAuthBoundary>
+  return <ActiveAuthBoundary>{children}</ActiveAuthBoundary>;
 }
 
 /** Sidebar-header organization switcher. */
 export function OrgSwitcher() {
-  return <ActiveOrgSwitcher />
+  return <ActiveOrgSwitcher />;
 }
 
 /** Sidebar-footer account menu. */
 export function UserMenu() {
-  return <ActiveUserMenu />
+  return <ActiveUserMenu />;
 }
 
 /**
@@ -87,33 +81,33 @@ export function UserMenu() {
  * WHERE: Consumed by the (auth) route pages.
  */
 export interface AuthScreenProps {
-  mode: AuthFormMode
-  callbackURL?: Route
+  mode: AuthFormMode;
+  callbackURL?: Route;
 }
 
 /** Sign-in / sign-up surface. */
-export function AuthScreen({ mode, callbackURL = '/' }: AuthScreenProps) {
-  return <ActiveAuthScreen mode={mode} callbackURL={callbackURL} />
+export function AuthScreen({ mode, callbackURL = "/" }: AuthScreenProps) {
+  return <ActiveAuthScreen mode={mode} callbackURL={callbackURL} />;
 }
 
 /** Request-a-reset-link surface. A hosted provider folds this into sign-in. */
 export function ForgotPasswordScreen() {
-  return <ActiveForgotPasswordScreen />
+  return <ActiveForgotPasswordScreen />;
 }
 
 /** Set-a-new-password surface. A hosted provider folds this into sign-in. */
 export function ResetPasswordScreen() {
-  return <ActiveResetPasswordScreen />
+  return <ActiveResetPasswordScreen />;
 }
 
 /** Team membership surface. */
 export function MemberManagement() {
-  return <ActiveMemberManagement />
+  return <ActiveMemberManagement />;
 }
 
 /** Billing settings surface. */
 export function BillingScreen() {
-  return <ActiveBillingScreen />
+  return <ActiveBillingScreen />;
 }
 
 /**
@@ -129,10 +123,10 @@ export function BillingScreen() {
  * WHERE: Rendered at the bottom of the organization settings page.
  */
 export function OrganizationAdvanced() {
-  return <ActiveOrganizationAdvanced />
+  return <ActiveOrganizationAdvanced />;
 }
 
 /** Create-an-organization wizard. */
 export function Onboarding() {
-  return <ActiveOnboarding />
+  return <ActiveOnboarding />;
 }

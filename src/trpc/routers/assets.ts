@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -40,22 +34,22 @@
  *        the `asset.ingest` workflow via `asset/uploaded`.
  */
 
-import { TRPCError } from '@trpc/server'
+import { TRPCError } from "@trpc/server";
 
-import { createStructuredError, createTRPCRouter } from '../init'
-import { protectedProcedure } from '../procedures'
-import { permissions } from '@/lib/permissions'
-import { checkFeatureGate, getOrganizationTier } from '@/lib/feature-gate'
-import { ERROR_CODES } from '@/lib/errors'
-import { decrementUsage, incrementUsage } from '@/services/usage.service'
+import { createStructuredError, createTRPCRouter } from "../init";
+import { protectedProcedure } from "../procedures";
+import { permissions } from "@/lib/permissions";
+import { checkFeatureGate, getOrganizationTier } from "@/lib/feature-gate";
+import { ERROR_CODES } from "@/lib/errors";
+import { decrementUsage, incrementUsage } from "@/services/usage.service";
 import {
   DEFAULT_SIGNED_PUT_TTL_SECONDS,
   getStorageAdapter,
   isOwnedByOrganization,
   uploadKey,
-} from '@/lib/adapters/storage'
-import { enqueue } from '@/lib/adapters/jobs'
-import * as assetsService from '@/services/assets.service'
+} from "@/lib/adapters/storage";
+import { enqueue } from "@/lib/adapters/jobs";
+import * as assetsService from "@/services/assets.service";
 import {
   completeUploadSchema,
   createUploadUrlSchema,
@@ -68,8 +62,8 @@ import {
   renameAssetSchema,
   VARIANT_NAMES,
   type VariantName,
-} from '@/lib/types'
-import { formatBytes } from '@/lib/resources'
+} from "@/lib/types";
+import { formatBytes } from "@/lib/resources";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: SignedVariant, assets.get
@@ -85,11 +79,11 @@ import { formatBytes } from '@/lib/resources'
  *        inferRouterOutputs.
  */
 interface SignedVariant {
-  variant: VariantName
-  width: number | null
-  height: number | null
-  bytes: number
-  url: string | null
+  variant: VariantName;
+  width: number | null;
+  height: number | null;
+  bytes: number;
+  url: string | null;
 }
 
 export const assetsRouter = createTRPCRouter({
@@ -126,30 +120,39 @@ export const assetsRouter = createTRPCRouter({
   })
     .input(createUploadUrlSchema)
     .mutation(async ({ input }) => {
-      const tier = await getOrganizationTier(input.organizationId)
-      const perFileCap = maxUploadBytesForPlan(tier.tier)
+      const tier = await getOrganizationTier(input.organizationId);
+      const perFileCap = maxUploadBytesForPlan(tier.tier);
 
       if (input.bytes > perFileCap) {
         throw new TRPCError({
-          code: 'BAD_REQUEST',
+          code: "BAD_REQUEST",
           message: `That file is ${formatBytes(input.bytes)}. The largest single file on your plan is ${formatBytes(perFileCap)}.`,
-        })
+        });
       }
 
       /* GATE_BEFORE_SIGNING — the quota is checked for THIS MANY BYTES, not for
        * "one more asset". That is the whole reason the gate takes a quantity. */
-      const gate = await checkFeatureGate(input.organizationId, 'storage', input.bytes)
+      const gate = await checkFeatureGate(
+        input.organizationId,
+        "storage",
+        input.bytes,
+      );
       if (!gate.allowed) {
-        throw createStructuredError('FORBIDDEN', gate.reason || 'Storage limit reached', {
-          errorCode: ERROR_CODES.USAGE_LIMIT_REACHED,
-          resource: 'storage',
-          limit: gate.limit ?? 0,
-          current: gate.currentUsage ?? 0,
-          currentPlan: gate.plan,
-          upgradeRequired: true,
-          message: gate.reason || 'This upload would exceed your storage limit',
-          upgradeMessage: gate.upgradeMessage,
-        })
+        throw createStructuredError(
+          "FORBIDDEN",
+          gate.reason || "Storage limit reached",
+          {
+            errorCode: ERROR_CODES.USAGE_LIMIT_REACHED,
+            resource: "storage",
+            limit: gate.limit ?? 0,
+            current: gate.currentUsage ?? 0,
+            currentPlan: gate.plan,
+            upgradeRequired: true,
+            message:
+              gate.reason || "This upload would exceed your storage limit",
+            upgradeMessage: gate.upgradeMessage,
+          },
+        );
       }
 
       /* The asset id is minted HERE, before the row exists, because the key
@@ -160,16 +163,16 @@ export const assetsRouter = createTRPCRouter({
        * whether the upload happens, leaving a `processing` asset behind for
        * every abandoned drag. A hex uuid rather than a cuid because this is
        * only ever a key segment, and `assertKeySegment` is what validates it. */
-      const assetId = crypto.randomUUID().replace(/-/g, '')
-      const extension = extensionForContentType(input.contentType)
+      const assetId = crypto.randomUUID().replace(/-/g, "");
+      const extension = extensionForContentType(input.contentType);
       if (extension === null) {
         /* Unreachable through the schema, which only admits allowlisted types.
          * Kept because the schema and the allowlist are two objects, and this
          * is the line that fails loudly rather than storing `original.null`. */
         throw new TRPCError({
-          code: 'BAD_REQUEST',
+          code: "BAD_REQUEST",
           message: `We do not accept ${input.contentType} files.`,
-        })
+        });
       }
 
       /* NEVER a hand-built key — the prefix is what enforces tenancy at the
@@ -177,16 +180,20 @@ export const assetsRouter = createTRPCRouter({
        * the content type, not from the customer's filename: a name the browser
        * supplied has no business in a key, and the display name is kept on the
        * row instead. */
-      const storageKey = uploadKey(input.organizationId, assetId, `original.${extension}`)
+      const storageKey = uploadKey(
+        input.organizationId,
+        assetId,
+        `original.${extension}`,
+      );
 
-      const storage = await getStorageAdapter()
+      const storage = await getStorageAdapter();
       const url = await storage.signedPutUrl(storageKey, {
         contentType: input.contentType,
         /* EXACT_CONTENT_LENGTH: the real size, because it is signed INTO the
          * URL and R2 rejects a body of any other length. See
          * createUploadUrlSchema for why this is not the plan cap. */
         maxBytes: input.bytes,
-      })
+      });
 
       return {
         url,
@@ -196,7 +203,7 @@ export const assetsRouter = createTRPCRouter({
          * re-deriving the header and disagreeing by a byte. */
         contentType: input.contentType,
         bytes: input.bytes,
-      }
+      };
     }),
 
   /**
@@ -223,64 +230,69 @@ export const assetsRouter = createTRPCRouter({
    *        than two competing transcodes writing the same variant keys.
    * WHERE: Called by the drop zone once its PUT resolves.
    */
-  completeUpload: protectedProcedure({ requirePermission: permissions.ASSETS_CREATE })
+  completeUpload: protectedProcedure({
+    requirePermission: permissions.ASSETS_CREATE,
+  })
     .input(completeUploadSchema)
     .mutation(async ({ ctx, input }) => {
       if (!isOwnedByOrganization(input.storageKey, input.organizationId)) {
         throw new TRPCError({
-          code: 'FORBIDDEN',
-          message: 'That storage location does not belong to this workspace.',
-        })
+          code: "FORBIDDEN",
+          message: "That storage location does not belong to this workspace.",
+        });
       }
 
-      const storage = await getStorageAdapter()
-      const head = await storage.head(input.storageKey)
+      const storage = await getStorageAdapter();
+      const head = await storage.head(input.storageKey);
       if (head === null) {
         throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: 'That upload did not complete. Please try again.',
-        })
+          code: "NOT_FOUND",
+          message: "That upload did not complete. Please try again.",
+        });
       }
 
       /* The kind is re-derived from the content type rather than taken from the
        * client (see UPLOADABLE_ASSET_KINDS); the client's hint only survives
        * when it agrees with what the file is. */
-      const derivedKind = kindForContentType(input.contentType)
+      const derivedKind = kindForContentType(input.contentType);
       if (derivedKind === null) {
         throw new TRPCError({
-          code: 'BAD_REQUEST',
+          code: "BAD_REQUEST",
           message: `We do not accept ${input.contentType} files.`,
-        })
+        });
       }
 
       const asset = await assetsService.createProcessingAsset(ctx.db, {
         organizationId: input.organizationId,
         kind: input.kind ?? derivedKind,
-        source: 'upload',
+        source: "upload",
         filename: input.filename,
         storageKey: input.storageKey,
         contentType: input.contentType,
         bytes: head.bytes,
-      })
+      });
 
       /* BYTES_METERED_ON_STORAGE — by hand, because `assets` has no limit of
        * its own and the factory therefore bumps nothing. Inside the handler's
        * transaction, so a failed row write cannot leave the counter inflated. */
-      await incrementUsage(input.organizationId, 'storage', head.bytes, ctx.db)
+      await incrementUsage(input.organizationId, "storage", head.bytes, ctx.db);
 
       await enqueue({
-        name: 'asset/uploaded',
+        name: "asset/uploaded",
         data: { assetId: asset.id, organizationId: input.organizationId },
         id: `asset-ingest-${asset.id}`,
-      })
+      });
 
-      return asset
+      return asset;
     }),
 
-  list: protectedProcedure({ requirePermission: permissions.ASSETS_READ, paginate: true })
+  list: protectedProcedure({
+    requirePermission: permissions.ASSETS_READ,
+    paginate: true,
+  })
     .input(listAssetsSchema)
     .query(async ({ ctx, input }) => {
-      const { skip, take, pageSize } = ctx.pagination
+      const { skip, take, pageSize } = ctx.pagination;
       const page = await assetsService.listAssets(
         ctx.db,
         {
@@ -289,8 +301,8 @@ export const assetsRouter = createTRPCRouter({
           kinds: input.kinds,
           status: input.status,
         },
-        { skip, take }
-      )
+        { skip, take },
+      );
 
       /* THUMB_URLS_WITH_THE_ROWS. The grid cannot render without them, so
        * fetching them per tile would be a request per asset on every page
@@ -301,20 +313,27 @@ export const assetsRouter = createTRPCRouter({
        * to an icon. */
       const items = await Promise.all(
         page.items.map(async (asset) => {
-          const thumb = asset.variants[0]
+          const thumb = asset.variants[0];
           const thumbUrl =
             thumb === undefined
               ? null
-              : await assetsService.signScopedKey(thumb.storageKey, input.organizationId)
-          const { variants: _variants, ...rest } = asset
-          return { ...rest, thumbUrl }
-        })
-      )
+              : await assetsService.signScopedKey(
+                  thumb.storageKey,
+                  input.organizationId,
+                );
+          const { variants: _variants, ...rest } = asset;
+          return { ...rest, thumbUrl };
+        }),
+      );
 
       /* SERVER_TOTAL_PAGES — computed against the pageSize the FACTORY clamped
        * to, as in projects.list, so the client's pager cannot disagree with the
        * query that produced the rows. */
-      return { items, total: page.total, totalPages: Math.max(1, Math.ceil(page.total / pageSize)) }
+      return {
+        items,
+        total: page.total,
+        totalPages: Math.max(1, Math.ceil(page.total / pageSize)),
+      };
     }),
 
   /**
@@ -335,34 +354,41 @@ export const assetsRouter = createTRPCRouter({
       const asset = await assetsService.findAssetWithVariants(
         ctx.db,
         input.organizationId,
-        input.id
-      )
-      if (!asset) throw new TRPCError({ code: 'NOT_FOUND', message: 'Asset not found' })
+        input.id,
+      );
+      if (!asset)
+        throw new TRPCError({ code: "NOT_FOUND", message: "Asset not found" });
 
-      const url = await assetsService.signScopedKey(asset.storageKey, input.organizationId)
+      const url = await assetsService.signScopedKey(
+        asset.storageKey,
+        input.organizationId,
+      );
 
       /* The rows are already loaded, so the map is built from them rather than
        * re-read — but it is built by the SERVICE's toVariantMap, not by a
        * `.find()` per name here, so the router and getAssetVariants cannot
        * disagree about an unrecognised variant name. */
-      const rowsByVariant = assetsService.toVariantMap(asset.variants)
-      const variants = assetsService.emptyVariantMap<SignedVariant>()
+      const rowsByVariant = assetsService.toVariantMap(asset.variants);
+      const variants = assetsService.emptyVariantMap<SignedVariant>();
 
       for (const name of VARIANT_NAMES) {
-        const row = rowsByVariant[name]
-        if (row === null) continue
+        const row = rowsByVariant[name];
+        if (row === null) continue;
         variants[name] = {
           variant: name,
           width: row.width,
           height: row.height,
           bytes: row.bytes,
-          url: await assetsService.signScopedKey(row.storageKey, input.organizationId),
-        }
+          url: await assetsService.signScopedKey(
+            row.storageKey,
+            input.organizationId,
+          ),
+        };
       }
 
-      const { variants: _variants, ...rest } = asset
+      const { variants: _variants, ...rest } = asset;
 
-      return { ...rest, url, variants }
+      return { ...rest, url, variants };
     }),
 
   /**
@@ -386,18 +412,19 @@ export const assetsRouter = createTRPCRouter({
       const existing = await assetsService.findAssetForOrganization(
         ctx.db,
         input.organizationId,
-        input.id
-      )
-      if (!existing) throw new TRPCError({ code: 'NOT_FOUND', message: 'Asset not found' })
+        input.id,
+      );
+      if (!existing)
+        throw new TRPCError({ code: "NOT_FOUND", message: "Asset not found" });
 
       if (existing.organizationId === null) {
         throw new TRPCError({
-          code: 'FORBIDDEN',
-          message: 'Library media is shared and cannot be renamed.',
-        })
+          code: "FORBIDDEN",
+          message: "Library media is shared and cannot be renamed.",
+        });
       }
 
-      return assetsService.renameAsset(ctx.db, existing.id, input.filename)
+      return assetsService.renameAsset(ctx.db, existing.id, input.filename);
     }),
 
   /**
@@ -435,25 +462,31 @@ export const assetsRouter = createTRPCRouter({
       const asset = await assetsService.findAssetWithVariants(
         ctx.db,
         input.organizationId,
-        input.id
-      )
-      if (!asset) throw new TRPCError({ code: 'NOT_FOUND', message: 'Asset not found' })
+        input.id,
+      );
+      if (!asset)
+        throw new TRPCError({ code: "NOT_FOUND", message: "Asset not found" });
 
       if (asset.organizationId === null) {
         throw new TRPCError({
-          code: 'FORBIDDEN',
-          message: 'Library media is shared and cannot be deleted.',
-        })
+          code: "FORBIDDEN",
+          message: "Library media is shared and cannot be deleted.",
+        });
       }
 
-      const keys = assetsService.collectAssetObjectKeys(asset)
+      const keys = assetsService.collectAssetObjectKeys(asset);
 
-      await assetsService.deleteAssetRow(ctx.db, asset.id)
-      await decrementUsage(input.organizationId, 'storage', asset.bytes, ctx.db)
+      await assetsService.deleteAssetRow(ctx.db, asset.id);
+      await decrementUsage(
+        input.organizationId,
+        "storage",
+        asset.bytes,
+        ctx.db,
+      );
 
-      const storage = await getStorageAdapter()
-      await storage.deleteObjects(keys)
+      const storage = await getStorageAdapter();
+      await storage.deleteObjects(keys);
 
-      return { id: asset.id, filename: asset.filename, bytes: asset.bytes }
+      return { id: asset.id, filename: asset.filename, bytes: asset.bytes };
     }),
-})
+});

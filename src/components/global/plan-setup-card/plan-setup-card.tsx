@@ -1,14 +1,8 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
-'use client'
+"use client";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: PlanSetupCard, POST_SIGNUP_PLAN_STEP,
@@ -37,14 +31,14 @@
  * WHERE: Rendered on /dashboard above the page content.
  */
 
-import * as React from 'react'
+import * as React from "react";
 
-import { useUpgradeModal } from '@/components/global/upgrade-modal/upgrade-modal-provider'
-import { useUpgradeNudge } from '@/components/global/upgrade-modal/use-upgrade-nudge'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
+import { useUpgradeModal } from "@/components/global/upgrade-modal/upgrade-modal-provider";
+import { useUpgradeNudge } from "@/components/global/upgrade-modal/use-upgrade-nudge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 
-const DISMISS_KEY = 'plan-setup-card:dismissed'
+const DISMISS_KEY = "plan-setup-card:dismissed";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: dismissedStore, useSyncExternalStore, HYDRATION_SAFE
@@ -61,52 +55,56 @@ const DISMISS_KEY = 'plan-setup-card:dismissed'
  *        reference and calls it on every render; recomputing would be a
  *        needless storage read each time.
  */
-let dismissedCache: boolean | null = null
-const listeners = new Set<() => void>()
+let dismissedCache: boolean | null = null;
+const listeners = new Set<() => void>();
 
 function readDismissed(): boolean {
   try {
-    return window.localStorage.getItem(DISMISS_KEY) === '1'
+    return window.localStorage.getItem(DISMISS_KEY) === "1";
   } catch {
     /* Private window or blocked site data — show the card rather than hide it
      * on an error. A nudge shown twice beats a funnel that silently vanishes. */
-    return false
+    return false;
   }
 }
 
 function subscribe(onChange: () => void): () => void {
-  listeners.add(onChange)
-  return () => listeners.delete(onChange)
+  listeners.add(onChange);
+  return () => listeners.delete(onChange);
 }
 
 function getSnapshot(): boolean {
-  dismissedCache ??= readDismissed()
-  return dismissedCache
+  dismissedCache ??= readDismissed();
+  return dismissedCache;
 }
 
 /* Server renders hidden: showing the card then removing it on hydration is
  * worse than revealing it a frame later. */
 function getServerSnapshot(): boolean {
-  return true
+  return true;
 }
 
 function dismiss(): void {
-  dismissedCache = true
+  dismissedCache = true;
   try {
-    window.localStorage.setItem(DISMISS_KEY, '1')
+    window.localStorage.setItem(DISMISS_KEY, "1");
   } catch {
     /* Dismissal does not persist here; the card returns next visit. */
   }
-  for (const listener of listeners) listener()
+  for (const listener of listeners) listener();
 }
 
 export function PlanSetupCard() {
-  const nudge = useUpgradeNudge()
-  const { open } = useUpgradeModal()
+  const nudge = useUpgradeNudge();
+  const { open } = useUpgradeModal();
 
-  const dismissed = React.useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)
+  const dismissed = React.useSyncExternalStore(
+    subscribe,
+    getSnapshot,
+    getServerSnapshot,
+  );
 
-  if (dismissed || nudge === null || nudge.variant !== 'card') return null
+  if (dismissed || nudge === null || nudge.variant !== "card") return null;
 
   return (
     <Card>
@@ -125,5 +123,5 @@ export function PlanSetupCard() {
         </div>
       </CardContent>
     </Card>
-  )
+  );
 }

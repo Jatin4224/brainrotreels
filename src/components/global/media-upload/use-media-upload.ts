@@ -1,14 +1,8 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
-'use client'
+"use client";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: useMediaUpload, UploadItem, UploadItemStatus,
@@ -45,17 +39,18 @@
  *        that component rather than this hook directly.
  */
 
-import * as React from 'react'
+import * as React from "react";
 
-import { trpc } from '@/trpc/react-provider'
-import { formatBytes } from '@/lib/resources'
+import { trpc } from "@/trpc/react-provider";
+import { formatBytes } from "@/lib/resources";
 import {
   isUploadContentType,
   type UploadableAssetKind,
   type UploadContentType,
-} from '@/lib/types'
+} from "@/lib/types";
 
-export type UploadItemStatus = 'queued' | 'uploading' | 'processing' | 'done' | 'error'
+export type UploadItemStatus =
+  "queued" | "uploading" | "processing" | "done" | "error";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: UploadItem
@@ -70,25 +65,25 @@ export type UploadItemStatus = 'queued' | 'uploading' | 'processing' | 'done' | 
  */
 export interface UploadItem {
   /** Stable across re-renders — a File object is not a usable React key. */
-  id: string
-  filename: string
-  bytes: number
-  status: UploadItemStatus
+  id: string;
+  filename: string;
+  bytes: number;
+  status: UploadItemStatus;
   /** 0–100, meaningful while `uploading`. */
-  progress: number
-  error: string | null
+  progress: number;
+  error: string | null;
   /** Set once the asset row exists. */
-  assetId: string | null
+  assetId: string | null;
 }
 
 export interface UseMediaUploadOptions {
-  organizationId: string
+  organizationId: string;
   /** The intent hint; the server re-derives the real kind from the file. */
-  kind?: UploadableAssetKind
+  kind?: UploadableAssetKind;
   /** Largest single file this workspace's plan allows. */
-  maxBytes: number
+  maxBytes: number;
   /** Called after each successful confirmation, for cache invalidation. */
-  onUploaded?: (assetId: string) => void
+  onUploaded?: (assetId: string) => void;
 }
 
 /**
@@ -107,53 +102,55 @@ export interface UseMediaUploadOptions {
  */
 export function validateFileForUpload(
   file: { name: string; size: number; type: string },
-  maxBytes: number
+  maxBytes: number,
 ): string | null {
   if (!isUploadContentType(file.type)) {
     return file.type.length === 0
       ? `We could not tell what kind of file "${file.name}" is. Try an MP4, MOV, WebM, JPEG, PNG, WebP, MP3 or WAV.`
-      : `${file.type} files are not supported. Try an MP4, MOV, WebM, JPEG, PNG, WebP, MP3 or WAV.`
+      : `${file.type} files are not supported. Try an MP4, MOV, WebM, JPEG, PNG, WebP, MP3 or WAV.`;
   }
 
   if (file.size === 0) {
-    return 'That file is empty.'
+    return "That file is empty.";
   }
 
   if (file.size > maxBytes) {
-    return `That file is ${formatBytes(file.size)}. The largest single file on your plan is ${formatBytes(maxBytes)}.`
+    return `That file is ${formatBytes(file.size)}. The largest single file on your plan is ${formatBytes(maxBytes)}.`;
   }
 
-  return null
+  return null;
 }
 
 export interface UseMediaUploadResult {
-  items: UploadItem[]
-  isUploading: boolean
+  items: UploadItem[];
+  isUploading: boolean;
   /** Adds files and starts uploading. Safe to call while a batch is running. */
-  addFiles: (files: readonly File[]) => void
+  addFiles: (files: readonly File[]) => void;
   /** Clears finished rows; leaves anything still in flight. */
-  clearFinished: () => void
+  clearFinished: () => void;
 }
 
-export function useMediaUpload(options: UseMediaUploadOptions): UseMediaUploadResult {
-  const { organizationId, kind, maxBytes, onUploaded } = options
+export function useMediaUpload(
+  options: UseMediaUploadOptions,
+): UseMediaUploadResult {
+  const { organizationId, kind, maxBytes, onUploaded } = options;
 
-  const createUploadUrl = trpc.assets.createUploadUrl.useMutation()
-  const completeUpload = trpc.assets.completeUpload.useMutation()
+  const createUploadUrl = trpc.assets.createUploadUrl.useMutation();
+  const completeUpload = trpc.assets.completeUpload.useMutation();
 
-  const [items, setItems] = React.useState<UploadItem[]>([])
+  const [items, setItems] = React.useState<UploadItem[]>([]);
 
   /* The queue lives in a ref, not in state: it is a work list, not something
    * rendered, and keeping it in state would restart the drain effect on every
    * progress tick. */
-  const queue = React.useRef<{ item: UploadItem; file: File }[]>([])
-  const draining = React.useRef(false)
+  const queue = React.useRef<{ item: UploadItem; file: File }[]>([]);
+  const draining = React.useRef(false);
 
   const update = React.useCallback((id: string, patch: Partial<UploadItem>) => {
     setItems((current) =>
-      current.map((item) => (item.id === id ? { ...item, ...patch } : item))
-    )
-  }, [])
+      current.map((item) => (item.id === id ? { ...item, ...patch } : item)),
+    );
+  }, []);
 
   /* The mutations and the callback are read through a ref inside the drain
    * loop, so a re-render mid-upload cannot swap the function underneath an
@@ -164,43 +161,60 @@ export function useMediaUpload(options: UseMediaUploadOptions): UseMediaUploadRe
    * a render that is thrown away would still have mutated the ref. An effect
    * runs after commit, and the only reader is a loop started by a click or a
    * drop — both of which happen long after the first commit. */
-  const latest = React.useRef({ createUploadUrl, completeUpload, onUploaded, organizationId, kind })
+  const latest = React.useRef({
+    createUploadUrl,
+    completeUpload,
+    onUploaded,
+    organizationId,
+    kind,
+  });
 
   React.useEffect(() => {
-    latest.current = { createUploadUrl, completeUpload, onUploaded, organizationId, kind }
-  }, [createUploadUrl, completeUpload, onUploaded, organizationId, kind])
+    latest.current = {
+      createUploadUrl,
+      completeUpload,
+      onUploaded,
+      organizationId,
+      kind,
+    };
+  }, [createUploadUrl, completeUpload, onUploaded, organizationId, kind]);
 
   const drain = React.useCallback(async () => {
-    if (draining.current) return
-    draining.current = true
+    if (draining.current) return;
+    draining.current = true;
 
     try {
       /* SEQUENTIAL_UPLOADS — one file at a time, in the order they were
        * dropped, so the progress bar means something. */
       for (;;) {
-        const next = queue.current.shift()
-        if (next === undefined) break
+        const next = queue.current.shift();
+        if (next === undefined) break;
 
-        const { item, file } = next
-        const contentType = file.type
+        const { item, file } = next;
+        const contentType = file.type;
 
         if (!isUploadContentType(contentType)) {
           /* Unreachable — addFiles validated it. Kept because the narrowing is
            * what lets the presign call be typed without a cast. */
-          update(item.id, { status: 'error', error: 'That file type is not supported.' })
-          continue
+          update(item.id, {
+            status: "error",
+            error: "That file type is not supported.",
+          });
+          continue;
         }
 
         try {
-          update(item.id, { status: 'uploading', progress: 0 })
+          update(item.id, { status: "uploading", progress: 0 });
 
           const signed = await latest.current.createUploadUrl.mutateAsync({
             organizationId: latest.current.organizationId,
             filename: file.name,
             contentType: contentType satisfies UploadContentType,
             bytes: file.size,
-            ...(latest.current.kind !== undefined ? { kind: latest.current.kind } : {}),
-          })
+            ...(latest.current.kind !== undefined
+              ? { kind: latest.current.kind }
+              : {}),
+          });
 
           await putWithProgress({
             url: signed.url,
@@ -208,81 +222,89 @@ export function useMediaUpload(options: UseMediaUploadOptions): UseMediaUploadRe
             /* PUT_EXACTLY_WHAT_WAS_SIGNED — the server's echo, not file.type. */
             contentType: signed.contentType,
             onProgress: (progress) => update(item.id, { progress }),
-          })
+          });
 
-          update(item.id, { status: 'processing', progress: 100 })
+          update(item.id, { status: "processing", progress: 100 });
 
           const asset = await latest.current.completeUpload.mutateAsync({
             organizationId: latest.current.organizationId,
             storageKey: signed.storageKey,
             filename: file.name,
             contentType: signed.contentType,
-            ...(latest.current.kind !== undefined ? { kind: latest.current.kind } : {}),
-          })
+            ...(latest.current.kind !== undefined
+              ? { kind: latest.current.kind }
+              : {}),
+          });
 
-          update(item.id, { status: 'processing', assetId: asset.id })
-          latest.current.onUploaded?.(asset.id)
+          update(item.id, { status: "processing", assetId: asset.id });
+          latest.current.onUploaded?.(asset.id);
         } catch (error) {
           update(item.id, {
-            status: 'error',
+            status: "error",
             error:
               error instanceof Error
                 ? error.message
-                : 'That upload failed. Please try again.',
-          })
+                : "That upload failed. Please try again.",
+          });
         }
       }
     } finally {
-      draining.current = false
+      draining.current = false;
     }
-  }, [update])
+  }, [update]);
 
   const addFiles = React.useCallback(
     (files: readonly File[]) => {
-      const accepted: { item: UploadItem; file: File }[] = []
-      const rejected: UploadItem[] = []
+      const accepted: { item: UploadItem; file: File }[] = [];
+      const rejected: UploadItem[] = [];
 
       for (const file of files) {
-        const id = `${file.name}-${file.size}-${crypto.randomUUID()}`
-        const refusal = validateFileForUpload(file, maxBytes)
+        const id = `${file.name}-${file.size}-${crypto.randomUUID()}`;
+        const refusal = validateFileForUpload(file, maxBytes);
         const base: UploadItem = {
           id,
           filename: file.name,
           bytes: file.size,
-          status: 'queued',
+          status: "queued",
           progress: 0,
           error: null,
           assetId: null,
-        }
+        };
 
         if (refusal !== null) {
           /* A refused file is still SHOWN, with its reason. Dropping it
            * silently is how someone drags eight files, sees six, and assumes
            * the page is broken. */
-          rejected.push({ ...base, status: 'error', error: refusal })
+          rejected.push({ ...base, status: "error", error: refusal });
         } else {
-          accepted.push({ item: base, file })
+          accepted.push({ item: base, file });
         }
       }
 
-      setItems((current) => [...current, ...rejected, ...accepted.map((entry) => entry.item)])
-      queue.current.push(...accepted)
-      void drain()
+      setItems((current) => [
+        ...current,
+        ...rejected,
+        ...accepted.map((entry) => entry.item),
+      ]);
+      queue.current.push(...accepted);
+      void drain();
     },
-    [drain, maxBytes]
-  )
+    [drain, maxBytes],
+  );
 
   const clearFinished = React.useCallback(() => {
     setItems((current) =>
-      current.filter((item) => item.status === 'queued' || item.status === 'uploading')
-    )
-  }, [])
+      current.filter(
+        (item) => item.status === "queued" || item.status === "uploading",
+      ),
+    );
+  }, []);
 
   const isUploading = items.some(
-    (item) => item.status === 'queued' || item.status === 'uploading'
-  )
+    (item) => item.status === "queued" || item.status === "uploading",
+  );
 
-  return { items, isUploading, addFiles, clearFinished }
+  return { items, isUploading, addFiles, clearFinished };
 }
 
 /**
@@ -298,45 +320,51 @@ export function useMediaUpload(options: UseMediaUploadOptions): UseMediaUploadRe
  * WHERE: useMediaUpload's drain loop.
  */
 function putWithProgress(args: {
-  url: string
-  file: File
-  contentType: string
-  onProgress: (progress: number) => void
+  url: string;
+  file: File;
+  contentType: string;
+  onProgress: (progress: number) => void;
 }): Promise<void> {
-  const { url, file, contentType, onProgress } = args
+  const { url, file, contentType, onProgress } = args;
 
   return new Promise<void>((resolve, reject) => {
-    const request = new XMLHttpRequest()
-    request.open('PUT', url, true)
-    request.setRequestHeader('Content-Type', contentType)
+    const request = new XMLHttpRequest();
+    request.open("PUT", url, true);
+    request.setRequestHeader("Content-Type", contentType);
 
-    request.upload.addEventListener('progress', (event) => {
-      if (!event.lengthComputable) return
+    request.upload.addEventListener("progress", (event) => {
+      if (!event.lengthComputable) return;
       /* Capped at 99 while the request is open: the last percent is the
        * server's acknowledgement, and a bar that sits at 100% for three seconds
        * reads as a hang. */
-      onProgress(Math.min(99, Math.round((event.loaded / event.total) * 100)))
-    })
+      onProgress(Math.min(99, Math.round((event.loaded / event.total) * 100)));
+    });
 
-    request.addEventListener('load', () => {
+    request.addEventListener("load", () => {
       if (request.status >= 200 && request.status < 300) {
-        resolve()
-        return
+        resolve();
+        return;
       }
       reject(
         new Error(
           request.status === 403
-            ? 'That upload link expired before the file finished. Please try again.'
-            : `The upload was rejected (${request.status}). Please try again.`
-        )
-      )
-    })
+            ? "That upload link expired before the file finished. Please try again."
+            : `The upload was rejected (${request.status}). Please try again.`,
+        ),
+      );
+    });
 
-    request.addEventListener('error', () =>
-      reject(new Error('The connection dropped during the upload. Please try again.'))
-    )
-    request.addEventListener('abort', () => reject(new Error('That upload was cancelled.')))
+    request.addEventListener("error", () =>
+      reject(
+        new Error(
+          "The connection dropped during the upload. Please try again.",
+        ),
+      ),
+    );
+    request.addEventListener("abort", () =>
+      reject(new Error("That upload was cancelled.")),
+    );
 
-    request.send(file)
-  })
+    request.send(file);
+  });
 }

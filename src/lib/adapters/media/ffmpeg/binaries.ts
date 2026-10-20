@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -36,33 +30,33 @@
  * WHERE: Used only by ./index.ts, the ffmpeg MediaAdapter implementation.
  */
 
-import 'server-only'
+import "server-only";
 
-import { execFile } from 'node:child_process'
+import { execFile } from "node:child_process";
 
-import { MediaProcessingError } from '../types'
+import { MediaProcessingError } from "../types";
 
 /** Overridable because a container image, a Mac with Homebrew and a CI runner
  *  all put these somewhere different. Bare names resolve on PATH. */
-const FFMPEG_PATH = process.env['FFMPEG_PATH']?.trim() || 'ffmpeg'
-const FFPROBE_PATH = process.env['FFPROBE_PATH']?.trim() || 'ffprobe'
+const FFMPEG_PATH = process.env["FFMPEG_PATH"]?.trim() || "ffmpeg";
+const FFPROBE_PATH = process.env["FFPROBE_PATH"]?.trim() || "ffprobe";
 
 /** Generous: a long 4K source legitimately takes minutes to transcode. Still
  *  finite, so a hung process cannot hold a worker forever. */
-export const MEDIA_TOOL_TIMEOUT_MS = 15 * 60 * 1000
+export const MEDIA_TOOL_TIMEOUT_MS = 15 * 60 * 1000;
 
 /** ffmpeg writes progress to stderr, so a chatty success can be megabytes.
  *  Capped, and only the tail is ever kept for diagnostics. */
-const MAX_TOOL_OUTPUT_BYTES = 8 * 1024 * 1024
+const MAX_TOOL_OUTPUT_BYTES = 8 * 1024 * 1024;
 
-const STDERR_TAIL_CHARS = 2000
+const STDERR_TAIL_CHARS = 2000;
 
 export function ffmpegBinary(): string {
-  return FFMPEG_PATH
+  return FFMPEG_PATH;
 }
 
 export function ffprobeBinary(): string {
-  return FFPROBE_PATH
+  return FFPROBE_PATH;
 }
 
 /* NO `isFfmpegConfigured()` HERE, deliberately — the obvious mirror of
@@ -89,7 +83,7 @@ export function ffprobeBinary(): string {
 export async function runTool(
   binary: string,
   args: readonly string[],
-  failureMessage: string
+  failureMessage: string,
 ): Promise<string> {
   return new Promise<string>((resolve, reject) => {
     execFile(
@@ -105,35 +99,35 @@ export async function runTool(
       },
       (error, stdout, stderr) => {
         if (error === null) {
-          resolve(stdout)
-          return
+          resolve(stdout);
+          return;
         }
 
-        const detail = String(stderr).slice(-STDERR_TAIL_CHARS)
+        const detail = String(stderr).slice(-STDERR_TAIL_CHARS);
 
-        if ('code' in error && error.code === 'ENOENT') {
+        if ("code" in error && error.code === "ENOENT") {
           reject(
             new MediaProcessingError(
               `Media processing is not available on this server: "${binary}" was not found. ` +
-                'Install ffmpeg in the worker image, or set FFMPEG_PATH and FFPROBE_PATH.',
-              detail
-            )
-          )
-          return
+                "Install ffmpeg in the worker image, or set FFMPEG_PATH and FFPROBE_PATH.",
+              detail,
+            ),
+          );
+          return;
         }
 
-        if ('killed' in error && error.killed === true) {
+        if ("killed" in error && error.killed === true) {
           reject(
             new MediaProcessingError(
-              'This file took too long to process and was stopped. It may be corrupt or much larger than expected.',
-              detail
-            )
-          )
-          return
+              "This file took too long to process and was stopped. It may be corrupt or much larger than expected.",
+              detail,
+            ),
+          );
+          return;
         }
 
-        reject(new MediaProcessingError(failureMessage, detail))
-      }
-    )
-  })
+        reject(new MediaProcessingError(failureMessage, detail));
+      },
+    );
+  });
 }

@@ -1,14 +1,8 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
-'use client'
+"use client";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: PricingGridFrame, DASHED_CELL_STYLE,
@@ -36,12 +30,12 @@
  *        this; cells apply DASHED_CELL_STYLE.
  */
 
-import * as React from 'react'
-import type { CSSProperties } from 'react'
+import * as React from "react";
+import type { CSSProperties } from "react";
 
 /* Semi-transparent border colour — a token, mixed rather than hardcoded, so the
  * dashes sit under the card content in both themes. */
-const DASH_COLOR = 'color-mix(in srgb, var(--color-border) 50%, transparent)'
+const DASH_COLOR = "color-mix(in srgb, var(--color-border) 50%, transparent)";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: DASHED_CELL_STYLE
@@ -54,11 +48,11 @@ export const DASHED_CELL_STYLE: CSSProperties = {
   backgroundImage: [
     `repeating-linear-gradient(to right, ${DASH_COLOR} 0 10px, transparent 10px 20px)`,
     `repeating-linear-gradient(to bottom, ${DASH_COLOR} 0 10px, transparent 10px 20px)`,
-  ].join(', '),
-  backgroundSize: '100% 1.5px, 1.5px 100%',
-  backgroundPosition: 'bottom left, top right',
-  backgroundRepeat: 'no-repeat',
-}
+  ].join(", "),
+  backgroundSize: "100% 1.5px, 1.5px 100%",
+  backgroundPosition: "bottom left, top right",
+  backgroundRepeat: "no-repeat",
+};
 
 /**
  * SOURCE OF TRUTH KEYWORDS: RIGHT_FADE_MASK
@@ -67,15 +61,22 @@ export const DASHED_CELL_STYLE: CSSProperties = {
  * the fold. Applied to the skeletons only — real content must never be masked.
  */
 export const RIGHT_FADE_MASK: CSSProperties = {
-  maskImage: 'linear-gradient(to right, black 0%, black 65%, transparent 100%)',
-  WebkitMaskImage: 'linear-gradient(to right, black 0%, black 65%, transparent 100%)',
-}
+  maskImage: "linear-gradient(to right, black 0%, black 65%, transparent 100%)",
+  WebkitMaskImage:
+    "linear-gradient(to right, black 0%, black 65%, transparent 100%)",
+};
 
 /* Crosshairs mark only where the outer edges meet — the four corners. Internal
  * column boundaries stay bare, which is what keeps the frame minimal. */
-const CORNER_POSITIONS = [0, 100] as const
+const CORNER_POSITIONS = [0, 100] as const;
 
-function CornerCross({ position, edge }: { position: number; edge: 'top' | 'bottom' }) {
+function CornerCross({
+  position,
+  edge,
+}: {
+  position: number;
+  edge: "top" | "bottom";
+}) {
   return (
     <span
       className={cnEdge(edge)}
@@ -87,15 +88,15 @@ function CornerCross({ position, edge }: { position: number; edge: 'top' | 'bott
         <span className="absolute top-0 left-1/2 h-full w-px -translate-x-1/2 bg-muted-foreground/25" />
       </span>
     </span>
-  )
+  );
 }
 
 /* Both crosses are identical apart from which edge they hang off; the class
  * string is the only difference, so it lives in one place. */
-function cnEdge(edge: 'top' | 'bottom'): string {
-  return edge === 'top'
-    ? 'pointer-events-none absolute top-0 z-20 -translate-x-1/2 -translate-y-1/2'
-    : 'pointer-events-none absolute bottom-0 z-20 -translate-x-1/2 translate-y-1/2'
+function cnEdge(edge: "top" | "bottom"): string {
+  return edge === "top"
+    ? "pointer-events-none absolute top-0 z-20 -translate-x-1/2 -translate-y-1/2"
+    : "pointer-events-none absolute bottom-0 z-20 -translate-x-1/2 translate-y-1/2";
 }
 
 /**
@@ -113,15 +114,15 @@ function cnEdge(edge: 'top' | 'bottom'): string {
  * WHERE: Both grids in <UpgradeContent /> — real cards and skeletons — size
  *        themselves through the `columns` prop below.
  */
-export const PRICING_CARD_MAX_WIDTH = 320
+export const PRICING_CARD_MAX_WIDTH = 320;
 
 export function PricingGridFrame({
   columns,
   children,
 }: {
   /** How many card columns this frame will hold at its widest. */
-  columns: number
-  children: React.ReactNode
+  columns: number;
+  children: React.ReactNode;
 }) {
   return (
     <div
@@ -136,28 +137,28 @@ export function PricingGridFrame({
       <span
         className="pointer-events-none absolute top-0 -right-3.5 -left-3.5 z-1 -translate-y-1/2"
         style={{
-          height: '1.5px',
+          height: "1.5px",
           backgroundImage: `repeating-linear-gradient(to right, ${DASH_COLOR} 0 10px, transparent 10px 20px)`,
         }}
       />
       <span
         className="pointer-events-none absolute -right-3.5 -bottom-0 -left-3.5 z-1 translate-y-1/2"
         style={{
-          height: '1.5px',
+          height: "1.5px",
           backgroundImage: `repeating-linear-gradient(to right, ${DASH_COLOR} 0 10px, transparent 10px 20px)`,
         }}
       />
       <span
         className="pointer-events-none absolute -top-3.5 -bottom-3.5 left-0 z-1 -translate-x-1/2"
         style={{
-          width: '1.5px',
+          width: "1.5px",
           backgroundImage: `repeating-linear-gradient(to bottom, ${DASH_COLOR} 0 10px, transparent 10px 20px)`,
         }}
       />
       <span
         className="pointer-events-none absolute -top-3.5 right-0 -bottom-3.5 z-1 translate-x-1/2"
         style={{
-          width: '1.5px',
+          width: "1.5px",
           backgroundImage: `repeating-linear-gradient(to bottom, ${DASH_COLOR} 0 10px, transparent 10px 20px)`,
         }}
       />
@@ -171,5 +172,5 @@ export function PricingGridFrame({
 
       {children}
     </div>
-  )
+  );
 }

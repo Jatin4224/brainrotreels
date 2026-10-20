@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -35,8 +29,8 @@
  *        ./ingest-plan.test.ts.
  */
 
-import type { MediaProbe, TranscodeFit } from '@/lib/adapters/media/types'
-import type { AssetKind, MediaFamily, VariantName } from '@/lib/types/asset'
+import type { MediaProbe, TranscodeFit } from "@/lib/adapters/media/types";
+import type { AssetKind, MediaFamily, VariantName } from "@/lib/types/asset";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: VERTICAL_MASTER, PROXY, THUMB_WIDTH, WAVEFORM_SIZE
@@ -56,13 +50,18 @@ import type { AssetKind, MediaFamily, VariantName } from '@/lib/types/asset'
  *        and visible compression is an acceptable trade for the latency.
  * WHERE: planVariants below.
  */
-export const VERTICAL_MASTER = { width: 1080, height: 1920, crf: 20, fps: 30 } as const
+export const VERTICAL_MASTER = {
+  width: 1080,
+  height: 1920,
+  crf: 20,
+  fps: 30,
+} as const;
 
-export const PROXY = { width: 480, height: 854, crf: 32, fps: 30 } as const
+export const PROXY = { width: 480, height: 854, crf: 32, fps: 30 } as const;
 
-export const THUMB_WIDTH = 480
+export const THUMB_WIDTH = 480;
 
-export const WAVEFORM_SIZE = { width: 1200, height: 240 } as const
+export const WAVEFORM_SIZE = { width: 1200, height: 240 } as const;
 
 /**
  * SOURCE OF TRUTH KEYWORDS: SUPPORTED_VIDEO_CODECS, SUPPORTED_AUDIO_CODECS,
@@ -80,26 +79,26 @@ export const WAVEFORM_SIZE = { width: 1200, height: 240 } as const
  * WHERE: assertSupportedMedia below.
  */
 export const SUPPORTED_VIDEO_CODECS: readonly string[] = [
-  'h264',
-  'vp8',
-  'vp9',
-  'av1',
-  'mpeg4',
-  'mjpeg',
-  'png',
-  'webp',
-]
+  "h264",
+  "vp8",
+  "vp9",
+  "av1",
+  "mpeg4",
+  "mjpeg",
+  "png",
+  "webp",
+];
 
 export const SUPPORTED_AUDIO_CODECS: readonly string[] = [
-  'aac',
-  'mp3',
-  'pcm_s16le',
-  'pcm_s24le',
-  'pcm_f32le',
-  'opus',
-  'vorbis',
-  'flac',
-]
+  "aac",
+  "mp3",
+  "pcm_s16le",
+  "pcm_s24le",
+  "pcm_f32le",
+  "opus",
+  "vorbis",
+  "flac",
+];
 
 /**
  * SOURCE OF TRUTH KEYWORDS: UnsupportedMediaError, READABLE_INGEST_FAILURE
@@ -117,8 +116,8 @@ export const SUPPORTED_AUDIO_CODECS: readonly string[] = [
  */
 export class UnsupportedMediaError extends Error {
   constructor(message: string) {
-    super(message)
-    this.name = 'UnsupportedMediaError'
+    super(message);
+    this.name = "UnsupportedMediaError";
   }
 }
 
@@ -146,26 +145,35 @@ export class UnsupportedMediaError extends Error {
 export function assertSupportedMedia(probe: MediaProbe): void {
   if (probe.video === null && probe.audio === null) {
     throw new UnsupportedMediaError(
-      'This file does not contain any video or audio. It may be corrupt or incompletely uploaded — try exporting it again.'
-    )
+      "This file does not contain any video or audio. It may be corrupt or incompletely uploaded — try exporting it again.",
+    );
   }
 
-  if (probe.video !== null && !SUPPORTED_VIDEO_CODECS.includes(probe.video.codec)) {
+  if (
+    probe.video !== null &&
+    !SUPPORTED_VIDEO_CODECS.includes(probe.video.codec)
+  ) {
     throw new UnsupportedMediaError(
-      `This video uses the ${probe.video.codec.toUpperCase()} codec, which we cannot process. Export it as H.264 (MP4) and upload it again.`
-    )
+      `This video uses the ${probe.video.codec.toUpperCase()} codec, which we cannot process. Export it as H.264 (MP4) and upload it again.`,
+    );
   }
 
-  if (probe.audio !== null && !SUPPORTED_AUDIO_CODECS.includes(probe.audio.codec)) {
+  if (
+    probe.audio !== null &&
+    !SUPPORTED_AUDIO_CODECS.includes(probe.audio.codec)
+  ) {
     throw new UnsupportedMediaError(
-      `This audio uses the ${probe.audio.codec.toUpperCase()} codec, which we cannot process. Export it as MP3 or WAV and upload it again.`
-    )
+      `This audio uses the ${probe.audio.codec.toUpperCase()} codec, which we cannot process. Export it as MP3 or WAV and upload it again.`,
+    );
   }
 
-  if (probe.video !== null && (probe.video.width <= 0 || probe.video.height <= 0)) {
+  if (
+    probe.video !== null &&
+    (probe.video.width <= 0 || probe.video.height <= 0)
+  ) {
     throw new UnsupportedMediaError(
-      'This video reports no picture size, so it cannot be resized for a vertical video. It may be corrupt.'
-    )
+      "This video reports no picture size, so it cannot be resized for a vertical video. It may be corrupt.",
+    );
   }
 }
 
@@ -191,21 +199,21 @@ export function assertSupportedMedia(probe: MediaProbe): void {
  * WHERE: planVariants below.
  */
 const FIT_BY_KIND: Readonly<Record<AssetKind, TranscodeFit>> = {
-  background: 'crop',
-  ai_footage: 'crop',
-  render_output: 'crop',
-  upload: 'pad',
-  image: 'pad',
-  avatar: 'pad',
+  background: "crop",
+  ai_footage: "crop",
+  render_output: "crop",
+  upload: "pad",
+  image: "pad",
+  avatar: "pad",
   /* Audio kinds never reach the fit maths; listed so the Record is exhaustive
    * and a future audio-with-visualiser variant has a stated default. */
-  audio_tts: 'pad',
-  audio_music: 'pad',
-  sfx: 'pad',
-}
+  audio_tts: "pad",
+  audio_music: "pad",
+  sfx: "pad",
+};
 
 export function fitForKind(kind: AssetKind): TranscodeFit {
-  return FIT_BY_KIND[kind]
+  return FIT_BY_KIND[kind];
 }
 
 /**
@@ -223,21 +231,21 @@ export function fitForKind(kind: AssetKind): TranscodeFit {
  * WHERE: planVariants' return value; consumed step by step in asset-ingest.ts.
  */
 export interface VariantPlan {
-  variant: VariantName
+  variant: VariantName;
   /** Which artifact this one is made from. */
-  source: 'original' | 'vertical_1080'
+  source: "original" | "vertical_1080";
   /** The object filename inside the asset's own prefix. */
-  filename: string
-  contentType: string
-  width: number
-  height: number
-  operation: 'transcode' | 'frame' | 'waveform'
+  filename: string;
+  contentType: string;
+  width: number;
+  height: number;
+  operation: "transcode" | "frame" | "waveform";
   /** Present for `transcode` only. */
   transcode?: {
-    fit: TranscodeFit
-    crf: number
-    fps?: number
-    encode: 'video' | 'still'
+    fit: TranscodeFit;
+    crf: number;
+    fps?: number;
+    encode: "video" | "still";
     /**
      * Whether to drop the source's audio track.
      *
@@ -248,10 +256,10 @@ export interface VariantPlan {
      * on every path. A customer's own upload may BE the audio they want, so it
      * keeps its track.
      */
-    muted: boolean
-  }
+    muted: boolean;
+  };
   /** Present for `frame` only — where in the source to grab the poster. */
-  atSec?: number
+  atSec?: number;
 }
 
 /**
@@ -267,13 +275,13 @@ export interface VariantPlan {
  * WHERE: planVariants' parameter; built from the probe step's stored result.
  */
 export interface ProbeFacts {
-  durationSec: number | null
+  durationSec: number | null;
   /** The source's own pixel dimensions, or null for audio. */
-  source: { width: number; height: number } | null
+  source: { width: number; height: number } | null;
 }
 
 /** Kinds whose own audio is dropped — see MUTE_BACKGROUNDS_NOT_UPLOADS. */
-const MUTED_KINDS: readonly AssetKind[] = ['background', 'ai_footage']
+const MUTED_KINDS: readonly AssetKind[] = ["background", "ai_footage"];
 
 /**
  * SOURCE OF TRUTH KEYWORDS: planVariants, VIDEO_PLAN, IMAGE_PLAN, AUDIO_PLAN
@@ -302,100 +310,113 @@ const MUTED_KINDS: readonly AssetKind[] = ['background', 'ai_footage']
  * WHERE: asset-ingest.ts iterates this.
  */
 export function planVariants(args: {
-  family: MediaFamily
-  kind: AssetKind
-  facts: ProbeFacts
+  family: MediaFamily;
+  kind: AssetKind;
+  facts: ProbeFacts;
 }): VariantPlan[] {
-  const { family, kind, facts } = args
-  const fit = fitForKind(kind)
-  const muted = MUTED_KINDS.includes(kind)
+  const { family, kind, facts } = args;
+  const fit = fitForKind(kind);
+  const muted = MUTED_KINDS.includes(kind);
 
-  if (family === 'audio') {
+  if (family === "audio") {
     return [
       {
-        variant: 'waveform',
-        source: 'original',
-        filename: 'waveform.png',
-        contentType: 'image/png',
+        variant: "waveform",
+        source: "original",
+        filename: "waveform.png",
+        contentType: "image/png",
         width: WAVEFORM_SIZE.width,
         height: WAVEFORM_SIZE.height,
-        operation: 'waveform',
+        operation: "waveform",
       },
-    ]
+    ];
   }
 
-  if (family === 'image') {
+  if (family === "image") {
     return [
       {
-        variant: 'vertical_1080',
-        source: 'original',
-        filename: 'vertical_1080.jpg',
-        contentType: 'image/jpeg',
+        variant: "vertical_1080",
+        source: "original",
+        filename: "vertical_1080.jpg",
+        contentType: "image/jpeg",
         width: VERTICAL_MASTER.width,
         height: VERTICAL_MASTER.height,
-        operation: 'transcode',
+        operation: "transcode",
         /* A still has no audio track to drop, so `muted` is irrelevant here and
          * written false rather than omitted — the field is required so that a
          * video plan cannot forget it. */
-        transcode: { fit, crf: VERTICAL_MASTER.crf, encode: 'still', muted: false },
+        transcode: {
+          fit,
+          crf: VERTICAL_MASTER.crf,
+          encode: "still",
+          muted: false,
+        },
       },
       {
-        variant: 'thumb',
-        source: 'original',
-        filename: 'thumb.jpg',
-        contentType: 'image/jpeg',
+        variant: "thumb",
+        source: "original",
+        filename: "thumb.jpg",
+        contentType: "image/jpeg",
         width: THUMB_WIDTH,
         /* Derived from the source's own ratio — a thumbnail is a preview of the
          * file, so letterboxing it would misrepresent what was uploaded. */
         height: thumbHeightFor(facts, THUMB_WIDTH),
-        operation: 'frame',
+        operation: "frame",
         atSec: 0,
       },
-    ]
+    ];
   }
 
   return [
     {
-      variant: 'vertical_1080',
-      source: 'original',
-      filename: 'vertical_1080.mp4',
-      contentType: 'video/mp4',
+      variant: "vertical_1080",
+      source: "original",
+      filename: "vertical_1080.mp4",
+      contentType: "video/mp4",
       width: VERTICAL_MASTER.width,
       height: VERTICAL_MASTER.height,
-      operation: 'transcode',
+      operation: "transcode",
       transcode: {
         fit,
         crf: VERTICAL_MASTER.crf,
         fps: VERTICAL_MASTER.fps,
-        encode: 'video',
+        encode: "video",
         muted,
       },
     },
     {
-      variant: 'proxy_480',
-      source: 'vertical_1080',
-      filename: 'proxy_480.mp4',
-      contentType: 'video/mp4',
+      variant: "proxy_480",
+      source: "vertical_1080",
+      filename: "proxy_480.mp4",
+      contentType: "video/mp4",
       width: PROXY.width,
       height: PROXY.height,
-      operation: 'transcode',
+      operation: "transcode",
       /* Already vertical by this point, so the fit is a no-op either way;
        * `crop` is named explicitly so a rounding difference cannot introduce a
        * one-pixel bar. The master has already had the muting decision applied,
        * so the proxy simply keeps whatever the master has. */
-      transcode: { fit: 'crop', crf: PROXY.crf, fps: PROXY.fps, encode: 'video', muted: false },
+      transcode: {
+        fit: "crop",
+        crf: PROXY.crf,
+        fps: PROXY.fps,
+        encode: "video",
+        muted: false,
+      },
     },
     {
-      variant: 'thumb',
-      source: 'vertical_1080',
-      filename: 'thumb.jpg',
-      contentType: 'image/jpeg',
+      variant: "thumb",
+      source: "vertical_1080",
+      filename: "thumb.jpg",
+      contentType: "image/jpeg",
       width: THUMB_WIDTH,
-      height: Math.round((THUMB_WIDTH * VERTICAL_MASTER.height) / VERTICAL_MASTER.width),
-      operation: 'frame',
+      height: Math.round(
+        (THUMB_WIDTH * VERTICAL_MASTER.height) / VERTICAL_MASTER.width,
+      ),
+      operation: "frame",
       atSec: posterTimeFor(facts.durationSec),
     },
-  ]
+  ];
 }
 
 /**
@@ -409,15 +430,18 @@ export function planVariants(args: {
  * WHERE: planVariants.
  */
 export function posterTimeFor(durationSec: number | null): number {
-  if (durationSec === null || durationSec <= 0) return 0
-  if (durationSec <= 1) return durationSec / 2
-  return 1
+  if (durationSec === null || durationSec <= 0) return 0;
+  if (durationSec <= 1) return durationSec / 2;
+  return 1;
 }
 
 function thumbHeightFor(facts: ProbeFacts, width: number): number {
-  const source = facts.source
-  if (source === null || source.width <= 0 || source.height <= 0) return width
+  const source = facts.source;
+  if (source === null || source.width <= 0 || source.height <= 0) return width;
   /* Even, because every encoder this pipeline touches requires it, and at least
    * 2 so a degenerate 1-pixel-tall source cannot produce a zero-height frame. */
-  return Math.max(2, 2 * Math.round((width * source.height) / source.width / 2))
+  return Math.max(
+    2,
+    2 * Math.round((width * source.height) / source.width / 2),
+  );
 }

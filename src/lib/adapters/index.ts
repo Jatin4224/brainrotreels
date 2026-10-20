@@ -1,14 +1,8 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
-import 'server-only'
+import "server-only";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: getAuthAdapter, getAdapterCapabilities,
@@ -35,8 +29,8 @@ import 'server-only'
  *        Contract in ./types.ts; provider selection in ./provider.ts.
  */
 
-import { AUTH_PROVIDER, assertProviderActive } from './provider'
-import type { AdapterCapabilities, AuthAdapter } from './types'
+import { AUTH_PROVIDER, assertProviderActive } from "./provider";
+import type { AdapterCapabilities, AuthAdapter } from "./types";
 
 export type {
   AdapterCapabilities,
@@ -52,26 +46,32 @@ export type {
   EntitlementAdapter,
   IdentityAdapter,
   TenancyAdapter,
-} from './types'
-export { AUTH_PROVIDER_IDS } from './types'
-export { AUTH_PROVIDER, DEFAULT_AUTH_PROVIDER, isAuthProviderId } from './provider'
+} from "./types";
+export { AUTH_PROVIDER_IDS } from "./types";
+export {
+  AUTH_PROVIDER,
+  DEFAULT_AUTH_PROVIDER,
+  isAuthProviderId,
+} from "./provider";
 
 /* Memoised per process. Holds the in-flight promise (not just the result) so
  * concurrent first-requests share one import instead of racing. */
-let adapterPromise: Promise<AuthAdapter> | null = null
+let adapterPromise: Promise<AuthAdapter> | null = null;
 
 async function loadAdapter(): Promise<AuthAdapter> {
   /* The switch is exhaustive over AuthProviderId — adding a provider to
    * AUTH_PROVIDER_IDS without a case here is a compile error at the
    * `never` branch below, so a provider can never be silently unreachable. */
   switch (AUTH_PROVIDER) {
-    case 'better-auth': {
-      const mod = await import('./better-auth')
-      return mod.betterAuthAdapter
+    case "better-auth": {
+      const mod = await import("./better-auth");
+      return mod.betterAuthAdapter;
     }
     default: {
-      const exhaustive: never = AUTH_PROVIDER
-      throw new Error(`[adapters] No adapter registered for provider "${String(exhaustive)}".`)
+      const exhaustive: never = AUTH_PROVIDER;
+      throw new Error(
+        `[adapters] No adapter registered for provider "${String(exhaustive)}".`,
+      );
     }
   }
 }
@@ -90,11 +90,11 @@ export async function getAuthAdapter(): Promise<AuthAdapter> {
     adapterPromise = loadAdapter().then((adapter) => {
       /* Belt-and-braces: the bundle asserts at its own module scope too, but
        * re-checking here catches a mis-registered switch case. */
-      assertProviderActive(adapter.id)
-      return adapter
-    })
+      assertProviderActive(adapter.id);
+      return adapter;
+    });
   }
-  return adapterPromise
+  return adapterPromise;
 }
 
 /**
@@ -104,7 +104,6 @@ export async function getAuthAdapter(): Promise<AuthAdapter> {
  * WHERE: Read by server components deciding which UI surface to render.
  */
 export async function getAdapterCapabilities(): Promise<AdapterCapabilities> {
-  const adapter = await getAuthAdapter()
-  return adapter.capabilities
+  const adapter = await getAuthAdapter();
+  return adapter.capabilities;
 }
-

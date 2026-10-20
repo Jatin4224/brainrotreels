@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -20,7 +14,10 @@
  *        (client).
  */
 
-import { QueryClient, defaultShouldDehydrateQuery } from '@tanstack/react-query'
+import {
+  QueryClient,
+  defaultShouldDehydrateQuery,
+} from "@tanstack/react-query";
 
 export const makeQueryClient = () => {
   return new QueryClient({
@@ -35,8 +32,9 @@ export const makeQueryClient = () => {
         /* `pending` opt-in lets streaming SSR ship in-flight queries; the
          * client picks them up without re-firing. */
         shouldDehydrateQuery: (query) =>
-          defaultShouldDehydrateQuery(query) || query.state.status === 'pending',
+          defaultShouldDehydrateQuery(query) ||
+          query.state.status === "pending",
       },
     },
-  })
-}
+  });
+};

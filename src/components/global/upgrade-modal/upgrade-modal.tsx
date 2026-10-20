@@ -1,14 +1,8 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
-'use client'
+"use client";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: UpgradeModal, UpgradeModalProps, UpgradeContent,
@@ -25,28 +19,28 @@
  * WHERE: Mounted once by <UpgradeModalProvider /> at the root of the app.
  */
 
-import { cn } from '@/lib/utils'
-import type { ResourceKey } from '@/lib/resources'
-import type { PlanKey } from '@/lib/config'
+import { cn } from "@/lib/utils";
+import type { ResourceKey } from "@/lib/resources";
+import type { PlanKey } from "@/lib/config";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog'
-import { UpgradeContent } from './upgrade-content'
+} from "@/components/ui/dialog";
+import { UpgradeContent } from "./upgrade-content";
 
 export interface UpgradeModalProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  organizationId: string
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  organizationId: string;
   /** The gated resource, when a gate opened this. */
-  resource?: ResourceKey | undefined
+  resource?: ResourceKey | undefined;
   /** The registry's upgrade sentence for that resource. */
-  upgradeMessage?: string | undefined
+  upgradeMessage?: string | undefined;
   /** Plan to open on; omitted, the content picks the next sensible step. */
-  plan?: PlanKey | undefined
+  plan?: PlanKey | undefined;
 }
 
 export function UpgradeModal({
@@ -64,9 +58,9 @@ export function UpgradeModal({
         className={cn(
           /* Fill the viewport: the shared DialogContent is centred and capped, so
              every one of those defaults has to be undone explicitly. */
-          'top-0! left-0! h-dvh! max-h-none! w-screen! max-w-none! translate-x-0! translate-y-0!',
-          'sm:max-w-none!',
-          'gap-0! rounded-none! bg-background p-0! ring-0! outline-none'
+          "top-0! left-0! h-dvh! max-h-none! w-screen! max-w-none! translate-x-0! translate-y-0!",
+          "sm:max-w-none!",
+          "gap-0! rounded-none! bg-background p-0! ring-0! outline-none",
         )}
       >
         {/* The visible header lives in the content and changes per step, so the
@@ -87,5 +81,5 @@ export function UpgradeModal({
         />
       </DialogContent>
     </Dialog>
-  )
+  );
 }

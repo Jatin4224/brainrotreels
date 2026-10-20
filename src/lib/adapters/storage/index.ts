@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -22,23 +16,23 @@
  * WHERE: Used by the asset services from Phase 02 onward.
  */
 
-import 'server-only'
+import "server-only";
 
-import { STORAGE_PROVIDER } from './provider'
-import type { StorageAdapter } from './types'
+import { STORAGE_PROVIDER } from "./provider";
+import type { StorageAdapter } from "./types";
 
 export type {
   StorageAdapter,
   StorageObjectInfo,
   StorageProviderId,
   SignedPutOptions,
-} from './types'
+} from "./types";
 export {
   STORAGE_PROVIDER_IDS,
   DEFAULT_SIGNED_GET_TTL_SECONDS,
   DEFAULT_SIGNED_PUT_TTL_SECONDS,
-} from './types'
-export { STORAGE_PROVIDER, DEFAULT_STORAGE_PROVIDER } from './provider'
+} from "./types";
+export { STORAGE_PROVIDER, DEFAULT_STORAGE_PROVIDER } from "./provider";
 export {
   assertKeySegment,
   isLibraryKey,
@@ -50,29 +44,31 @@ export {
   TMP_PREFIX,
   type LibraryKind,
   type ProjectAssetKind,
-} from './keys'
-export { uploadKey } from './keys'
+} from "./keys";
+export { uploadKey } from "./keys";
 
-let adapterPromise: Promise<StorageAdapter> | null = null
+let adapterPromise: Promise<StorageAdapter> | null = null;
 
 async function loadAdapter(): Promise<StorageAdapter> {
   /* Exhaustive over StorageProviderId — a new id without a case here is a
    * compile error at the `never` branch. */
   switch (STORAGE_PROVIDER) {
-    case 'r2': {
-      const mod = await import('./r2')
-      return mod.r2StorageAdapter
+    case "r2": {
+      const mod = await import("./r2");
+      return mod.r2StorageAdapter;
     }
     default: {
-      const exhaustive: never = STORAGE_PROVIDER
-      throw new Error(`[adapters/storage] No adapter registered for "${String(exhaustive)}".`)
+      const exhaustive: never = STORAGE_PROVIDER;
+      throw new Error(
+        `[adapters/storage] No adapter registered for "${String(exhaustive)}".`,
+      );
     }
   }
 }
 
 export async function getStorageAdapter(): Promise<StorageAdapter> {
   if (!adapterPromise) {
-    adapterPromise = loadAdapter()
+    adapterPromise = loadAdapter();
   }
-  return adapterPromise
+  return adapterPromise;
 }

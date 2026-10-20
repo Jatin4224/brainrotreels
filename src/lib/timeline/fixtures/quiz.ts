@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -24,96 +18,148 @@
  * WHERE: src/lib/timeline/*.test.ts; the Phase 13 quiz work.
  */
 
-import type { TimelineDoc } from '../schema'
-import { buildWords } from './words'
+import type { TimelineDoc } from "../schema";
+import { buildWords } from "./words";
 
 const SCRIPT =
-  'Which planet has the shortest day? And which ocean is the deepest of them all?'
+  "Which planet has the shortest day? And which ocean is the deepest of them all?";
 
-const FIRST_QUESTION_SECONDS = 6
-const SECOND_QUESTION_SECONDS = 6
+const FIRST_QUESTION_SECONDS = 6;
+const SECOND_QUESTION_SECONDS = 6;
 
 export function quizFixture(): TimelineDoc {
-  const words = buildWords(SCRIPT, { speaker: 'Q' })
-  const total = FIRST_QUESTION_SECONDS + SECOND_QUESTION_SECONDS
+  const words = buildWords(SCRIPT, { speaker: "Q" });
+  const total = FIRST_QUESTION_SECONDS + SECOND_QUESTION_SECONDS;
 
   return {
     version: 4,
-    kind: 'quiz',
-    timing: 'resolved',
+    kind: "quiz",
+    timing: "resolved",
     canvas: { width: 1080, height: 1920, fps: 30 },
-    style: { paletteId: 'electric', captionStyleId: 'bold-pop', safeZone: 'shorts' },
+    style: {
+      paletteId: "electric",
+      captionStyleId: "bold-pop",
+      safeZone: "shorts",
+    },
     words,
     tracks: [
       {
-        id: 'bg',
-        type: 'video',
-        label: 'Background',
+        id: "bg",
+        type: "video",
+        label: "Background",
         items: [
           {
-            id: 'i1',
+            id: "i1",
             start: 0,
             duration: total,
-            assetId: 'bg_gradient',
-            fit: 'cover',
+            assetId: "bg_gradient",
+            fit: "cover",
             loop: true,
             muted: true,
-            render: 'media',
+            render: "media",
           },
         ],
       },
       {
-        id: 'questions',
-        type: 'scene',
-        label: 'Questions',
+        id: "questions",
+        type: "scene",
+        label: "Questions",
         items: [
           {
-            id: 'q1',
+            id: "q1",
             start: 0,
             duration: FIRST_QUESTION_SECONDS,
-            render: 'quizCard',
+            render: "quizCard",
             scene: {
-              layout: 'quiz-four-up',
+              layout: "quiz-four-up",
               elements: [
-                { id: 'q1-prompt', kind: 'prompt', text: 'Which planet has the shortest day?' },
-                { id: 'q1-a', kind: 'option', text: 'Mercury', props: { index: 0 } },
-                { id: 'q1-b', kind: 'option', text: 'Jupiter', props: { index: 1, correct: true } },
-                { id: 'q1-c', kind: 'option', text: 'Earth', props: { index: 2 } },
-                { id: 'q1-d', kind: 'option', text: 'Mars', props: { index: 3 } },
-                { id: 'q1-timer', kind: 'countdown', props: { seconds: 3 } },
+                {
+                  id: "q1-prompt",
+                  kind: "prompt",
+                  text: "Which planet has the shortest day?",
+                },
+                {
+                  id: "q1-a",
+                  kind: "option",
+                  text: "Mercury",
+                  props: { index: 0 },
+                },
+                {
+                  id: "q1-b",
+                  kind: "option",
+                  text: "Jupiter",
+                  props: { index: 1, correct: true },
+                },
+                {
+                  id: "q1-c",
+                  kind: "option",
+                  text: "Earth",
+                  props: { index: 2 },
+                },
+                {
+                  id: "q1-d",
+                  kind: "option",
+                  text: "Mars",
+                  props: { index: 3 },
+                },
+                { id: "q1-timer", kind: "countdown", props: { seconds: 3 } },
               ],
             },
           },
           {
-            id: 'q2',
+            id: "q2",
             start: FIRST_QUESTION_SECONDS,
             duration: SECOND_QUESTION_SECONDS,
-            render: 'quizCard',
+            render: "quizCard",
             scene: {
-              layout: 'quiz-four-up',
+              layout: "quiz-four-up",
               elements: [
-                { id: 'q2-prompt', kind: 'prompt', text: 'Which ocean is the deepest?' },
-                { id: 'q2-a', kind: 'option', text: 'Atlantic', props: { index: 0 } },
-                { id: 'q2-b', kind: 'option', text: 'Indian', props: { index: 1 } },
-                { id: 'q2-c', kind: 'option', text: 'Pacific', props: { index: 2, correct: true } },
-                { id: 'q2-d', kind: 'option', text: 'Arctic', props: { index: 3 } },
-                { id: 'q2-timer', kind: 'countdown', props: { seconds: 3 } },
+                {
+                  id: "q2-prompt",
+                  kind: "prompt",
+                  text: "Which ocean is the deepest?",
+                },
+                {
+                  id: "q2-a",
+                  kind: "option",
+                  text: "Atlantic",
+                  props: { index: 0 },
+                },
+                {
+                  id: "q2-b",
+                  kind: "option",
+                  text: "Indian",
+                  props: { index: 1 },
+                },
+                {
+                  id: "q2-c",
+                  kind: "option",
+                  text: "Pacific",
+                  props: { index: 2, correct: true },
+                },
+                {
+                  id: "q2-d",
+                  kind: "option",
+                  text: "Arctic",
+                  props: { index: 3 },
+                },
+                { id: "q2-timer", kind: "countdown", props: { seconds: 3 } },
               ],
             },
           },
         ],
       },
       {
-        id: 'narration',
-        type: 'audio',
-        label: 'Narration',
+        id: "narration",
+        type: "audio",
+        label: "Narration",
         items: [
           {
-            id: 'a1',
+            id: "a1",
             start: 0,
             duration: total,
-            assetId: 'narration_q1',
-            speaker: 'Q',
+            assetId: "narration_q1",
+            speaker: "Q",
             gain: 1,
             duck: false,
             loop: false,
@@ -121,18 +167,24 @@ export function quizFixture(): TimelineDoc {
         ],
       },
       {
-        id: 'captions',
-        type: 'caption',
-        label: 'Captions',
-        items: [
-          { id: 'c1', startWord: 0, endWord: 5, position: { y: 0.84 } },
-        ],
+        id: "captions",
+        type: "caption",
+        label: "Captions",
+        items: [{ id: "c1", startWord: 0, endWord: 5, position: { y: 0.84 } }],
       },
     ],
-    speakers: { Q: { voiceId: 'lib_quinn', displayName: 'Quinn' } },
+    speakers: { Q: { voiceId: "lib_quinn", displayName: "Quinn" } },
     assets: {
-      bg_gradient: { assetId: 'ast_bg_gradient', kind: 'video', license: 'owned' },
-      narration_q1: { assetId: 'ast_narration_q1', kind: 'audio', license: 'generated' },
+      bg_gradient: {
+        assetId: "ast_bg_gradient",
+        kind: "video",
+        license: "owned",
+      },
+      narration_q1: {
+        assetId: "ast_narration_q1",
+        kind: "audio",
+        license: "generated",
+      },
     },
-  }
+  };
 }

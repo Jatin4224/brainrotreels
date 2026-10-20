@@ -1,14 +1,8 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
-'use client'
+"use client";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: PageHeader, ContentLayout, PageContainer, width
@@ -29,16 +23,16 @@
  *        the sidebar from src/components/global/sidebar.
  */
 
-import * as React from 'react'
+import * as React from "react";
 
-import { PageContainer } from '@/components/global/page-container'
-import type { PageContainerWidth } from '@/components/global/page-container'
-import { Separator } from '@/components/ui/separator'
-import { SidebarTrigger } from '@/components/ui/sidebar'
+import { PageContainer } from "@/components/global/page-container";
+import type { PageContainerWidth } from "@/components/global/page-container";
+import { Separator } from "@/components/ui/separator";
+import { SidebarTrigger } from "@/components/ui/sidebar";
 
 export interface PageHeaderProps {
-  title: string
-  actions?: React.ReactNode
+  title: string;
+  actions?: React.ReactNode;
 }
 
 export function PageHeader({ title, actions }: PageHeaderProps) {
@@ -54,27 +48,29 @@ export function PageHeader({ title, actions }: PageHeaderProps) {
           overriding either here is what knocked the rule out of alignment. */}
       <Separator orientation="vertical" className="mr-2" />
       <h1 className="text-base font-medium">{title}</h1>
-      {actions ? <div className="ml-auto flex items-center gap-2">{actions}</div> : null}
+      {actions ? (
+        <div className="ml-auto flex items-center gap-2">{actions}</div>
+      ) : null}
     </header>
-  )
+  );
 }
 
 export interface ContentLayoutProps {
-  title: string
-  actions?: React.ReactNode
+  title: string;
+  actions?: React.ReactNode;
   /**
    * Max width of the centered content column — see PAGE_CONTAINER_WIDTHS.
    * Defaults to `'default'`; pass `'full'` for content that needs the whole
    * page (wide tables, boards) so the opt-out stays explicit and greppable.
    */
-  width?: PageContainerWidth
-  children: React.ReactNode
+  width?: PageContainerWidth;
+  children: React.ReactNode;
 }
 
 export function ContentLayout({
   title,
   actions,
-  width = 'default',
+  width = "default",
   children,
 }: ContentLayoutProps) {
   return (
@@ -87,5 +83,5 @@ export function ContentLayout({
         {children}
       </PageContainer>
     </div>
-  )
+  );
 }

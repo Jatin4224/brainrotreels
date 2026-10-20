@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -21,7 +15,7 @@
  *        templates are rendered to HTML in src/services/email.service.ts.
  */
 
-import * as React from 'react'
+import * as React from "react";
 import {
   Body,
   Button,
@@ -31,8 +25,8 @@ import {
   Html,
   Preview,
   Text,
-} from '@react-email/components'
-import { APP_NAME } from '@/lib/config/branding'
+} from "@react-email/components";
+import { APP_NAME } from "@/lib/config/branding";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: emailStyles
@@ -44,64 +38,64 @@ import { APP_NAME } from '@/lib/config/branding'
  */
 export const emailStyles = {
   body: {
-    backgroundColor: '#f5f5f5',
+    backgroundColor: "#f5f5f5",
     fontFamily:
       "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
     margin: 0,
-    padding: '40px 0',
+    padding: "40px 0",
   },
   container: {
-    backgroundColor: '#ffffff',
-    borderRadius: '12px',
-    margin: '0 auto',
-    maxWidth: '520px',
-    padding: '40px',
+    backgroundColor: "#ffffff",
+    borderRadius: "12px",
+    margin: "0 auto",
+    maxWidth: "520px",
+    padding: "40px",
   },
   brand: {
-    color: '#111111',
-    fontSize: '20px',
+    color: "#111111",
+    fontSize: "20px",
     fontWeight: 700,
-    margin: '0 0 24px',
+    margin: "0 0 24px",
   },
   title: {
-    color: '#111111',
-    fontSize: '22px',
+    color: "#111111",
+    fontSize: "22px",
     fontWeight: 600,
-    margin: '0 0 16px',
+    margin: "0 0 16px",
   },
   paragraph: {
-    color: '#444444',
-    fontSize: '15px',
-    lineHeight: '24px',
-    margin: '0 0 16px',
+    color: "#444444",
+    fontSize: "15px",
+    lineHeight: "24px",
+    margin: "0 0 16px",
   },
   ctaButton: {
-    backgroundColor: '#111111',
-    borderRadius: '8px',
-    color: '#ffffff',
-    display: 'inline-block',
-    fontSize: '15px',
+    backgroundColor: "#111111",
+    borderRadius: "8px",
+    color: "#ffffff",
+    display: "inline-block",
+    fontSize: "15px",
     fontWeight: 600,
-    padding: '12px 24px',
-    textDecoration: 'none',
+    padding: "12px 24px",
+    textDecoration: "none",
   },
   note: {
-    color: '#888888',
-    fontSize: '13px',
-    lineHeight: '20px',
-    margin: '16px 0 0',
+    color: "#888888",
+    fontSize: "13px",
+    lineHeight: "20px",
+    margin: "16px 0 0",
   },
   hr: {
-    borderColor: '#eaeaea',
-    margin: '28px 0',
+    borderColor: "#eaeaea",
+    margin: "28px 0",
   },
   footer: {
-    color: '#999999',
-    fontSize: '12px',
-    lineHeight: '18px',
+    color: "#999999",
+    fontSize: "12px",
+    lineHeight: "18px",
     margin: 0,
   },
-} as const
+} as const;
 
 /**
  * SOURCE OF TRUTH KEYWORDS: EmailButton
@@ -110,12 +104,18 @@ export const emailStyles = {
  * WHY:   Keeps the CTA visual identical across templates.
  * WHERE: Used inside each template's body.
  */
-export function EmailButton({ href, children }: { href: string; children: React.ReactNode }) {
+export function EmailButton({
+  href,
+  children,
+}: {
+  href: string;
+  children: React.ReactNode;
+}) {
   return (
     <Button href={href} style={emailStyles.ctaButton}>
       {children}
     </Button>
-  )
+  );
 }
 
 /**
@@ -130,8 +130,8 @@ export function BaseLayout({
   preview,
   children,
 }: {
-  preview: string
-  children: React.ReactNode
+  preview: string;
+  children: React.ReactNode;
 }) {
   return (
     <Html>
@@ -143,10 +143,11 @@ export function BaseLayout({
           {children}
           <Hr style={emailStyles.hr} />
           <Text style={emailStyles.footer}>
-            © {APP_NAME}. If you didn’t expect this email, you can safely ignore it.
+            © {APP_NAME}. If you didn’t expect this email, you can safely ignore
+            it.
           </Text>
         </Container>
       </Body>
     </Html>
-  )
+  );
 }

@@ -1,14 +1,8 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
-'use client'
+"use client";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: PlanOverageBanner, getPlanOverages, OVER_PLAN_STATE,
@@ -46,13 +40,13 @@
  *        src/app/(dashboard)/layout.tsx.
  */
 
-import * as React from 'react'
-import { TriangleAlertIcon } from 'lucide-react'
+import * as React from "react";
+import { TriangleAlertIcon } from "lucide-react";
 
-import { trpc } from '@/trpc/react-provider'
-import { useActiveOrganization } from '@/hooks/use-active-organization'
-import { UsageLimitList } from '@/components/global/usage-limit-list'
-import { Button } from '@/components/ui/button'
+import { trpc } from "@/trpc/react-provider";
+import { useActiveOrganization } from "@/hooks/use-active-organization";
+import { UsageLimitList } from "@/components/global/usage-limit-list";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -60,21 +54,21 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog'
+} from "@/components/ui/dialog";
 
 export function PlanOverageBanner() {
-  const { activeOrganization } = useActiveOrganization()
-  const organizationId = activeOrganization?.id ?? ''
-  const [open, setOpen] = React.useState(false)
+  const { activeOrganization } = useActiveOrganization();
+  const organizationId = activeOrganization?.id ?? "";
+  const [open, setOpen] = React.useState(false);
 
   const { data: overages } = trpc.usage.getPlanOverages.useQuery(
     { organizationId },
-    { enabled: organizationId !== '', staleTime: 30_000 }
-  )
+    { enabled: organizationId !== "", staleTime: 30_000 },
+  );
 
   /* The overwhelmingly common case — render nothing at all rather than reserve
    * space for a bar that is almost never there. */
-  if (!overages || overages.length === 0) return null
+  if (!overages || overages.length === 0) return null;
 
   return (
     <>
@@ -89,9 +83,9 @@ export function PlanOverageBanner() {
       >
         <TriangleAlertIcon className="size-5 shrink-0" />
         <p className="min-w-0 flex-1 text-sm font-bold">
-          Your organization is using more than your current plan includes. Please bring
-          your usage back within your plan before your next billing date so your team
-          keeps uninterrupted access.
+          Your organization is using more than your current plan includes.
+          Please bring your usage back within your plan before your next billing
+          date so your team keeps uninterrupted access.
         </p>
         <Button
           size="sm"
@@ -107,9 +101,9 @@ export function PlanOverageBanner() {
           <DialogHeader>
             <DialogTitle>Bring your usage within your plan</DialogTitle>
             <DialogDescription>
-              Your organization is over what your current plan includes. Remove the
-              excess below before your next billing date, or move to a plan that covers
-              it.
+              Your organization is over what your current plan includes. Remove
+              the excess below before your next billing date, or move to a plan
+              that covers it.
             </DialogDescription>
           </DialogHeader>
 
@@ -123,5 +117,5 @@ export function PlanOverageBanner() {
         </DialogContent>
       </Dialog>
     </>
-  )
+  );
 }

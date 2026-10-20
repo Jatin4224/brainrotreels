@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -26,42 +20,48 @@
  *        src/components/global/sidebar.
  */
 
-import { redirect } from 'next/navigation'
-import { headers } from 'next/headers'
-import { HydrationBoundary, dehydrate } from '@tanstack/react-query'
+import { redirect } from "next/navigation";
+import { headers } from "next/headers";
+import { HydrationBoundary, dehydrate } from "@tanstack/react-query";
 
-import { getSidebarNav } from '@/lib/resources'
-import { permissions } from '@/lib/permissions'
-import { getFeatureGates } from '@/lib/feature-gate'
+import { getSidebarNav } from "@/lib/resources";
+import { permissions } from "@/lib/permissions";
+import { getFeatureGates } from "@/lib/feature-gate";
 
-import { getServerSession } from '@/lib/adapters/session'
-import { createTRPCContext } from '@/trpc/init'
-import { getQueryClient, trpc } from '@/trpc/server'
-import { AUTH_ROUTES, ROUTES, PORTAL_PATH, isPortalOwnerEmail, prisma } from '@/lib/config'
+import { getServerSession } from "@/lib/adapters/session";
+import { createTRPCContext } from "@/trpc/init";
+import { getQueryClient, trpc } from "@/trpc/server";
+import {
+  AUTH_ROUTES,
+  ROUTES,
+  PORTAL_PATH,
+  isPortalOwnerEmail,
+  prisma,
+} from "@/lib/config";
 import {
   ensurePersonalWorkspace,
   workspaceNameFor,
-} from '@/services/organization.service'
-import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
-import { AppSidebar } from '@/components/global/sidebar'
-import { PlanOverageBanner } from '@/components/global/plan-overage-banner'
-import { OrgSwitcher, UserMenu } from '@/components/global/providers/server'
+} from "@/services/organization.service";
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import { AppSidebar } from "@/components/global/sidebar";
+import { PlanOverageBanner } from "@/components/global/plan-overage-banner";
+import { OrgSwitcher, UserMenu } from "@/components/global/providers/server";
 
 export default async function DashboardLayout({
   children,
 }: {
-  children: React.ReactNode
+  children: React.ReactNode;
 }) {
-  const session = await getServerSession()
-  if (!session) redirect(AUTH_ROUTES.signIn)
+  const session = await getServerSession();
+  if (!session) redirect(AUTH_ROUTES.signIn);
 
-  const ctx = await createTRPCContext()
-  await ctx.resolveAuth()
-  const activeOrganization = await ctx.getActiveOrganization()
+  const ctx = await createTRPCContext();
+  await ctx.resolveAuth();
+  const activeOrganization = await ctx.getActiveOrganization();
   if (!activeOrganization) {
     /* A fresh platform-admin owner (no org yet) belongs in /portal, which
      * bootstraps their portal org — not the tenant onboarding flow. */
-    if (isPortalOwnerEmail(session.user.email)) redirect(PORTAL_PATH)
+    if (isPortalOwnerEmail(session.user.email)) redirect(PORTAL_PATH);
 
     /* PERSONAL_WORKSPACE — a solo creator has no team to name, so one
      * workspace is created for them rather than asking.
@@ -80,15 +80,15 @@ export default async function DashboardLayout({
      *
      * On failure fall through to onboarding, which stays reachable as the
      * recovery path and can report the error properly. */
-    let created = false
+    let created = false;
     try {
       await ensurePersonalWorkspace(prisma, {
         userId: session.user.id,
         name: workspaceNameFor(session.user),
-      })
-      created = true
+      });
+      created = true;
     } catch (error) {
-      console.error('[dashboard] personal workspace creation failed', error)
+      console.error("[dashboard] personal workspace creation failed", error);
     }
 
     /* Redirect rather than re-reading the context. `createTRPCContext` and its
@@ -99,9 +99,9 @@ export default async function DashboardLayout({
      *
      * Outside the try on purpose: redirect() signals by throwing, and the
      * catch above would swallow it. */
-    if (created) redirect(ROUTES.dashboard)
+    if (created) redirect(ROUTES.dashboard);
 
-    redirect(ROUTES.onboarding)
+    redirect(ROUTES.onboarding);
   }
 
   /* ─────────────────────────────────────────────────────────────────────
@@ -120,47 +120,57 @@ export default async function DashboardLayout({
    * page with a `nav` entry gates it automatically; there is no per-page
    * function to remember, which is the whole point of the registry.
    * ───────────────────────────────────────────────────────────────────── */
-  const pathname = (await headers()).get('x-pathname') ?? ''
+  const pathname = (await headers()).get("x-pathname") ?? "";
   const navItem = getSidebarNav()
     .flatMap((section) => section.items)
     /* Longest href first so /settings/billing wins over a /settings parent. */
     .sort((a, b) => b.href.length - a.href.length)
-    .find((item) => pathname === item.href || pathname.startsWith(`${item.href}/`))
+    .find(
+      (item) => pathname === item.href || pathname.startsWith(`${item.href}/`),
+    );
 
   if (navItem) {
     const permitted =
       activeOrganization.hasFullAccess ||
-      activeOrganization.permissions.includes(navItem.requirePermission)
-    if (!permitted) redirect(ROUTES.dashboard)
+      activeOrganization.permissions.includes(navItem.requirePermission);
+    if (!permitted) redirect(ROUTES.dashboard);
 
     if (navItem.requireFlag) {
       /* Same computation the procedure factory and <FeatureGate> read, so the
        * page cannot disagree with the server about plan availability. */
-      const gates = await getFeatureGates(activeOrganization.id)
-      if (gates.gates[navItem.key]?.atLimit) redirect(ROUTES.dashboard)
+      const gates = await getFeatureGates(activeOrganization.id);
+      if (gates.gates[navItem.key]?.atLimit) redirect(ROUTES.dashboard);
     }
   }
 
   /* Prefetch everything the sidebar/user-menu read, then hydrate — the client
    * components resolve from cache on first paint (no flicker). */
-  const queryClient = getQueryClient()
+  const queryClient = getQueryClient();
   /* Same question billing.getSubscription asks server-side; asked here from the
    * membership already in hand rather than by letting a prefetch fail. */
   const canReadBilling =
     activeOrganization.hasFullAccess ||
-    activeOrganization.permissions.includes(permissions.BILLING_READ)
+    activeOrganization.permissions.includes(permissions.BILLING_READ);
   await Promise.all([
-    queryClient.prefetchQuery(trpc.organization.getActiveOrganization.queryOptions()),
-    queryClient.prefetchQuery(trpc.organization.getUserOrganizations.queryOptions()),
     queryClient.prefetchQuery(
-      trpc.usage.getFeatureGates.queryOptions({ organizationId: activeOrganization.id })
+      trpc.organization.getActiveOrganization.queryOptions(),
+    ),
+    queryClient.prefetchQuery(
+      trpc.organization.getUserOrganizations.queryOptions(),
+    ),
+    queryClient.prefetchQuery(
+      trpc.usage.getFeatureGates.queryOptions({
+        organizationId: activeOrganization.id,
+      }),
     ),
     queryClient.prefetchQuery(trpc.user.getProfile.queryOptions()),
     /* OVER_PLAN_STATE — prefetched so the banner is decided before first paint.
      * Fetching it client-side would flash a red bar onto every page load in the
      * normal case, or worse, show nothing for a beat while the org is over. */
     queryClient.prefetchQuery(
-      trpc.usage.getPlanOverages.queryOptions({ organizationId: activeOrganization.id })
+      trpc.usage.getPlanOverages.queryOptions({
+        organizationId: activeOrganization.id,
+      }),
     ),
     /* UPGRADE_STATE_IS_PRERENDERED — the plan catalogue and this user's trial
      * history. Both feed the sidebar nudge AND the upgrade modal's header, and
@@ -180,11 +190,11 @@ export default async function DashboardLayout({
           queryClient.prefetchQuery(
             trpc.billing.getSubscription.queryOptions({
               organizationId: activeOrganization.id,
-            })
+            }),
           ),
         ]
       : []),
-  ])
+  ]);
 
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>
@@ -197,5 +207,5 @@ export default async function DashboardLayout({
         <SidebarInset>{children}</SidebarInset>
       </SidebarProvider>
     </HydrationBoundary>
-  )
+  );
 }

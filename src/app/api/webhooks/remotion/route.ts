@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -70,79 +64,85 @@
  *        render, which is what lets a preview deployment keep its own renders.
  */
 
-import { NextResponse } from 'next/server'
+import { NextResponse } from "next/server";
 
-import { enqueue } from '@/lib/adapters/jobs'
-import { getRemotionWebhookSecret } from '@/lib/adapters/render/lambda/config'
+import { enqueue } from "@/lib/adapters/jobs";
+import { getRemotionWebhookSecret } from "@/lib/adapters/render/lambda/config";
 import {
   remotionWebhookPayloadSchema,
   verifyRemotionSignature,
-} from '@/lib/adapters/render/lambda/webhook'
+} from "@/lib/adapters/render/lambda/webhook";
 
 /* Signature verification needs Node's crypto, and `enqueue` reaches the jobs
  * provider — neither runs on edge. Same reason as the Stripe webhook. */
-export const runtime = 'nodejs'
-export const dynamic = 'force-dynamic'
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 /** The header Remotion sends its HMAC in. */
-const SIGNATURE_HEADER = 'X-Remotion-Signature'
+const SIGNATURE_HEADER = "X-Remotion-Signature";
 
 export async function POST(request: Request): Promise<NextResponse> {
-  const secret = getRemotionWebhookSecret()
+  const secret = getRemotionWebhookSecret();
   if (secret === null) {
     /* 503 rather than 500: the endpoint is not broken, it is not configured —
      * and with no secret there is no way to tell a genuine call from a forged
      * one, so accepting anything would be worse than refusing everything. */
-    return NextResponse.json({ error: 'The render webhook is not configured' }, { status: 503 })
+    return NextResponse.json(
+      { error: "The render webhook is not configured" },
+      { status: 503 },
+    );
   }
 
-  const signature = request.headers.get(SIGNATURE_HEADER)
+  const signature = request.headers.get(SIGNATURE_HEADER);
   if (signature === null || signature.length === 0) {
-    return NextResponse.json({ error: 'Missing render webhook signature' }, { status: 400 })
+    return NextResponse.json(
+      { error: "Missing render webhook signature" },
+      { status: 400 },
+    );
   }
 
   /* SIGNATURE_IS_OVER_RESTRINGIFIED_JSON — parsed first, deliberately. See the
    * file header before changing this to request.text(). */
-  let body: unknown
+  let body: unknown;
   try {
-    body = await request.json()
+    body = await request.json();
   } catch {
-    return NextResponse.json({ error: 'Body is not JSON' }, { status: 400 })
+    return NextResponse.json({ error: "Body is not JSON" }, { status: 400 });
   }
 
   /* VERIFY_BEFORE_ANYTHING. Nothing above this line touched the database or
    * the queue, and nothing below it runs if this fails. */
   if (!verifyRemotionSignature({ secret, body, signatureHeader: signature })) {
-    console.error('[remotion-webhook] signature verification failed')
-    return NextResponse.json({ error: 'Invalid signature' }, { status: 400 })
+    console.error("[remotion-webhook] signature verification failed");
+    return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
   }
 
-  const parsed = remotionWebhookPayloadSchema.safeParse(body)
+  const parsed = remotionWebhookPayloadSchema.safeParse(body);
   if (!parsed.success) {
     /* ACK_WHAT_WE_CANNOT_USE. Signed by us, so it is genuine — just not a
      * shape this build understands, which is what a provider upgrade looks
      * like. Logged loudly and acknowledged, because retrying it will produce
      * the identical payload. */
     console.error(
-      '[remotion-webhook] a correctly-signed payload did not match the expected shape:',
+      "[remotion-webhook] a correctly-signed payload did not match the expected shape:",
       parsed.error.issues.slice(0, 5),
-    )
-    return NextResponse.json({ received: true, acted: false })
+    );
+    return NextResponse.json({ received: true, acted: false });
   }
 
-  const payload = parsed.data
+  const payload = parsed.data;
   /* Bracketed because `customData` is an open record — the provider echoes
    * whatever it was given, so the key is data rather than a known property. */
-  const renderId = payload.customData?.['renderId']
+  const renderId = payload.customData?.["renderId"];
 
-  if (typeof renderId !== 'string' || renderId.length === 0) {
+  if (typeof renderId !== "string" || renderId.length === 0) {
     /* RENDER_ID_FROM_CUSTOM_DATA — without it there is no way to know which
      * row this is about. Every render this build starts sends it, so this can
      * only be a render started by an older deploy. */
     console.error(
       `[remotion-webhook] payload for provider render ${payload.renderId} carries no renderId in customData`,
-    )
-    return NextResponse.json({ received: true, acted: false })
+    );
+    return NextResponse.json({ received: true, acted: false });
   }
 
   /* WEBHOOK_ONLY_RELAYS. The whole handler, right here: translate the
@@ -150,16 +150,18 @@ export async function POST(request: Request): Promise<NextResponse> {
    * queue. The workflow does everything that touches storage or the row. */
   try {
     await enqueue({
-      name: 'render/finished',
+      name: "render/finished",
       data: {
         renderId,
         outcome: payload.type,
-        outputUrl: payload.type === 'success' ? payload.outputUrl ?? null : null,
+        outputUrl:
+          payload.type === "success" ? (payload.outputUrl ?? null) : null,
         error:
-          payload.type === 'error'
-            ? payload.errors?.[0]?.message ?? 'The renderer reported an error with no message.'
-            : payload.type === 'timeout'
-              ? 'The renderer timed out while producing this video.'
+          payload.type === "error"
+            ? (payload.errors?.[0]?.message ??
+              "The renderer reported an error with no message.")
+            : payload.type === "timeout"
+              ? "The renderer timed out while producing this video."
               : null,
       },
       /* Deduplicated on the provider's render id and the outcome, so an
@@ -167,7 +169,7 @@ export async function POST(request: Request): Promise<NextResponse> {
        * — produces one event rather than one per delivery. The workflow's
        * finalize step is idempotent anyway; this stops it having to be twice. */
       id: `render-finished-${payload.renderId}-${payload.type}`,
-    })
+    });
   } catch (error) {
     /* ENQUEUE_FAILURE_MUST_RETRY, and this is the one case where a non-2xx is
      * the right answer. The queue is how the waiting workflow finds out the
@@ -179,9 +181,15 @@ export async function POST(request: Request): Promise<NextResponse> {
      * event. Caught rather than left to propagate so the response is a clean
      * JSON body instead of a framework stack trace, matching the Stripe
      * webhook's handler-error branch. */
-    console.error(`[remotion-webhook] could not enqueue render/finished for ${renderId}:`, error)
-    return NextResponse.json({ error: 'Could not record this render' }, { status: 500 })
+    console.error(
+      `[remotion-webhook] could not enqueue render/finished for ${renderId}:`,
+      error,
+    );
+    return NextResponse.json(
+      { error: "Could not record this render" },
+      { status: 500 },
+    );
   }
 
-  return NextResponse.json({ received: true, acted: true })
+  return NextResponse.json({ received: true, acted: true });
 }

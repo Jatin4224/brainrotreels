@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -24,12 +18,12 @@
  *        in src/lib/dev-email-outbox.ts.
  */
 
-import { z } from 'zod'
+import { z } from "zod";
 
-import { createTRPCRouter } from '../init'
-import { baseProcedure } from '../procedures'
-import { isDevEmailFallbackActive } from '@/lib/config/resend'
-import { takePendingDevEmail } from '@/lib/dev-email-outbox'
+import { createTRPCRouter } from "../init";
+import { baseProcedure } from "../procedures";
+import { isDevEmailFallbackActive } from "@/lib/config/resend";
+import { takePendingDevEmail } from "@/lib/dev-email-outbox";
 
 export const devRouter = createTRPCRouter({
   getPendingEmail: baseProcedure
@@ -37,8 +31,8 @@ export const devRouter = createTRPCRouter({
     .query(({ input }) => {
       /* The link leaves the server only in this exact state: development with no
        * email provider configured (isDevEmailFallbackActive). Anything else → null. */
-      if (!isDevEmailFallbackActive()) return null
-      const entry = takePendingDevEmail(input.email)
-      return entry ? { subject: entry.subject, link: entry.link } : null
+      if (!isDevEmailFallbackActive()) return null;
+      const entry = takePendingDevEmail(input.email);
+      return entry ? { subject: entry.subject, link: entry.link } : null;
     }),
-})
+});

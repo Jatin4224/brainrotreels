@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -32,27 +26,31 @@
  *        src/lib/config/auth-routes.ts.
  */
 
-'use client'
+"use client";
 
-import type { QueryClient } from '@tanstack/react-query'
-import { QueryClientProvider } from '@tanstack/react-query'
-import { httpBatchLink, splitLink, httpSubscriptionLink } from '@trpc/client'
-import { TRPCClientError } from '@trpc/client'
-import { createTRPCReact } from '@trpc/react-query'
-import superjson from 'superjson'
-import { useState, useEffect, useRef } from 'react'
-import { useRouter, usePathname } from 'next/navigation'
-import { makeQueryClient } from './tanstack-config'
-import type { AppRouter } from './routers/_app'
-import { getMutationFeatureMap, isResourceKey, type LimitResourceKey } from '@/lib/resources'
-import type { FeatureGatesData } from '@/components/feature-gate'
-import { AUTH_ROUTES, isAuthRoute } from '@/lib/config/auth-routes'
-import { ROUTES } from '@/lib/config/routes'
-import { ERROR_CODES } from '@/lib/errors'
+import type { QueryClient } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { httpBatchLink, splitLink, httpSubscriptionLink } from "@trpc/client";
+import { TRPCClientError } from "@trpc/client";
+import { createTRPCReact } from "@trpc/react-query";
+import superjson from "superjson";
+import { useState, useEffect, useRef } from "react";
+import { useRouter, usePathname } from "next/navigation";
+import { makeQueryClient } from "./tanstack-config";
+import type { AppRouter } from "./routers/_app";
+import {
+  getMutationFeatureMap,
+  isResourceKey,
+  type LimitResourceKey,
+} from "@/lib/resources";
+import type { FeatureGatesData } from "@/components/feature-gate";
+import { AUTH_ROUTES, isAuthRoute } from "@/lib/config/auth-routes";
+import { ROUTES } from "@/lib/config/routes";
+import { ERROR_CODES } from "@/lib/errors";
 
 interface PendingMutation {
-  resource: LimitResourceKey
-  countChange: number
+  resource: LimitResourceKey;
+  countChange: number;
 }
 
 /**
@@ -65,20 +63,21 @@ interface PendingMutation {
  *        `getMutationFeatureMap()` in src/lib/resources.ts.
  */
 /* Built once at module load from RESOURCES; avoids re-walking on every event. */
-const MUTATION_RESOURCE_MAP = getMutationFeatureMap()
+const MUTATION_RESOURCE_MAP = getMutationFeatureMap();
 
 function getMutationMapping(mutationKey: unknown) {
-  if (!Array.isArray(mutationKey)) return null
-  const procedurePath = mutationKey[0]
-  if (!Array.isArray(procedurePath)) return null
-  return MUTATION_RESOURCE_MAP[procedurePath.join('.')] ?? null
+  if (!Array.isArray(mutationKey)) return null;
+  const procedurePath = mutationKey[0];
+  if (!Array.isArray(procedurePath)) return null;
+  return MUTATION_RESOURCE_MAP[procedurePath.join(".")] ?? null;
 }
 
 function getBaseUrl(): string {
-  if (typeof window !== 'undefined') return window.location.origin
-  if (process.env['VERCEL_URL']) return `https://${process.env['VERCEL_URL']}`
-  if (process.env['NEXT_PUBLIC_APP_URL']) return process.env['NEXT_PUBLIC_APP_URL']
-  return 'http://localhost:3000'
+  if (typeof window !== "undefined") return window.location.origin;
+  if (process.env["VERCEL_URL"]) return `https://${process.env["VERCEL_URL"]}`;
+  if (process.env["NEXT_PUBLIC_APP_URL"])
+    return process.env["NEXT_PUBLIC_APP_URL"];
+  return "http://localhost:3000";
 }
 
 /**
@@ -89,15 +88,15 @@ function getBaseUrl(): string {
  *        for the whole client app so router type changes propagate everywhere.
  * WHERE: Imported by every client component that calls tRPC.
  */
-export const trpc = createTRPCReact<AppRouter>()
+export const trpc = createTRPCReact<AppRouter>();
 
 /* Browser singleton — lazy so SSR doesn't try to construct during module load. */
-let browserQueryClient: QueryClient | undefined
+let browserQueryClient: QueryClient | undefined;
 
 function getQueryClient() {
-  if (typeof window === 'undefined') return makeQueryClient()
-  if (!browserQueryClient) browserQueryClient = makeQueryClient()
-  return browserQueryClient
+  if (typeof window === "undefined") return makeQueryClient();
+  if (!browserQueryClient) browserQueryClient = makeQueryClient();
+  return browserQueryClient;
 }
 
 /**
@@ -111,7 +110,7 @@ function getQueryClient() {
  * WHERE: Mounted in src/app/layout.tsx.
  */
 export function TRPCReactProvider({ children }: { children: React.ReactNode }) {
-  const queryClient = getQueryClient()
+  const queryClient = getQueryClient();
 
   const [trpcClient] = useState(() =>
     trpc.createClient({
@@ -119,7 +118,7 @@ export function TRPCReactProvider({ children }: { children: React.ReactNode }) {
         splitLink({
           /* Subscriptions → SSE (one-way streams with auto-reconnect via
            * tRPC `tracked()`); queries/mutations → batched HTTP. */
-          condition: (op) => op.type === 'subscription',
+          condition: (op) => op.type === "subscription",
           true: httpSubscriptionLink({
             url: `${getBaseUrl()}/api/trpc`,
             transformer: superjson,
@@ -137,15 +136,18 @@ export function TRPCReactProvider({ children }: { children: React.ReactNode }) {
                * `exactOptionalPropertyTypes`. Rebuild a clean RequestInit
                * with `credentials: 'include'` for cookie forwarding; spread
                * to forward future tRPC additions (cache, priority, ...). */
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any -- DOM RequestInit boundary, see comment.
-              const init: RequestInit = { ...(options as any), credentials: 'include' }
-              return fetch(url, init)
+              const init: RequestInit = {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any -- DOM RequestInit boundary, see comment.
+                ...(options as any),
+                credentials: "include",
+              };
+              return fetch(url, init);
             },
           }),
         }),
       ],
-    })
-  )
+    }),
+  );
 
   return (
     <trpc.Provider client={trpcClient} queryClient={queryClient}>
@@ -155,7 +157,7 @@ export function TRPCReactProvider({ children }: { children: React.ReactNode }) {
         {children}
       </QueryClientProvider>
     </trpc.Provider>
-  )
+  );
 }
 
 /**
@@ -173,116 +175,144 @@ export function TRPCReactProvider({ children }: { children: React.ReactNode }) {
  * on mutation START so a fast-click can't squeak past the limit during the
  * round-trip. Rolls back on error/idle; success needs no reconcile because
  * the server's auto-bump matches the +1/-1 convention exactly. */
-function FeatureGateMutationObserver({ queryClient }: { queryClient: QueryClient }) {
+function FeatureGateMutationObserver({
+  queryClient,
+}: {
+  queryClient: QueryClient;
+}) {
   /* Ref so the map survives re-renders WITHOUT triggering them. */
-  const pendingMutationsRef = useRef<Map<number, PendingMutation>>(new Map())
+  const pendingMutationsRef = useRef<Map<number, PendingMutation>>(new Map());
 
   useEffect(() => {
-    const pendingMutations = pendingMutationsRef.current
+    const pendingMutations = pendingMutationsRef.current;
 
     /* Two key shapes seen in the wild: nested array
      * `[['usage','getFeatureGates'], {input}]` and flat-string legacy.
      * Cover both, fail closed on anything else. */
     const isFeatureGatesQuery = (queryKey: unknown): boolean => {
       try {
-        if (!Array.isArray(queryKey) || queryKey.length === 0) return false
-        const firstPart = queryKey[0]
+        if (!Array.isArray(queryKey) || queryKey.length === 0) return false;
+        const firstPart = queryKey[0];
         if (Array.isArray(firstPart)) {
           return firstPart.some(
-            (part) => typeof part === 'string' && part.includes('getFeatureGates')
-          )
+            (part) =>
+              typeof part === "string" && part.includes("getFeatureGates"),
+          );
         }
-        if (typeof firstPart === 'string') return firstPart.includes('getFeatureGates')
-        return false
+        if (typeof firstPart === "string")
+          return firstPart.includes("getFeatureGates");
+        return false;
       } catch {
-        return false
+        return false;
       }
-    }
+    };
 
-    const updateFeatureGateCache = (resourceKey: string, countChange: number): boolean => {
-      if (!resourceKey || countChange === 0) return false
-      let updated = false
+    const updateFeatureGateCache = (
+      resourceKey: string,
+      countChange: number,
+    ): boolean => {
+      if (!resourceKey || countChange === 0) return false;
+      let updated = false;
 
       try {
         for (const query of queryClient.getQueryCache().getAll()) {
-          if (!isFeatureGatesQuery(query.queryKey)) continue
+          if (!isFeatureGatesQuery(query.queryKey)) continue;
 
-          queryClient.setQueryData<FeatureGatesData>(query.queryKey, (oldData) => {
-            /* Defensive: leave malformed cache entries alone. */
-            if (!oldData || typeof oldData !== 'object') return oldData
-            if (!oldData.gates || typeof oldData.gates !== 'object') return oldData
-            if (!isResourceKey(resourceKey)) return oldData
-            const gate = oldData.gates[resourceKey]
-            if (!gate) return oldData
-            if (typeof gate.usage !== 'number') return oldData
+          queryClient.setQueryData<FeatureGatesData>(
+            query.queryKey,
+            (oldData) => {
+              /* Defensive: leave malformed cache entries alone. */
+              if (!oldData || typeof oldData !== "object") return oldData;
+              if (!oldData.gates || typeof oldData.gates !== "object")
+                return oldData;
+              if (!isResourceKey(resourceKey)) return oldData;
+              const gate = oldData.gates[resourceKey];
+              if (!gate) return oldData;
+              if (typeof gate.usage !== "number") return oldData;
 
-            const newUsage = Math.max(0, gate.usage + countChange)
-            const newAtLimit =
-              !gate.isUnlimited && gate.limit !== null && newUsage >= gate.limit
+              const newUsage = Math.max(0, gate.usage + countChange);
+              const newAtLimit =
+                !gate.isUnlimited &&
+                gate.limit !== null &&
+                newUsage >= gate.limit;
 
-            updated = true
-            return {
-              ...oldData,
-              gates: {
-                ...oldData.gates,
-                [resourceKey]: { ...gate, usage: newUsage, atLimit: newAtLimit },
-              },
-            }
-          })
+              updated = true;
+              return {
+                ...oldData,
+                gates: {
+                  ...oldData.gates,
+                  [resourceKey]: {
+                    ...gate,
+                    usage: newUsage,
+                    atLimit: newAtLimit,
+                  },
+                },
+              };
+            },
+          );
         }
       } catch (error) {
-        console.error('[FeatureGateMutationObserver] Cache update failed:', error)
+        console.error(
+          "[FeatureGateMutationObserver] Cache update failed:",
+          error,
+        );
       }
 
-      return updated
-    }
+      return updated;
+    };
 
     const processMutationEvent = (mutation: {
-      mutationId: number
-      state: { status: string; variables?: unknown; data?: unknown }
-      options: { mutationKey?: unknown }
+      mutationId: number;
+      state: { status: string; variables?: unknown; data?: unknown };
+      options: { mutationKey?: unknown };
     }) => {
       try {
-        const { mutationId } = mutation
-        const status = mutation.state.status
-        const mapping = getMutationMapping(mutation.options.mutationKey)
-        if (!mapping) return
+        const { mutationId } = mutation;
+        const status = mutation.state.status;
+        const mapping = getMutationMapping(mutation.options.mutationKey);
+        if (!mapping) return;
 
-        const resourceKey = mapping.resource
+        const resourceKey = mapping.resource;
         /* `<resource>.create` → +1; `<resource>.delete` → -1. Bulk variants
          * aren't supported by the auto-mapping. */
-        const countChange = mapping.operation === 'increment' ? 1 : -1
+        const countChange = mapping.operation === "increment" ? 1 : -1;
 
-        if (status === 'pending') {
+        if (status === "pending") {
           /* Skip if already counted (status events can fire more than once). */
-          if (pendingMutations.has(mutationId)) return
-          pendingMutations.set(mutationId, { resource: resourceKey, countChange })
-          updateFeatureGateCache(resourceKey, countChange)
-          return
+          if (pendingMutations.has(mutationId)) return;
+          pendingMutations.set(mutationId, {
+            resource: resourceKey,
+            countChange,
+          });
+          updateFeatureGateCache(resourceKey, countChange);
+          return;
         }
 
-        if (status === 'error' || status === 'idle') {
-          const pending = pendingMutations.get(mutationId)
+        if (status === "error" || status === "idle") {
+          const pending = pendingMutations.get(mutationId);
           if (pending) {
-            updateFeatureGateCache(pending.resource, -pending.countChange)
-            pendingMutations.delete(mutationId)
+            updateFeatureGateCache(pending.resource, -pending.countChange);
+            pendingMutations.delete(mutationId);
           }
-          return
+          return;
         }
 
-        if (status === 'success') {
-          pendingMutations.delete(mutationId)
+        if (status === "success") {
+          pendingMutations.delete(mutationId);
         }
       } catch (error) {
-        console.error('[FeatureGateMutationObserver] Event processing failed:', error)
+        console.error(
+          "[FeatureGateMutationObserver] Event processing failed:",
+          error,
+        );
       }
-    }
+    };
 
     /* Catch-up scan for mutations that started before the observer mounted
      * (rare; happens during initial hydration). */
     try {
       for (const mutation of queryClient.getMutationCache().getAll()) {
-        if (mutation.state.status === 'pending') {
+        if (mutation.state.status === "pending") {
           processMutationEvent({
             mutationId: mutation.mutationId,
             state: {
@@ -291,15 +321,18 @@ function FeatureGateMutationObserver({ queryClient }: { queryClient: QueryClient
               data: mutation.state.data,
             },
             options: { mutationKey: mutation.options.mutationKey },
-          })
+          });
         }
       }
     } catch (error) {
-      console.error('[FeatureGateMutationObserver] Initial scan failed:', error)
+      console.error(
+        "[FeatureGateMutationObserver] Initial scan failed:",
+        error,
+      );
     }
 
     const unsubscribe = queryClient.getMutationCache().subscribe((event) => {
-      if (event.type !== 'updated' || !event.mutation) return
+      if (event.type !== "updated" || !event.mutation) return;
       processMutationEvent({
         mutationId: event.mutation.mutationId,
         state: {
@@ -308,17 +341,17 @@ function FeatureGateMutationObserver({ queryClient }: { queryClient: QueryClient
           data: event.mutation.state.data,
         },
         options: { mutationKey: event.mutation.options.mutationKey },
-      })
-    })
+      });
+    });
 
     return () => {
-      unsubscribe()
+      unsubscribe();
       /* Don't reset pendingMutations — the ref persists and any in-flight
        * rollbacks need to find their entry. */
-    }
-  }, [queryClient])
+    };
+  }, [queryClient]);
 
-  return null
+  return null;
 }
 
 /**
@@ -341,40 +374,40 @@ function FeatureGateMutationObserver({ queryClient }: { queryClient: QueryClient
  *        authProcedure / protectedProcedure in src/trpc/procedures/protected.ts.
  */
 function AuthRedirectObserver({ queryClient }: { queryClient: QueryClient }) {
-  const router = useRouter()
-  const pathname = usePathname()
+  const router = useRouter();
+  const pathname = usePathname();
   /* Ref lets the cache callbacks read the latest pathname without
    * re-subscribing on every navigation. */
-  const pathnameRef = useRef(pathname)
+  const pathnameRef = useRef(pathname);
   useEffect(() => {
-    pathnameRef.current = pathname
-  }, [pathname])
+    pathnameRef.current = pathname;
+  }, [pathname]);
 
   useEffect(() => {
     const isUnauthorized = (error: unknown): boolean => {
-      if (!(error instanceof TRPCClientError)) return false
+      if (!(error instanceof TRPCClientError)) return false;
       /* tRPC client surfaces the TRPCError `code` as `data.code` on the
        * client; the protected.ts errorFormatter preserves it as-is. */
-      const data: unknown = error.data
-      if (data === null || typeof data !== 'object') return false
-      const code = (data as { code?: unknown }).code
-      return code === 'UNAUTHORIZED'
-    }
+      const data: unknown = error.data;
+      if (data === null || typeof data !== "object") return false;
+      const code = (data as { code?: unknown }).code;
+      return code === "UNAUTHORIZED";
+    };
 
     /* protectedProcedure throws PRECONDITION_FAILED with a structured cause
      * carrying errorCode ONBOARDING_INCOMPLETE for users with zero
      * memberships; the cause survives to the client via the errorFormatter. */
     const isOnboardingIncomplete = (error: unknown): boolean => {
-      if (!(error instanceof TRPCClientError)) return false
-      const data: unknown = error.data
-      if (data === null || typeof data !== 'object') return false
-      const cause = (data as { cause?: unknown }).cause
-      if (cause === null || typeof cause !== 'object') return false
+      if (!(error instanceof TRPCClientError)) return false;
+      const data: unknown = error.data;
+      if (data === null || typeof data !== "object") return false;
+      const cause = (data as { cause?: unknown }).cause;
+      if (cause === null || typeof cause !== "object") return false;
       return (
         (cause as { errorCode?: unknown }).errorCode ===
         ERROR_CODES.ONBOARDING_INCOMPLETE
-      )
-    }
+      );
+    };
 
     const handleError = (error: unknown) => {
       /* PUBLIC_AUTH_SURFACE: never redirect away from an auth screen. Those
@@ -384,35 +417,35 @@ function AuthRedirectObserver({ queryClient }: { queryClient: QueryClient }) {
        * analytics probe) fires its queries on these pages too. Without this,
        * one such component asking an authProcedure a question turns every auth
        * page into an instant bounce to sign-in. */
-      if (isAuthRoute(pathnameRef.current)) return
+      if (isAuthRoute(pathnameRef.current)) return;
 
       if (isUnauthorized(error)) {
-        router.replace(AUTH_ROUTES.signIn)
-        return
+        router.replace(AUTH_ROUTES.signIn);
+        return;
       }
       if (isOnboardingIncomplete(error)) {
-        if (pathnameRef.current === ROUTES.onboarding) return
-        router.replace(ROUTES.onboarding)
+        if (pathnameRef.current === ROUTES.onboarding) return;
+        router.replace(ROUTES.onboarding);
       }
-    }
+    };
 
     const queryUnsub = queryClient.getQueryCache().subscribe((event) => {
-      if (event.type !== 'updated') return
-      if (event.query.state.status !== 'error') return
-      handleError(event.query.state.error)
-    })
+      if (event.type !== "updated") return;
+      if (event.query.state.status !== "error") return;
+      handleError(event.query.state.error);
+    });
 
     const mutationUnsub = queryClient.getMutationCache().subscribe((event) => {
-      if (event.type !== 'updated' || !event.mutation) return
-      if (event.mutation.state.status !== 'error') return
-      handleError(event.mutation.state.error)
-    })
+      if (event.type !== "updated" || !event.mutation) return;
+      if (event.mutation.state.status !== "error") return;
+      handleError(event.mutation.state.error);
+    });
 
     return () => {
-      queryUnsub()
-      mutationUnsub()
-    }
-  }, [queryClient, router])
+      queryUnsub();
+      mutationUnsub();
+    };
+  }, [queryClient, router]);
 
-  return null
+  return null;
 }

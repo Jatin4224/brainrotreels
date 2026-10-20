@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -37,36 +31,41 @@
  * WHERE: Mounted by src/remotion/timeline-renderer.tsx for audio tracks.
  */
 
-import { Audio, Sequence, useVideoConfig } from 'remotion'
-import { z } from 'zod'
+import { Audio, Sequence, useVideoConfig } from "remotion";
+import { z } from "zod";
 
-import { duckingVolumeAt, type FrameWindow } from '@/lib/render'
-import type { RenderItemProps } from '@/lib/types'
+import { duckingVolumeAt, type FrameWindow } from "@/lib/render";
+import type { RenderItemProps } from "@/lib/types";
 
 const audioClipPropsSchema = z.object({
   assetId: z.string().min(1),
   gain: z.number().min(0).max(4).default(1),
   duck: z.boolean().default(false),
   loop: z.boolean().default(false),
-})
+});
 
 export interface AudioClipProps extends RenderItemProps {
   /** The frames during which any narration item is playing. */
-  narrationWindows: readonly FrameWindow[]
+  narrationWindows: readonly FrameWindow[];
 }
 
-export function AudioClip({ item, assets, frames, narrationWindows }: AudioClipProps) {
-  const { fps } = useVideoConfig()
+export function AudioClip({
+  item,
+  assets,
+  frames,
+  narrationWindows,
+}: AudioClipProps) {
+  const { fps } = useVideoConfig();
 
-  const parsed = audioClipPropsSchema.safeParse(item)
-  if (!parsed.success) return null
+  const parsed = audioClipPropsSchema.safeParse(item);
+  if (!parsed.success) return null;
 
-  const { assetId, gain, duck, loop } = parsed.data
-  const asset = assets[assetId]
+  const { assetId, gain, duck, loop } = parsed.data;
+  const asset = assets[assetId];
   /* Same rule as MediaClip: a missing asset is a gap, not a failed render. */
-  if (asset === undefined || asset.url === null) return null
+  if (asset === undefined || asset.url === null) return null;
 
-  const url = asset.url
+  const url = asset.url;
 
   /* `volume` as a FUNCTION of the frame, which is Remotion's own API for a
    * level that changes. The frame Remotion passes is relative to the nearest
@@ -79,15 +78,22 @@ export function AudioClip({ item, assets, frames, narrationWindows }: AudioClipP
     duck
       ? (relativeFrame: number) =>
           gain *
-          duckingVolumeAt({ frame: offset + relativeFrame, fps, windows: narrationWindows })
-      : gain
+          duckingVolumeAt({
+            frame: offset + relativeFrame,
+            fps,
+            windows: narrationWindows,
+          })
+      : gain;
 
-  const sourceLength = asset.durationInSeconds
+  const sourceLength = asset.durationInSeconds;
   const shouldLoop =
-    loop && sourceLength !== undefined && sourceLength > 0 && frames.durationInFrames / fps > sourceLength
+    loop &&
+    sourceLength !== undefined &&
+    sourceLength > 0 &&
+    frames.durationInFrames / fps > sourceLength;
 
   if (!shouldLoop) {
-    return <Audio src={url} volume={volumeAt(frames.from)} />
+    return <Audio src={url} volume={volumeAt(frames.from)} />;
   }
 
   /* EXPLICIT_REPETITIONS_FOR_DUCKED_LOOPS. Remotion's <Loop> would be shorter,
@@ -97,24 +103,27 @@ export function AudioClip({ item, assets, frames, narrationWindows }: AudioClipP
    * the repetitions out by hand is what makes each one's absolute offset
    * knowable. The last is trimmed to the item's end rather than overrunning
    * it, so the audio stops where the document says it does. */
-  const sourceFrames = Math.max(1, Math.round(sourceLength * fps))
-  const repetitions = Math.ceil(frames.durationInFrames / sourceFrames)
+  const sourceFrames = Math.max(1, Math.round(sourceLength * fps));
+  const repetitions = Math.ceil(frames.durationInFrames / sourceFrames);
 
   return (
     <>
       {Array.from({ length: repetitions }, (_, index) => {
-        const offset = index * sourceFrames
+        const offset = index * sourceFrames;
         return (
           <Sequence
             key={index}
             from={offset}
-            durationInFrames={Math.min(sourceFrames, frames.durationInFrames - offset)}
+            durationInFrames={Math.min(
+              sourceFrames,
+              frames.durationInFrames - offset,
+            )}
             layout="none"
           >
             <Audio src={url} volume={volumeAt(frames.from + offset)} />
           </Sequence>
-        )
+        );
       })}
     </>
-  )
+  );
 }

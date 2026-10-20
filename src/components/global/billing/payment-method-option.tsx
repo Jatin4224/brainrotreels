@@ -1,14 +1,8 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
-'use client'
+"use client";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: PaymentMethodOption, PaymentMethodOptionProps,
@@ -29,19 +23,23 @@
  *        checkout surface through the billing barrel.
  */
 
-import { CheckIcon, CreditCardIcon } from 'lucide-react'
+import { CheckIcon, CreditCardIcon } from "lucide-react";
 
-import { cn } from '@/lib/utils'
-import type { PaymentMethodSummary } from '@/services/payment.service'
-import { Badge } from '@/components/ui/badge'
+import { cn } from "@/lib/utils";
+import type { PaymentMethodSummary } from "@/services/payment.service";
+import { Badge } from "@/components/ui/badge";
 
 export interface PaymentMethodOptionProps {
-  method: PaymentMethodSummary
-  selected: boolean
-  onSelect: (paymentMethodId: string) => void
+  method: PaymentMethodSummary;
+  selected: boolean;
+  onSelect: (paymentMethodId: string) => void;
 }
 
-export function PaymentMethodOption({ method, selected, onSelect }: PaymentMethodOptionProps) {
+export function PaymentMethodOption({
+  method,
+  selected,
+  onSelect,
+}: PaymentMethodOptionProps) {
   return (
     <button
       type="button"
@@ -49,8 +47,10 @@ export function PaymentMethodOption({ method, selected, onSelect }: PaymentMetho
       aria-checked={selected}
       onClick={() => onSelect(method.id)}
       className={cn(
-        'group relative flex w-full items-center justify-between rounded-2xl border bg-card p-4 text-left transition-all duration-200',
-        selected ? 'border-primary/60 shadow-lg' : 'border-border/50 hover:border-primary/30'
+        "group relative flex w-full items-center justify-between rounded-2xl border bg-card p-4 text-left transition-all duration-200",
+        selected
+          ? "border-primary/60 shadow-lg"
+          : "border-border/50 hover:border-primary/30",
       )}
     >
       <div className="flex items-center gap-3">
@@ -60,7 +60,8 @@ export function PaymentMethodOption({ method, selected, onSelect }: PaymentMetho
         <div>
           <div className="flex items-center gap-2">
             <p className="text-sm font-medium">
-              {(method.brand ?? 'Card').toUpperCase()} •••• {method.last4 ?? '••••'}
+              {(method.brand ?? "Card").toUpperCase()} ••••{" "}
+              {method.last4 ?? "••••"}
             </p>
             {method.isDefault ? (
               <Badge variant="secondary" className="text-xs">
@@ -82,5 +83,5 @@ export function PaymentMethodOption({ method, selected, onSelect }: PaymentMetho
         </div>
       ) : null}
     </button>
-  )
+  );
 }

@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -55,14 +49,14 @@
  *        Triggered by `asset/uploaded`, sent by assets.completeUpload.
  */
 
-import { NonRetriableError } from 'inngest'
-import { z } from 'zod'
+import { NonRetriableError } from "inngest";
+import { z } from "zod";
 
-import { inngestClient } from '@/lib/adapters/jobs/inngest/client'
-import { getMediaAdapter } from '@/lib/adapters/media'
-import { MediaProcessingError } from '@/lib/adapters/media/types'
-import { uploadKey } from '@/lib/adapters/storage'
-import { prisma } from '@/lib/config/prisma'
+import { inngestClient } from "@/lib/adapters/jobs/inngest/client";
+import { getMediaAdapter } from "@/lib/adapters/media";
+import { MediaProcessingError } from "@/lib/adapters/media/types";
+import { uploadKey } from "@/lib/adapters/storage";
+import { prisma } from "@/lib/config/prisma";
 import {
   UnsupportedMediaError,
   assertSupportedMedia,
@@ -71,15 +65,15 @@ import {
   uploadFile,
   withStagingDir,
   type VariantPlan,
-} from '@/lib/media'
-import { assetKindSchema, mediaFamilyOf } from '@/lib/types/asset'
+} from "@/lib/media";
+import { assetKindSchema, mediaFamilyOf } from "@/lib/types/asset";
 import {
   findAssetById,
   markAssetFailed,
   markAssetReady,
   setModerationStatus,
   upsertAssetVariant,
-} from '@/services/assets.service'
+} from "@/services/assets.service";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: assetUploadedEventSchema, EVENT_PAYLOAD_PARSED
@@ -96,7 +90,7 @@ import {
 const assetUploadedEventSchema = z.object({
   assetId: z.string().min(1),
   organizationId: z.string().min(1),
-})
+});
 
 /**
  * SOURCE OF TRUTH KEYWORDS: failureEventSchema, inngest/function.failed
@@ -113,7 +107,7 @@ const failureEventSchema = z.object({
   data: z.object({
     event: z.object({ data: assetUploadedEventSchema }),
   }),
-})
+});
 
 /**
  * SOURCE OF TRUTH KEYWORDS: probedFactsSchema, STEP_RESULTS_ARE_JSON
@@ -127,20 +121,20 @@ const failureEventSchema = z.object({
  * WHERE: Passed from the probe step into the variant steps.
  */
 const probedFactsSchema = z.object({
-  family: z.enum(['video', 'image', 'audio']),
+  family: z.enum(["video", "image", "audio"]),
   kind: assetKindSchema,
   storageKey: z.string(),
   organizationId: z.string(),
   durationSec: z.number().nullable(),
   width: z.number().nullable(),
   height: z.number().nullable(),
-})
+});
 
 export const assetIngestFunction = inngestClient.createFunction(
   {
-    id: 'asset-ingest',
-    name: 'Ingest an uploaded asset',
-    triggers: [{ event: 'asset/uploaded' }],
+    id: "asset-ingest",
+    name: "Ingest an uploaded asset",
+    triggers: [{ event: "asset/uploaded" }],
     /* Two retries, not the default. Each attempt may be minutes of CPU, and the
      * failures worth retrying here (a download blip, a transient disk) clear
      * fast or not at all — four attempts would mostly buy a longer wait before
@@ -149,7 +143,7 @@ export const assetIngestFunction = inngestClient.createFunction(
     /* One ingest at a time per WORKSPACE. A customer dropping thirty files must
      * not be able to saturate the worker pool and stall every other tenant's
      * uploads behind their own; the queue drains in order instead. */
-    concurrency: { key: 'event.data.organizationId', limit: 1 },
+    concurrency: { key: "event.data.organizationId", limit: 1 },
     /**
      * A run that exhausts its retries still has to leave the row honest —
      * otherwise the asset sits on `processing` forever and the customer has a
@@ -163,68 +157,80 @@ export const assetIngestFunction = inngestClient.createFunction(
        * reason as EVENT_PAYLOAD_PARSED: this handler runs on the path where
        * something has already gone wrong, and a crash here would replace a
        * readable failure with no failure at all. */
-      const parsed = failureEventSchema.safeParse(event)
+      const parsed = failureEventSchema.safeParse(event);
       if (!parsed.success) {
-        console.error('[asset.ingest] Failure handler could not read the original event.')
-        return
+        console.error(
+          "[asset.ingest] Failure handler could not read the original event.",
+        );
+        return;
       }
       await markAssetFailed(
         prisma,
         parsed.data.data.event.data.assetId,
-        'Processing this file did not finish. Please try uploading it again.'
-      )
+        "Processing this file did not finish. Please try uploading it again.",
+      );
     },
   },
   async ({ event, step }) => {
-    const input = assetUploadedEventSchema.safeParse(event.data)
+    const input = assetUploadedEventSchema.safeParse(event.data);
     if (!input.success) {
       /* A malformed event cannot be fixed by retrying it, and there is no id to
        * mark failed — so the only useful thing is to stop loudly. */
       throw new NonRetriableError(
-        `[asset.ingest] Event payload is not valid: ${input.error.message}`
-      )
+        `[asset.ingest] Event payload is not valid: ${input.error.message}`,
+      );
     }
-    const { assetId } = input.data
+    const { assetId } = input.data;
 
     // ───────────────────────────────────────────────────────────────────────
     // [1] PROBE — read what the file actually is, and refuse it here if the
     //     pipeline cannot process it. Everything downstream may assume the
     //     file is real, supported, and has dimensions.
     // ───────────────────────────────────────────────────────────────────────
-    const facts = await step.run('probe', async () => {
-      const asset = await findAssetById(prisma, assetId)
+    const facts = await step.run("probe", async () => {
+      const asset = await findAssetById(prisma, assetId);
       if (asset === null) {
         /* The row was deleted while the event was in flight — a customer
          * cancelling an upload. Not an error worth retrying or alerting on. */
-        throw new NonRetriableError(`[asset.ingest] Asset ${assetId} no longer exists.`)
+        throw new NonRetriableError(
+          `[asset.ingest] Asset ${assetId} no longer exists.`,
+        );
       }
 
-      const family = mediaFamilyOf(asset.contentType)
+      const family = mediaFamilyOf(asset.contentType);
       if (family === null) {
         await markAssetFailed(
           prisma,
           assetId,
-          `We do not support ${asset.contentType} files.`
-        )
-        throw new NonRetriableError(`[asset.ingest] Unsupported content type ${asset.contentType}.`)
+          `We do not support ${asset.contentType} files.`,
+        );
+        throw new NonRetriableError(
+          `[asset.ingest] Unsupported content type ${asset.contentType}.`,
+        );
       }
 
-      const kind = assetKindSchema.safeParse(asset.kind)
+      const kind = assetKindSchema.safeParse(asset.kind);
       if (!kind.success) {
-        await markAssetFailed(prisma, assetId, 'This asset has an unrecognised type.')
-        throw new NonRetriableError(`[asset.ingest] Unknown asset kind "${asset.kind}".`)
+        await markAssetFailed(
+          prisma,
+          assetId,
+          "This asset has an unrecognised type.",
+        );
+        throw new NonRetriableError(
+          `[asset.ingest] Unknown asset kind "${asset.kind}".`,
+        );
       }
 
       return withStagingDir(async (dir) => {
-        const localPath = dir.file('original')
-        await downloadToFile(asset.storageKey, localPath)
+        const localPath = dir.file("original");
+        await downloadToFile(asset.storageKey, localPath);
 
-        const media = await getMediaAdapter()
+        const media = await getMediaAdapter();
 
-        let probe
+        let probe;
         try {
-          probe = await media.probe(localPath)
-          assertSupportedMedia(probe)
+          probe = await media.probe(localPath);
+          assertSupportedMedia(probe);
         } catch (error) {
           /* PERMANENT_VS_TRANSIENT_FAILURE — a refusal and a tool failure are
            * both permanent for THIS file: a corrupt upload does not become
@@ -232,15 +238,18 @@ export const assetIngestFunction = inngestClient.createFunction(
            * and stop the run; anything else (a download failure, a full disk)
            * falls through to Inngest's retry. */
           if (error instanceof UnsupportedMediaError) {
-            await markAssetFailed(prisma, assetId, error.message)
-            throw new NonRetriableError(error.message)
+            await markAssetFailed(prisma, assetId, error.message);
+            throw new NonRetriableError(error.message);
           }
           if (error instanceof MediaProcessingError) {
-            await markAssetFailed(prisma, assetId, error.message)
-            console.error(`[asset.ingest] ${assetId} probe failed:`, error.detail)
-            throw new NonRetriableError(error.message)
+            await markAssetFailed(prisma, assetId, error.message);
+            console.error(
+              `[asset.ingest] ${assetId} probe failed:`,
+              error.detail,
+            );
+            throw new NonRetriableError(error.message);
           }
-          throw error
+          throw error;
         }
 
         return {
@@ -251,11 +260,11 @@ export const assetIngestFunction = inngestClient.createFunction(
           durationSec: probe.durationSec,
           width: probe.video?.width ?? null,
           height: probe.video?.height ?? null,
-        }
-      })
-    })
+        };
+      });
+    });
 
-    const probed = probedFactsSchema.parse(facts)
+    const probed = probedFactsSchema.parse(facts);
 
     // ───────────────────────────────────────────────────────────────────────
     // [2] VARIANTS — one step each, in plan order, because a later variant may
@@ -273,7 +282,7 @@ export const assetIngestFunction = inngestClient.createFunction(
             ? { width: probed.width, height: probed.height }
             : null,
       },
-    })
+    });
 
     for (const plan of plans) {
       /* The step id is the variant name, so a resumed run matches its completed
@@ -287,17 +296,17 @@ export const assetIngestFunction = inngestClient.createFunction(
           plan,
           plans,
           durationSec: probed.durationSec,
-        })
-      )
+        }),
+      );
     }
 
     // ───────────────────────────────────────────────────────────────────────
     // [3] MODERATE — stubbed. See MODERATION_STUB in the file header.
     // ───────────────────────────────────────────────────────────────────────
-    await step.run('moderate', async () => {
-      await setModerationStatus(prisma, assetId, 'skipped')
-      return { moderationStatus: 'skipped' }
-    })
+    await step.run("moderate", async () => {
+      await setModerationStatus(prisma, assetId, "skipped");
+      return { moderationStatus: "skipped" };
+    });
 
     // ───────────────────────────────────────────────────────────────────────
     // [4] READY — the only transition that lets a renderer touch this asset.
@@ -305,22 +314,22 @@ export const assetIngestFunction = inngestClient.createFunction(
     //     asset is never simultaneously `processing` and claiming a duration
     //     that nothing has produced a variant for.
     // ───────────────────────────────────────────────────────────────────────
-    await step.run('mark-ready', async () => {
+    await step.run("mark-ready", async () => {
       await markAssetReady(prisma, assetId, {
         durationSec: probed.durationSec,
         width: probed.width,
         height: probed.height,
-      })
-      return { status: 'ready' }
-    })
+      });
+      return { status: "ready" };
+    });
 
     return {
       assetId,
       variants: plans.map((plan) => plan.variant),
       durationSec: probed.durationSec,
-    }
-  }
-)
+    };
+  },
+);
 
 /**
  * SOURCE OF TRUTH KEYWORDS: buildVariant, STAGE_PER_STEP, RESUMABLE_INGEST
@@ -336,35 +345,35 @@ export const assetIngestFunction = inngestClient.createFunction(
  * WHERE: The variant loop above.
  */
 async function buildVariant(args: {
-  assetId: string
-  organizationId: string
-  originalKey: string
-  plan: VariantPlan
-  plans: readonly VariantPlan[]
-  durationSec: number | null
+  assetId: string;
+  organizationId: string;
+  originalKey: string;
+  plan: VariantPlan;
+  plans: readonly VariantPlan[];
+  durationSec: number | null;
 }): Promise<{ variant: string; bytes: number }> {
-  const { assetId, organizationId, originalKey, plan, plans } = args
+  const { assetId, organizationId, originalKey, plan, plans } = args;
 
   const sourceKey =
-    plan.source === 'original'
+    plan.source === "original"
       ? originalKey
-      : keyForVariant(organizationId, assetId, plans, plan.source)
+      : keyForVariant(organizationId, assetId, plans, plan.source);
 
-  const outputKey = uploadKey(organizationId, assetId, plan.filename)
+  const outputKey = uploadKey(organizationId, assetId, plan.filename);
 
   return withStagingDir(async (dir) => {
-    const inputPath = dir.file('input')
-    const outputPath = dir.file(plan.filename)
-    await downloadToFile(sourceKey, inputPath)
+    const inputPath = dir.file("input");
+    const outputPath = dir.file(plan.filename);
+    await downloadToFile(sourceKey, inputPath);
 
-    const media = await getMediaAdapter()
+    const media = await getMediaAdapter();
 
     try {
-      if (plan.operation === 'transcode') {
+      if (plan.operation === "transcode") {
         /* Present by construction for a transcode plan; checked rather than
          * asserted, because the plan is data and a future entry could omit it. */
         if (plan.transcode === undefined) {
-          throw new UnsupportedMediaError('This file could not be converted.')
+          throw new UnsupportedMediaError("This file could not be converted.");
         }
         await media.transcode({
           inputPath,
@@ -377,41 +386,46 @@ async function buildVariant(args: {
           /* MUTE_BACKGROUNDS_NOT_UPLOADS — decided per asset kind in the plan,
            * not here. See src/lib/media/ingest-plan.ts. */
           muted: plan.transcode.muted,
-          ...(plan.transcode.fps !== undefined ? { fps: plan.transcode.fps } : {}),
-        })
-      } else if (plan.operation === 'frame') {
+          ...(plan.transcode.fps !== undefined
+            ? { fps: plan.transcode.fps }
+            : {}),
+        });
+      } else if (plan.operation === "frame") {
         await media.extractFrame({
           inputPath,
           outputPath,
           atSec: plan.atSec ?? 0,
           width: plan.width,
-        })
+        });
       } else {
         await media.renderWaveform({
           inputPath,
           outputPath,
           width: plan.width,
           height: plan.height,
-        })
+        });
       }
     } catch (error) {
       if (error instanceof MediaProcessingError) {
-        await markAssetFailed(prisma, assetId, error.message)
-        console.error(`[asset.ingest] ${assetId} ${plan.variant} failed:`, error.detail)
-        throw new NonRetriableError(error.message)
+        await markAssetFailed(prisma, assetId, error.message);
+        console.error(
+          `[asset.ingest] ${assetId} ${plan.variant} failed:`,
+          error.detail,
+        );
+        throw new NonRetriableError(error.message);
       }
       if (error instanceof UnsupportedMediaError) {
-        await markAssetFailed(prisma, assetId, error.message)
-        throw new NonRetriableError(error.message)
+        await markAssetFailed(prisma, assetId, error.message);
+        throw new NonRetriableError(error.message);
       }
-      throw error
+      throw error;
     }
 
     const bytes = await uploadFile({
       localPath: outputPath,
       storageKey: outputKey,
       contentType: plan.contentType,
-    })
+    });
 
     await upsertAssetVariant(prisma, {
       assetId,
@@ -420,10 +434,10 @@ async function buildVariant(args: {
       bytes,
       width: plan.width,
       height: plan.height,
-    })
+    });
 
-    return { variant: plan.variant, bytes }
-  })
+    return { variant: plan.variant, bytes };
+  });
 }
 
 /**
@@ -441,13 +455,13 @@ function keyForVariant(
   organizationId: string,
   assetId: string,
   plans: readonly VariantPlan[],
-  source: Exclude<VariantPlan['source'], 'original'>
+  source: Exclude<VariantPlan["source"], "original">,
 ): string {
-  const sourcePlan = plans.find((candidate) => candidate.variant === source)
+  const sourcePlan = plans.find((candidate) => candidate.variant === source);
   if (sourcePlan === undefined) {
     throw new NonRetriableError(
-      `[asset.ingest] Variant plan refers to "${source}", which this plan does not build.`
-    )
+      `[asset.ingest] Variant plan refers to "${source}", which this plan does not build.`,
+    );
   }
-  return uploadKey(organizationId, assetId, sourcePlan.filename)
+  return uploadKey(organizationId, assetId, sourcePlan.filename);
 }

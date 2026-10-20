@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -55,7 +49,7 @@ import {
   type TimelineDoc,
   type Track,
   type TrackItem,
-} from '@/lib/timeline'
+} from "@/lib/timeline";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: LAYER_ORDER, TRACK_ORDER_IS_STACK_ORDER
@@ -74,17 +68,17 @@ import {
  *        audio outside the visual stack.
  * WHERE: planTimeline's sort, below.
  */
-export const LAYER_ORDER: Readonly<Record<Track['type'], number>> = {
+export const LAYER_ORDER: Readonly<Record<Track["type"], number>> = {
   video: 0,
   scene: 10,
   overlay: 20,
   caption: 30,
   /* Not a visual layer — see the note above. */
   audio: -1,
-}
+};
 
 /* A compile error if a track type is ever added without a layer decision. */
-const _LAYER_ORDER_IS_TOTAL: readonly Track['type'][] = TRACK_TYPES
+const _LAYER_ORDER_IS_TOTAL: readonly Track["type"][] = TRACK_TYPES;
 
 /**
  * SOURCE OF TRUTH KEYWORDS: PlannedItem
@@ -106,28 +100,28 @@ const _LAYER_ORDER_IS_TOTAL: readonly Track['type'][] = TRACK_TYPES
  */
 export interface PlannedItem {
   /** The item's own id, unique within the document. */
-  id: string
+  id: string;
   /** Which lane it came from, so the composition knows how to draw it. */
-  trackType: Track['type']
+  trackType: Track["type"];
   /** Which component family draws it. Captions and audio have none. */
-  render: RenderKind | null
-  from: number
-  durationInFrames: number
-  layer: number
+  render: RenderKind | null;
+  from: number;
+  durationInFrames: number;
+  layer: number;
   /** Position in the flattened document, for a stable sort. */
-  order: number
+  order: number;
   /** Overlay depth, when the item declares one. */
-  z: number | null
-  item: TrackItem
+  z: number | null;
+  item: TrackItem;
 }
 
 export interface CompositionPlan {
-  width: number
-  height: number
-  fps: number
+  width: number;
+  height: number;
+  fps: number;
   /** Always at least 1 — see MINIMUM_ONE_FRAME. */
-  durationInFrames: number
-  durationInSeconds: number
+  durationInFrames: number;
+  durationInSeconds: number;
 }
 
 /**
@@ -148,14 +142,14 @@ export interface CompositionPlan {
  * WHERE: `<Composition>` in src/remotion/root.tsx and the Player's props.
  */
 export function planComposition(doc: TimelineDoc): CompositionPlan {
-  const seconds = documentLength(doc)
+  const seconds = documentLength(doc);
   return {
     width: doc.canvas.width,
     height: doc.canvas.height,
     fps: doc.canvas.fps,
     durationInFrames: Math.max(1, secondsToFrames(seconds, doc.canvas.fps)),
     durationInSeconds: seconds,
-  }
+  };
 }
 
 /**
@@ -177,32 +171,35 @@ export function planComposition(doc: TimelineDoc): CompositionPlan {
  * WHERE: The composition's single `.map()`; planFrame below.
  */
 export function planTimeline(doc: TimelineDoc): PlannedItem[] {
-  const planned: PlannedItem[] = []
-  let order = 0
+  const planned: PlannedItem[] = [];
+  let order = 0;
 
   for (const track of doc.tracks) {
     for (const item of track.items) {
-      const index = order
-      order += 1
+      const index = order;
+      order += 1;
 
-      const span = itemSpan(item, doc.words)
-      if (span === null) continue
+      const span = itemSpan(item, doc.words);
+      if (span === null) continue;
 
-      const from = secondsToFrames(span.start, doc.canvas.fps)
-      const durationInFrames = secondsToFrames(span.end - span.start, doc.canvas.fps)
-      if (durationInFrames <= 0) continue
+      const from = secondsToFrames(span.start, doc.canvas.fps);
+      const durationInFrames = secondsToFrames(
+        span.end - span.start,
+        doc.canvas.fps,
+      );
+      if (durationInFrames <= 0) continue;
 
       planned.push({
         id: item.id,
         trackType: track.type,
-        render: 'render' in item ? item.render : null,
+        render: "render" in item ? item.render : null,
         from,
         durationInFrames,
         layer: LAYER_ORDER[track.type],
         order: index,
-        z: 'z' in item ? item.z : null,
+        z: "z" in item ? item.z : null,
         item,
-      })
+      });
     }
   }
 
@@ -210,13 +207,13 @@ export function planTimeline(doc: TimelineDoc): PlannedItem[] {
    * Every comparison is total, so the result does not depend on the sort
    * implementation — which it would if the comparator ever returned 0 for two
    * genuinely different items. */
-  return planned.sort(compareForComposite)
+  return planned.sort(compareForComposite);
 }
 
 function compareForComposite(a: PlannedItem, b: PlannedItem): number {
-  if (a.layer !== b.layer) return a.layer - b.layer
-  if (a.z !== null && b.z !== null && a.z !== b.z) return a.z - b.z
-  return a.order - b.order
+  if (a.layer !== b.layer) return a.layer - b.layer;
+  if (a.z !== null && b.z !== null && a.z !== b.z) return a.z - b.z;
+  return a.order - b.order;
 }
 
 /**
@@ -239,8 +236,9 @@ function compareForComposite(a: PlannedItem, b: PlannedItem): number {
  */
 export function planFrame(doc: TimelineDoc, frame: number): PlannedItem[] {
   return planTimeline(doc).filter(
-    (planned) => frame >= planned.from && frame < planned.from + planned.durationInFrames
-  )
+    (planned) =>
+      frame >= planned.from && frame < planned.from + planned.durationInFrames,
+  );
 }
 
 /**
@@ -261,6 +259,8 @@ export function planFrame(doc: TimelineDoc, frame: number): PlannedItem[] {
  * WHERE: `projects.preview` passes the result to
  *        signDocumentAssets in src/services/assets.service.ts.
  */
-export function collectAssetHandles(doc: TimelineDoc): { handle: string; ref: AssetRef }[] {
-  return Object.entries(doc.assets).map(([handle, ref]) => ({ handle, ref }))
+export function collectAssetHandles(
+  doc: TimelineDoc,
+): { handle: string; ref: AssetRef }[] {
+  return Object.entries(doc.assets).map(([handle, ref]) => ({ handle, ref }));
 }

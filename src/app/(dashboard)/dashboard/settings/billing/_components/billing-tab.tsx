@@ -1,14 +1,8 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
-'use client'
+"use client";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: BillingTab, BillingSkeleton
@@ -26,9 +20,9 @@
  * WHERE: Rendered by settings/billing page.
  */
 
-import * as React from 'react'
-import { format } from 'date-fns'
-import { toast } from 'sonner'
+import * as React from "react";
+import { format } from "date-fns";
+import { toast } from "sonner";
 import {
   AlertTriangle,
   Calendar,
@@ -37,78 +31,96 @@ import {
   Plus,
   RefreshCw,
   Sparkles,
-} from 'lucide-react'
+} from "lucide-react";
 
-import { trpc } from '@/trpc/react-provider'
-import { useActiveOrganization } from '@/hooks/use-active-organization'
-import { permissions } from '@/lib/permissions'
-import { SettingsSection } from '@/components/global/settings-section'
-import { PaymentMethodRow, AddPaymentMethodDialog } from '@/components/global/billing'
-import { useUpgradeModal } from '@/components/global/upgrade-modal'
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Label } from '@/components/ui/label'
-import { Separator } from '@/components/ui/separator'
-import { Skeleton } from '@/components/ui/skeleton'
+import { trpc } from "@/trpc/react-provider";
+import { useActiveOrganization } from "@/hooks/use-active-organization";
+import { permissions } from "@/lib/permissions";
+import { SettingsSection } from "@/components/global/settings-section";
+import {
+  PaymentMethodRow,
+  AddPaymentMethodDialog,
+} from "@/components/global/billing";
+import { useUpgradeModal } from "@/components/global/upgrade-modal";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export function BillingTab() {
-  const { activeOrganization, isLoading: isLoadingOrg, hasPermission } = useActiveOrganization()
-  const organizationId = activeOrganization?.id
-  const orgId = organizationId ?? ''
-  const enabled = organizationId !== undefined
+  const {
+    activeOrganization,
+    isLoading: isLoadingOrg,
+    hasPermission,
+  } = useActiveOrganization();
+  const organizationId = activeOrganization?.id;
+  const orgId = organizationId ?? "";
+  const enabled = organizationId !== undefined;
 
-  const utils = trpc.useUtils()
-  const subscriptionQuery = trpc.billing.getSubscription.useQuery({ organizationId: orgId }, { enabled })
-  const paymentMethodsQuery = trpc.billing.getPaymentMethods.useQuery({ organizationId: orgId }, { enabled })
+  const utils = trpc.useUtils();
+  const subscriptionQuery = trpc.billing.getSubscription.useQuery(
+    { organizationId: orgId },
+    { enabled },
+  );
+  const paymentMethodsQuery = trpc.billing.getPaymentMethods.useQuery(
+    { organizationId: orgId },
+    { enabled },
+  );
 
-  const canManage = hasPermission(permissions.BILLING_UPDATE)
-  const canAdd = hasPermission(permissions.BILLING_CREATE)
+  const canManage = hasPermission(permissions.BILLING_UPDATE);
+  const canAdd = hasPermission(permissions.BILLING_CREATE);
 
-  const [addOpen, setAddOpen] = React.useState(false)
+  const [addOpen, setAddOpen] = React.useState(false);
   /* GLOBAL_UPGRADE_SURFACE: "Change plan" opens the SAME modal a plan limit
    * opens. A second plan-picking dialog here would be a second place to keep
    * the pricing, the trial rules and the downgrade guard correct. */
-  const upgradeModal = useUpgradeModal()
+  const upgradeModal = useUpgradeModal();
 
   async function refresh() {
     await Promise.all([
       utils.billing.getSubscription.invalidate({ organizationId: orgId }),
       utils.billing.getPaymentMethods.invalidate({ organizationId: orgId }),
       utils.usage.getFeatureGates.invalidate({ organizationId: orgId }),
-    ])
+    ]);
   }
 
   const cancel = trpc.billing.cancelSubscription.useMutation({
     onSuccess: async () => {
-      toast.success('Subscription canceled')
-      await refresh()
+      toast.success("Subscription canceled");
+      await refresh();
     },
-    onError: (e) => toast.error(e.message || 'Failed to cancel subscription'),
-  })
+    onError: (e) => toast.error(e.message || "Failed to cancel subscription"),
+  });
   const reactivate = trpc.billing.reactivateSubscription.useMutation({
     onSuccess: async () => {
-      toast.success('Subscription reactivated')
-      await refresh()
+      toast.success("Subscription reactivated");
+      await refresh();
     },
-    onError: (e) => toast.error(e.message || 'Failed to reactivate subscription'),
-  })
+    onError: (e) =>
+      toast.error(e.message || "Failed to reactivate subscription"),
+  });
   const setDefault = trpc.billing.setDefaultPaymentMethod.useMutation({
     onSuccess: async () => {
-      toast.success('Default payment method updated')
-      await utils.billing.getPaymentMethods.invalidate({ organizationId: orgId })
+      toast.success("Default payment method updated");
+      await utils.billing.getPaymentMethods.invalidate({
+        organizationId: orgId,
+      });
     },
-    onError: () => toast.error('Failed to set default payment method'),
-  })
+    onError: () => toast.error("Failed to set default payment method"),
+  });
   const remove = trpc.billing.deletePaymentMethod.useMutation({
     onSuccess: async () => {
-      toast.success('Payment method removed')
-      await utils.billing.getPaymentMethods.invalidate({ organizationId: orgId })
+      toast.success("Payment method removed");
+      await utils.billing.getPaymentMethods.invalidate({
+        organizationId: orgId,
+      });
     },
-    onError: () => toast.error('Failed to remove payment method'),
-  })
+    onError: () => toast.error("Failed to remove payment method"),
+  });
 
-  if (isLoadingOrg && !activeOrganization) return <BillingSkeleton />
+  if (isLoadingOrg && !activeOrganization) return <BillingSkeleton />;
   if (!activeOrganization) {
     return (
       <div className="flex items-center justify-center p-12">
@@ -116,35 +128,40 @@ export function BillingTab() {
           No active organization found. Please complete onboarding first.
         </p>
       </div>
-    )
+    );
   }
   if (
     (subscriptionQuery.isLoading && !subscriptionQuery.data) ||
     (paymentMethodsQuery.isLoading && !paymentMethodsQuery.data)
   ) {
-    return <BillingSkeleton />
+    return <BillingSkeleton />;
   }
 
-  const data = subscriptionQuery.data
-  const subscription = data?.subscription ?? null
-  const isCanceled = subscription?.cancelAtPeriodEnd ?? false
-  const periodEnd = subscription?.periodEnd ?? null
-  const methods = paymentMethodsQuery.data ?? []
+  const data = subscriptionQuery.data;
+  const subscription = data?.subscription ?? null;
+  const isCanceled = subscription?.cancelAtPeriodEnd ?? false;
+  const periodEnd = subscription?.periodEnd ?? null;
+  const methods = paymentMethodsQuery.data ?? [];
 
   function handleCancel() {
-    if (!organizationId) return
-    if (!window.confirm('Cancel your subscription? It stays active until the period ends.')) return
-    cancel.mutate({ organizationId })
+    if (!organizationId) return;
+    if (
+      !window.confirm(
+        "Cancel your subscription? It stays active until the period ends.",
+      )
+    )
+      return;
+    cancel.mutate({ organizationId });
   }
   function handleRemove(paymentMethodId: string) {
-    if (!organizationId) return
-    const target = methods.find((m) => m.id === paymentMethodId)
+    if (!organizationId) return;
+    const target = methods.find((m) => m.id === paymentMethodId);
     if (target?.isDefault) {
-      toast.error('Set another card as default before removing this one.')
-      return
+      toast.error("Set another card as default before removing this one.");
+      return;
     }
-    if (!window.confirm('Remove this payment method?')) return
-    remove.mutate({ organizationId, paymentMethodId })
+    if (!window.confirm("Remove this payment method?")) return;
+    remove.mutate({ organizationId, paymentMethodId });
   }
 
   return (
@@ -159,107 +176,127 @@ export function BillingTab() {
           description="Manage your subscription plan and billing cycle"
           label="Current Plan"
           labelDescription={
-            subscription ? 'Your active subscription details' : 'The plan this workspace is on'
+            subscription
+              ? "Your active subscription details"
+              : "The plan this workspace is on"
           }
         >
-            <div className="space-y-6">
-              {isCanceled && periodEnd ? (
-                <Alert className="border-destructive bg-destructive/10">
-                  <AlertTriangle className="h-4 w-4 text-destructive" />
-                  <AlertTitle className="text-destructive">Subscription canceled</AlertTitle>
-                  <AlertDescription className="space-y-3 text-sm">
-                    <p>
-                      Your subscription will end on{' '}
-                      <strong>{format(new Date(periodEnd), 'MMMM d, yyyy')}</strong>.
-                    </p>
-                    <Button
-                      onClick={() => organizationId && reactivate.mutate({ organizationId })}
-                      disabled={reactivate.isPending}
-                      size="lg"
-                      className="w-full gap-2"
-                    >
-                      {reactivate.isPending ? (
-                        <>
-                          <Loader2Icon className="h-4 w-4 animate-spin" />
-                          Reactivating...
-                        </>
-                      ) : (
-                        <>
-                          <RefreshCw className="h-4 w-4" />
-                          Reactivate subscription
-                        </>
-                      )}
-                    </Button>
-                  </AlertDescription>
-                </Alert>
-              ) : null}
+          <div className="space-y-6">
+            {isCanceled && periodEnd ? (
+              <Alert className="border-destructive bg-destructive/10">
+                <AlertTriangle className="h-4 w-4 text-destructive" />
+                <AlertTitle className="text-destructive">
+                  Subscription canceled
+                </AlertTitle>
+                <AlertDescription className="space-y-3 text-sm">
+                  <p>
+                    Your subscription will end on{" "}
+                    <strong>
+                      {format(new Date(periodEnd), "MMMM d, yyyy")}
+                    </strong>
+                    .
+                  </p>
+                  <Button
+                    onClick={() =>
+                      organizationId && reactivate.mutate({ organizationId })
+                    }
+                    disabled={reactivate.isPending}
+                    size="lg"
+                    className="w-full gap-2"
+                  >
+                    {reactivate.isPending ? (
+                      <>
+                        <Loader2Icon className="h-4 w-4 animate-spin" />
+                        Reactivating...
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw className="h-4 w-4" />
+                        Reactivate subscription
+                      </>
+                    )}
+                  </Button>
+                </AlertDescription>
+              </Alert>
+            ) : null}
 
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-1">
-                    <Label>Plan</Label>
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-medium">{data?.planName}</p>
-                      {data?.isOnTrial ? (
-                        <Badge variant="secondary" className="text-xs">
-                          Trial
-                        </Badge>
-                      ) : null}
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <Label>Billing</Label>
-                    <p className="text-sm font-medium capitalize">{data?.billingInterval ?? 'N/A'}</p>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <Label>Plan</Label>
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-medium">{data?.planName}</p>
+                    {data?.isOnTrial ? (
+                      <Badge variant="secondary" className="text-xs">
+                        Trial
+                      </Badge>
+                    ) : null}
                   </div>
                 </div>
+                <div className="text-right">
+                  <Label>Billing</Label>
+                  <p className="text-sm font-medium capitalize">
+                    {data?.billingInterval ?? "N/A"}
+                  </p>
+                </div>
+              </div>
 
-                {periodEnd ? (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Calendar className="h-4 w-4" />
-                    <span>
-                      {isCanceled ? 'Ends' : 'Renews'} on {format(new Date(periodEnd), 'MMMM d, yyyy')}
-                    </span>
-                  </div>
-                ) : null}
+              {periodEnd ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Calendar className="h-4 w-4" />
+                  <span>
+                    {isCanceled ? "Ends" : "Renews"} on{" "}
+                    {format(new Date(periodEnd), "MMMM d, yyyy")}
+                  </span>
+                </div>
+              ) : null}
 
-                {!subscription ? (
-                  canAdd ? (
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Button onClick={() => upgradeModal.open()} size="sm" className="gap-2">
-                        <Sparkles className="h-4 w-4" />
-                        View plans
-                      </Button>
-                    </div>
-                  ) : null
-                ) : !isCanceled && canManage ? (
+              {!subscription ? (
+                canAdd ? (
                   <div className="flex flex-wrap items-center gap-2">
-                    <Button onClick={() => upgradeModal.open()} size="sm" className="gap-2">
-                      <Sparkles className="h-4 w-4" />
-                      Change plan
-                    </Button>
                     <Button
-                      onClick={handleCancel}
-                      disabled={cancel.isPending}
-                      variant="outline"
+                      onClick={() => upgradeModal.open()}
                       size="sm"
                       className="gap-2"
                     >
-                      {cancel.isPending ? (
-                        <>
-                          <Loader2Icon className="h-4 w-4 animate-spin" />
-                          Canceling...
-                        </>
-                      ) : (
-                        <>
-                          <AlertTriangle className="h-4 w-4" />
-                          Cancel subscription
-                        </>
-                      )}
+                      <Sparkles className="h-4 w-4" />
+                      View plans
                     </Button>
                   </div>
-                ) : null}
-              </div>
+                ) : null
+              ) : !isCanceled && canManage ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    onClick={() => upgradeModal.open()}
+                    size="sm"
+                    className="gap-2"
+                  >
+                    <Sparkles className="h-4 w-4" />
+                    Change plan
+                  </Button>
+                  <Button
+                    onClick={handleCancel}
+                    disabled={cancel.isPending}
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                  >
+                    {cancel.isPending ? (
+                      <>
+                        <Loader2Icon className="h-4 w-4 animate-spin" />
+                        Canceling...
+                      </>
+                    ) : (
+                      <>
+                        <AlertTriangle className="h-4 w-4" />
+                        Cancel subscription
+                      </>
+                    )}
+                  </Button>
+                </div>
+              ) : null}
             </div>
+          </div>
         </SettingsSection>
 
         <SettingsSection
@@ -276,7 +313,12 @@ export function BillingTab() {
                 Add a payment method to manage your subscription
               </p>
               {canAdd ? (
-                <Button onClick={() => setAddOpen(true)} variant="outline" size="sm" className="mt-4 gap-2">
+                <Button
+                  onClick={() => setAddOpen(true)}
+                  variant="outline"
+                  size="sm"
+                  className="mt-4 gap-2"
+                >
                   <Plus className="h-4 w-4" />
                   Add payment method
                 </Button>
@@ -284,20 +326,36 @@ export function BillingTab() {
             </div>
           ) : (
             <div className="space-y-3">
-              <p className="text-xs text-muted-foreground">Always keep a second card on file.</p>
+              <p className="text-xs text-muted-foreground">
+                Always keep a second card on file.
+              </p>
               {methods.map((method) => (
                 <PaymentMethodRow
                   key={method.id}
                   method={method}
                   canManage={canManage}
-                  onSetDefault={(id) => organizationId && setDefault.mutate({ organizationId, paymentMethodId: id })}
+                  onSetDefault={(id) =>
+                    organizationId &&
+                    setDefault.mutate({ organizationId, paymentMethodId: id })
+                  }
                   onDelete={handleRemove}
-                  settingDefault={setDefault.isPending && setDefault.variables?.paymentMethodId === method.id}
-                  deleting={remove.isPending && remove.variables?.paymentMethodId === method.id}
+                  settingDefault={
+                    setDefault.isPending &&
+                    setDefault.variables?.paymentMethodId === method.id
+                  }
+                  deleting={
+                    remove.isPending &&
+                    remove.variables?.paymentMethodId === method.id
+                  }
                 />
               ))}
               {canAdd ? (
-                <Button onClick={() => setAddOpen(true)} variant="outline" size="sm" className="w-full gap-2">
+                <Button
+                  onClick={() => setAddOpen(true)}
+                  variant="outline"
+                  size="sm"
+                  className="w-full gap-2"
+                >
                   <Plus className="h-4 w-4" />
                   Add new payment method
                 </Button>
@@ -308,10 +366,14 @@ export function BillingTab() {
       </div>
 
       {organizationId ? (
-        <AddPaymentMethodDialog organizationId={organizationId} open={addOpen} onOpenChange={setAddOpen} />
+        <AddPaymentMethodDialog
+          organizationId={organizationId}
+          open={addOpen}
+          onOpenChange={setAddOpen}
+        />
       ) : null}
     </>
-  )
+  );
 }
 
 /* Mirrors the two-section layout so the swap-in is flicker-free. */
@@ -338,5 +400,5 @@ function BillingSkeleton() {
         </div>
       ))}
     </div>
-  )
+  );
 }

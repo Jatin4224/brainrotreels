@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -24,22 +18,24 @@
  *        layouts, auth.ts, and the upgrade-modal UI.
  */
 
-export const APP_NAME = process.env['NEXT_PUBLIC_APP_NAME'] ?? 'My App'
+export const APP_NAME = process.env["NEXT_PUBLIC_APP_NAME"] ?? "My App";
 
 export const APP_DESCRIPTION =
-  process.env['NEXT_PUBLIC_APP_DESCRIPTION'] ?? `${APP_NAME} — multi-tenant SaaS.`
+  process.env["NEXT_PUBLIC_APP_DESCRIPTION"] ??
+  `${APP_NAME} — multi-tenant SaaS.`;
 
-export const APP_URL = process.env['NEXT_PUBLIC_APP_URL'] ?? 'http://localhost:3000'
+export const APP_URL =
+  process.env["NEXT_PUBLIC_APP_URL"] ?? "http://localhost:3000";
 
 export const APP_METADATA_BASE = (() => {
   try {
-    return new URL(APP_URL)
+    return new URL(APP_URL);
   } catch {
-    return new URL('http://localhost:3000')
+    return new URL("http://localhost:3000");
   }
-})()
+})();
 
-export const APP_DOMAIN = APP_METADATA_BASE.hostname
+export const APP_DOMAIN = APP_METADATA_BASE.hostname;
 
 /**
  * SOURCE OF TRUTH KEYWORDS: BRANDING
@@ -69,13 +65,13 @@ export const BRANDING = {
     genericBody:
       "You've hit your plan limit for this feature. Upgrade your workspace to keep going.",
     /* Fallback for a FLAG resource that doesn't write its own upgradeMessage. */
-    flagMessageTemplate: 'Upgrade to {nextPlan} to unlock {resourceName}',
+    flagMessageTemplate: "Upgrade to {nextPlan} to unlock {resourceName}",
     /* Used when the organization is already on the top plan, where naming a
      * next plan would be a lie. */
     topOfLadderBody:
       "You're on our highest plan. Contact us and we'll raise this limit for you.",
-    primaryCtaLabel: 'View plans',
-    secondaryCtaLabel: 'Maybe later',
+    primaryCtaLabel: "View plans",
+    secondaryCtaLabel: "Maybe later",
     /* SOURCE OF TRUTH KEYWORDS: UPGRADE_SCENARIO_COPY, UserScenario
      * Header copy per situation the user is actually in. Keyed by the
      * UserScenario the modal derives from the current tier + trial state, so
@@ -84,49 +80,54 @@ export const BRANDING = {
      * else. */
     scenarios: {
       free_to_trial: {
-        title: 'Start your free trial',
-        description: 'Choose a plan and start your free trial. No charges until it ends.',
-        ctaLabel: 'Start free trial',
+        title: "Start your free trial",
+        description:
+          "Choose a plan and start your free trial. No charges until it ends.",
+        ctaLabel: "Start free trial",
       },
       free_to_paid: {
-        title: 'Upgrade your plan',
-        description: 'Unlock higher limits and the features your team is asking for.',
-        ctaLabel: 'Upgrade now',
+        title: "Upgrade your plan",
+        description:
+          "Unlock higher limits and the features your team is asking for.",
+        ctaLabel: "Upgrade now",
       },
       trial_to_paid: {
-        title: 'Complete your subscription',
-        description: 'Keep everything you have been using after your trial ends.',
-        ctaLabel: 'Complete subscription',
+        title: "Complete your subscription",
+        description:
+          "Keep everything you have been using after your trial ends.",
+        ctaLabel: "Complete subscription",
       },
       paid_upgrade: {
-        title: 'Upgrade your plan',
-        description: 'More room, more features — effective immediately.',
-        ctaLabel: 'Upgrade plan',
+        title: "Upgrade your plan",
+        description: "More room, more features — effective immediately.",
+        ctaLabel: "Upgrade plan",
       },
       paid_downgrade: {
-        title: 'Change your plan',
-        description: 'Move to a smaller plan. Proration is handled automatically.',
-        ctaLabel: 'Change plan',
+        title: "Change your plan",
+        description:
+          "Move to a smaller plan. Proration is handled automatically.",
+        ctaLabel: "Change plan",
       },
       paid_same: {
-        title: 'Change billing interval',
-        description: 'Switch between monthly and yearly billing.',
-        ctaLabel: 'Update billing',
+        title: "Change billing interval",
+        description: "Switch between monthly and yearly billing.",
+        ctaLabel: "Update billing",
       },
     },
     /* Step + state copy that isn't scenario-dependent. */
-    comparisonTitle: 'Compare plans & features',
-    paymentTitle: 'Payment details',
-    successTitle: 'Welcome to {planName}',
-    successBody: "Your upgrade is complete. Everything is unlocked — let's get going.",
+    comparisonTitle: "Compare plans & features",
+    paymentTitle: "Payment details",
+    successTitle: "Welcome to {planName}",
+    successBody:
+      "Your upgrade is complete. Everything is unlocked — let's get going.",
     successDowngradeBody:
-      'Your plan has been updated. The change is reflected on your next invoice.',
+      "Your plan has been updated. The change is reflected on your next invoice.",
     successTrialBody:
-      'Your subscription is active. Nothing changes for you except the invoice.',
+      "Your subscription is active. Nothing changes for you except the invoice.",
     /* Shown instead of the CTA to a member who cannot buy — billing permissions
      * are the server's call, so the UI states the fact rather than failing. */
     noBillingPermissionBody:
-      'Ask an owner or an admin with billing access to upgrade this workspace.',
+      "Ask an owner or an admin with billing access to upgrade this workspace.",
   },
   /**
    * SOURCE OF TRUTH KEYWORDS: UPGRADE_NUDGE_COPY, useUpgradeNudge,
@@ -153,15 +154,16 @@ export const BRANDING = {
     /* CARD variant — a free plan or a running trial, where the user has not
      * bought anything yet and the whole product is still on the other side of a
      * decision. Worth a section with a button. */
-    currentPlanLabel: 'Current plan:',
+    currentPlanLabel: "Current plan:",
     /* Appended to the plan name while trialing — "Pro trial". */
-    trialPlanSuffix: 'trial',
-    cardBody: 'Upgrade to {targetPlan} to get the latest and exclusive features',
-    cardCtaLabel: 'Upgrade to {targetPlan}',
+    trialPlanSuffix: "trial",
+    cardBody:
+      "Upgrade to {targetPlan} to get the latest and exclusive features",
+    cardCtaLabel: "Upgrade to {targetPlan}",
     /* INLINE variant — the customer already pays; this is a nudge between
      * plans or between billing periods, so it stays a single muted line. */
-    tierBody: 'More room on {targetPlan}',
-    yearlyBody: 'Save {amount} a year on yearly',
-    ariaLabel: 'View plans and upgrade',
+    tierBody: "More room on {targetPlan}",
+    yearlyBody: "Save {amount} a year on yearly",
+    ariaLabel: "View plans and upgrade",
   },
-} as const
+} as const;

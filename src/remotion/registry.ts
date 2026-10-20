@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -39,12 +33,12 @@
  *        in src/remotion/components/.
  */
 
-import type { ComponentType } from 'react'
+import type { ComponentType } from "react";
 
-import { RENDER_KINDS, type RenderKind } from '@/lib/timeline'
-import type { RenderItemProps } from '@/lib/types'
-import { MediaClip } from './components/media-clip'
-import { TextOverlay } from './components/text-overlay'
+import { RENDER_KINDS, type RenderKind } from "@/lib/timeline";
+import type { RenderItemProps } from "@/lib/types";
+import { MediaClip } from "./components/media-clip";
+import { TextOverlay } from "./components/text-overlay";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: RENDER_COMPONENTS
@@ -69,12 +63,12 @@ export const RENDER_COMPONENTS: Partial<
 > = {
   media: MediaClip,
   text: TextOverlay,
-}
+};
 
 /* One warning per unknown kind per process, not per frame. A 60-second render
  * is 1800 frames, and an unknown overlay would otherwise write 1800 identical
  * lines into the log that matters most when a render goes wrong. */
-const warned = new Set<string>()
+const warned = new Set<string>();
 
 /**
  * SOURCE OF TRUTH KEYWORDS: resolveRenderComponent, UNKNOWN_DRAWS_NOTHING
@@ -87,27 +81,29 @@ const warned = new Set<string>()
  * WHERE: TimelineRenderer, once per planned item.
  */
 export function resolveRenderComponent(
-  render: string | null
+  render: string | null,
 ): ComponentType<RenderItemProps> | null {
-  if (render === null) return null
+  if (render === null) return null;
 
   /* Narrowed against the document's own union, not against this file's keys —
    * so a VALID kind that simply has no component yet (`redditCard` until
    * Phase 12) takes the same path as a garbage value, which is correct: both
    * draw nothing and both are worth one log line. */
-  const component = isRenderKind(render) ? RENDER_COMPONENTS[render] : undefined
-  if (component !== undefined) return component
+  const component = isRenderKind(render)
+    ? RENDER_COMPONENTS[render]
+    : undefined;
+  if (component !== undefined) return component;
 
   if (!warned.has(render)) {
-    warned.add(render)
+    warned.add(render);
     console.warn(
       `[remotion/registry] No component for render kind "${render}" — drawing nothing. ` +
-        'Add it to RENDER_COMPONENTS in src/remotion/registry.ts.'
-    )
+        "Add it to RENDER_COMPONENTS in src/remotion/registry.ts.",
+    );
   }
-  return null
+  return null;
 }
 
 function isRenderKind(value: string): value is RenderKind {
-  return (RENDER_KINDS as readonly string[]).includes(value)
+  return (RENDER_KINDS as readonly string[]).includes(value);
 }

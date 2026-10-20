@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -40,26 +34,26 @@
  *        filesystem and holds bucket credentials by transitive import.
  */
 
-import 'server-only'
+import "server-only";
 
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
-import { getStorageAdapter } from '@/lib/adapters/storage'
+import { getStorageAdapter } from "@/lib/adapters/storage";
 
 /** Named so a stray directory in a worker's /tmp is identifiable. */
-export const MEDIA_STAGING_PREFIX = 'brainrot-ingest-'
+export const MEDIA_STAGING_PREFIX = "brainrot-ingest-";
 
 /** The signed URL only has to live long enough for one download inside one
  *  step; anything longer is a credential sitting in a workflow's memory. */
-const STAGING_GET_TTL_SECONDS = 600
+const STAGING_GET_TTL_SECONDS = 600;
 
 export interface StagingDir {
   /** Absolute path to the temporary directory. */
-  path: string
+  path: string;
   /** Builds a path inside it. Never takes a path separator — see uploadFile. */
-  file(name: string): string
+  file(name: string): string;
 }
 
 /**
@@ -73,18 +67,20 @@ export interface StagingDir {
  *        TEMP_DIR_ALWAYS_CLEANED) appears days later on a different upload.
  * WHERE: Wraps the body of every media step in the ingest workflow.
  */
-export async function withStagingDir<T>(work: (dir: StagingDir) => Promise<T>): Promise<T> {
-  const path = await mkdtemp(join(tmpdir(), MEDIA_STAGING_PREFIX))
+export async function withStagingDir<T>(
+  work: (dir: StagingDir) => Promise<T>,
+): Promise<T> {
+  const path = await mkdtemp(join(tmpdir(), MEDIA_STAGING_PREFIX));
 
   try {
     return await work({
       path,
       file: (name: string) => join(path, name),
-    })
+    });
   } finally {
     /* `force` so a step that already cleaned up, or never wrote anything,
      * does not turn a successful ingest into a failure at the last line. */
-    await rm(path, { recursive: true, force: true })
+    await rm(path, { recursive: true, force: true });
   }
 }
 
@@ -100,11 +96,14 @@ export async function withStagingDir<T>(work: (dir: StagingDir) => Promise<T>): 
  *        ever rises past a worker's memory, this is the line to change.
  * WHERE: Every media step's first act.
  */
-export async function downloadToFile(storageKey: string, destinationPath: string): Promise<number> {
-  const storage = await getStorageAdapter()
-  const url = await storage.signedGetUrl(storageKey, STAGING_GET_TTL_SECONDS)
+export async function downloadToFile(
+  storageKey: string,
+  destinationPath: string,
+): Promise<number> {
+  const storage = await getStorageAdapter();
+  const url = await storage.signedGetUrl(storageKey, STAGING_GET_TTL_SECONDS);
 
-  return downloadUrlToFile(url, destinationPath, `object "${storageKey}"`)
+  return downloadUrlToFile(url, destinationPath, `object "${storageKey}"`);
 }
 
 /**
@@ -134,18 +133,18 @@ export async function downloadToFile(storageKey: string, destinationPath: string
 export async function downloadUrlToFile(
   url: string,
   destinationPath: string,
-  label = 'the requested file',
+  label = "the requested file",
 ): Promise<number> {
-  const response = await fetch(url)
+  const response = await fetch(url);
   if (!response.ok) {
     throw new Error(
       `[media/staging] Could not download ${label}: ${response.status} ${response.statusText}`,
-    )
+    );
   }
 
-  const bytes = new Uint8Array(await response.arrayBuffer())
-  await writeFile(destinationPath, bytes)
-  return bytes.byteLength
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  await writeFile(destinationPath, bytes);
+  return bytes.byteLength;
 }
 
 /**
@@ -162,18 +161,18 @@ export async function downloadUrlToFile(
  * WHERE: Every media step's last act.
  */
 export async function uploadFile(args: {
-  localPath: string
-  storageKey: string
-  contentType: string
+  localPath: string;
+  storageKey: string;
+  contentType: string;
 }): Promise<number> {
-  const storage = await getStorageAdapter()
-  const body = await readFile(args.localPath)
+  const storage = await getStorageAdapter();
+  const body = await readFile(args.localPath);
 
   await storage.putObject({
     key: args.storageKey,
     body,
     contentType: args.contentType,
-  })
+  });
 
-  return body.byteLength
+  return body.byteLength;
 }

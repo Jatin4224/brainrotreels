@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -23,52 +17,63 @@
  *        src/services/portal.service.
  */
 
-import { TRPCError } from '@trpc/server'
-import { z } from 'zod'
+import { TRPCError } from "@trpc/server";
+import { z } from "zod";
 
-import { createTRPCRouter } from '../init'
-import { authProcedure } from '../procedures'
-import { isPortalEnabled } from '@/lib/config/portal'
+import { createTRPCRouter } from "../init";
+import { authProcedure } from "../procedures";
+import { isPortalEnabled } from "@/lib/config/portal";
 import {
   resolvePortalAdmin,
   listAllOrganizations,
   listAllUsers,
   getPortalOverview,
   listPlatformActivity,
-} from '@/services/portal.service'
+} from "@/services/portal.service";
 
-const PORTAL_PAGE_SIZE = 25
+const PORTAL_PAGE_SIZE = 25;
 
 function pageInput() {
-  return z.object({ page: z.number().int().positive().optional() })
+  return z.object({ page: z.number().int().positive().optional() });
 }
 
 function toSkip(page: number | undefined): number {
-  return ((page ?? 1) - 1) * PORTAL_PAGE_SIZE
+  return ((page ?? 1) - 1) * PORTAL_PAGE_SIZE;
 }
 
 /* Platform-admin gate: logged-in AND (owner email OR portal-org member). */
 const portalProcedure = authProcedure.use(async ({ ctx, next }) => {
-  const isAdmin = await resolvePortalAdmin({ id: ctx.user.id, email: ctx.user.email })
+  const isAdmin = await resolvePortalAdmin({
+    id: ctx.user.id,
+    email: ctx.user.email,
+  });
   if (!isAdmin) {
-    throw new TRPCError({ code: 'FORBIDDEN', message: 'Platform admin access required' })
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "Platform admin access required",
+    });
   }
-  return next()
-})
+  return next();
+});
 
 export const portalRouter = createTRPCRouter({
   /* Ungated (authed): lets the tenant UI decide whether to surface the portal
    * link for the current user without leaking who the owner is. */
   getAccess: authProcedure.query(async ({ ctx }) => ({
     enabled: isPortalEnabled(),
-    isPortalAdmin: await resolvePortalAdmin({ id: ctx.user.id, email: ctx.user.email }),
+    isPortalAdmin: await resolvePortalAdmin({
+      id: ctx.user.id,
+      email: ctx.user.email,
+    }),
   })),
 
   getOverview: portalProcedure.query(() => getPortalOverview()),
 
   listOrganizations: portalProcedure
     .input(pageInput())
-    .query(({ input }) => listAllOrganizations(toSkip(input.page), PORTAL_PAGE_SIZE)),
+    .query(({ input }) =>
+      listAllOrganizations(toSkip(input.page), PORTAL_PAGE_SIZE),
+    ),
 
   listUsers: portalProcedure
     .input(pageInput())
@@ -76,5 +81,7 @@ export const portalRouter = createTRPCRouter({
 
   listActivity: portalProcedure
     .input(pageInput())
-    .query(({ input }) => listPlatformActivity(toSkip(input.page), PORTAL_PAGE_SIZE)),
-})
+    .query(({ input }) =>
+      listPlatformActivity(toSkip(input.page), PORTAL_PAGE_SIZE),
+    ),
+});

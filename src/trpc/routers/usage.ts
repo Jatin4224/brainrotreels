@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -24,16 +18,16 @@
  *        src/trpc/routers/_app.ts; delegates to src/lib/feature-gate.ts.
  */
 
-import { z } from 'zod'
-import { createTRPCRouter } from '../init'
-import { protectedProcedure } from '../procedures'
+import { z } from "zod";
+import { createTRPCRouter } from "../init";
+import { protectedProcedure } from "../procedures";
 import {
   getFeatureGates,
   getDowngradeBlockers,
   getDowngradeBlockerMap,
   getPlanOverages,
-} from '@/lib/feature-gate'
-import { PLAN_KEYS } from '@/lib/config/plans'
+} from "@/lib/feature-gate";
+import { PLAN_KEYS } from "@/lib/config/plans";
 
 export const usageRouter = createTRPCRouter({
   getFeatureGates: protectedProcedure()
@@ -50,10 +44,10 @@ export const usageRouter = createTRPCRouter({
       z.object({
         organizationId: z.string(),
         targetPlan: z.enum(PLAN_KEYS),
-      })
+      }),
     )
     .query(async ({ input }) =>
-      getDowngradeBlockers(input.organizationId, input.targetPlan)
+      getDowngradeBlockers(input.organizationId, input.targetPlan),
     ),
 
   /* WHOLE_LADDER_IN_ONE_READ: every plan in one round trip, so the plan picker
@@ -70,4 +64,4 @@ export const usageRouter = createTRPCRouter({
   getPlanOverages: protectedProcedure()
     .input(z.object({ organizationId: z.string() }))
     .query(async ({ input }) => getPlanOverages(input.organizationId)),
-})
+});

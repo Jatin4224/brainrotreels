@@ -211,6 +211,7 @@ model Organization {
   assets            Asset[]
   renders           Render[]
   creditLedger      CreditLedger[]
+  scriptBlocks      ScriptBlock[]
 
   @@map("organization")
 }
@@ -454,6 +455,7 @@ model Project {
   versions     Project[]    @relation("ProjectVersions")
   timeline     Timeline?
   renders      Render[]
+  scriptBlocks ScriptBlock[]
 
   @@index([organizationId])
   @@index([organizationId, createdAt])
@@ -724,4 +726,61 @@ model StripeEvent {
   processedAt DateTime @default(now())
 
   @@map("stripe_event")
+}
+
+// ============================================================================
+// SCRIPTS — the editable text a video is generated from
+// ============================================================================
+
+/// ScriptBlock — one addressable chunk of narration: a hook, a body beat, or a
+/// call to action. A project's script is its blocks in `position` order.
+///
+/// WHY ROWS AND NOT A JSON COLUMN ON Project. The editor edits ONE block at a
+/// time — inline text edits, drag to reorder, delete, and per-block
+/// regenerate — and `scripts.regenerateBlock` must leave every other block
+/// BYTE-IDENTICAL. A JSON blob makes each of those a read-modify-write of the
+/// whole script, so two people editing different blocks, or a regenerate
+/// racing an edit, silently discards one of them. Rows make the unit of
+/// concurrency the same as the unit of editing.
+///
+/// `position` IS NOT THE PRIMARY KEY and is not unique. Reordering a list by
+/// rewriting a unique column needs either a temporary gap or a deferred
+/// constraint, and both are how a drag-to-reorder ends in a constraint
+/// violation halfway through. Order is `@@index([projectId, position])` and
+/// ties break on `createdAt`, so a duplicate position is ugly rather than
+/// fatal.
+///
+/// `durationEstimate` is SECONDS, derived from the word count at a speaking
+/// rate (see WORDS_PER_SECOND in src/lib/types/script.ts). It is stored rather
+/// than computed on read because the pacing warning and the credit estimate
+/// both need the total, and recomputing it per request would mean the number
+/// shown and the number charged could drift apart.
+///
+/// `speakerTag` is nullable and unused in this phase — Phase 12 splits a
+/// Reddit thread into multiple speakers and Phase 07 maps a tag to a voice.
+/// It is in the schema now because adding it later would mean a migration on a
+/// table that by then holds every customer's scripts.
+///
+/// `sectionType` is String, not a Prisma enum — this schema has zero enum
+/// blocks and the validated union lives in src/lib/types/script.ts.
+///
+/// SOURCE OF TRUTH KEYWORD: ScriptBlock
+model ScriptBlock {
+  id               String   @id @default(cuid())
+  organizationId   String
+  projectId        String
+  position         Int
+  sectionType      String // hook | body | cta
+  narrationText    String
+  durationEstimate Float
+  speakerTag       String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project      Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([projectId, position])
+  @@map("script_block")
 }

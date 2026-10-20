@@ -1,14 +1,8 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
-import 'server-only'
+import "server-only";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: betterAuthAdapter, BETTER_AUTH_CAPABILITIES,
@@ -33,25 +27,25 @@ import 'server-only'
  *        Subscription table.
  */
 
-import { cache } from 'react'
+import { cache } from "react";
 
-import { assertProviderActive } from '../provider'
-import { resolveOrganizationRolePermissions } from '../shared/resolve-permissions'
-import { betterAuthMembership } from './membership'
+import { assertProviderActive } from "../provider";
+import { resolveOrganizationRolePermissions } from "../shared/resolve-permissions";
+import { betterAuthMembership } from "./membership";
 import type {
   AdapterCapabilities,
   AdapterMembership,
   AdapterSession,
   AdapterTier,
   AuthAdapter,
-} from '../types'
-import { getCachedSession } from '@/lib/better-auth/auth'
-import { getUserMemberships } from '@/services/membership.service'
-import { prisma } from '@/lib/config/prisma'
-import { PLANS, PLAN_KEYS, type PlanKey } from '@/lib/config/plans'
+} from "../types";
+import { getCachedSession } from "@/lib/better-auth/auth";
+import { getUserMemberships } from "@/services/membership.service";
+import { prisma } from "@/lib/config/prisma";
+import { PLANS, PLAN_KEYS, type PlanKey } from "@/lib/config/plans";
 
 /* PROVIDER_ISOLATION runtime backstop — see src/lib/adapters/provider.ts. */
-assertProviderActive('better-auth')
+assertProviderActive("better-auth");
 
 /**
  * SOURCE OF TRUTH KEYWORDS: BETTER_AUTH_FULL_ACCESS_ROLE
@@ -62,7 +56,7 @@ assertProviderActive('better-auth')
  *        "owner" — everything above reads AdapterMembership.hasFullAccess.
  * WHERE: Used by toMembership below; mirrors `creatorRole` in auth.ts.
  */
-const BETTER_AUTH_FULL_ACCESS_ROLE = 'owner'
+const BETTER_AUTH_FULL_ACCESS_ROLE = "owner";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: BETTER_AUTH_CAPABILITIES
@@ -78,14 +72,14 @@ const BETTER_AUTH_CAPABILITIES: AdapterCapabilities = {
   providerInvitations: false,
   /* Better Auth stores organizations in this app's own tables. */
   appManagedOrganizations: true,
-}
+};
 
 const isPlanKey = (value: string): value is PlanKey =>
-  (PLAN_KEYS as readonly string[]).includes(value)
+  (PLAN_KEYS as readonly string[]).includes(value);
 
 async function getSession(): Promise<AdapterSession | null> {
-  const session = await getCachedSession()
-  if (!session?.user) return null
+  const session = await getCachedSession();
+  if (!session?.user) return null;
 
   return {
     user: {
@@ -96,11 +90,13 @@ async function getSession(): Promise<AdapterSession | null> {
       emailVerified: session.user.emailVerified,
     },
     activeOrganizationId: session.session.activeOrganizationId ?? null,
-  }
+  };
 }
 
 /* The single translation point for Better Auth's role vocabulary. */
-function toMembership(row: Awaited<ReturnType<typeof getUserMemberships>>[number]): AdapterMembership {
+function toMembership(
+  row: Awaited<ReturnType<typeof getUserMemberships>>[number],
+): AdapterMembership {
   return {
     organizationId: row.organizationId,
     organization: {
@@ -112,12 +108,12 @@ function toMembership(row: Awaited<ReturnType<typeof getUserMemberships>>[number
     role: row.role,
     hasFullAccess: row.role === BETTER_AUTH_FULL_ACCESS_ROLE,
     createdAt: row.createdAt,
-  }
+  };
 }
 
 async function getMemberships(userId: string): Promise<AdapterMembership[]> {
-  const rows = await getUserMemberships(userId)
-  return rows.map(toMembership)
+  const rows = await getUserMemberships(userId);
+  return rows.map(toMembership);
 }
 
 /**
@@ -132,69 +128,71 @@ async function getMemberships(userId: string): Promise<AdapterMembership[]> {
  *        pair of queries.
  * WHERE: EntitlementAdapter.getTier for this provider.
  */
-const getBetterAuthTier = cache(async (organizationId: string): Promise<AdapterTier> => {
-  const freeTier: AdapterTier = {
-    tier: 'free',
-    planName: PLANS.free.name,
-    isOnTrial: false,
-    subscription: null,
-  }
-
-  /* Platform-admin bypass FIRST: a portal org gets the hidden unlimited
-   * `portal` tier regardless of any subscription row. */
-  const organization = await prisma.organization.findUnique({
-    where: { id: organizationId },
-    select: { isPortalOrganization: true },
-  })
-  if (organization?.isPortalOrganization) {
-    return {
-      tier: 'portal',
-      planName: PLANS.portal.name,
+const getBetterAuthTier = cache(
+  async (organizationId: string): Promise<AdapterTier> => {
+    const freeTier: AdapterTier = {
+      tier: "free",
+      planName: PLANS.free.name,
       isOnTrial: false,
       subscription: null,
+    };
+
+    /* Platform-admin bypass FIRST: a portal org gets the hidden unlimited
+     * `portal` tier regardless of any subscription row. */
+    const organization = await prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { isPortalOrganization: true },
+    });
+    if (organization?.isPortalOrganization) {
+      return {
+        tier: "portal",
+        planName: PLANS.portal.name,
+        isOnTrial: false,
+        subscription: null,
+      };
     }
-  }
 
-  const subscription = await prisma.subscription.findFirst({
-    where: { referenceId: organizationId },
-    orderBy: { createdAt: 'desc' },
-  })
-  if (!subscription) return freeTier
+    const subscription = await prisma.subscription.findFirst({
+      where: { referenceId: organizationId },
+      orderBy: { createdAt: "desc" },
+    });
+    if (!subscription) return freeTier;
 
-  const rawPlan = subscription.plan.toLowerCase()
-  if (!isPlanKey(rawPlan)) {
-    console.warn(
-      `[adapters/better-auth] subscription ${subscription.id} references unknown plan "${subscription.plan}" — defaulting to 'free'`
-    )
-    return freeTier
-  }
-  if (rawPlan === 'free') return freeTier
-  /* `portal` is granted via the isPortalOrganization bypass above, never via a
-   * subscription row — a subscription claiming it is treated as free. */
-  if (rawPlan === 'portal') return freeTier
+    const rawPlan = subscription.plan.toLowerCase();
+    if (!isPlanKey(rawPlan)) {
+      console.warn(
+        `[adapters/better-auth] subscription ${subscription.id} references unknown plan "${subscription.plan}" — defaulting to 'free'`,
+      );
+      return freeTier;
+    }
+    if (rawPlan === "free") return freeTier;
+    /* `portal` is granted via the isPortalOrganization bypass above, never via a
+     * subscription row — a subscription claiming it is treated as free. */
+    if (rawPlan === "portal") return freeTier;
 
-  const now = new Date()
-  if (subscription.periodEnd && subscription.periodEnd < now) return freeTier
+    const now = new Date();
+    if (subscription.periodEnd && subscription.periodEnd < now) return freeTier;
 
-  const isOnTrial =
-    subscription.status === 'trialing' &&
-    subscription.trialEnd !== null &&
-    subscription.trialEnd > now
-  if (subscription.status === 'trialing' && !isOnTrial) return freeTier
+    const isOnTrial =
+      subscription.status === "trialing" &&
+      subscription.trialEnd !== null &&
+      subscription.trialEnd > now;
+    if (subscription.status === "trialing" && !isOnTrial) return freeTier;
 
-  return {
-    tier: rawPlan,
-    planName: PLANS[rawPlan].name,
-    isOnTrial,
-    subscription: {
-      id: subscription.id,
-      status: subscription.status,
-      periodEnd: subscription.periodEnd,
-      cancelAtPeriodEnd: subscription.cancelAtPeriodEnd ?? false,
-      subscriptionId: subscription.stripeSubscriptionId,
-    },
-  }
-})
+    return {
+      tier: rawPlan,
+      planName: PLANS[rawPlan].name,
+      isOnTrial,
+      subscription: {
+        id: subscription.id,
+        status: subscription.status,
+        periodEnd: subscription.periodEnd,
+        cancelAtPeriodEnd: subscription.cancelAtPeriodEnd ?? false,
+        subscriptionId: subscription.stripeSubscriptionId,
+      },
+    };
+  },
+);
 
 /**
  * SOURCE OF TRUTH KEYWORDS: betterAuthAdapter
@@ -203,7 +201,7 @@ const getBetterAuthTier = cache(async (organizationId: string): Promise<AdapterT
  * WHERE: Imported dynamically by src/lib/adapters/index.ts.
  */
 export const betterAuthAdapter: AuthAdapter = {
-  id: 'better-auth',
+  id: "better-auth",
   capabilities: BETTER_AUTH_CAPABILITIES,
   identity: { getSession },
   tenancy: {
@@ -212,4 +210,4 @@ export const betterAuthAdapter: AuthAdapter = {
     ...betterAuthMembership,
   },
   entitlement: { getTier: getBetterAuthTier },
-}
+};

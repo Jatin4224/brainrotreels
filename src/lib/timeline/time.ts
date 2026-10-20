@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -37,7 +31,7 @@ import type {
   TrackItem,
   WordAnchor,
   WordToken,
-} from './schema'
+} from "./schema";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: TIME_EPSILON
@@ -48,7 +42,7 @@ import type {
  *        chain of float additions accumulates. See the file's WHY.
  * WHERE: Boundary checks in validate.ts, split bounds in ops.ts.
  */
-export const TIME_EPSILON = 0.0005
+export const TIME_EPSILON = 0.0005;
 
 /**
  * SOURCE OF TRUTH KEYWORDS: isWordAnchor, isSeconds
@@ -59,11 +53,11 @@ export const TIME_EPSILON = 0.0005
  * WHERE: Everywhere a TimeValue is read.
  */
 export function isSeconds(value: TimeValue): value is number {
-  return typeof value === 'number'
+  return typeof value === "number";
 }
 
 export function isWordAnchor(value: TimeValue): value is WordAnchor {
-  return typeof value === 'object' && value !== null
+  return typeof value === "object" && value !== null;
 }
 
 /**
@@ -76,7 +70,7 @@ export function isWordAnchor(value: TimeValue): value is WordAnchor {
  * WHERE: ops.ts, anchors.ts, hash.ts.
  */
 export function roundSeconds(value: number): number {
-  return Math.round(value * 1e6) / 1e6
+  return Math.round(value * 1e6) / 1e6;
 }
 
 /**
@@ -93,23 +87,26 @@ export function roundSeconds(value: number): number {
  *        quoted the script, not the tokeniser's output.
  * WHERE: validate.ts (to check ranges), anchors.ts (to eliminate anchors).
  */
-export function resolveTimeValue(value: TimeValue, words: readonly WordToken[]): number | null {
-  if (isSeconds(value)) return value
+export function resolveTimeValue(
+  value: TimeValue,
+  words: readonly WordToken[],
+): number | null {
+  if (isSeconds(value)) return value;
 
-  if ('wordIndex' in value) {
-    const token = words[value.wordIndex]
-    return token === undefined ? null : token.s
+  if ("wordIndex" in value) {
+    const token = words[value.wordIndex];
+    return token === undefined ? null : token.s;
   }
 
-  const needle = normalizeWord(value.word)
+  const needle = normalizeWord(value.word);
   for (const token of words) {
-    if (normalizeWord(token.w) === needle) return token.s
+    if (normalizeWord(token.w) === needle) return token.s;
   }
-  return null
+  return null;
 }
 
 function normalizeWord(word: string): string {
-  return word.toLowerCase().replace(/[^\p{L}\p{N}']/gu, '')
+  return word.toLowerCase().replace(/[^\p{L}\p{N}']/gu, "");
 }
 
 /**
@@ -128,27 +125,30 @@ function normalizeWord(word: string): string {
  *        is what the phrase means to the person writing a script.
  * WHERE: itemSpan() below, anchors.ts, validate.ts.
  */
-export function resolveWordEnd(anchor: WordAnchor, words: readonly WordToken[]): number | null {
-  if ('wordIndex' in anchor) {
-    const token = words[anchor.wordIndex]
-    return token === undefined ? null : token.e
+export function resolveWordEnd(
+  anchor: WordAnchor,
+  words: readonly WordToken[],
+): number | null {
+  if ("wordIndex" in anchor) {
+    const token = words[anchor.wordIndex];
+    return token === undefined ? null : token.e;
   }
-  const needle = normalizeWord(anchor.word)
+  const needle = normalizeWord(anchor.word);
   for (const token of words) {
-    if (normalizeWord(token.w) === needle) return token.e
+    if (normalizeWord(token.w) === needle) return token.e;
   }
-  return null
+  return null;
 }
 
 export function resolveDuration(
   value: TimeValue,
   start: number,
-  words: readonly WordToken[]
+  words: readonly WordToken[],
 ): number | null {
-  if (isSeconds(value)) return value
-  const end = resolveWordEnd(value, words)
-  if (end === null) return null
-  return roundSeconds(end - start)
+  if (isSeconds(value)) return value;
+  const end = resolveWordEnd(value, words);
+  if (end === null) return null;
+  return roundSeconds(end - start);
 }
 
 /**
@@ -163,12 +163,12 @@ export function resolveDuration(
 export function captionRangeSeconds(
   startWord: number,
   endWord: number,
-  words: readonly WordToken[]
+  words: readonly WordToken[],
 ): { start: number; end: number } | null {
-  const first = words[startWord]
-  const last = words[endWord]
-  if (first === undefined || last === undefined) return null
-  return { start: first.s, end: last.e }
+  const first = words[startWord];
+  const last = words[endWord];
+  if (first === undefined || last === undefined) return null;
+  return { start: first.s, end: last.e };
 }
 
 /**
@@ -183,17 +183,17 @@ export function captionRangeSeconds(
  */
 export function itemSpan(
   item: TrackItem,
-  words: readonly WordToken[]
+  words: readonly WordToken[],
 ): { start: number; end: number } | null {
-  if ('startWord' in item) {
-    return captionRangeSeconds(item.startWord, item.endWord, words)
+  if ("startWord" in item) {
+    return captionRangeSeconds(item.startWord, item.endWord, words);
   }
 
-  const start = resolveTimeValue(item.start, words)
-  if (start === null) return null
-  const duration = resolveDuration(item.duration, start, words)
-  if (duration === null) return null
-  return { start, end: start + duration }
+  const start = resolveTimeValue(item.start, words);
+  if (start === null) return null;
+  const duration = resolveDuration(item.duration, start, words);
+  if (duration === null) return null;
+  return { start, end: start + duration };
 }
 
 /**
@@ -211,24 +211,27 @@ export function itemSpan(
  *        for it rather than failing everything at zero.
  * WHERE: validate.ts (the OUT_OF_RANGE rule), the player's scrubber.
  */
-export const SPINE_TRACKS: readonly Track['type'][] = ['video', 'audio']
+export const SPINE_TRACKS: readonly Track["type"][] = ["video", "audio"];
 
 export function documentLength(doc: TimelineDoc): number {
-  const spine = furthestEnd(doc, (track) => SPINE_TRACKS.includes(track.type))
-  if (spine > 0) return spine
-  return furthestEnd(doc, () => true)
+  const spine = furthestEnd(doc, (track) => SPINE_TRACKS.includes(track.type));
+  if (spine > 0) return spine;
+  return furthestEnd(doc, () => true);
 }
 
-function furthestEnd(doc: TimelineDoc, include: (track: Track) => boolean): number {
-  let furthest = 0
+function furthestEnd(
+  doc: TimelineDoc,
+  include: (track: Track) => boolean,
+): number {
+  let furthest = 0;
   for (const track of doc.tracks) {
-    if (!include(track)) continue
+    if (!include(track)) continue;
     for (const item of track.items) {
-      const span = itemSpan(item, doc.words)
-      if (span !== null && span.end > furthest) furthest = span.end
+      const span = itemSpan(item, doc.words);
+      if (span !== null && span.end > furthest) furthest = span.end;
     }
   }
-  return furthest
+  return furthest;
 }
 
 /**
@@ -241,11 +244,11 @@ function furthestEnd(doc: TimelineDoc, include: (track: Track) => boolean): numb
  * WHERE: anchors.ts; the Remotion compositions in Phase 03.
  */
 export function secondsToFrames(seconds: number, fps: number): number {
-  return Math.round(seconds * fps)
+  return Math.round(seconds * fps);
 }
 
 export function framesToSeconds(frames: number, fps: number): number {
-  return roundSeconds(frames / fps)
+  return roundSeconds(frames / fps);
 }
 
 /**
@@ -259,15 +262,15 @@ export function framesToSeconds(frames: number, fps: number): number {
  * WHERE: validate.ts, ops.ts, anchors.ts.
  */
 export interface TimelineItemRef {
-  track: Track
-  trackIndex: number
-  itemIndex: number
-  item: TrackItem
-  path: string
+  track: Track;
+  trackIndex: number;
+  itemIndex: number;
+  item: TrackItem;
+  path: string;
 }
 
 export function iterateItems(doc: TimelineDoc): TimelineItemRef[] {
-  const refs: TimelineItemRef[] = []
+  const refs: TimelineItemRef[] = [];
   doc.tracks.forEach((track, trackIndex) => {
     track.items.forEach((item, itemIndex) => {
       refs.push({
@@ -276,10 +279,10 @@ export function iterateItems(doc: TimelineDoc): TimelineItemRef[] {
         itemIndex,
         item,
         path: `tracks.${trackIndex}.items.${itemIndex}`,
-      })
-    })
-  })
-  return refs
+      });
+    });
+  });
+  return refs;
 }
 
 /**
@@ -295,8 +298,8 @@ export function iterateItems(doc: TimelineDoc): TimelineItemRef[] {
  * WHERE: ops.ts, anchors.ts, migrate.ts.
  */
 export function cloneDoc<T>(doc: T): T {
-  const parsed: unknown = JSON.parse(JSON.stringify(doc))
+  const parsed: unknown = JSON.parse(JSON.stringify(doc));
   /* The round-trip of a JSON-only value is that same value. The assertion is
    * the one point where that is stated, rather than at every callsite. */
-  return parsed as T
+  return parsed as T;
 }

@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -34,40 +28,40 @@
  */
 export const TIMELINE_ERROR_CODES = [
   /* The document did not parse against timelineDocSchema at all. */
-  'SCHEMA',
+  "SCHEMA",
   /* A duration that is zero or negative, or a negative start. */
-  'BAD_DURATION',
+  "BAD_DURATION",
   /* An item that starts or ends outside the video's length. */
-  'OUT_OF_RANGE',
+  "OUT_OF_RANGE",
   /* A caption whose word range is empty, inverted, or points past doc.words. */
-  'BAD_WORD_RANGE',
+  "BAD_WORD_RANGE",
   /* doc.words[n].i disagrees with n, or a token ends before it starts. */
-  'BAD_WORD_TOKEN',
+  "BAD_WORD_TOKEN",
   /* An assetId that is not a key of doc.assets. */
-  'UNKNOWN_ASSET',
+  "UNKNOWN_ASSET",
   /* A speaker that is not a key of doc.speakers. */
-  'UNKNOWN_SPEAKER',
+  "UNKNOWN_SPEAKER",
   /* Two items, or two tracks, sharing an id. */
-  'DUPLICATE_ID',
+  "DUPLICATE_ID",
   /* Two overlapping overlays claiming the same z. */
-  'Z_COLLISION',
+  "Z_COLLISION",
   /* A box or position outside the 0..1 canvas. */
-  'OUT_OF_BOUNDS',
+  "OUT_OF_BOUNDS",
   /* A word anchor surviving in a document whose `timing` says 'resolved'. */
-  'UNRESOLVED_ANCHOR',
+  "UNRESOLVED_ANCHOR",
   /* An anchor that points at a word the document does not contain. */
-  'ANCHOR_NOT_FOUND',
+  "ANCHOR_NOT_FOUND",
   /* A cached start/duration on a caption that disagrees with its word range. */
-  'STALE_RESOLUTION',
+  "STALE_RESOLUTION",
   /* An op naming an item, track or index that does not exist. */
-  'NOT_FOUND',
+  "NOT_FOUND",
   /* An op whose arguments are self-contradictory (splitting outside the clip). */
-  'BAD_OPERATION',
+  "BAD_OPERATION",
   /* migrate() was handed something it has no path from. */
-  'UNMIGRATABLE',
-] as const
+  "UNMIGRATABLE",
+] as const;
 
-export type TimelineErrorCode = (typeof TIMELINE_ERROR_CODES)[number]
+export type TimelineErrorCode = (typeof TIMELINE_ERROR_CODES)[number];
 
 /**
  * SOURCE OF TRUTH KEYWORDS: ValidationError
@@ -80,9 +74,9 @@ export type TimelineErrorCode = (typeof TIMELINE_ERROR_CODES)[number]
  * WHERE: validate(), apply(), and the UI that renders them.
  */
 export interface ValidationError {
-  path: string
-  code: TimelineErrorCode
-  message: string
+  path: string;
+  code: TimelineErrorCode;
+  message: string;
 }
 
 /**
@@ -95,8 +89,7 @@ export interface ValidationError {
  * WHERE: validate() in validate.ts.
  */
 export type ValidationResult<T> =
-  | { ok: true; doc: T }
-  | { ok: false; errors: ValidationError[] }
+  { ok: true; doc: T } | { ok: false; errors: ValidationError[] };
 
 /**
  * SOURCE OF TRUTH KEYWORDS: timelineError
@@ -110,7 +103,7 @@ export type ValidationResult<T> =
 export function timelineError(
   path: string,
   code: TimelineErrorCode,
-  message: string
+  message: string,
 ): ValidationError {
-  return { path, code, message }
+  return { path, code, message };
 }

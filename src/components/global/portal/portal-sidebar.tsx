@@ -1,14 +1,8 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
-'use client'
+"use client";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: PortalSidebar, PORTAL_NAV
@@ -21,8 +15,8 @@
  * WHERE: Mounted by src/app/(portal)/portal/layout.tsx inside <SidebarProvider>.
  */
 
-import { usePathname } from 'next/navigation'
-import Link from 'next/link'
+import { usePathname } from "next/navigation";
+import Link from "next/link";
 import {
   LayoutDashboard,
   Building2,
@@ -30,7 +24,7 @@ import {
   ScrollText,
   ArrowLeft,
   ShieldCheck,
-} from 'lucide-react'
+} from "lucide-react";
 
 import {
   Sidebar,
@@ -42,21 +36,31 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-} from '@/components/ui/sidebar'
-import { PORTAL_PATH, portalRoute, ROUTES } from '@/lib/config'
+} from "@/components/ui/sidebar";
+import { PORTAL_PATH, portalRoute, ROUTES } from "@/lib/config";
 
 const PORTAL_NAV = [
-  { label: 'Overview', href: PORTAL_PATH, icon: LayoutDashboard, exact: true },
-  { label: 'Organizations', href: portalRoute('/organizations'), icon: Building2, exact: false },
-  { label: 'Users', href: portalRoute('/users'), icon: Users, exact: false },
-  { label: 'Audit logs', href: portalRoute('/audit-logs'), icon: ScrollText, exact: false },
-] as const
+  { label: "Overview", href: PORTAL_PATH, icon: LayoutDashboard, exact: true },
+  {
+    label: "Organizations",
+    href: portalRoute("/organizations"),
+    icon: Building2,
+    exact: false,
+  },
+  { label: "Users", href: portalRoute("/users"), icon: Users, exact: false },
+  {
+    label: "Audit logs",
+    href: portalRoute("/audit-logs"),
+    icon: ScrollText,
+    exact: false,
+  },
+] as const;
 
 /* SERVER_PROVIDER_BRANCH: the account menu arrives already rendered from the
  * server layout, so this client component never imports a provider surface and
  * only the selected provider reaches the browser bundle. */
 export function PortalSidebar({ userMenu }: { userMenu: React.ReactNode }) {
-  const pathname = usePathname()
+  const pathname = usePathname();
 
   return (
     <Sidebar collapsible="icon" variant="inset">
@@ -69,7 +73,9 @@ export function PortalSidebar({ userMenu }: { userMenu: React.ReactNode }) {
               </div>
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-medium">Platform</span>
-                <span className="truncate text-xs text-muted-foreground">Admin console</span>
+                <span className="truncate text-xs text-muted-foreground">
+                  Admin console
+                </span>
               </div>
             </SidebarMenuButton>
           </SidebarMenuItem>
@@ -83,16 +89,21 @@ export function PortalSidebar({ userMenu }: { userMenu: React.ReactNode }) {
             {PORTAL_NAV.map((item) => {
               const isActive = item.exact
                 ? pathname === item.href
-                : pathname === item.href || pathname.startsWith(`${item.href}/`)
-              const Icon = item.icon
+                : pathname === item.href ||
+                  pathname.startsWith(`${item.href}/`);
+              const Icon = item.icon;
               return (
                 <SidebarMenuItem key={item.href}>
-                  <SidebarMenuButton render={<Link href={item.href} />} isActive={isActive} tooltip={item.label}>
+                  <SidebarMenuButton
+                    render={<Link href={item.href} />}
+                    isActive={isActive}
+                    tooltip={item.label}
+                  >
                     <Icon />
                     <span>{item.label}</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
-              )
+              );
             })}
           </SidebarMenu>
         </SidebarGroup>
@@ -100,7 +111,10 @@ export function PortalSidebar({ userMenu }: { userMenu: React.ReactNode }) {
         <SidebarGroup>
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarMenuButton render={<Link href={ROUTES.dashboard} />} tooltip="Back to app">
+              <SidebarMenuButton
+                render={<Link href={ROUTES.dashboard} />}
+                tooltip="Back to app"
+              >
                 <ArrowLeft />
                 <span>Back to app</span>
               </SidebarMenuButton>
@@ -109,9 +123,7 @@ export function PortalSidebar({ userMenu }: { userMenu: React.ReactNode }) {
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter>
-        {userMenu}
-      </SidebarFooter>
+      <SidebarFooter>{userMenu}</SidebarFooter>
     </Sidebar>
-  )
+  );
 }

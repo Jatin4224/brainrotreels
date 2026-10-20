@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -29,14 +23,18 @@
  *        and by the render pre-flight in Phase 04.
  */
 
-import { timelineError, type ValidationError, type ValidationResult } from './errors'
+import {
+  timelineError,
+  type ValidationError,
+  type ValidationResult,
+} from "./errors";
 import {
   timelineDocSchema,
   type NormalizedBox,
   type TimelineDoc,
   type TimeValue,
   type TrackItem,
-} from './schema'
+} from "./schema";
 import {
   TIME_EPSILON,
   captionRangeSeconds,
@@ -46,7 +44,7 @@ import {
   iterateItems,
   resolveDuration,
   resolveTimeValue,
-} from './time'
+} from "./time";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: BOUNDS_EPSILON
@@ -56,7 +54,7 @@ import {
  *        the canvas by any measure a viewer could take.
  * WHERE: checkBounds below.
  */
-const BOUNDS_EPSILON = 1e-6
+const BOUNDS_EPSILON = 1e-6;
 
 /**
  * SOURCE OF TRUTH KEYWORDS: validate
@@ -73,31 +71,35 @@ const BOUNDS_EPSILON = 1e-6
  * WHERE: Every read of Timeline.doc (after migrate), every write, and apply().
  */
 export function validate(doc: unknown): ValidationResult<TimelineDoc> {
-  const parsed = timelineDocSchema.safeParse(doc)
+  const parsed = timelineDocSchema.safeParse(doc);
   if (!parsed.success) {
     return {
       ok: false,
       errors: parsed.error.issues.map((issue) =>
-        timelineError(issue.path.join('.') || 'document', 'SCHEMA', issue.message)
+        timelineError(
+          issue.path.join(".") || "document",
+          "SCHEMA",
+          issue.message,
+        ),
       ),
-    }
+    };
   }
 
-  const candidate = parsed.data
-  const errors: ValidationError[] = []
+  const candidate = parsed.data;
+  const errors: ValidationError[] = [];
 
   /* Word tokens first: captions and anchors are both read against them, so a
    * broken word list would otherwise produce an error per consumer. */
-  const wordsOk = checkWords(candidate, errors)
+  const wordsOk = checkWords(candidate, errors);
 
-  checkIds(candidate, errors)
-  checkTiming(candidate, errors, wordsOk)
-  checkReferences(candidate, errors)
-  checkBounds(candidate, errors)
-  checkOverlayDepth(candidate, errors, wordsOk)
+  checkIds(candidate, errors);
+  checkTiming(candidate, errors, wordsOk);
+  checkReferences(candidate, errors);
+  checkBounds(candidate, errors);
+  checkOverlayDepth(candidate, errors, wordsOk);
 
-  if (errors.length > 0) return { ok: false, errors }
-  return { ok: true, doc: candidate }
+  if (errors.length > 0) return { ok: false, errors };
+  return { ok: true, doc: candidate };
 }
 
 /**
@@ -113,41 +115,55 @@ export function validate(doc: unknown): ValidationResult<TimelineDoc> {
  * WHERE: validate(), above.
  */
 function checkWords(doc: TimelineDoc, errors: ValidationError[]): boolean {
-  let ok = true
-  let previousStart = Number.NEGATIVE_INFINITY
+  let ok = true;
+  let previousStart = Number.NEGATIVE_INFINITY;
 
   doc.words.forEach((token, index) => {
-    const path = `words.${index}`
+    const path = `words.${index}`;
     if (token.i !== index) {
       errors.push(
         timelineError(
           `${path}.i`,
-          'BAD_WORD_TOKEN',
-          `Word ${index} is labelled ${token.i}. Word indices must match their position.`
-        )
-      )
-      ok = false
+          "BAD_WORD_TOKEN",
+          `Word ${index} is labelled ${token.i}. Word indices must match their position.`,
+        ),
+      );
+      ok = false;
     }
     if (token.s < 0) {
-      errors.push(timelineError(`${path}.s`, 'BAD_WORD_TOKEN', 'A word cannot start before zero.'))
-      ok = false
+      errors.push(
+        timelineError(
+          `${path}.s`,
+          "BAD_WORD_TOKEN",
+          "A word cannot start before zero.",
+        ),
+      );
+      ok = false;
     }
     if (token.e < token.s - TIME_EPSILON) {
       errors.push(
-        timelineError(`${path}.e`, 'BAD_WORD_TOKEN', 'A word cannot end before it starts.')
-      )
-      ok = false
+        timelineError(
+          `${path}.e`,
+          "BAD_WORD_TOKEN",
+          "A word cannot end before it starts.",
+        ),
+      );
+      ok = false;
     }
     if (token.s < previousStart - TIME_EPSILON) {
       errors.push(
-        timelineError(`${path}.s`, 'BAD_WORD_TOKEN', 'Words must be in spoken order.')
-      )
-      ok = false
+        timelineError(
+          `${path}.s`,
+          "BAD_WORD_TOKEN",
+          "Words must be in spoken order.",
+        ),
+      );
+      ok = false;
     }
-    previousStart = token.s
-  })
+    previousStart = token.s;
+  });
 
-  return ok
+  return ok;
 }
 
 /**
@@ -161,32 +177,32 @@ function checkWords(doc: TimelineDoc, errors: ValidationError[]): boolean {
  * WHERE: validate().
  */
 function checkIds(doc: TimelineDoc, errors: ValidationError[]): void {
-  const trackIds = new Set<string>()
+  const trackIds = new Set<string>();
   doc.tracks.forEach((track, trackIndex) => {
     if (trackIds.has(track.id)) {
       errors.push(
         timelineError(
           `tracks.${trackIndex}.id`,
-          'DUPLICATE_ID',
-          `More than one track is called "${track.id}".`
-        )
-      )
+          "DUPLICATE_ID",
+          `More than one track is called "${track.id}".`,
+        ),
+      );
     }
-    trackIds.add(track.id)
-  })
+    trackIds.add(track.id);
+  });
 
-  const itemIds = new Set<string>()
+  const itemIds = new Set<string>();
   for (const ref of iterateItems(doc)) {
     if (itemIds.has(ref.item.id)) {
       errors.push(
         timelineError(
           `${ref.path}.id`,
-          'DUPLICATE_ID',
-          `More than one item is called "${ref.item.id}".`
-        )
-      )
+          "DUPLICATE_ID",
+          `More than one item is called "${ref.item.id}".`,
+        ),
+      );
     }
-    itemIds.add(ref.item.id)
+    itemIds.add(ref.item.id);
   }
 }
 
@@ -204,36 +220,44 @@ function checkIds(doc: TimelineDoc, errors: ValidationError[]): void {
  *        skipped rather than also failing the range check.
  * WHERE: validate().
  */
-function checkTiming(doc: TimelineDoc, errors: ValidationError[], wordsOk: boolean): void {
-  const length = documentLength(doc)
-  const mustBeResolved = doc.timing === 'resolved'
+function checkTiming(
+  doc: TimelineDoc,
+  errors: ValidationError[],
+  wordsOk: boolean,
+): void {
+  const length = documentLength(doc);
+  const mustBeResolved = doc.timing === "resolved";
 
   for (const ref of iterateItems(doc)) {
-    const { item, path } = ref
+    const { item, path } = ref;
 
-    if ('startWord' in item) {
+    if ("startWord" in item) {
       if (item.endWord < item.startWord) {
         errors.push(
           timelineError(
             `${path}.endWord`,
-            'BAD_WORD_RANGE',
-            'A caption cannot end before the word it starts on.'
-          )
-        )
-        continue
+            "BAD_WORD_RANGE",
+            "A caption cannot end before the word it starts on.",
+          ),
+        );
+        continue;
       }
-      if (!wordsOk) continue
+      if (!wordsOk) continue;
 
-      const range = captionRangeSeconds(item.startWord, item.endWord, doc.words)
+      const range = captionRangeSeconds(
+        item.startWord,
+        item.endWord,
+        doc.words,
+      );
       if (range === null) {
         errors.push(
           timelineError(
             `${path}.startWord`,
-            'BAD_WORD_RANGE',
-            `This caption covers words ${item.startWord}–${item.endWord}, but the script has ${doc.words.length}.`
-          )
-        )
-        continue
+            "BAD_WORD_RANGE",
+            `This caption covers words ${item.startWord}–${item.endWord}, but the script has ${doc.words.length}.`,
+          ),
+        );
+        continue;
       }
 
       /* The cached pair is a derived value. Disagreeing with the range means
@@ -246,65 +270,79 @@ function checkTiming(doc: TimelineDoc, errors: ValidationError[], wordsOk: boole
        * word times by design. Comparing at microsecond precision would reject
        * every document the resolver produces — which is how a tolerance that
        * looks stricter ends up being wrong. */
-      const cacheTolerance = 1 / doc.canvas.fps
+      const cacheTolerance = 1 / doc.canvas.fps;
       if (item.start !== undefined && isSeconds(item.start)) {
         if (Math.abs(item.start - range.start) > cacheTolerance) {
           errors.push(
             timelineError(
               `${path}.start`,
-              'STALE_RESOLUTION',
-              'This caption’s start no longer matches the words it covers.'
-            )
-          )
+              "STALE_RESOLUTION",
+              "This caption’s start no longer matches the words it covers.",
+            ),
+          );
         }
       }
       if (item.duration !== undefined && isSeconds(item.duration)) {
         /* Two snapped edges, so up to two frames of legitimate difference. */
-        if (Math.abs(item.duration - (range.end - range.start)) > 2 * cacheTolerance) {
+        if (
+          Math.abs(item.duration - (range.end - range.start)) >
+          2 * cacheTolerance
+        ) {
           errors.push(
             timelineError(
               `${path}.duration`,
-              'STALE_RESOLUTION',
-              'This caption’s length no longer matches the words it covers.'
-            )
-          )
+              "STALE_RESOLUTION",
+              "This caption’s length no longer matches the words it covers.",
+            ),
+          );
         }
       }
 
-      reportOutOfRange(range.start, range.end, length, path, errors)
-      continue
+      reportOutOfRange(range.start, range.end, length, path, errors);
+      continue;
     }
 
-    const start = checkTimeValue(item.start, `${path}.start`, doc, errors, mustBeResolved, null)
-    if (start === null) continue
+    const start = checkTimeValue(
+      item.start,
+      `${path}.start`,
+      doc,
+      errors,
+      mustBeResolved,
+      null,
+    );
+    if (start === null) continue;
     const duration = checkTimeValue(
       item.duration,
       `${path}.duration`,
       doc,
       errors,
       mustBeResolved,
-      start
-    )
-    if (duration === null) continue
+      start,
+    );
+    if (duration === null) continue;
 
     if (start < -TIME_EPSILON) {
       errors.push(
-        timelineError(`${path}.start`, 'BAD_DURATION', 'An item cannot start before the video does.')
-      )
-      continue
+        timelineError(
+          `${path}.start`,
+          "BAD_DURATION",
+          "An item cannot start before the video does.",
+        ),
+      );
+      continue;
     }
     if (duration <= TIME_EPSILON) {
       errors.push(
         timelineError(
           `${path}.duration`,
-          'BAD_DURATION',
-          'An item needs a length greater than zero to be seen.'
-        )
-      )
-      continue
+          "BAD_DURATION",
+          "An item needs a length greater than zero to be seen.",
+        ),
+      );
+      continue;
     }
 
-    reportOutOfRange(start, start + duration, length, path, errors)
+    reportOutOfRange(start, start + duration, length, path, errors);
   }
 }
 
@@ -315,23 +353,27 @@ function reportOutOfRange(
   end: number,
   length: number,
   path: string,
-  errors: ValidationError[]
+  errors: ValidationError[],
 ): void {
-  if (length <= 0) return
+  if (length <= 0) return;
   if (end > length + TIME_EPSILON) {
     errors.push(
       timelineError(
         `${path}.duration`,
-        'OUT_OF_RANGE',
-        `This runs to ${end.toFixed(2)}s, past the end of the ${length.toFixed(2)}s video.`
-      )
-    )
-    return
+        "OUT_OF_RANGE",
+        `This runs to ${end.toFixed(2)}s, past the end of the ${length.toFixed(2)}s video.`,
+      ),
+    );
+    return;
   }
   if (start > length + TIME_EPSILON) {
     errors.push(
-      timelineError(`${path}.start`, 'OUT_OF_RANGE', 'This starts after the video ends.')
-    )
+      timelineError(
+        `${path}.start`,
+        "OUT_OF_RANGE",
+        "This starts after the video ends.",
+      ),
+    );
   }
 }
 
@@ -347,36 +389,36 @@ function checkTimeValue(
   doc: TimelineDoc,
   errors: ValidationError[],
   mustBeResolved: boolean,
-  measuredFrom: number | null
+  measuredFrom: number | null,
 ): number | null {
   if (isWordAnchor(value)) {
     if (mustBeResolved) {
       errors.push(
         timelineError(
           path,
-          'UNRESOLVED_ANCHOR',
-          'This document is marked resolved but still points at a word instead of a time.'
-        )
-      )
-      return null
+          "UNRESOLVED_ANCHOR",
+          "This document is marked resolved but still points at a word instead of a time.",
+        ),
+      );
+      return null;
     }
     const seconds =
       measuredFrom === null
         ? resolveTimeValue(value, doc.words)
-        : resolveDuration(value, measuredFrom, doc.words)
+        : resolveDuration(value, measuredFrom, doc.words);
     if (seconds === null) {
       errors.push(
         timelineError(
           path,
-          'ANCHOR_NOT_FOUND',
-          'This points at a word the script does not contain.'
-        )
-      )
-      return null
+          "ANCHOR_NOT_FOUND",
+          "This points at a word the script does not contain.",
+        ),
+      );
+      return null;
     }
-    return seconds
+    return seconds;
   }
-  return value
+  return value;
 }
 
 /**
@@ -393,61 +435,71 @@ function checkTimeValue(
  */
 function checkReferences(doc: TimelineDoc, errors: ValidationError[]): void {
   for (const ref of iterateItems(doc)) {
-    const { item, path } = ref
+    const { item, path } = ref;
 
-    const assetId = readAssetId(item)
+    const assetId = readAssetId(item);
     if (assetId !== undefined && !Object.hasOwn(doc.assets, assetId)) {
       errors.push(
         timelineError(
           `${path}.assetId`,
-          'UNKNOWN_ASSET',
-          `This item uses "${assetId}", which is not in the document’s asset list.`
-        )
-      )
+          "UNKNOWN_ASSET",
+          `This item uses "${assetId}", which is not in the document’s asset list.`,
+        ),
+      );
     }
 
-    if ('speaker' in item && item.speaker !== undefined && !Object.hasOwn(doc.speakers, item.speaker)) {
+    if (
+      "speaker" in item &&
+      item.speaker !== undefined &&
+      !Object.hasOwn(doc.speakers, item.speaker)
+    ) {
       errors.push(
         timelineError(
           `${path}.speaker`,
-          'UNKNOWN_SPEAKER',
-          `This item is voiced by "${item.speaker}", who is not in the document’s cast.`
-        )
-      )
+          "UNKNOWN_SPEAKER",
+          `This item is voiced by "${item.speaker}", who is not in the document’s cast.`,
+        ),
+      );
     }
 
     /* Scene elements carry handles too, and a quiz card's image is exactly the
      * kind of thing that goes missing on a regeneration. */
-    if ('scene' in item) {
+    if ("scene" in item) {
       item.scene.elements.forEach((element, elementIndex) => {
-        if (element.assetId !== undefined && !Object.hasOwn(doc.assets, element.assetId)) {
+        if (
+          element.assetId !== undefined &&
+          !Object.hasOwn(doc.assets, element.assetId)
+        ) {
           errors.push(
             timelineError(
               `${path}.scene.elements.${elementIndex}.assetId`,
-              'UNKNOWN_ASSET',
-              `This element uses "${element.assetId}", which is not in the document’s asset list.`
-            )
-          )
+              "UNKNOWN_ASSET",
+              `This element uses "${element.assetId}", which is not in the document’s asset list.`,
+            ),
+          );
         }
-      })
+      });
     }
   }
 
   doc.words.forEach((token, index) => {
-    if (token.speaker !== undefined && !Object.hasOwn(doc.speakers, token.speaker)) {
+    if (
+      token.speaker !== undefined &&
+      !Object.hasOwn(doc.speakers, token.speaker)
+    ) {
       errors.push(
         timelineError(
           `words.${index}.speaker`,
-          'UNKNOWN_SPEAKER',
-          `Word ${index} is attributed to "${token.speaker}", who is not in the document’s cast.`
-        )
-      )
+          "UNKNOWN_SPEAKER",
+          `Word ${index} is attributed to "${token.speaker}", who is not in the document’s cast.`,
+        ),
+      );
     }
-  })
+  });
 }
 
 function readAssetId(item: TrackItem): string | undefined {
-  return 'assetId' in item ? item.assetId : undefined
+  return "assetId" in item ? item.assetId : undefined;
 }
 
 /**
@@ -462,46 +514,66 @@ function readAssetId(item: TrackItem): string | undefined {
  */
 function checkBounds(doc: TimelineDoc, errors: ValidationError[]): void {
   for (const ref of iterateItems(doc)) {
-    const { item, path } = ref
+    const { item, path } = ref;
 
-    if ('box' in item) {
-      reportBox(item.box, `${path}.box`, errors)
+    if ("box" in item) {
+      reportBox(item.box, `${path}.box`, errors);
     }
-    if ('position' in item && item.position !== undefined) {
-      const { x, y } = item.position
+    if ("position" in item && item.position !== undefined) {
+      const { x, y } = item.position;
       if (y < -BOUNDS_EPSILON || y > 1 + BOUNDS_EPSILON) {
         errors.push(
-          timelineError(`${path}.position.y`, 'OUT_OF_BOUNDS', 'This caption sits off the canvas.')
-        )
+          timelineError(
+            `${path}.position.y`,
+            "OUT_OF_BOUNDS",
+            "This caption sits off the canvas.",
+          ),
+        );
       }
       if (x !== undefined && (x < -BOUNDS_EPSILON || x > 1 + BOUNDS_EPSILON)) {
         errors.push(
-          timelineError(`${path}.position.x`, 'OUT_OF_BOUNDS', 'This caption sits off the canvas.')
-        )
+          timelineError(
+            `${path}.position.x`,
+            "OUT_OF_BOUNDS",
+            "This caption sits off the canvas.",
+          ),
+        );
       }
     }
-    if ('scene' in item) {
+    if ("scene" in item) {
       item.scene.elements.forEach((element, elementIndex) => {
         if (element.box !== undefined) {
-          reportBox(element.box, `${path}.scene.elements.${elementIndex}.box`, errors)
+          reportBox(
+            element.box,
+            `${path}.scene.elements.${elementIndex}.box`,
+            errors,
+          );
         }
-      })
+      });
     }
   }
 }
 
-function reportBox(box: NormalizedBox, path: string, errors: ValidationError[]): void {
+function reportBox(
+  box: NormalizedBox,
+  path: string,
+  errors: ValidationError[],
+): void {
   const outside =
     box.x < -BOUNDS_EPSILON ||
     box.y < -BOUNDS_EPSILON ||
     box.w <= 0 ||
     box.x + box.w > 1 + BOUNDS_EPSILON ||
-    (box.h !== undefined && (box.h <= 0 || box.y + box.h > 1 + BOUNDS_EPSILON))
+    (box.h !== undefined && (box.h <= 0 || box.y + box.h > 1 + BOUNDS_EPSILON));
 
   if (outside) {
     errors.push(
-      timelineError(path, 'OUT_OF_BOUNDS', 'This sits partly or wholly off the canvas.')
-    )
+      timelineError(
+        path,
+        "OUT_OF_BOUNDS",
+        "This sits partly or wholly off the canvas.",
+      ),
+    );
   }
 }
 
@@ -520,36 +592,37 @@ function reportBox(box: NormalizedBox, path: string, errors: ValidationError[]):
 function checkOverlayDepth(
   doc: TimelineDoc,
   errors: ValidationError[],
-  wordsOk: boolean
+  wordsOk: boolean,
 ): void {
-  if (!wordsOk) return
+  if (!wordsOk) return;
 
-  const placed: Array<{ z: number; start: number; end: number; path: string }> = []
+  const placed: Array<{ z: number; start: number; end: number; path: string }> =
+    [];
 
   for (const ref of iterateItems(doc)) {
-    if (ref.track.type !== 'overlay') continue
-    const item = ref.item
-    if (!('z' in item)) continue
+    if (ref.track.type !== "overlay") continue;
+    const item = ref.item;
+    if (!("z" in item)) continue;
 
-    const start = resolveTimeValue(item.start, doc.words)
-    if (start === null) continue
-    const duration = resolveDuration(item.duration, start, doc.words)
-    if (duration === null) continue
-    const span = { z: item.z, start, end: start + duration, path: ref.path }
+    const start = resolveTimeValue(item.start, doc.words);
+    if (start === null) continue;
+    const duration = resolveDuration(item.duration, start, doc.words);
+    if (duration === null) continue;
+    const span = { z: item.z, start, end: start + duration, path: ref.path };
 
     for (const other of placed) {
       if (other.z === span.z && overlaps(other, span)) {
         errors.push(
           timelineError(
             `${ref.path}.z`,
-            'Z_COLLISION',
-            `Two overlays are both at depth ${span.z} at the same time; one would hide the other unpredictably.`
-          )
-        )
-        break
+            "Z_COLLISION",
+            `Two overlays are both at depth ${span.z} at the same time; one would hide the other unpredictably.`,
+          ),
+        );
+        break;
       }
     }
-    placed.push(span)
+    placed.push(span);
   }
 }
 
@@ -557,7 +630,7 @@ function checkOverlayDepth(
  * the next begins is the normal way to hand off a slot. */
 function overlaps(
   a: { start: number; end: number },
-  b: { start: number; end: number }
+  b: { start: number; end: number },
 ): boolean {
-  return a.start < b.end - TIME_EPSILON && b.start < a.end - TIME_EPSILON
+  return a.start < b.end - TIME_EPSILON && b.start < a.end - TIME_EPSILON;
 }

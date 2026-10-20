@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -42,22 +36,22 @@
  *        here.
  */
 
-import 'server-only'
+import "server-only";
 
 import {
   getStorageAdapter,
   isLibraryKey,
   isOwnedByOrganization,
-} from '@/lib/adapters/storage'
-import { prisma, type DbClient } from '@/lib/config/prisma'
+} from "@/lib/adapters/storage";
+import { prisma, type DbClient } from "@/lib/config/prisma";
 import {
   TTL_BY_QUALITY,
   VARIANT_BY_QUALITY,
   type AssetUrlMap,
   type RenderQuality,
   type ResolvedAsset,
-} from '@/lib/types/render'
-import type { Prisma } from '@/generated/prisma'
+} from "@/lib/types/render";
+import type { Prisma } from "@/generated/prisma";
 import {
   variantNameSchema,
   type AssetKind,
@@ -65,7 +59,7 @@ import {
   type AssetStatus,
   type ModerationStatus,
   type VariantName,
-} from '@/lib/types/asset'
+} from "@/lib/types/asset";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: ASSET_LIST_SELECT, AssetListItem
@@ -96,14 +90,18 @@ export const ASSET_LIST_SELECT = {
   error: true,
   createdAt: true,
   variants: {
-    where: { variant: 'thumb' },
+    where: { variant: "thumb" },
     select: { variant: true, storageKey: true, width: true, height: true },
   },
-} as const satisfies Prisma.AssetSelect
+} as const satisfies Prisma.AssetSelect;
 
-export type AssetListItem = Prisma.AssetGetPayload<{ select: typeof ASSET_LIST_SELECT }>
+export type AssetListItem = Prisma.AssetGetPayload<{
+  select: typeof ASSET_LIST_SELECT;
+}>;
 
-export type AssetWithVariants = Prisma.AssetGetPayload<{ include: { variants: true } }>
+export type AssetWithVariants = Prisma.AssetGetPayload<{
+  include: { variants: true };
+}>;
 
 /**
  * SOURCE OF TRUTH KEYWORDS: assetScopeWhere, MINE_OR_LIBRARY
@@ -114,8 +112,10 @@ export type AssetWithVariants = Prisma.AssetGetPayload<{ include: { variants: tr
  *        query that can read an asset.
  * WHERE: Every read in this file.
  */
-export function assetScopeWhere(organizationId: string): Prisma.AssetWhereInput {
-  return { OR: [{ organizationId }, { organizationId: null }] }
+export function assetScopeWhere(
+  organizationId: string,
+): Prisma.AssetWhereInput {
+  return { OR: [{ organizationId }, { organizationId: null }] };
 }
 
 /**
@@ -134,12 +134,12 @@ export function assetScopeWhere(organizationId: string): Prisma.AssetWhereInput 
 export async function listAssets(
   db: DbClient,
   filters: {
-    organizationId: string
-    search?: string | undefined
-    kinds?: readonly AssetKind[] | undefined
-    status?: AssetStatus | undefined
+    organizationId: string;
+    search?: string | undefined;
+    kinds?: readonly AssetKind[] | undefined;
+    status?: AssetStatus | undefined;
   },
-  pagination: { skip: number; take: number }
+  pagination: { skip: number; take: number },
 ): Promise<{ items: AssetListItem[]; total: number }> {
   const where: Prisma.AssetWhereInput = {
     ...assetScopeWhere(filters.organizationId),
@@ -148,22 +148,22 @@ export async function listAssets(
       : {}),
     ...(filters.status !== undefined ? { status: filters.status } : {}),
     ...(filters.search !== undefined && filters.search.length > 0
-      ? { filename: { contains: filters.search, mode: 'insensitive' } }
+      ? { filename: { contains: filters.search, mode: "insensitive" } }
       : {}),
-  }
+  };
 
   const [items, total] = await Promise.all([
     db.asset.findMany({
       where,
       select: ASSET_LIST_SELECT,
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       skip: pagination.skip,
       take: pagination.take,
     }),
     db.asset.count({ where }),
-  ])
+  ]);
 
-  return { items, total }
+  return { items, total };
 }
 
 /**
@@ -180,20 +180,22 @@ export async function listAssets(
 export async function findAssetForOrganization(
   db: DbClient,
   organizationId: string,
-  id: string
+  id: string,
 ): Promise<Prisma.AssetGetPayload<Record<string, never>> | null> {
-  return db.asset.findFirst({ where: { id, ...assetScopeWhere(organizationId) } })
+  return db.asset.findFirst({
+    where: { id, ...assetScopeWhere(organizationId) },
+  });
 }
 
 export async function findAssetWithVariants(
   db: DbClient,
   organizationId: string,
-  id: string
+  id: string,
 ): Promise<AssetWithVariants | null> {
   return db.asset.findFirst({
     where: { id, ...assetScopeWhere(organizationId) },
     include: { variants: true },
-  })
+  });
 }
 
 /**
@@ -213,9 +215,9 @@ export async function findAssetWithVariants(
  */
 export async function findAssetById(
   db: DbClient,
-  id: string
+  id: string,
 ): Promise<AssetWithVariants | null> {
-  return db.asset.findUnique({ where: { id }, include: { variants: true } })
+  return db.asset.findUnique({ where: { id }, include: { variants: true } });
 }
 
 /**
@@ -232,16 +234,16 @@ export async function findAssetById(
 export async function createProcessingAsset(
   db: DbClient,
   data: {
-    organizationId: string
-    kind: AssetKind
-    source: AssetSource
-    filename: string
-    storageKey: string
-    contentType: string
-    bytes: number
-  }
+    organizationId: string;
+    kind: AssetKind;
+    source: AssetSource;
+    filename: string;
+    storageKey: string;
+    contentType: string;
+    bytes: number;
+  },
 ): Promise<Prisma.AssetGetPayload<Record<string, never>>> {
-  return db.asset.create({ data })
+  return db.asset.create({ data });
 }
 
 /**
@@ -260,47 +262,53 @@ export async function createProcessingAsset(
 export async function markAssetReady(
   db: DbClient,
   id: string,
-  facts: { durationSec?: number | null; width?: number | null; height?: number | null }
+  facts: {
+    durationSec?: number | null;
+    width?: number | null;
+    height?: number | null;
+  },
 ): Promise<void> {
   await db.asset.update({
     where: { id },
     data: {
-      status: 'ready',
+      status: "ready",
       error: null,
-      ...(facts.durationSec !== undefined ? { durationSec: facts.durationSec } : {}),
+      ...(facts.durationSec !== undefined
+        ? { durationSec: facts.durationSec }
+        : {}),
       ...(facts.width !== undefined ? { width: facts.width } : {}),
       ...(facts.height !== undefined ? { height: facts.height } : {}),
     },
-  })
+  });
 }
 
 export async function markAssetFailed(
   db: DbClient,
   id: string,
-  error: string
+  error: string,
 ): Promise<void> {
   await db.asset.update({
     where: { id },
     /* Truncated: the column is unbounded text but the UI renders this inline,
      * and an ffmpeg dump pasted into a table cell is not a readable error. */
-    data: { status: 'failed', error: error.slice(0, 500) },
-  })
+    data: { status: "failed", error: error.slice(0, 500) },
+  });
 }
 
 export async function setModerationStatus(
   db: DbClient,
   id: string,
-  moderationStatus: ModerationStatus
+  moderationStatus: ModerationStatus,
 ): Promise<void> {
-  await db.asset.update({ where: { id }, data: { moderationStatus } })
+  await db.asset.update({ where: { id }, data: { moderationStatus } });
 }
 
 export async function renameAsset(
   db: DbClient,
   id: string,
-  filename: string
+  filename: string,
 ): Promise<Prisma.AssetGetPayload<Record<string, never>>> {
-  return db.asset.update({ where: { id }, data: { filename } })
+  return db.asset.update({ where: { id }, data: { filename } });
 }
 
 /**
@@ -318,27 +326,27 @@ export async function renameAsset(
 export async function upsertAssetVariant(
   db: DbClient,
   data: {
-    assetId: string
-    variant: VariantName
-    storageKey: string
-    bytes: number
-    width?: number | null
-    height?: number | null
-  }
+    assetId: string;
+    variant: VariantName;
+    storageKey: string;
+    bytes: number;
+    width?: number | null;
+    height?: number | null;
+  },
 ): Promise<void> {
-  const { assetId, variant, storageKey, bytes, width, height } = data
+  const { assetId, variant, storageKey, bytes, width, height } = data;
   const writable = {
     storageKey,
     bytes,
     ...(width !== undefined ? { width } : {}),
     ...(height !== undefined ? { height } : {}),
-  }
+  };
 
   await db.assetVariant.upsert({
     where: { assetId_variant: { assetId, variant } },
     update: writable,
     create: { assetId, variant, ...writable },
-  })
+  });
 }
 
 /**
@@ -354,9 +362,11 @@ export async function upsertAssetVariant(
  *        thumbnail.
  * WHERE: assets.get; the render pre-flight in Phase 04; the editor in Phase 15.
  */
-export type AssetVariantRow = Prisma.AssetVariantGetPayload<Record<string, never>>
+export type AssetVariantRow = Prisma.AssetVariantGetPayload<
+  Record<string, never>
+>;
 
-export type VariantMap = Record<VariantName, AssetVariantRow | null>
+export type VariantMap = Record<VariantName, AssetVariantRow | null>;
 
 /**
  * SOURCE OF TRUTH KEYWORDS: emptyVariantMap, toVariantMap, VARIANT_MAP_IS_SEEDED
@@ -388,25 +398,27 @@ export function emptyVariantMap<T>(): Record<VariantName, T | null> {
     proxy_480: null,
     thumb: null,
     waveform: null,
-  }
+  };
 }
 
 export function toVariantMap(rows: readonly AssetVariantRow[]): VariantMap {
-  const map = emptyVariantMap<AssetVariantRow>()
+  const map = emptyVariantMap<AssetVariantRow>();
 
   for (const row of rows) {
     /* Parsed, not cast. The column is a String (STRING_NOT_ENUM), so a row
      * left behind by a future rename is possible — and a stale variant must be
      * ignored rather than take a screen down or be asserted into the map. */
-    const name = variantNameSchema.safeParse(row.variant)
-    if (name.success) map[name.data] = row
+    const name = variantNameSchema.safeParse(row.variant);
+    if (name.success) map[name.data] = row;
   }
 
-  return map
+  return map;
 }
 
 export async function getAssetVariants(assetId: string): Promise<VariantMap> {
-  return toVariantMap(await prisma.assetVariant.findMany({ where: { assetId } }))
+  return toVariantMap(
+    await prisma.assetVariant.findMany({ where: { assetId } }),
+  );
 }
 
 /**
@@ -436,15 +448,15 @@ export async function getAssetVariants(assetId: string): Promise<VariantMap> {
 export async function signAssetUrl(
   assetId: string,
   organizationId: string,
-  ttlSeconds?: number
+  ttlSeconds?: number,
 ): Promise<string | null> {
   const asset = await prisma.asset.findFirst({
     where: { id: assetId, ...assetScopeWhere(organizationId) },
     select: { storageKey: true, organizationId: true },
-  })
-  if (asset === null) return null
+  });
+  if (asset === null) return null;
 
-  return signScopedKey(asset.storageKey, organizationId, ttlSeconds)
+  return signScopedKey(asset.storageKey, organizationId, ttlSeconds);
 }
 
 /**
@@ -462,7 +474,7 @@ export async function signVariantUrl(
   assetId: string,
   variant: VariantName,
   organizationId: string,
-  ttlSeconds?: number
+  ttlSeconds?: number,
 ): Promise<string | null> {
   const row = await prisma.assetVariant.findFirst({
     where: {
@@ -471,10 +483,10 @@ export async function signVariantUrl(
       asset: assetScopeWhere(organizationId),
     },
     select: { storageKey: true },
-  })
-  if (row === null) return null
+  });
+  if (row === null) return null;
 
-  return signScopedKey(row.storageKey, organizationId, ttlSeconds)
+  return signScopedKey(row.storageKey, organizationId, ttlSeconds);
 }
 
 /**
@@ -492,19 +504,22 @@ export async function signVariantUrl(
 export async function signScopedKey(
   storageKey: string,
   organizationId: string,
-  ttlSeconds?: number
+  ttlSeconds?: number,
 ): Promise<string | null> {
-  if (!isOwnedByOrganization(storageKey, organizationId) && !isLibraryKey(storageKey)) {
+  if (
+    !isOwnedByOrganization(storageKey, organizationId) &&
+    !isLibraryKey(storageKey)
+  ) {
     /* Not an exception: a mismatched key is a data problem, and an asset list
      * must still render with one broken tile rather than erroring entirely. */
     console.error(
-      `[assets.service] Refusing to sign "${storageKey}" for organization ${organizationId} — the key is outside its prefix.`
-    )
-    return null
+      `[assets.service] Refusing to sign "${storageKey}" for organization ${organizationId} — the key is outside its prefix.`,
+    );
+    return null;
   }
 
-  const storage = await getStorageAdapter()
-  return storage.signedGetUrl(storageKey, ttlSeconds)
+  const storage = await getStorageAdapter();
+  return storage.signedGetUrl(storageKey, ttlSeconds);
 }
 
 /**
@@ -519,12 +534,15 @@ export async function signScopedKey(
  * WHERE: assets.delete.
  */
 export function collectAssetObjectKeys(asset: AssetWithVariants): string[] {
-  return [asset.storageKey, ...asset.variants.map((variant) => variant.storageKey)]
+  return [
+    asset.storageKey,
+    ...asset.variants.map((variant) => variant.storageKey),
+  ];
 }
 
 export async function deleteAssetRow(db: DbClient, id: string): Promise<void> {
   /* Variants go with it through the schema's onDelete: Cascade. */
-  await db.asset.delete({ where: { id } })
+  await db.asset.delete({ where: { id } });
 }
 
 /**
@@ -543,12 +561,15 @@ export async function deleteAssetRow(db: DbClient, id: string): Promise<void> {
  * WHERE: Available to the portal console and the cleanup cron; not on the
  *        request path.
  */
-export async function sumAssetBytes(db: DbClient, organizationId: string): Promise<number> {
+export async function sumAssetBytes(
+  db: DbClient,
+  organizationId: string,
+): Promise<number> {
   const result = await db.asset.aggregate({
     where: { organizationId },
     _sum: { bytes: true },
-  })
-  return result._sum.bytes ?? 0
+  });
+  return result._sum.bytes ?? 0;
 }
 
 /**
@@ -592,15 +613,18 @@ export async function sumAssetBytes(db: DbClient, organizationId: string): Promi
  */
 export async function signDocumentAssets(
   db: DbClient,
-  handles: readonly { handle: string; ref: { assetId: string; kind: ResolvedAsset['kind'] } }[],
+  handles: readonly {
+    handle: string;
+    ref: { assetId: string; kind: ResolvedAsset["kind"] };
+  }[],
   organizationId: string,
-  quality: RenderQuality
+  quality: RenderQuality,
 ): Promise<AssetUrlMap> {
-  const map: AssetUrlMap = {}
-  if (handles.length === 0) return map
+  const map: AssetUrlMap = {};
+  if (handles.length === 0) return map;
 
-  const wanted = VARIANT_BY_QUALITY[quality]
-  const ttl = TTL_BY_QUALITY[quality]
+  const wanted = VARIANT_BY_QUALITY[quality];
+  const ttl = TTL_BY_QUALITY[quality];
 
   const rows = await db.asset.findMany({
     where: {
@@ -608,24 +632,31 @@ export async function signDocumentAssets(
       ...assetScopeWhere(organizationId),
     },
     include: { variants: true },
-  })
+  });
 
-  const byId = new Map(rows.map((row) => [row.id, row]))
+  const byId = new Map(rows.map((row) => [row.id, row]));
 
   for (const { handle, ref } of handles) {
-    const row = byId.get(ref.assetId)
+    const row = byId.get(ref.assetId);
 
     /* A handle whose row is missing, deleted, or belongs to another workspace.
      * Null, not an exception: MISSING_ASSET_IS_NOT_AN_ERROR — the renderer
      * draws a gap and the rest of the video still renders. */
     if (row === undefined) {
-      map[handle] = { assetId: ref.assetId, kind: ref.kind, url: null, variant: null }
-      continue
+      map[handle] = {
+        assetId: ref.assetId,
+        kind: ref.kind,
+        url: null,
+        variant: null,
+      };
+      continue;
     }
 
-    const variantRow = row.variants.find((candidate) => candidate.variant === wanted)
-    const key = variantRow?.storageKey ?? row.storageKey
-    const url = await signScopedKey(key, organizationId, ttl)
+    const variantRow = row.variants.find(
+      (candidate) => candidate.variant === wanted,
+    );
+    const key = variantRow?.storageKey ?? row.storageKey;
+    const url = await signScopedKey(key, organizationId, ttl);
 
     map[handle] = {
       assetId: row.id,
@@ -635,7 +666,9 @@ export async function signDocumentAssets(
       /* Dimensions come from the VARIANT when there is one — a proxy is 480
        * wide and the row's own width is the master's, and a component sizing
        * against the wrong one would letterbox its own media. */
-      ...(row.durationSec !== null ? { durationInSeconds: row.durationSec } : {}),
+      ...(row.durationSec !== null
+        ? { durationInSeconds: row.durationSec }
+        : {}),
       ...(variantRow?.width != null
         ? { width: variantRow.width }
         : row.width !== null
@@ -646,8 +679,8 @@ export async function signDocumentAssets(
         : row.height !== null
           ? { height: row.height }
           : {}),
-    }
+    };
   }
 
-  return map
+  return map;
 }

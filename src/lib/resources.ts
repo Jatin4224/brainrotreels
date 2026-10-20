@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -31,23 +25,28 @@
  *        (src/trpc/react-provider.tsx); depends on src/lib/config/plans.ts.
  */
 
-import type { Route } from 'next'
+import type { Route } from "next";
 
-import { PLAN_KEYS, PLANS, getNextPlan, type PlanKey } from '@/lib/config/plans'
-import { BRANDING } from '@/lib/config/branding'
+import {
+  PLAN_KEYS,
+  PLANS,
+  getNextPlan,
+  type PlanKey,
+} from "@/lib/config/plans";
+import { BRANDING } from "@/lib/config/branding";
 
 /* PLAN_KEYS / PlanKey are the single source of truth in plans.ts (RESOURCES only
  * consumes them for perPlan exhaustiveness). Re-exported here so existing
  * importers of `@/lib/resources` keep resolving without a second declaration. */
-export { PLAN_KEYS }
+export { PLAN_KEYS };
 
-type PerPlan<T> = Record<PlanKey, T>
+type PerPlan<T> = Record<PlanKey, T>;
 
 export interface ResourceLimit {
-  perPlan: PerPlan<number | 'unlimited'>
-  upgradeMessage: string
-  availableOnFreeTrial: boolean
-  unit?: string
+  perPlan: PerPlan<number | "unlimited">;
+  upgradeMessage: string;
+  availableOnFreeTrial: boolean;
+  unit?: string;
   /**
    * How the cap is consumed over time.
    *
@@ -64,12 +63,12 @@ export interface ResourceLimit {
    * Absolute is the default precisely because the unsafe direction is the one
    * that must be typed out deliberately.
    */
-  period?: 'month'
+  period?: "month";
 }
 
 export interface ResourceFlag {
-  perPlan: PerPlan<boolean>
-  availableOnFreeTrial: boolean
+  perPlan: PerPlan<boolean>;
+  availableOnFreeTrial: boolean;
   /**
    * Copy shown when the plan does not include the feature. Optional because a
    * flag reads the same way every time — getUpgradeMessage falls back to
@@ -77,30 +76,33 @@ export interface ResourceFlag {
    * its own sentence has to write one. `{nextPlan}` / `{resourceName}` are
    * interpolated the same way as on a limit.
    */
-  upgradeMessage?: string
+  upgradeMessage?: string;
 }
 
 export interface ResourceNav {
-  label: string
+  label: string;
   /* TYPED_ROUTE_GUARANTEE: a real route, not a string. This href is also the
    * key ROUTE_AUTHORIZATION matches the pathname against, so a stale value
    * both 404s the link and leaves the page ungated — it must not compile. */
-  href: Route
-  icon: string
-  section?: 'main' | 'settings' | (string & {})
+  href: Route;
+  icon: string;
+  section?: "main" | "settings" | (string & {});
   /** Defaults to 'read' when omitted. */
-  requirePermission?: string
-  requireFlag?: boolean
+  requirePermission?: string;
+  requireFlag?: boolean;
 }
 
 export interface ResourceAudit {
-  entity?: string
+  entity?: string;
   /** Templates support {input.field} and {output.field} interpolation. */
-  describe?: Record<string, string>
+  describe?: Record<string, string>;
 }
 
 export interface ResourceRateLimit {
-  [action: string]: { count: number; window: `${number} ${'s' | 'm' | 'h' | 'd'}` }
+  [action: string]: {
+    count: number;
+    window: `${number} ${"s" | "m" | "h" | "d"}`;
+  };
 }
 
 /**
@@ -116,22 +118,22 @@ export interface ResourceRateLimit {
  * that declares `limit` or `flag`, regardless of whether `nav` is present.
  */
 export interface ResourceDefinition {
-  name: string
-  description?: string
+  name: string;
+  description?: string;
   /**
    * Which group this resource sits under in the pricing comparison table.
    * Optional: omitted entries fall into the default group for their kind
    * (limits vs. flags) via getFeatureCategories, so the table is complete
    * whether or not anyone has curated the grouping.
    */
-  category?: string
-  permissions?: readonly string[]
+  category?: string;
+  permissions?: readonly string[];
   /** limit and flag are mutually exclusive — pick at most one. */
-  limit?: ResourceLimit
-  flag?: ResourceFlag
-  nav?: ResourceNav
-  audit?: ResourceAudit
-  rateLimit?: ResourceRateLimit
+  limit?: ResourceLimit;
+  flag?: ResourceFlag;
+  nav?: ResourceNav;
+  audit?: ResourceAudit;
+  rateLimit?: ResourceRateLimit;
 }
 
 /**
@@ -151,20 +153,26 @@ export interface ResourceDefinition {
  */
 export const RESOURCES = {
   member: {
-    name: 'Team Members',
-    description: 'Add, remove, and modify organization members',
-    permissions: ['create', 'read', 'update', 'delete'],
+    name: "Team Members",
+    description: "Add, remove, and modify organization members",
+    permissions: ["create", "read", "update", "delete"],
     limit: {
-      perPlan: { free: 1, starter: 3, pro: 10, enterprise: 'unlimited', portal: 'unlimited' },
-      upgradeMessage: 'Upgrade to {nextPlan} to invite more teammates',
+      perPlan: {
+        free: 1,
+        starter: 3,
+        pro: 10,
+        enterprise: "unlimited",
+        portal: "unlimited",
+      },
+      upgradeMessage: "Upgrade to {nextPlan} to invite more teammates",
       availableOnFreeTrial: true,
-      unit: 'seats',
+      unit: "seats",
     },
     nav: {
-      label: 'Team',
-      href: '/dashboard/team',
-      icon: 'Users',
-      section: 'main',
+      label: "Team",
+      href: "/dashboard/team",
+      icon: "Users",
+      section: "main",
     },
   },
 
@@ -173,26 +181,32 @@ export const RESOURCES = {
    * `period` here would refill the cap monthly and let a free workspace
    * accumulate projects forever (see src/lib/usage-period.ts). */
   projects: {
-    name: 'Projects',
-    description: 'Videos being made in this workspace',
-    permissions: ['create', 'read', 'update', 'delete'],
+    name: "Projects",
+    description: "Videos being made in this workspace",
+    permissions: ["create", "read", "update", "delete"],
     limit: {
-      perPlan: { free: 3, starter: 30, pro: 300, enterprise: 'unlimited', portal: 'unlimited' },
-      upgradeMessage: 'Upgrade to {nextPlan} for more projects',
+      perPlan: {
+        free: 3,
+        starter: 30,
+        pro: 300,
+        enterprise: "unlimited",
+        portal: "unlimited",
+      },
+      upgradeMessage: "Upgrade to {nextPlan} for more projects",
       availableOnFreeTrial: true,
-      unit: 'projects',
+      unit: "projects",
     },
     nav: {
-      label: 'Projects',
-      href: '/dashboard/projects',
-      icon: 'Folder',
-      section: 'main',
+      label: "Projects",
+      href: "/dashboard/projects",
+      icon: "Folder",
+      section: "main",
     },
     audit: {
       describe: {
-        create: 'Created project {output.title}',
-        update: 'Updated project {output.title}',
-        delete: 'Deleted project {input.id}',
+        create: "Created project {output.title}",
+        update: "Updated project {output.title}",
+        delete: "Deleted project {input.id}",
       },
     },
   },
@@ -228,20 +242,20 @@ export const RESOURCES = {
    * description at all.
    */
   assets: {
-    name: 'Media',
-    description: 'Uploaded and generated media in this workspace',
-    permissions: ['create', 'read', 'update', 'delete'],
+    name: "Media",
+    description: "Uploaded and generated media in this workspace",
+    permissions: ["create", "read", "update", "delete"],
     nav: {
-      label: 'Media',
-      href: '/dashboard/media',
-      icon: 'Library',
-      section: 'main',
+      label: "Media",
+      href: "/dashboard/media",
+      icon: "Library",
+      section: "main",
     },
     audit: {
       describe: {
-        completeUpload: 'Uploaded {output.filename}',
-        update: 'Renamed asset to {output.filename}',
-        delete: 'Deleted asset {input.id}',
+        completeUpload: "Uploaded {output.filename}",
+        update: "Renamed asset to {output.filename}",
+        delete: "Deleted asset {input.id}",
       },
     },
     /* Presigning is cheap but it is also the step that decides whether bytes
@@ -250,7 +264,7 @@ export const RESOURCES = {
      * write URLs for an hour. Generous enough for a real bulk drop of a few
      * dozen files. */
     rateLimit: {
-      createUploadUrl: { count: 60, window: '1 m' },
+      createUploadUrl: { count: 60, window: "1 m" },
     },
   },
   /**
@@ -279,20 +293,26 @@ export const RESOURCES = {
    * has to be the PATH verb and not the CRUD word.
    */
   renders: {
-    name: 'Renders',
-    description: 'Videos rendered per month',
-    permissions: ['create', 'read'],
+    name: "Renders",
+    description: "Videos rendered per month",
+    permissions: ["create", "read"],
     limit: {
-      perPlan: { free: 5, starter: 100, pro: 1000, enterprise: 'unlimited', portal: 'unlimited' },
-      upgradeMessage: 'Upgrade to {nextPlan} to render more videos each month',
+      perPlan: {
+        free: 5,
+        starter: 100,
+        pro: 1000,
+        enterprise: "unlimited",
+        portal: "unlimited",
+      },
+      upgradeMessage: "Upgrade to {nextPlan} to render more videos each month",
       availableOnFreeTrial: true,
-      unit: 'renders',
-      period: 'month',
+      unit: "renders",
+      period: "month",
     },
     audit: {
       describe: {
-        create: 'Started a render for project {input.projectId}',
-        retry: 'Retried render {input.id}',
+        create: "Started a render for project {input.projectId}",
+        retry: "Retried render {input.id}",
       },
     },
     /* A render is the most expensive thing a customer can trigger, and the
@@ -300,8 +320,8 @@ export const RESOURCES = {
      * one minute from a stuck client, which on an unlimited plan is unbounded
      * spend. The monthly quota is the budget; this is the blast radius. */
     rateLimit: {
-      create: { count: 10, window: '1 m' },
-      retry: { count: 5, window: '1 m' },
+      create: { count: 10, window: "1 m" },
+      retry: { count: 5, window: "1 m" },
     },
   },
 
@@ -322,12 +342,18 @@ export const RESOURCES = {
    * watermark-free exports would make the trial the product.
    */
   watermarkFree: {
-    name: 'Watermark-free export',
-    description: 'Export finished videos without the watermark',
+    name: "Watermark-free export",
+    description: "Export finished videos without the watermark",
     flag: {
-      perPlan: { free: false, starter: true, pro: true, enterprise: true, portal: true },
+      perPlan: {
+        free: false,
+        starter: true,
+        pro: true,
+        enterprise: true,
+        portal: true,
+      },
       availableOnFreeTrial: false,
-      upgradeMessage: 'Upgrade to {nextPlan} to export without the watermark',
+      upgradeMessage: "Upgrade to {nextPlan} to export without the watermark",
     },
   },
 
@@ -361,137 +387,203 @@ export const RESOURCES = {
    * card. The audit template is keyed by that same PATH verb.
    */
   credits: {
-    name: 'Credits',
-    description: 'Credit balance and purchase history',
-    permissions: ['read', 'purchase'],
-    category: 'Billing',
+    name: "Credits",
+    description: "Credit balance and purchase history",
+    permissions: ["read", "purchase"],
+    category: "Billing",
     nav: {
-      label: 'Credits',
-      href: '/dashboard/settings/credits',
-      icon: 'CreditCard',
-      section: 'settings',
-      requirePermission: 'credits:read',
+      label: "Credits",
+      href: "/dashboard/settings/credits",
+      icon: "CreditCard",
+      section: "settings",
+      requirePermission: "credits:read",
     },
     audit: {
-      describe: { purchase: 'Purchased {input.packKey} credits' },
+      describe: { purchase: "Purchased {input.packKey} credits" },
     },
     /* Each attempt is a real payment-intent round trip against a real card.
      * A loop here is both a Stripe bill and a fraud signal on the account. */
     rateLimit: {
-      purchase: { count: 10, window: '1 m' },
+      purchase: { count: 10, window: "1 m" },
+    },
+  },
+
+  /**
+   * SOURCE OF TRUTH KEYWORDS: RESOURCES.scripts, SCRIPTS_HAVE_NO_LIMIT,
+   *   scripts.generate, LEDGER_NOT_A_COUNTER
+   *
+   * The generated text a video is made from.
+   *
+   * SCRIPTS_HAVE_NO_LIMIT, for the same reason `credits` has none: a
+   * generation's cost is VARIABLE — it depends on how much source text was
+   * supplied and how long a script was asked for — and the registry's `limit`
+   * is a counter that can only increment and decrement. Scripts are paid for
+   * on the credit ledger (Phase 05), where a hold can be placed before the
+   * cost is known and released if the model refuses. A `limit` here would be a
+   * second, parallel quota that disagrees with the ledger the first time a
+   * generation fails. Grep LEDGER_NOT_A_COUNTER.
+   *
+   * It also carries no `nav`: a script has no screen of its own, it is edited
+   * inside the project it belongs to. The permissions still exist because the
+   * editor's actions — rewriting a block, deleting one, reordering — are
+   * things a workspace may reasonably want to restrict to the people who make
+   * videos rather than everyone who can view them.
+   *
+   * The audit templates are keyed by the PATH VERB, as everywhere else:
+   * `generate` and `updateBlock`, not `create` and `update`. See the note on
+   * the `assets` entry for why keying them by the CRUD word compiles, reads
+   * correctly, and silently produces audit rows with no description.
+   *
+   * `generate` is rate-limited because each call is a billed model request
+   * against a customer's credits, and the credit hold is placed INSIDE the
+   * workflow — so a client looping the mutation could enqueue many runs before
+   * the first one reserved anything.
+   */
+  scripts: {
+    name: "Scripts",
+    description: "AI-generated scripts for a project",
+    permissions: ["create", "read", "update", "delete"],
+    audit: {
+      describe: {
+        generate: "Generated a script for project {input.projectId}",
+        updateBlock: "Edited a script block",
+        regenerateBlock: "Rewrote a script block",
+        deleteBlock: "Deleted a script block",
+      },
+    },
+    rateLimit: {
+      generate: { count: 20, window: "1 m" },
+      regenerateBlock: { count: 30, window: "1 m" },
     },
   },
 
   invitation: {
-    name: 'Invitations',
-    description: 'Send invites and cancel pending invitations',
-    permissions: ['create', 'cancel'],
+    name: "Invitations",
+    description: "Send invites and cancel pending invitations",
+    permissions: ["create", "cancel"],
   },
 
   organizationRoles: {
-    name: 'Organization Roles',
-    description: 'Create and manage custom roles and their permissions',
-    permissions: ['create', 'read', 'update', 'delete'],
+    name: "Organization Roles",
+    description: "Create and manage custom roles and their permissions",
+    permissions: ["create", "read", "update", "delete"],
   },
 
   storage: {
-    name: 'Storage',
-    description: 'File storage capacity',
+    name: "Storage",
+    description: "File storage capacity",
     limit: {
       perPlan: {
         free: 100 * 1024 * 1024,
         starter: 5 * 1024 * 1024 * 1024,
         pro: 25 * 1024 * 1024 * 1024,
-        enterprise: 'unlimited',
-        portal: 'unlimited',
+        enterprise: "unlimited",
+        portal: "unlimited",
       },
-      upgradeMessage: 'Upgrade to {nextPlan} to expand your storage',
+      upgradeMessage: "Upgrade to {nextPlan} to expand your storage",
       availableOnFreeTrial: true,
-      unit: 'bytes',
+      unit: "bytes",
     },
   },
 
   apiCalls: {
-    name: 'API Calls',
-    description: 'Total API calls per month',
+    name: "API Calls",
+    description: "Total API calls per month",
     limit: {
-      perPlan: { free: 1_000, starter: 50_000, pro: 500_000, enterprise: 'unlimited', portal: 'unlimited' },
-      upgradeMessage: 'Upgrade to {nextPlan} for more API calls',
+      perPlan: {
+        free: 1_000,
+        starter: 50_000,
+        pro: 500_000,
+        enterprise: "unlimited",
+        portal: "unlimited",
+      },
+      upgradeMessage: "Upgrade to {nextPlan} for more API calls",
       availableOnFreeTrial: true,
       /* `unit` is the noun the pricing copy uses — "50,000 API calls". */
-      unit: 'API calls',
+      unit: "API calls",
       /* The only periodic resource today. The description has always said "per
        * month"; this is the machine-readable half that usage.reset acts on. */
-      period: 'month',
+      period: "month",
     },
   },
 
   auditLogs: {
-    name: 'Audit Logs',
-    description: 'Access full audit log history with forensic detail',
-    permissions: ['read'],
+    name: "Audit Logs",
+    description: "Access full audit log history with forensic detail",
+    permissions: ["read"],
     flag: {
-      perPlan: { free: false, starter: false, pro: true, enterprise: true, portal: true },
+      perPlan: {
+        free: false,
+        starter: false,
+        pro: true,
+        enterprise: true,
+        portal: true,
+      },
       availableOnFreeTrial: false,
     },
     nav: {
-      label: 'Audit Logs',
-      href: '/dashboard/settings/audit-logs',
-      icon: 'ScrollText',
-      section: 'settings',
+      label: "Audit Logs",
+      href: "/dashboard/settings/audit-logs",
+      icon: "ScrollText",
+      section: "settings",
       requireFlag: true,
     },
   },
 
   billing: {
-    name: 'Billing & Payments',
-    description: 'Manage subscriptions, invoices, and payment methods',
-    permissions: ['create', 'read', 'update', 'delete'],
+    name: "Billing & Payments",
+    description: "Manage subscriptions, invoices, and payment methods",
+    permissions: ["create", "read", "update", "delete"],
     nav: {
-      label: 'Billing',
-      href: '/dashboard/settings/billing',
-      icon: 'CreditCard',
-      section: 'settings',
+      label: "Billing",
+      href: "/dashboard/settings/billing",
+      icon: "CreditCard",
+      section: "settings",
     },
   },
 
   organizationSettings: {
-    name: 'Organization Settings',
-    description: 'Update organization name, logo, and other org-wide settings',
-    permissions: ['read', 'update'],
-    audit: { entity: 'organization' },
+    name: "Organization Settings",
+    description: "Update organization name, logo, and other org-wide settings",
+    permissions: ["read", "update"],
+    audit: { entity: "organization" },
     nav: {
-      label: 'Workspace',
-      href: '/dashboard/settings/organization',
-      icon: 'Settings',
-      section: 'settings',
+      label: "Workspace",
+      href: "/dashboard/settings/organization",
+      icon: "Settings",
+      section: "settings",
     },
   },
+} as const satisfies Record<string, ResourceDefinition>;
 
-} as const satisfies Record<string, ResourceDefinition>
-
-export type ResourceKey = keyof typeof RESOURCES
+export type ResourceKey = keyof typeof RESOURCES;
 
 export type LimitResourceKey = {
-  [K in ResourceKey]: (typeof RESOURCES)[K] extends { limit: ResourceLimit } ? K : never
-}[ResourceKey]
+  [K in ResourceKey]: (typeof RESOURCES)[K] extends { limit: ResourceLimit }
+    ? K
+    : never;
+}[ResourceKey];
 
 export type FlagResourceKey = {
-  [K in ResourceKey]: (typeof RESOURCES)[K] extends { flag: ResourceFlag } ? K : never
-}[ResourceKey]
+  [K in ResourceKey]: (typeof RESOURCES)[K] extends { flag: ResourceFlag }
+    ? K
+    : never;
+}[ResourceKey];
 
 export type PermissionedResourceKey = {
-  [K in ResourceKey]: (typeof RESOURCES)[K] extends { permissions: readonly string[] }
+  [K in ResourceKey]: (typeof RESOURCES)[K] extends {
+    permissions: readonly string[];
+  }
     ? K
-    : never
-}[ResourceKey]
+    : never;
+}[ResourceKey];
 
 export type PermissionAction<R extends PermissionedResourceKey> =
   (typeof RESOURCES)[R] extends { permissions: infer A }
     ? A extends readonly (infer T)[]
       ? T
       : never
-    : never
+    : never;
 
 /**
  * SOURCE OF TRUTH KEYWORDS: Permission
@@ -504,9 +596,11 @@ export type PermissionAction<R extends PermissionedResourceKey> =
  */
 export type Permission =
   | {
-      [R in PermissionedResourceKey]: `${R & string}:${PermissionAction<R> & string}`
+      [
+        R in PermissionedResourceKey
+      ]: `${R & string}:${PermissionAction<R> & string}`;
     }[PermissionedResourceKey]
-  | '*:*'
+  | "*:*";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: isResourceKey
@@ -516,22 +610,23 @@ export type Permission =
  * WHERE: Used by getResourceFromPath and the RESOURCE_ENTRIES builder below.
  */
 export function isResourceKey(value: string): value is ResourceKey {
-  return Object.prototype.hasOwnProperty.call(RESOURCES, value)
+  return Object.prototype.hasOwnProperty.call(RESOURCES, value);
 }
 
 /* Single widening point for iterating RESOURCES as [key, def] tuples — the
  * `as const satisfies` literal types refuse to see optional fields on the
  * union when iterated directly, so we widen here once. */
-export const RESOURCE_ENTRIES: ReadonlyArray<readonly [ResourceKey, ResourceDefinition]> =
-  (() => {
-    const out: Array<readonly [ResourceKey, ResourceDefinition]> = []
-    for (const key of Object.keys(RESOURCES)) {
-      if (isResourceKey(key)) {
-        out.push([key, RESOURCES[key]])
-      }
+export const RESOURCE_ENTRIES: ReadonlyArray<
+  readonly [ResourceKey, ResourceDefinition]
+> = (() => {
+  const out: Array<readonly [ResourceKey, ResourceDefinition]> = [];
+  for (const key of Object.keys(RESOURCES)) {
+    if (isResourceKey(key)) {
+      out.push([key, RESOURCES[key]]);
     }
-    return out
-  })()
+  }
+  return out;
+})();
 
 /**
  * SOURCE OF TRUTH KEYWORDS: getOrganizationStatement
@@ -542,13 +637,13 @@ export const RESOURCE_ENTRIES: ReadonlyArray<readonly [ResourceKey, ResourceDefi
  * WHERE: Used by src/lib/better-auth/access-control.ts to build organizationStatement.
  */
 export function getOrganizationStatement(): Record<string, readonly string[]> {
-  const statement: Record<string, readonly string[]> = {}
+  const statement: Record<string, readonly string[]> = {};
   for (const [key, def] of RESOURCE_ENTRIES) {
     if (def.permissions && def.permissions.length > 0) {
-      statement[key] = def.permissions
+      statement[key] = def.permissions;
     }
   }
-  return statement
+  return statement;
 }
 
 /**
@@ -564,23 +659,23 @@ export function getOrganizationStatement(): Record<string, readonly string[]> {
  *        src/components/global/sidebar/app-sidebar.tsx.
  */
 export interface SidebarNavItem {
-  key: ResourceKey
-  label: string
-  href: Route
-  icon: string
+  key: ResourceKey;
+  label: string;
+  href: Route;
+  icon: string;
   /** Full `resource:action` the member must hold; owners always pass. */
-  requirePermission: Permission
+  requirePermission: Permission;
   /** When true, the item is hidden unless the resource's plan flag is on. */
-  requireFlag: boolean
+  requireFlag: boolean;
 }
 
 export interface SidebarNavSection {
-  section: string
-  items: SidebarNavItem[]
+  section: string;
+  items: SidebarNavItem[];
 }
 
 /* Render order for the known sections; unknown sections append after. */
-const NAV_SECTION_ORDER: readonly string[] = ['main', 'settings']
+const NAV_SECTION_ORDER: readonly string[] = ["main", "settings"];
 
 /**
  * SOURCE OF TRUTH KEYWORDS: getSidebarNav
@@ -593,16 +688,16 @@ const NAV_SECTION_ORDER: readonly string[] = ['main', 'settings']
  * WHERE: Called by app-sidebar.tsx (client) to render sections.
  */
 export function getSidebarNav(): SidebarNavSection[] {
-  const bySection = new Map<string, SidebarNavItem[]>()
+  const bySection = new Map<string, SidebarNavItem[]>();
 
   for (const [key, def] of RESOURCE_ENTRIES) {
-    if (!def.nav) continue
-    const action = def.nav.requirePermission ?? 'read'
+    if (!def.nav) continue;
+    const action = def.nav.requirePermission ?? "read";
     /* `${key}:${action}` is a Permission by construction, but RESOURCE_ENTRIES
      * is typed against the widened ResourceDefinition so TS sees `string`. This
      * is the same documented boundary the permission-constants builder uses. */
-    const requirePermission = `${key}:${action}` as Permission
-    const section = def.nav.section ?? 'main'
+    const requirePermission = `${key}:${action}` as Permission;
+    const section = def.nav.section ?? "main";
     const item: SidebarNavItem = {
       key,
       label: def.nav.label,
@@ -610,20 +705,20 @@ export function getSidebarNav(): SidebarNavSection[] {
       icon: def.nav.icon,
       requirePermission,
       requireFlag: def.nav.requireFlag ?? false,
-    }
-    const existing = bySection.get(section)
-    if (existing) existing.push(item)
-    else bySection.set(section, [item])
+    };
+    const existing = bySection.get(section);
+    if (existing) existing.push(item);
+    else bySection.set(section, [item]);
   }
 
   const orderedKeys = [
     ...NAV_SECTION_ORDER.filter((s) => bySection.has(s)),
     ...[...bySection.keys()].filter((s) => !NAV_SECTION_ORDER.includes(s)),
-  ]
+  ];
   return orderedKeys.map((section) => ({
     section,
     items: bySection.get(section) ?? [],
-  }))
+  }));
 }
 
 /**
@@ -636,22 +731,28 @@ export function getSidebarNav(): SidebarNavSection[] {
  * WHERE: Used by protectedProcedure (src/trpc/procedures/protected.ts).
  */
 export function getResourceFromPath(path: string): ResourceKey | null {
-  if (!path) return null
-  const first = path.split('.')[0]
-  if (first === undefined) return null
-  return isResourceKey(first) ? first : null
+  if (!path) return null;
+  const first = path.split(".")[0];
+  if (first === undefined) return null;
+  return isResourceKey(first) ? first : null;
 }
 
 function isLimitEntry(
-  entry: readonly [ResourceKey, ResourceDefinition]
-): entry is readonly [LimitResourceKey, ResourceDefinition & { limit: ResourceLimit }] {
-  return entry[1].limit !== undefined
+  entry: readonly [ResourceKey, ResourceDefinition],
+): entry is readonly [
+  LimitResourceKey,
+  ResourceDefinition & { limit: ResourceLimit },
+] {
+  return entry[1].limit !== undefined;
 }
 
 function isFlagEntry(
-  entry: readonly [ResourceKey, ResourceDefinition]
-): entry is readonly [FlagResourceKey, ResourceDefinition & { flag: ResourceFlag }] {
-  return entry[1].flag !== undefined
+  entry: readonly [ResourceKey, ResourceDefinition],
+): entry is readonly [
+  FlagResourceKey,
+  ResourceDefinition & { flag: ResourceFlag },
+] {
+  return entry[1].flag !== undefined;
 }
 
 /**
@@ -669,23 +770,23 @@ function isFlagEntry(
  */
 export function getMutationFeatureMap(): Record<
   string,
-  { resource: LimitResourceKey; operation: 'increment' | 'decrement' }
+  { resource: LimitResourceKey; operation: "increment" | "decrement" }
 > {
   const map: Record<
     string,
-    { resource: LimitResourceKey; operation: 'increment' | 'decrement' }
-  > = {}
+    { resource: LimitResourceKey; operation: "increment" | "decrement" }
+  > = {};
   for (const entry of RESOURCE_ENTRIES) {
-    if (!isLimitEntry(entry)) continue
-    const [key] = entry
-    map[`${key}.create`] = { resource: key, operation: 'increment' }
-    map[`${key}.delete`] = { resource: key, operation: 'decrement' }
+    if (!isLimitEntry(entry)) continue;
+    const [key] = entry;
+    map[`${key}.create`] = { resource: key, operation: "increment" };
+    map[`${key}.delete`] = { resource: key, operation: "decrement" };
   }
-  return map
+  return map;
 }
 
 function isJsonObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 /**
@@ -700,17 +801,20 @@ function isJsonObject(value: unknown): value is Record<string, unknown> {
  */
 export function interpolateAuditDescribe(
   template: string,
-  params: { input: unknown; output: unknown }
+  params: { input: unknown; output: unknown },
 ): string {
-  return template.replace(/\{(input|output)\.([a-zA-Z0-9_]+)\}/g, (_, source, field) => {
-    const obj = source === 'input' ? params.input : params.output
-    if (!isJsonObject(obj) || !(field in obj)) {
-      return `{${source}.${field}}`
-    }
-    const value = obj[field]
-    if (value === null || value === undefined) return `{${source}.${field}}`
-    return String(value)
-  })
+  return template.replace(
+    /\{(input|output)\.([a-zA-Z0-9_]+)\}/g,
+    (_, source, field) => {
+      const obj = source === "input" ? params.input : params.output;
+      if (!isJsonObject(obj) || !(field in obj)) {
+        return `{${source}.${field}}`;
+      }
+      const value = obj[field];
+      if (value === null || value === undefined) return `{${source}.${field}}`;
+      return String(value);
+    },
+  );
 }
 
 /**
@@ -724,10 +828,10 @@ export function interpolateAuditDescribe(
  */
 export function getResourceLimitForPlan(
   resource: LimitResourceKey,
-  plan: PlanKey
+  plan: PlanKey,
 ): number {
-  const value = RESOURCES[resource].limit.perPlan[plan]
-  return value === 'unlimited' ? Infinity : value
+  const value = RESOURCES[resource].limit.perPlan[plan];
+  return value === "unlimited" ? Infinity : value;
 }
 
 /**
@@ -740,9 +844,9 @@ export function getResourceLimitForPlan(
  */
 export function getResourceFlagForPlan(
   resource: FlagResourceKey,
-  plan: PlanKey
+  plan: PlanKey,
 ): boolean {
-  return RESOURCES[resource].flag.perPlan[plan]
+  return RESOURCES[resource].flag.perPlan[plan];
 }
 
 /**
@@ -766,9 +870,11 @@ export function getResourceFlagForPlan(
  *        src/app/(dashboard)/dashboard/settings/audit-logs/_components.
  */
 export function getAuditEntityLabel(entity: string): string {
-  if (isResourceKey(entity)) return RESOURCES[entity].name
-  const spaced = entity.replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/[_-]+/g, ' ')
-  return spaced.charAt(0).toUpperCase() + spaced.slice(1)
+  if (isResourceKey(entity)) return RESOURCES[entity].name;
+  const spaced = entity
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/[_-]+/g, " ");
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
 }
 
 /**
@@ -790,26 +896,26 @@ export function getAuditEntityLabel(entity: string): string {
  *        pricing surface.
  */
 export function getPlanFeatureList(plan: PlanKey): string[] {
-  const lines: string[] = []
+  const lines: string[] = [];
 
   for (const [, def] of RESOURCE_ENTRIES) {
-    if (!def.limit) continue
-    const value = def.limit.perPlan[plan]
+    if (!def.limit) continue;
+    const value = def.limit.perPlan[plan];
     /* A zero cap means the plan does not include the resource at all — listing
      * "0 seats" as a selling point would read worse than saying nothing. */
-    if (value === 0) continue
-    lines.push(formatLimitValue(value, def.name, def.limit))
+    if (value === 0) continue;
+    lines.push(formatLimitValue(value, def.name, def.limit));
   }
 
   for (const [, def] of RESOURCE_ENTRIES) {
-    if (!def.flag) continue
-    if (def.flag.perPlan[plan]) lines.push(def.name)
+    if (!def.flag) continue;
+    if (def.flag.perPlan[plan]) lines.push(def.name);
   }
 
-  return lines
+  return lines;
 }
 
-const BYTE_UNITS: readonly string[] = ['B', 'KB', 'MB', 'GB', 'TB']
+const BYTE_UNITS: readonly string[] = ["B", "KB", "MB", "GB", "TB"];
 
 /**
  * SOURCE OF TRUTH KEYWORDS: formatBytes, BYTE_UNITS, PLAN_FEATURE_COPY
@@ -825,18 +931,18 @@ const BYTE_UNITS: readonly string[] = ['B', 'KB', 'MB', 'GB', 'TB']
  * WHERE: formatLimitAmount; the media table and upload UI; <UsageMeter>.
  */
 export function formatBytes(value: number): string {
-  if (!Number.isFinite(value) || value <= 0) return '0 B'
+  if (!Number.isFinite(value) || value <= 0) return "0 B";
 
-  let size = value
-  let unitIndex = 0
+  let size = value;
+  let unitIndex = 0;
   while (size >= 1024 && unitIndex < BYTE_UNITS.length - 1) {
-    size /= 1024
-    unitIndex += 1
+    size /= 1024;
+    unitIndex += 1;
   }
 
   /* Trim a trailing .0 so 5 GB doesn't render as "5.0 GB". */
-  const rounded = Number.isInteger(size) ? String(size) : size.toFixed(1)
-  return `${rounded} ${BYTE_UNITS[unitIndex]}`
+  const rounded = Number.isInteger(size) ? String(size) : size.toFixed(1);
+  return `${rounded} ${BYTE_UNITS[unitIndex]}`;
 }
 
 /**
@@ -850,11 +956,11 @@ export function formatBytes(value: number): string {
  * WHERE: Called by getPlanFeatureList.
  */
 export function formatLimitValue(
-  value: number | 'unlimited',
+  value: number | "unlimited",
   name: string,
-  limit: ResourceLimit
+  limit: ResourceLimit,
 ): string {
-  return `${formatLimitAmount(value, limit)} ${formatLimitNoun(value, name, limit)}`
+  return `${formatLimitAmount(value, limit)} ${formatLimitNoun(value, name, limit)}`;
 }
 
 /**
@@ -870,22 +976,23 @@ export function formatLimitValue(
  * WHERE: formatLimitValue above, and the `noun` on every PlanFeatureRow.
  */
 export function formatLimitNoun(
-  value: number | 'unlimited',
+  value: number | "unlimited",
   name: string,
-  limit: ResourceLimit
+  limit: ResourceLimit,
 ): string {
-  const isBytes = limit.unit === 'bytes'
+  const isBytes = limit.unit === "bytes";
 
   /* Unlimited reads as a sentence ("Unlimited storage"), so the noun is
    * lower-case even for a byte limit, where a capped value reads as a
    * measurement of a named thing ("5 GB Storage"). */
-  if (value === 'unlimited') return isBytes ? name.toLowerCase() : (limit.unit ?? name.toLowerCase())
-  if (isBytes) return name
+  if (value === "unlimited")
+    return isBytes ? name.toLowerCase() : (limit.unit ?? name.toLowerCase());
+  if (isBytes) return name;
 
   /* Registry units are written plural because that is the common case; drop the
    * s for a cap of one so a Free plan reads "1 seat", not "1 seats". */
-  const noun = limit.unit ?? name.toLowerCase()
-  return value === 1 && noun.endsWith('s') ? noun.slice(0, -1) : noun
+  const noun = limit.unit ?? name.toLowerCase();
+  return value === 1 && noun.endsWith("s") ? noun.slice(0, -1) : noun;
 }
 
 /**
@@ -902,26 +1009,26 @@ export function formatLimitNoun(
  *        pricing cards; formatLimitValue builds its sentence from it.
  */
 export function formatLimitAmount(
-  value: number | 'unlimited',
-  limit: ResourceLimit
+  value: number | "unlimited",
+  limit: ResourceLimit,
 ): string {
-  if (value === 'unlimited') return 'Unlimited'
+  if (value === "unlimited") return "Unlimited";
 
   /* Shared with the media library and the usage meter — see formatBytes. */
-  if (limit.unit === 'bytes') return formatBytes(value)
+  if (limit.unit === "bytes") return formatBytes(value);
 
-  return value.toLocaleString('en-US')
+  return value.toLocaleString("en-US");
 }
 
 /* `satisfies` is load-bearing: if a new limit/flag resource gets added and
  * the tuple isn't updated, TS fails to compile. */
-export const LIMIT_RESOURCE_KEYS = RESOURCE_ENTRIES
-  .filter(isLimitEntry)
-  .map(([k]) => k) satisfies readonly LimitResourceKey[]
+export const LIMIT_RESOURCE_KEYS = RESOURCE_ENTRIES.filter(isLimitEntry).map(
+  ([k]) => k,
+) satisfies readonly LimitResourceKey[];
 
-export const FLAG_RESOURCE_KEYS = RESOURCE_ENTRIES
-  .filter(isFlagEntry)
-  .map(([k]) => k) satisfies readonly FlagResourceKey[]
+export const FLAG_RESOURCE_KEYS = RESOURCE_ENTRIES.filter(isFlagEntry).map(
+  ([k]) => k,
+) satisfies readonly FlagResourceKey[];
 
 /**
  * SOURCE OF TRUTH KEYWORDS: PlanFeatureRow, getPlanFeatureRows,
@@ -940,26 +1047,26 @@ export const FLAG_RESOURCE_KEYS = RESOURCE_ENTRIES
  *        <FeatureComparisonTable /> in src/components/global/upgrade-modal.
  */
 export interface PlanFeatureRow {
-  resource: ResourceKey
-  name: string
-  category: string
-  kind: 'limit' | 'flag'
+  resource: ResourceKey;
+  name: string;
+  category: string;
+  kind: "limit" | "flag";
   /** "25 GB", "50,000", "Unlimited" — empty string for a flag. */
-  amount: string
+  amount: string;
   /** The noun the amount counts — "seats", "Storage" — empty for a flag. */
-  noun: string
+  noun: string;
   /** Sentence form — "10 seats", "Custom Domain". */
-  label: string
+  label: string;
   /** False when the plan caps the resource at 0 or leaves the flag off. */
-  isIncluded: boolean
-  isUnlimited: boolean
+  isIncluded: boolean;
+  isUnlimited: boolean;
 }
 
 /* The group a resource falls into when its registry entry doesn't name one.
  * Two defaults, not one, because a quota and a capability answer different
  * questions for a buyer and a single undifferentiated list buries both. */
-const DEFAULT_LIMIT_CATEGORY = 'Usage & limits'
-const DEFAULT_FLAG_CATEGORY = 'Features'
+const DEFAULT_LIMIT_CATEGORY = "Usage & limits";
+const DEFAULT_FLAG_CATEGORY = "Features";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: getPlanFeatureRows, PLAN_FEATURE_COPY
@@ -974,41 +1081,41 @@ const DEFAULT_FLAG_CATEGORY = 'Features'
  * WHERE: <PricingCard /> and <FeatureComparisonTable />.
  */
 export function getPlanFeatureRows(plan: PlanKey): PlanFeatureRow[] {
-  const rows: PlanFeatureRow[] = []
+  const rows: PlanFeatureRow[] = [];
 
   for (const [key, def] of RESOURCE_ENTRIES) {
-    if (!def.limit) continue
-    const value = def.limit.perPlan[plan]
+    if (!def.limit) continue;
+    const value = def.limit.perPlan[plan];
     rows.push({
       resource: key,
       name: def.name,
       category: def.category ?? DEFAULT_LIMIT_CATEGORY,
-      kind: 'limit',
+      kind: "limit",
       amount: formatLimitAmount(value, def.limit),
       noun: formatLimitNoun(value, def.name, def.limit),
       label: formatLimitValue(value, def.name, def.limit),
       /* A cap of 0 is not "a small allowance" — the plan doesn't include it. */
       isIncluded: value !== 0,
-      isUnlimited: value === 'unlimited',
-    })
+      isUnlimited: value === "unlimited",
+    });
   }
 
   for (const [key, def] of RESOURCE_ENTRIES) {
-    if (!def.flag) continue
+    if (!def.flag) continue;
     rows.push({
       resource: key,
       name: def.name,
       category: def.category ?? DEFAULT_FLAG_CATEGORY,
-      kind: 'flag',
-      amount: '',
-      noun: '',
+      kind: "flag",
+      amount: "",
+      noun: "",
       label: def.name,
       isIncluded: def.flag.perPlan[plan],
       isUnlimited: false,
-    })
+    });
   }
 
-  return rows
+  return rows;
 }
 
 /**
@@ -1022,18 +1129,24 @@ export function getPlanFeatureRows(plan: PlanKey): PlanFeatureRow[] {
  *        never reshuffles on an unrelated edit.
  * WHERE: <FeatureComparisonTable />.
  */
-export function getFeatureCategories(): Array<{ name: string; resources: ResourceKey[] }> {
-  const groups = new Map<string, ResourceKey[]>()
+export function getFeatureCategories(): Array<{
+  name: string;
+  resources: ResourceKey[];
+}> {
+  const groups = new Map<string, ResourceKey[]>();
 
   /* Limits first, then flags — the same order getPlanFeatureRows returns, so
    * the table reads top-to-bottom in one consistent sequence. */
   for (const row of getPlanFeatureRows(PLAN_KEYS[0])) {
-    const existing = groups.get(row.category)
-    if (existing) existing.push(row.resource)
-    else groups.set(row.category, [row.resource])
+    const existing = groups.get(row.category);
+    if (existing) existing.push(row.resource);
+    else groups.set(row.category, [row.resource]);
   }
 
-  return [...groups.entries()].map(([name, resources]) => ({ name, resources }))
+  return [...groups.entries()].map(([name, resources]) => ({
+    name,
+    resources,
+  }));
 }
 
 /**
@@ -1056,22 +1169,25 @@ export function getFeatureCategories(): Array<{ name: string; resources: Resourc
  *        and to the structured gate errors thrown by protectedProcedure; both
  *        surface in <UpgradeModal />.
  */
-export function getUpgradeMessage(resource: ResourceKey, currentPlan: PlanKey): string {
+export function getUpgradeMessage(
+  resource: ResourceKey,
+  currentPlan: PlanKey,
+): string {
   /* Widened through ResourceDefinition for the same reason RESOURCE_ENTRIES is:
    * the `as const satisfies` literal refuses to show optional fields on the
    * union. */
-  const def: ResourceDefinition = RESOURCES[resource]
+  const def: ResourceDefinition = RESOURCES[resource];
   const template =
     def.limit?.upgradeMessage ??
     def.flag?.upgradeMessage ??
-    BRANDING.upgradeModal.flagMessageTemplate
+    BRANDING.upgradeModal.flagMessageTemplate;
 
-  const nextPlan = getNextPlan(currentPlan)
+  const nextPlan = getNextPlan(currentPlan);
   /* No rung above this one — a sentence naming a next plan would be false, so
    * the generic line takes over instead. */
-  if (!nextPlan) return BRANDING.upgradeModal.topOfLadderBody
+  if (!nextPlan) return BRANDING.upgradeModal.topOfLadderBody;
 
   return template
-    .replace('{nextPlan}', PLANS[nextPlan].name)
-    .replace('{resourceName}', def.name)
+    .replace("{nextPlan}", PLANS[nextPlan].name)
+    .replace("{resourceName}", def.name);
 }

@@ -1,14 +1,8 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
-'use client'
+"use client";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: CreditsScreen, CreditBalanceCard, TopUpPacks,
@@ -40,20 +34,26 @@
  * WHERE: Rendered by /dashboard/settings/credits.
  */
 
-import * as React from 'react'
-import Link from 'next/link'
-import { toast } from 'sonner'
+import * as React from "react";
+import Link from "next/link";
+import { toast } from "sonner";
 
-import { trpc } from '@/trpc/react-provider'
-import { useActiveOrganization, useActiveOrganizationId } from '@/hooks/use-active-organization'
-import { permissions } from '@/lib/permissions'
-import { DataTable, type DataTableColumn } from '@/components/global/data-table'
-import { PaymentMethodOption } from '@/components/global/billing'
-import { Badge } from '@/components/ui/badge'
-import { Button, buttonVariants } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Skeleton } from '@/components/ui/skeleton'
-import type { CreditLedgerKind, CreditPackKey } from '@/lib/types'
+import { trpc } from "@/trpc/react-provider";
+import {
+  useActiveOrganization,
+  useActiveOrganizationId,
+} from "@/hooks/use-active-organization";
+import { permissions } from "@/lib/permissions";
+import {
+  DataTable,
+  type DataTableColumn,
+} from "@/components/global/data-table";
+import { PaymentMethodOption } from "@/components/global/billing";
+import { Badge } from "@/components/ui/badge";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import type { CreditLedgerKind, CreditPackKey } from "@/lib/types";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: LEDGER_KIND_COPY
@@ -67,26 +67,29 @@ import type { CreditLedgerKind, CreditPackKey } from '@/lib/types'
  * WHERE: The ledger table below.
  */
 const LEDGER_KIND_COPY: Readonly<
-  Record<CreditLedgerKind, { label: string; tone: 'default' | 'secondary' | 'destructive' }>
+  Record<
+    CreditLedgerKind,
+    { label: string; tone: "default" | "secondary" | "destructive" }
+  >
 > = {
-  purchase: { label: 'Top-up', tone: 'default' },
-  grant: { label: 'Granted', tone: 'default' },
-  hold: { label: 'Reserved', tone: 'secondary' },
-  commit: { label: 'Used', tone: 'secondary' },
-  release: { label: 'Returned', tone: 'default' },
-}
+  purchase: { label: "Top-up", tone: "default" },
+  grant: { label: "Granted", tone: "default" },
+  hold: { label: "Reserved", tone: "secondary" },
+  commit: { label: "Used", tone: "secondary" },
+  release: { label: "Returned", tone: "default" },
+};
 
 function toLedgerKind(value: string): CreditLedgerKind {
-  return value in LEDGER_KIND_COPY ? (value as CreditLedgerKind) : 'commit'
+  return value in LEDGER_KIND_COPY ? (value as CreditLedgerKind) : "commit";
 }
 
 export function CreditsScreen() {
-  const organizationId = useActiveOrganizationId()
-  const { hasPermission } = useActiveOrganization()
-  const enabled = organizationId !== undefined
-  const canPurchase = hasPermission(permissions.CREDITS_PURCHASE)
+  const organizationId = useActiveOrganizationId();
+  const { hasPermission } = useActiveOrganization();
+  const enabled = organizationId !== undefined;
+  const canPurchase = hasPermission(permissions.CREDITS_PURCHASE);
 
-  if (!enabled) return <Skeleton className="h-64 w-full rounded-xl" />
+  if (!enabled) return <Skeleton className="h-64 w-full rounded-xl" />;
 
   return (
     <div className="flex flex-col gap-6">
@@ -94,7 +97,7 @@ export function CreditsScreen() {
       {canPurchase ? <TopUpPacks organizationId={organizationId} /> : null}
       <CreditLedgerTable organizationId={organizationId} />
     </div>
-  )
+  );
 }
 
 /**
@@ -106,7 +109,10 @@ export function CreditsScreen() {
  *        caption says "available" rather than "balance".
  */
 function CreditBalanceCard({ organizationId }: { organizationId: string }) {
-  const query = trpc.credits.getBalance.useQuery({ organizationId }, { retry: false })
+  const query = trpc.credits.getBalance.useQuery(
+    { organizationId },
+    { retry: false },
+  );
 
   return (
     <Card>
@@ -117,7 +123,7 @@ function CreditBalanceCard({ organizationId }: { organizationId: string }) {
             <Skeleton className="mt-2 h-9 w-24" />
           ) : (
             <p className="mt-1 text-3xl font-semibold text-foreground">
-              {query.data.balance.toLocaleString('en-US')}
+              {query.data.balance.toLocaleString("en-US")}
             </p>
           )}
         </div>
@@ -127,7 +133,7 @@ function CreditBalanceCard({ organizationId }: { organizationId: string }) {
         </p>
       </CardContent>
     </Card>
-  )
+  );
 }
 
 /**
@@ -139,35 +145,47 @@ function CreditBalanceCard({ organizationId }: { organizationId: string }) {
  *        rendering, and a modal in that moment is a modal they abandon.
  */
 function TopUpPacks({ organizationId }: { organizationId: string }) {
-  const utils = trpc.useUtils()
-  const [selectedCard, setSelectedCard] = React.useState<string | null>(null)
-  const [buying, setBuying] = React.useState<CreditPackKey | null>(null)
+  const utils = trpc.useUtils();
+  const [selectedCard, setSelectedCard] = React.useState<string | null>(null);
+  const [buying, setBuying] = React.useState<CreditPackKey | null>(null);
 
-  const packs = trpc.credits.getPacks.useQuery({ organizationId }, { retry: false })
-  const methods = trpc.billing.getPaymentMethods.useQuery({ organizationId }, { retry: false })
+  const packs = trpc.credits.getPacks.useQuery(
+    { organizationId },
+    { retry: false },
+  );
+  const methods = trpc.billing.getPaymentMethods.useQuery(
+    { organizationId },
+    { retry: false },
+  );
 
   const purchase = trpc.credits.purchase.useMutation({
     onSuccess: (result) => {
-      toast.success(`${result.credits.toLocaleString('en-US')} credits added`, {
-        description: `You now have ${result.balance.toLocaleString('en-US')} credits.`,
-      })
-      void utils.credits.invalidate()
+      toast.success(`${result.credits.toLocaleString("en-US")} credits added`, {
+        description: `You now have ${result.balance.toLocaleString("en-US")} credits.`,
+      });
+      void utils.credits.invalidate();
     },
     onError: (error) => {
-      toast.error('That top-up did not go through', { description: error.message })
+      toast.error("That top-up did not go through", {
+        description: error.message,
+      });
     },
     onSettled: () => setBuying(null),
-  })
+  });
 
   /* The default card, preselected — the one Stripe would charge anyway. A
    * `useState` seeded from a query would be stale on first paint, so the
    * choice is DERIVED and an explicit click wins. Same pattern and same reason
    * as CHOICE_IS_DERIVED_NOT_SYNCED on the render panel. */
-  const cards = methods.data ?? []
-  const activeCard = selectedCard ?? cards.find((card) => card.isDefault)?.id ?? cards[0]?.id ?? null
+  const cards = methods.data ?? [];
+  const activeCard =
+    selectedCard ??
+    cards.find((card) => card.isDefault)?.id ??
+    cards[0]?.id ??
+    null;
 
   if (methods.isPending || packs.isPending) {
-    return <Skeleton className="h-48 w-full rounded-xl" />
+    return <Skeleton className="h-48 w-full rounded-xl" />;
   }
 
   /* NO_CARD_NO_PURCHASE — a different screen, said plainly. */
@@ -186,13 +204,13 @@ function TopUpPacks({ organizationId }: { organizationId: string }) {
               prefetches like every other internal link. */}
           <Link
             href="/dashboard/settings/billing"
-            className={buttonVariants({ variant: 'outline', size: 'sm' })}
+            className={buttonVariants({ variant: "outline", size: "sm" })}
           >
             Go to Billing
           </Link>
         </CardContent>
       </Card>
-    )
+    );
   }
 
   return (
@@ -223,9 +241,11 @@ function TopUpPacks({ organizationId }: { organizationId: string }) {
               className="flex flex-col gap-3 rounded-xl border border-border p-4"
             >
               <div>
-                <p className="text-sm font-medium text-foreground">{pack.label}</p>
+                <p className="text-sm font-medium text-foreground">
+                  {pack.label}
+                </p>
                 <p className="text-2xl font-semibold text-foreground">
-                  {pack.credits.toLocaleString('en-US')}
+                  {pack.credits.toLocaleString("en-US")}
                 </p>
                 <p className="text-xs text-muted-foreground">credits</p>
               </div>
@@ -234,18 +254,20 @@ function TopUpPacks({ organizationId }: { organizationId: string }) {
                 size="sm"
                 /* PACK_UNAVAILABLE_IS_SHOWN — disabled with the reason, not
                    hidden. An operator missing one price should see which. */
-                disabled={!pack.available || activeCard === null || buying !== null}
+                disabled={
+                  !pack.available || activeCard === null || buying !== null
+                }
                 onClick={() => {
-                  if (activeCard === null) return
-                  setBuying(pack.key)
+                  if (activeCard === null) return;
+                  setBuying(pack.key);
                   purchase.mutate({
                     organizationId,
                     packKey: pack.key,
                     paymentMethodId: activeCard,
-                  })
+                  });
                 }}
               >
-                {buying === pack.key ? 'Charging…' : 'Buy'}
+                {buying === pack.key ? "Charging…" : "Buy"}
               </Button>
 
               {!pack.available ? (
@@ -258,7 +280,7 @@ function TopUpPacks({ organizationId }: { organizationId: string }) {
         </div>
       </CardContent>
     </Card>
-  )
+  );
 }
 
 /**
@@ -270,53 +292,59 @@ function TopUpPacks({ organizationId }: { organizationId: string }) {
  *        screen contributes.
  */
 function CreditLedgerTable({ organizationId }: { organizationId: string }) {
-  const [page, setPage] = React.useState(1)
+  const [page, setPage] = React.useState(1);
 
   const query = trpc.credits.listLedger.useQuery(
     { organizationId, page },
     { retry: false, placeholderData: (previous) => previous },
-  )
+  );
 
-  type Row = NonNullable<typeof query.data>['rows'][number]
+  type Row = NonNullable<typeof query.data>["rows"][number];
 
   const columns: DataTableColumn<Row>[] = [
     {
-      id: 'kind',
-      header: 'Event',
+      id: "kind",
+      header: "Event",
       cell: (row) => {
-        const copy = LEDGER_KIND_COPY[toLedgerKind(row.kind)]
-        return <Badge variant={copy.tone}>{copy.label}</Badge>
+        const copy = LEDGER_KIND_COPY[toLedgerKind(row.kind)];
+        return <Badge variant={copy.tone}>{copy.label}</Badge>;
       },
     },
     {
-      id: 'detail',
-      header: 'Detail',
-      cell: (row) => <span className="text-muted-foreground">{describeRow(row)}</span>,
+      id: "detail",
+      header: "Detail",
+      cell: (row) => (
+        <span className="text-muted-foreground">{describeRow(row)}</span>
+      ),
     },
     {
-      id: 'delta',
-      header: 'Credits',
+      id: "delta",
+      header: "Credits",
       cell: (row) => (
         /* The sign is kept rather than rendered as "added/removed", because a
          * ledger that shows signed numbers can be checked by adding them up —
          * which is exactly what somebody querying their balance wants to do. */
         <span
-          className={row.delta >= 0 ? 'font-medium text-foreground' : 'text-muted-foreground'}
+          className={
+            row.delta >= 0
+              ? "font-medium text-foreground"
+              : "text-muted-foreground"
+          }
         >
           {row.delta > 0 ? `+${row.delta}` : row.delta}
         </span>
       ),
     },
     {
-      id: 'createdAt',
-      header: 'When',
+      id: "createdAt",
+      header: "When",
       cell: (row) => (
         <span className="text-muted-foreground">
           {new Date(row.createdAt).toLocaleString()}
         </span>
       ),
     },
-  ]
+  ];
 
   return (
     <DataTable
@@ -331,15 +359,17 @@ function CreditLedgerTable({ organizationId }: { organizationId: string }) {
       isLoading={query.isPending}
       isFetching={query.isFetching}
       error={query.error?.message ?? null}
-      countLabel={['entry', 'entries']}
+      countLabel={["entry", "entries"]}
       empty={
         <>
           <p className="font-medium text-foreground">No credit activity yet</p>
-          <p className="mt-1">Every top-up and every render will appear here.</p>
+          <p className="mt-1">
+            Every top-up and every render will appear here.
+          </p>
         </>
       }
     />
-  )
+  );
 }
 
 /**
@@ -354,25 +384,30 @@ function CreditLedgerTable({ organizationId }: { organizationId: string }) {
  *        than crash the table.
  * WHERE: The `detail` column above.
  */
-function describeRow(row: { kind: string; metadata: unknown; refId: string | null }): string {
-  const meta = isRecord(row.metadata) ? row.metadata : {}
+function describeRow(row: {
+  kind: string;
+  metadata: unknown;
+  refId: string | null;
+}): string {
+  const meta = isRecord(row.metadata) ? row.metadata : {};
 
-  const packKey = typeof meta['packKey'] === 'string' ? meta['packKey'] : null
-  if (packKey !== null) return `${packKey} pack`
+  const packKey = typeof meta["packKey"] === "string" ? meta["packKey"] : null;
+  if (packKey !== null) return `${packKey} pack`;
 
-  const reason = typeof meta['reason'] === 'string' ? meta['reason'] : null
-  if (reason !== null) return reason
+  const reason = typeof meta["reason"] === "string" ? meta["reason"] : null;
+  if (reason !== null) return reason;
 
-  const kind = typeof meta['kind'] === 'string' ? meta['kind'] : null
-  const resolution = typeof meta['resolution'] === 'string' ? meta['resolution'] : null
-  if (kind === 'render') {
-    return resolution !== null ? `Render at ${resolution}` : 'Render'
+  const kind = typeof meta["kind"] === "string" ? meta["kind"] : null;
+  const resolution =
+    typeof meta["resolution"] === "string" ? meta["resolution"] : null;
+  if (kind === "render") {
+    return resolution !== null ? `Render at ${resolution}` : "Render";
   }
 
-  if (row.refId !== null) return `Reference ${row.refId.slice(0, 12)}`
-  return '—'
+  if (row.refId !== null) return `Reference ${row.refId.slice(0, 12)}`;
+  return "—";
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

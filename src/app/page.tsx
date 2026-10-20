@@ -1,14 +1,8 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
-'use client'
+"use client";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: RootPage
@@ -26,21 +20,21 @@
  *        landing route: ROUTES (src/lib/config/routes.ts).
  */
 
-import { useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 
-import { trpc } from '@/trpc/react-provider'
-import { ROUTES } from '@/lib/config'
+import { trpc } from "@/trpc/react-provider";
+import { ROUTES } from "@/lib/config";
 
 export default function RootPage(): null {
-  const router = useRouter()
+  const router = useRouter();
   /* Anonymous → UNAUTHORIZED → observer → sign-in. Authenticated → resolves
    * (org or null) and we forward to the dashboard. */
-  const { isSuccess } = trpc.organization.getActiveOrganization.useQuery()
+  const { isSuccess } = trpc.organization.getActiveOrganization.useQuery();
 
   useEffect(() => {
-    if (isSuccess) router.replace(ROUTES.dashboard)
-  }, [isSuccess, router])
+    if (isSuccess) router.replace(ROUTES.dashboard);
+  }, [isSuccess, router]);
 
-  return null
+  return null;
 }

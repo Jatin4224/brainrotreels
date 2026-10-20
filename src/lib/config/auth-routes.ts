@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -35,19 +29,19 @@
  *        src/components/global/auth/auth-form.tsx (footer cross-links).
  */
 
-import type { Route } from 'next'
+import type { Route } from "next";
 
 export const AUTH_ROUTES = {
-  signIn: '/sign-in',
-  signUp: '/sign-up',
-  forgotPassword: '/forgot-password',
-  resetPassword: '/reset-password',
+  signIn: "/sign-in",
+  signUp: "/sign-up",
+  forgotPassword: "/forgot-password",
+  resetPassword: "/reset-password",
   /* Public like the rest: the invitee is signed out (or signed in as the wrong
    * account) precisely when they arrive here. */
-  acceptInvitation: '/accept-invitation',
-} as const
+  acceptInvitation: "/accept-invitation",
+} as const;
 
-export type AuthRouteKey = keyof typeof AUTH_ROUTES
+export type AuthRouteKey = keyof typeof AUTH_ROUTES;
 
 /**
  * SOURCE OF TRUTH KEYWORDS: isAuthRoute, PUBLIC_AUTH_SURFACE,
@@ -74,8 +68,8 @@ export type AuthRouteKey = keyof typeof AUTH_ROUTES
  */
 export function isAuthRoute(pathname: string): boolean {
   return Object.values(AUTH_ROUTES).some(
-    (route) => pathname === route || pathname.startsWith(`${route}/`)
-  )
+    (route) => pathname === route || pathname.startsWith(`${route}/`),
+  );
 }
 
 /**
@@ -87,7 +81,7 @@ export function isAuthRoute(pathname: string): boolean {
  * WHERE: Built into links by authRouteWithCallback; read by the (auth) pages
  *        through resolveAuthCallback.
  */
-export const AUTH_CALLBACK_PARAM = 'callbackURL'
+export const AUTH_CALLBACK_PARAM = "callbackURL";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: resolveAuthCallback, OPEN_REDIRECT_GUARD,
@@ -115,20 +109,22 @@ export const AUTH_CALLBACK_PARAM = 'callbackURL'
  *        404s after login rather than corrupting anything.
  * WHERE: Called by the (auth) route pages to seed AuthScreen's callbackURL.
  */
-export function resolveAuthCallback(raw: string | string[] | undefined): Route | null {
+export function resolveAuthCallback(
+  raw: string | string[] | undefined,
+): Route | null {
   /* A repeated ?callbackURL= arrives as an array. Ambiguous intent, and the
    * usual shape of someone probing the parser — take none of them. */
-  if (typeof raw !== 'string') return null
+  if (typeof raw !== "string") return null;
 
-  const value = raw.trim()
-  if (value.length === 0) return null
+  const value = raw.trim();
+  if (value.length === 0) return null;
   /* Control characters and whitespace can smuggle a second header/URL past a
    * naive parser; a legitimate in-app path never contains them. */
-  if (/[\x00-\x20\x7f]/.test(value)) return null
+  if (/[\x00-\x20\x7f]/.test(value)) return null;
 
-  if (!value.startsWith('/')) return null
+  if (!value.startsWith("/")) return null;
   /* Protocol-relative: browsers read both as "another origin". */
-  if (value.startsWith('//') || value.startsWith('/\\')) return null
+  if (value.startsWith("//") || value.startsWith("/\\")) return null;
 
   /* The cast is the honest boundary of TYPED_ROUTE_GUARANTEE: `Route` is a
    * literal union generated into .next/types by `next build`, and a value read
@@ -139,7 +135,7 @@ export function resolveAuthCallback(raw: string | string[] | undefined): Route |
    * `string` and the cast looks redundant. It is not — `next build` fails
    * without it. Trust the build over the rule here; see the eslint override
    * for this file. */
-  return value as Route
+  return value as Route;
 }
 
 /**
@@ -154,10 +150,13 @@ export function resolveAuthCallback(raw: string | string[] | undefined): Route |
  * WHERE: The accept-invitation screen's sign-in / create-account buttons, and
  *        the auth form's sign-in ⇄ sign-up cross-links.
  */
-export function authRouteWithCallback(route: Route, callbackURL: string | null): Route {
-  if (callbackURL === null || callbackURL.length === 0) return route
+export function authRouteWithCallback(
+  route: Route,
+  callbackURL: string | null,
+): Route {
+  if (callbackURL === null || callbackURL.length === 0) return route;
   /* No `as Route` here: Route already admits a query string appended to a known
    * route, so asserting would be flagged as redundant — and a redundant
    * assertion is exactly what hides the day the type stops admitting it. */
-  return `${route}?${AUTH_CALLBACK_PARAM}=${encodeURIComponent(callbackURL)}`
+  return `${route}?${AUTH_CALLBACK_PARAM}=${encodeURIComponent(callbackURL)}`;
 }

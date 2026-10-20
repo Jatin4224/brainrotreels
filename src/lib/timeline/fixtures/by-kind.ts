@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -20,16 +14,18 @@
  *        list.
  */
 
-import type { ProjectKind } from '@/lib/types/project'
-import type { TimelineDoc } from '../schema'
-import { motionFixture } from './motion'
-import { quizFixture } from './quiz'
-import { redditStoryFixture } from './reddit-story'
-import { voiceoverFixture } from './voiceover'
+import type { ProjectKind } from "@/lib/types/project";
+import type { TimelineDoc } from "../schema";
+import { motionFixture } from "./motion";
+import { quizFixture } from "./quiz";
+import { redditStoryFixture } from "./reddit-story";
+import { voiceoverFixture } from "./voiceover";
 
-export const FIXTURES_BY_KIND: Readonly<Record<ProjectKind, () => TimelineDoc>> = {
-  'reddit-story': redditStoryFixture,
+export const FIXTURES_BY_KIND: Readonly<
+  Record<ProjectKind, () => TimelineDoc>
+> = {
+  "reddit-story": redditStoryFixture,
   voiceover: voiceoverFixture,
   quiz: quizFixture,
   motion: motionFixture,
-}
+};

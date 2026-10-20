@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -25,7 +19,7 @@
  * WHERE: Loaded by ../index.ts through a dynamic import.
  */
 
-import 'server-only'
+import "server-only";
 
 import {
   DeleteObjectCommand,
@@ -33,32 +27,36 @@ import {
   GetObjectCommand,
   HeadObjectCommand,
   PutObjectCommand,
-} from '@aws-sdk/client-s3'
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
+} from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
-import { getR2Bucket, getR2Client } from './client'
+import { getR2Bucket, getR2Client } from "./client";
 import {
   DEFAULT_SIGNED_GET_TTL_SECONDS,
   DEFAULT_SIGNED_PUT_TTL_SECONDS,
   type StorageAdapter,
   type StorageObjectInfo,
-} from '../types'
+} from "../types";
 
-const DELETE_BATCH_LIMIT = 1000
+const DELETE_BATCH_LIMIT = 1000;
 
 function isNotFound(error: unknown): boolean {
-  if (typeof error !== 'object' || error === null) return false
-  const name = 'name' in error ? error.name : undefined
-  if (name === 'NotFound' || name === 'NoSuchKey') return true
-  const metadata = '$metadata' in error ? error.$metadata : undefined
-  if (typeof metadata === 'object' && metadata !== null && 'httpStatusCode' in metadata) {
-    return metadata.httpStatusCode === 404
+  if (typeof error !== "object" || error === null) return false;
+  const name = "name" in error ? error.name : undefined;
+  if (name === "NotFound" || name === "NoSuchKey") return true;
+  const metadata = "$metadata" in error ? error.$metadata : undefined;
+  if (
+    typeof metadata === "object" &&
+    metadata !== null &&
+    "httpStatusCode" in metadata
+  ) {
+    return metadata.httpStatusCode === 404;
   }
-  return false
+  return false;
 }
 
 export const r2StorageAdapter: StorageAdapter = {
-  id: 'r2',
+  id: "r2",
 
   async putObject({ key, body, contentType }) {
     await getR2Client().send(
@@ -68,7 +66,7 @@ export const r2StorageAdapter: StorageAdapter = {
         Body: body,
         ContentType: contentType,
       }),
-    )
+    );
   },
 
   async signedGetUrl(key, ttlSeconds = DEFAULT_SIGNED_GET_TTL_SECONDS) {
@@ -76,7 +74,7 @@ export const r2StorageAdapter: StorageAdapter = {
       getR2Client(),
       new GetObjectCommand({ Bucket: getR2Bucket(), Key: key }),
       { expiresIn: ttlSeconds },
-    )
+    );
   },
 
   async signedPutUrl(key, { contentType, maxBytes, ttlSeconds }) {
@@ -91,28 +89,28 @@ export const r2StorageAdapter: StorageAdapter = {
         ContentLength: maxBytes,
       }),
       { expiresIn: ttlSeconds ?? DEFAULT_SIGNED_PUT_TTL_SECONDS },
-    )
+    );
   },
 
   async deleteObject(key) {
     await getR2Client().send(
       new DeleteObjectCommand({ Bucket: getR2Bucket(), Key: key }),
-    )
+    );
   },
 
   async deleteObjects(keys) {
-    if (keys.length === 0) return
-    const bucket = getR2Bucket()
-    const client = getR2Client()
+    if (keys.length === 0) return;
+    const bucket = getR2Bucket();
+    const client = getR2Client();
 
     for (let i = 0; i < keys.length; i += DELETE_BATCH_LIMIT) {
-      const batch = keys.slice(i, i + DELETE_BATCH_LIMIT)
+      const batch = keys.slice(i, i + DELETE_BATCH_LIMIT);
       await client.send(
         new DeleteObjectsCommand({
           Bucket: bucket,
           Delete: { Objects: batch.map((Key) => ({ Key })) },
         }),
-      )
+      );
     }
   },
 
@@ -120,16 +118,16 @@ export const r2StorageAdapter: StorageAdapter = {
     try {
       const result = await getR2Client().send(
         new HeadObjectCommand({ Bucket: getR2Bucket(), Key: key }),
-      )
+      );
       return {
         key,
         bytes: result.ContentLength ?? 0,
         contentType: result.ContentType,
         lastModified: result.LastModified,
-      }
+      };
     } catch (error) {
-      if (isNotFound(error)) return null
-      throw error
+      if (isNotFound(error)) return null;
+      throw error;
     }
   },
-}
+};

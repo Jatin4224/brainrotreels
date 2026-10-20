@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -36,12 +30,16 @@ import {
   KeyRoundIcon,
   PlayCircleIcon,
   ShieldCheckIcon,
+  SparklesIcon,
   type LucideIcon,
-} from 'lucide-react'
+} from "lucide-react";
 
-import type { EnvChecklistItem, OptionalEnvItem } from '@/lib/config/required-env'
-import { cn } from '@/lib/utils'
-import { AUTH_PROVIDER } from '@/lib/adapters/provider'
+import type {
+  EnvChecklistItem,
+  OptionalEnvItem,
+} from "@/lib/config/required-env";
+import { cn } from "@/lib/utils";
+import { AUTH_PROVIDER } from "@/lib/adapters/provider";
 
 /* Maps RequiredEnvVar.icon strings to lucide components. */
 const SETUP_ICONS: Record<string, LucideIcon> = {
@@ -52,10 +50,11 @@ const SETUP_ICONS: Record<string, LucideIcon> = {
   HardDrive: HardDriveIcon,
   Film: FilmIcon,
   Clapperboard: ClapperboardIcon,
-}
+  Sparkles: SparklesIcon,
+};
 
 function iconFor(name: string): LucideIcon {
-  return SETUP_ICONS[name] ?? CircleIcon
+  return SETUP_ICONS[name] ?? CircleIcon;
 }
 
 /* Shared link + video CTAs, used by both required and optional rows. */
@@ -63,10 +62,10 @@ function CtaLinks({
   link,
   video,
 }: {
-  link?: { label: string; url: string } | undefined
-  video?: { url: string; label?: string | undefined } | undefined
+  link?: { label: string; url: string } | undefined;
+  video?: { url: string; label?: string | undefined } | undefined;
 }) {
-  if (!link && !video) return null
+  if (!link && !video) return null;
   return (
     <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1">
       {link ? (
@@ -88,22 +87,35 @@ function CtaLinks({
           className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
         >
           <PlayCircleIcon className="size-3.5" strokeWidth={2} />
-          {video.label ?? 'Watch setup video'}
+          {video.label ?? "Watch setup video"}
         </a>
       ) : null}
     </div>
-  )
+  );
 }
 
 /* Minimal circular progress indicator. Uses currentColor so it inherits the
  * surrounding text token. */
 function ProgressRing({ percent }: { percent: number }) {
-  const radius = 9
-  const circumference = 2 * Math.PI * radius
-  const offset = circumference * (1 - percent / 100)
+  const radius = 9;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference * (1 - percent / 100);
   return (
-    <svg width="22" height="22" viewBox="0 0 22 22" className="-rotate-90 text-foreground">
-      <circle cx="11" cy="11" r={radius} fill="none" stroke="currentColor" strokeOpacity={0.15} strokeWidth="2.5" />
+    <svg
+      width="22"
+      height="22"
+      viewBox="0 0 22 22"
+      className="-rotate-90 text-foreground"
+    >
+      <circle
+        cx="11"
+        cy="11"
+        r={radius}
+        fill="none"
+        stroke="currentColor"
+        strokeOpacity={0.15}
+        strokeWidth="2.5"
+      />
       <circle
         cx="11"
         cy="11"
@@ -116,21 +128,21 @@ function ProgressRing({ percent }: { percent: number }) {
         strokeDashoffset={offset}
       />
     </svg>
-  )
+  );
 }
 
 export function SetupChecklist({
   items,
   optional = [],
 }: {
-  items: EnvChecklistItem[]
-  optional?: OptionalEnvItem[]
+  items: EnvChecklistItem[];
+  optional?: OptionalEnvItem[];
 }) {
-  const done = items.filter((item) => item.ok).length
-  const total = items.length
-  const percent = total === 0 ? 100 : Math.round((done / total) * 100)
+  const done = items.filter((item) => item.ok).length;
+  const total = items.length;
+  const percent = total === 0 ? 100 : Math.round((done / total) * 100);
   /* The first not-yet-configured row is the "next step" — lifted + highlighted. */
-  const activeIndex = items.findIndex((item) => !item.ok)
+  const activeIndex = items.findIndex((item) => !item.ok);
 
   return (
     <main className="flex min-h-svh items-center justify-center bg-background p-6">
@@ -142,10 +154,12 @@ export function SetupChecklist({
             particular keys — and how to change their mind before configuring
             anything. */}
         <p className="mb-6 text-center text-xs text-muted-foreground">
-          Auth provider:{' '}
-          <code className="rounded bg-muted px-1 py-0.5 font-mono">{AUTH_PROVIDER}</code>
-          {' — '}
-          change it with{' '}
+          Auth provider:{" "}
+          <code className="rounded bg-muted px-1 py-0.5 font-mono">
+            {AUTH_PROVIDER}
+          </code>
+          {" — "}
+          change it with{" "}
           <code className="rounded bg-muted px-1 py-0.5 font-mono">
             NEXT_PUBLIC_AUTH_PROVIDER
           </code>
@@ -153,20 +167,22 @@ export function SetupChecklist({
 
         <div className="space-y-1 rounded-2xl border bg-card p-1.5">
           {items.map((item, index) => {
-            const Icon = iconFor(item.icon)
-            const isActive = index === activeIndex
+            const Icon = iconFor(item.icon);
+            const isActive = index === activeIndex;
             return (
               <div
                 key={item.key}
                 className={cn(
-                  'relative flex items-center gap-3.5 rounded-xl px-4 py-3.5 transition-colors',
-                  isActive && 'bg-accent'
+                  "relative flex items-center gap-3.5 rounded-xl px-4 py-3.5 transition-colors",
+                  isActive && "bg-accent",
                 )}
               >
                 <div
                   className={cn(
-                    'flex size-9 shrink-0 items-center justify-center rounded-full',
-                    isActive ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
+                    "flex size-9 shrink-0 items-center justify-center rounded-full",
+                    isActive
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted text-muted-foreground",
                   )}
                 >
                   <Icon className="size-[18px]" strokeWidth={2} />
@@ -175,25 +191,30 @@ export function SetupChecklist({
                 <div className="min-w-0 flex-1">
                   <p
                     className={cn(
-                      'text-sm font-medium',
-                      item.ok ? 'text-muted-foreground' : 'text-foreground'
+                      "text-sm font-medium",
+                      item.ok ? "text-muted-foreground" : "text-foreground",
                     )}
                   >
                     {item.label}
                   </p>
                   {!item.ok ? (
                     <>
-                      <p className="mt-0.5 text-xs text-muted-foreground">{item.help}</p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        {item.help}
+                      </p>
                       <CtaLinks link={item.link} video={item.video} />
                     </>
                   ) : null}
                 </div>
 
                 {item.ok ? (
-                  <CheckIcon className="size-4 shrink-0 text-muted-foreground" strokeWidth={2.5} />
+                  <CheckIcon
+                    className="size-4 shrink-0 text-muted-foreground"
+                    strokeWidth={2.5}
+                  />
                 ) : null}
               </div>
-            )
+            );
           })}
         </div>
 
@@ -207,34 +228,47 @@ export function SetupChecklist({
         {optional.length > 0 ? (
           <div className="mt-8">
             <div className="mb-2 flex items-center justify-between px-1">
-              <p className="text-xs font-medium text-muted-foreground">Optional integrations</p>
-              <p className="text-xs text-muted-foreground">Not required to run the app</p>
+              <p className="text-xs font-medium text-muted-foreground">
+                Optional integrations
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Not required to run the app
+              </p>
             </div>
             <div className="space-y-1 rounded-2xl border border-dashed bg-card/50 p-1.5">
               {optional.map((item) => {
-                const Icon = iconFor(item.icon)
+                const Icon = iconFor(item.icon);
                 return (
-                  <div key={item.id} className="flex items-start gap-3.5 rounded-xl px-4 py-3.5">
+                  <div
+                    key={item.id}
+                    className="flex items-start gap-3.5 rounded-xl px-4 py-3.5"
+                  >
                     <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
                       <Icon className="size-[18px]" strokeWidth={2} />
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <p className="text-sm font-medium text-foreground">{item.label}</p>
+                        <p className="text-sm font-medium text-foreground">
+                          {item.label}
+                        </p>
                         <span
                           className={cn(
-                            'rounded-full px-1.5 py-0.5 text-[10px] font-medium',
+                            "rounded-full px-1.5 py-0.5 text-[10px] font-medium",
                             item.ok
-                              ? 'bg-primary/10 text-primary'
-                              : 'bg-muted text-muted-foreground'
+                              ? "bg-primary/10 text-primary"
+                              : "bg-muted text-muted-foreground",
                           )}
                         >
-                          {item.ok ? 'Configured' : 'Not set'}
+                          {item.ok ? "Configured" : "Not set"}
                         </span>
                       </div>
-                      <p className="mt-0.5 text-xs text-muted-foreground">{item.purpose}</p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        {item.purpose}
+                      </p>
                       {!item.ok ? (
-                        <p className="mt-1.5 text-xs text-muted-foreground">{item.help}</p>
+                        <p className="mt-1.5 text-xs text-muted-foreground">
+                          {item.help}
+                        </p>
                       ) : null}
 
                       {/* Per-key status so a half-configured integration (e.g. keys set
@@ -243,37 +277,52 @@ export function SetupChecklist({
                         {item.keys.map((k) => (
                           <li key={k.key} className="flex items-center gap-1.5">
                             {k.ok ? (
-                              <CheckIcon className="size-3 shrink-0 text-primary" strokeWidth={2.5} />
+                              <CheckIcon
+                                className="size-3 shrink-0 text-primary"
+                                strokeWidth={2.5}
+                              />
                             ) : (
-                              <CircleIcon className="size-3 shrink-0 text-muted-foreground/50" strokeWidth={2} />
+                              <CircleIcon
+                                className="size-3 shrink-0 text-muted-foreground/50"
+                                strokeWidth={2}
+                              />
                             )}
                             <span
                               className={cn(
-                                'text-[11px]',
-                                k.ok ? 'text-muted-foreground' : 'text-foreground'
+                                "text-[11px]",
+                                k.ok
+                                  ? "text-muted-foreground"
+                                  : "text-foreground",
                               )}
                             >
                               {k.label}
                             </span>
                             {k.optional ? (
-                              <span className="text-[10px] text-muted-foreground/70">· optional</span>
+                              <span className="text-[10px] text-muted-foreground/70">
+                                · optional
+                              </span>
                             ) : null}
                           </li>
                         ))}
                       </ul>
 
-                      {!item.ok ? <CtaLinks link={item.link} video={item.video} /> : null}
+                      {!item.ok ? (
+                        <CtaLinks link={item.link} video={item.video} />
+                      ) : null}
                     </div>
                     {item.ok ? (
-                      <CheckIcon className="size-4 shrink-0 text-muted-foreground" strokeWidth={2.5} />
+                      <CheckIcon
+                        className="size-4 shrink-0 text-muted-foreground"
+                        strokeWidth={2.5}
+                      />
                     ) : null}
                   </div>
-                )
+                );
               })}
             </div>
           </div>
         ) : null}
       </div>
     </main>
-  )
+  );
 }

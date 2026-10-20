@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -41,25 +35,38 @@
  *        Never imported by anything under src/app or src/trpc.
  */
 
-import { staticFile } from 'remotion'
+import { staticFile } from "remotion";
 
-import type { TimelineDoc } from '@/lib/timeline'
-import type { AssetUrlMap, ResolvedAsset } from '@/lib/types'
+import type { TimelineDoc } from "@/lib/timeline";
+import type { AssetUrlMap, ResolvedAsset } from "@/lib/types";
 
 /* The committed files, with the real durations they were generated at — a loop
  * needs the source length, and reading it from the file would mean decoding
  * before the first frame. Keep these in step with the files. */
 const DEV_ASSETS: Readonly<
-  Record<ResolvedAsset['kind'], { file: string; durationInSeconds?: number; width?: number; height?: number }>
+  Record<
+    ResolvedAsset["kind"],
+    {
+      file: string;
+      durationInSeconds?: number;
+      width?: number;
+      height?: number;
+    }
+  >
 > = {
-  video: { file: 'dev-assets/bg-loop.mp4', durationInSeconds: 4, width: 540, height: 960 },
-  audio: { file: 'dev-assets/narration.m4a', durationInSeconds: 6 },
-  image: { file: 'dev-assets/logo-badge.png', width: 360, height: 144 },
+  video: {
+    file: "dev-assets/bg-loop.mp4",
+    durationInSeconds: 4,
+    width: 540,
+    height: 960,
+  },
+  audio: { file: "dev-assets/narration.m4a", durationInSeconds: 6 },
+  image: { file: "dev-assets/logo-badge.png", width: 360, height: 144 },
   /* A document may declare a font asset; nothing in Phase 03 draws from one
    * (the render font is bundled — BUNDLED_FONT_ONLY), so it resolves to no
    * URL, which every component already handles. */
-  font: { file: '' },
-}
+  font: { file: "" },
+};
 
 /**
  * SOURCE OF TRUTH KEYWORDS: devAssetMap
@@ -73,28 +80,28 @@ const DEV_ASSETS: Readonly<
  * WHERE: Composition defaultProps in root.tsx.
  */
 export function devAssetMap(doc: TimelineDoc): AssetUrlMap {
-  const map: AssetUrlMap = {}
+  const map: AssetUrlMap = {};
 
   for (const [handle, ref] of Object.entries(doc.assets)) {
-    const standIn = DEV_ASSETS[ref.kind]
+    const standIn = DEV_ASSETS[ref.kind];
     /* `noUncheckedIndexedAccess` is on, so a Record read is `T | undefined`
      * even though DEV_ASSETS is total over the kind union. Skipping is the
      * honest handling: an unmapped kind simply has no stand-in, and the
      * components already treat an absent handle as a gap. */
-    if (standIn === undefined) continue
+    if (standIn === undefined) continue;
 
     map[handle] = {
       assetId: ref.assetId,
       kind: ref.kind,
-      url: standIn.file === '' ? null : staticFile(standIn.file),
+      url: standIn.file === "" ? null : staticFile(standIn.file),
       variant: null,
       ...(standIn.durationInSeconds !== undefined
         ? { durationInSeconds: standIn.durationInSeconds }
         : {}),
       ...(standIn.width !== undefined ? { width: standIn.width } : {}),
       ...(standIn.height !== undefined ? { height: standIn.height } : {}),
-    }
+    };
   }
 
-  return map
+  return map;
 }

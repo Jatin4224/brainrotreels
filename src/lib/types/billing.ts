@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -22,18 +16,20 @@
  *        UI. Re-exported via src/lib/types.
  */
 
-import { z } from 'zod'
+import { z } from "zod";
 
-import type { BillingInterval, PlanKey } from '@/lib/config/plans'
+import type { BillingInterval, PlanKey } from "@/lib/config/plans";
 
-const organizationIdSchema = z.string().min(1, 'Organization ID is required.')
+const organizationIdSchema = z.string().min(1, "Organization ID is required.");
 
-export const billingIntervalSchema = z.enum(['monthly', 'yearly'])
+export const billingIntervalSchema = z.enum(["monthly", "yearly"]);
 
 /* `free` is excluded — you don't create a Stripe subscription for free. */
-export const planKeySchema = z.enum(['starter', 'pro', 'enterprise'])
+export const planKeySchema = z.enum(["starter", "pro", "enterprise"]);
 
-export const paymentMethodIdSchema = z.string().min(1, 'Payment method is required.')
+export const paymentMethodIdSchema = z
+  .string()
+  .min(1, "Payment method is required.");
 
 export const createSubscriptionSchema = z.object({
   organizationId: organizationIdSchema,
@@ -44,13 +40,13 @@ export const createSubscriptionSchema = z.object({
    * uses it to surface a clear TRIAL_ALREADY_USED error (rather than silently
    * charging) when the card/user has already consumed a trial. */
   expectTrial: z.boolean().optional(),
-})
+});
 
 export const upgradeSubscriptionSchema = z.object({
   organizationId: organizationIdSchema,
   planKey: planKeySchema,
   billingInterval: billingIntervalSchema,
-})
+});
 
 /**
  * SOURCE OF TRUTH KEYWORDS: PurchasablePlanKey, isPurchasablePlan, planKeySchema
@@ -65,14 +61,16 @@ export const upgradeSubscriptionSchema = z.object({
  * WHERE: <UpgradeContent /> before calling billing.createSubscription /
  *        billing.upgradeOrganization.
  */
-export type PurchasablePlanKey = z.infer<typeof planKeySchema>
+export type PurchasablePlanKey = z.infer<typeof planKeySchema>;
 
 export function isPurchasablePlan(plan: string): plan is PurchasablePlanKey {
-  return planKeySchema.safeParse(plan).success
+  return planKeySchema.safeParse(plan).success;
 }
 
-export type CreateSubscriptionValues = z.infer<typeof createSubscriptionSchema>
-export type UpgradeSubscriptionValues = z.infer<typeof upgradeSubscriptionSchema>
+export type CreateSubscriptionValues = z.infer<typeof createSubscriptionSchema>;
+export type UpgradeSubscriptionValues = z.infer<
+  typeof upgradeSubscriptionSchema
+>;
 
 /**
  * SOURCE OF TRUTH KEYWORDS: PlanPrice, AvailablePlan, PRICES_LIVE_IN_STRIPE,
@@ -97,20 +95,20 @@ export type UpgradeSubscriptionValues = z.infer<typeof upgradeSubscriptionSchema
  */
 export interface PlanPrice {
   /** Minor units (cents) as the provider states them. */
-  amount: number
+  amount: number;
   /** ISO 4217, lower-case, as returned by the provider. */
-  currency: string
-  interval: BillingInterval
+  currency: string;
+  interval: BillingInterval;
 }
 
 export interface AvailablePlan {
-  key: PlanKey
-  name: string
-  description: string
-  icon: string
-  showPlan: boolean
-  trialDays: number
-  isFree: boolean
-  monthlyPrice: PlanPrice | null
-  yearlyPrice: PlanPrice | null
+  key: PlanKey;
+  name: string;
+  description: string;
+  icon: string;
+  showPlan: boolean;
+  trialDays: number;
+  isFree: boolean;
+  monthlyPrice: PlanPrice | null;
+  yearlyPrice: PlanPrice | null;
 }

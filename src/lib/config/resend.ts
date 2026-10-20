@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -21,12 +15,12 @@
  *        src/lib/config/index.ts.
  */
 
-import { Resend } from 'resend'
-import { APP_NAME } from '@/lib/config/branding'
+import { Resend } from "resend";
+import { APP_NAME } from "@/lib/config/branding";
 
 /* Test-only fallback sender. Resend accepts `onboarding@resend.dev` for
  * sandbox sends; production must set RESEND_FROM_EMAIL to a verified domain. */
-const FALLBACK_FROM_EMAIL = 'onboarding@resend.dev'
+const FALLBACK_FROM_EMAIL = "onboarding@resend.dev";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: RESEND_DEFAULT_FROM
@@ -36,7 +30,7 @@ const FALLBACK_FROM_EMAIL = 'onboarding@resend.dev'
  *        in one place; falls back to the Resend sandbox address when unset.
  * WHERE: Default `from` in src/services/email.service.ts.
  */
-export const RESEND_DEFAULT_FROM = `${APP_NAME} <${process.env['RESEND_FROM_EMAIL'] || FALLBACK_FROM_EMAIL}>`
+export const RESEND_DEFAULT_FROM = `${APP_NAME} <${process.env["RESEND_FROM_EMAIL"] || FALLBACK_FROM_EMAIL}>`;
 
 /**
  * SOURCE OF TRUTH KEYWORDS: isResendConfigured
@@ -47,7 +41,7 @@ export const RESEND_DEFAULT_FROM = `${APP_NAME} <${process.env['RESEND_FROM_EMAI
  * WHERE: Guard in src/services/email.service.ts.
  */
 export function isResendConfigured(): boolean {
-  return Boolean(process.env['RESEND_API_KEY'])
+  return Boolean(process.env["RESEND_API_KEY"]);
 }
 
 /**
@@ -67,10 +61,10 @@ export function isResendConfigured(): boolean {
  *        (getPendingEmail gate).
  */
 export function isDevEmailFallbackActive(): boolean {
-  return process.env.NODE_ENV === 'development' && !isResendConfigured()
+  return process.env.NODE_ENV === "development" && !isResendConfigured();
 }
 
-let client: Resend | null = null
+let client: Resend | null = null;
 
 /**
  * SOURCE OF TRUTH KEYWORDS: getResendClient
@@ -81,8 +75,8 @@ let client: Resend | null = null
  * WHERE: Called by src/services/email.service.ts.
  */
 export function getResendClient(): Resend | null {
-  const apiKey = process.env['RESEND_API_KEY']
-  if (!apiKey) return null
-  if (!client) client = new Resend(apiKey)
-  return client
+  const apiKey = process.env["RESEND_API_KEY"];
+  if (!apiKey) return null;
+  if (!client) client = new Resend(apiKey);
+  return client;
 }

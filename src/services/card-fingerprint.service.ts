@@ -1,14 +1,8 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
-import 'server-only'
+import "server-only";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: hasUserUsedFreeTrial, hasUserAnyTrialUsedFingerprint,
@@ -28,18 +22,21 @@ import 'server-only'
  *        Uses the lazy Stripe client (config/stripe) and the prisma singleton.
  */
 
-import { prisma } from '@/lib/config/prisma'
-import { getStripeClient, isStripeConfigured } from '@/lib/config/stripe'
+import { prisma } from "@/lib/config/prisma";
+import { getStripeClient, isStripeConfigured } from "@/lib/config/stripe";
 
 /* Resolves the card fingerprint for a payment method, or null on any failure
  * (unconfigured Stripe, retrieval error, non-card method). */
-async function getCardFingerprint(paymentMethodId: string): Promise<string | null> {
-  if (!isStripeConfigured()) return null
+async function getCardFingerprint(
+  paymentMethodId: string,
+): Promise<string | null> {
+  if (!isStripeConfigured()) return null;
   try {
-    const paymentMethod = await getStripeClient().paymentMethods.retrieve(paymentMethodId)
-    return paymentMethod.card?.fingerprint ?? null
+    const paymentMethod =
+      await getStripeClient().paymentMethods.retrieve(paymentMethodId);
+    return paymentMethod.card?.fingerprint ?? null;
   } catch {
-    return null
+    return null;
   }
 }
 
@@ -55,18 +52,18 @@ async function getCardFingerprint(paymentMethodId: string): Promise<string | nul
  */
 export async function hasUserUsedFreeTrial(
   _userId: string,
-  paymentMethodId: string
+  paymentMethodId: string,
 ): Promise<boolean> {
   try {
-    const fingerprint = await getCardFingerprint(paymentMethodId)
-    if (!fingerprint) return false
+    const fingerprint = await getCardFingerprint(paymentMethodId);
+    if (!fingerprint) return false;
     const existing = await prisma.cardFingerprint.findFirst({
       where: { fingerprint, usedFreeTrial: true },
       select: { id: true },
-    })
-    return existing !== null
+    });
+    return existing !== null;
   } catch {
-    return false
+    return false;
   }
 }
 
@@ -78,15 +75,17 @@ export async function hasUserUsedFreeTrial(
  *        method from Stripe. Fails OPEN.
  * WHERE: billing.createSubscription before granting a trial.
  */
-export async function hasUserAnyTrialUsedFingerprint(userId: string): Promise<boolean> {
+export async function hasUserAnyTrialUsedFingerprint(
+  userId: string,
+): Promise<boolean> {
   try {
     const existing = await prisma.cardFingerprint.findFirst({
       where: { userId, usedFreeTrial: true },
       select: { id: true },
-    })
-    return existing !== null
+    });
+    return existing !== null;
   } catch {
-    return false
+    return false;
   }
 }
 
@@ -103,17 +102,20 @@ export async function hasUserAnyTrialUsedFingerprint(userId: string): Promise<bo
 export async function storeCardFingerprint(
   userId: string,
   paymentMethodId: string,
-  usedFreeTrial = false
+  usedFreeTrial = false,
 ): Promise<void> {
   try {
-    const fingerprint = await getCardFingerprint(paymentMethodId)
-    if (!fingerprint) return
+    const fingerprint = await getCardFingerprint(paymentMethodId);
+    if (!fingerprint) return;
     await prisma.cardFingerprint.upsert({
       where: { userId_fingerprint: { userId, fingerprint } },
       /* Only escalate to true — never clear a previously-used flag. */
-      update: { updatedAt: new Date(), ...(usedFreeTrial ? { usedFreeTrial: true } : {}) },
+      update: {
+        updatedAt: new Date(),
+        ...(usedFreeTrial ? { usedFreeTrial: true } : {}),
+      },
       create: { userId, fingerprint, usedFreeTrial },
-    })
+    });
   } catch {
     /* Non-critical — swallow. */
   }
@@ -128,12 +130,14 @@ export async function storeCardFingerprint(
  *        the user's trial eligibility. Fails OPEN.
  * WHERE: Stripe webhook on customer.subscription.created/updated when trialing.
  */
-export async function markUserFingerprintsAsTrialUsed(userId: string): Promise<void> {
+export async function markUserFingerprintsAsTrialUsed(
+  userId: string,
+): Promise<void> {
   try {
     await prisma.cardFingerprint.updateMany({
       where: { userId, usedFreeTrial: false },
       data: { usedFreeTrial: true, updatedAt: new Date() },
-    })
+    });
   } catch {
     /* Non-critical — swallow. */
   }

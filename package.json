@@ -19,6 +19,7 @@
     "postinstall": "prisma generate"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.136.0",
     "@aws-sdk/client-s3": "^3.1152.0",
     "@aws-sdk/s3-request-presigner": "^3.1152.0",
     "@base-ui/react": "^1.4.1",
@@ -66,6 +67,7 @@
     "stripe": "^22.3.0",
     "superjson": "^2.2.2",
     "tailwind-merge": "^3.6.0",
+    "unpdf": "^1.9.1",
     "zod": "^4.4.3"
   },
   "devDependencies": {

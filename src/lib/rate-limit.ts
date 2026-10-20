@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -38,44 +32,44 @@
  * not the only line of defense; refusing all traffic on a Redis outage is
  * almost always worse than letting more requests through. */
 
-import { Ratelimit } from '@upstash/ratelimit'
-import { Redis } from '@upstash/redis'
+import { Ratelimit } from "@upstash/ratelimit";
+import { Redis } from "@upstash/redis";
 
-const GLOBAL_REDIS_KEY = Symbol.for('app.upstash.redis')
+const GLOBAL_REDIS_KEY = Symbol.for("app.upstash.redis");
 
 type GlobalWithRedis = typeof globalThis & {
-  [GLOBAL_REDIS_KEY]?: Redis | null
-}
+  [GLOBAL_REDIS_KEY]?: Redis | null;
+};
 
 function resolveRedisClient(): Redis | null {
-  const globalWithRedis = globalThis as GlobalWithRedis
+  const globalWithRedis = globalThis as GlobalWithRedis;
   if (GLOBAL_REDIS_KEY in globalWithRedis) {
-    return globalWithRedis[GLOBAL_REDIS_KEY] ?? null
+    return globalWithRedis[GLOBAL_REDIS_KEY] ?? null;
   }
-  const url = process.env['UPSTASH_REDIS_REST_URL']
-  const token = process.env['UPSTASH_REDIS_REST_TOKEN']
+  const url = process.env["UPSTASH_REDIS_REST_URL"];
+  const token = process.env["UPSTASH_REDIS_REST_TOKEN"];
   if (!url || !token) {
-    globalWithRedis[GLOBAL_REDIS_KEY] = null
-    return null
+    globalWithRedis[GLOBAL_REDIS_KEY] = null;
+    return null;
   }
-  globalWithRedis[GLOBAL_REDIS_KEY] = new Redis({ url, token })
-  return globalWithRedis[GLOBAL_REDIS_KEY]
+  globalWithRedis[GLOBAL_REDIS_KEY] = new Redis({ url, token });
+  return globalWithRedis[GLOBAL_REDIS_KEY];
 }
 
-const redis: Redis | null = resolveRedisClient()
+const redis: Redis | null = resolveRedisClient();
 
 function buildLimiter(
   prefix: string,
   count: number,
-  window: `${number} ${'s' | 'm' | 'h' | 'd'}`
+  window: `${number} ${"s" | "m" | "h" | "d"}`,
 ): Ratelimit | null {
-  if (!redis) return null
+  if (!redis) return null;
   return new Ratelimit({
     redis,
     limiter: Ratelimit.slidingWindow(count, window),
     prefix,
     analytics: false,
-  })
+  });
 }
 
 /**
@@ -88,7 +82,7 @@ function buildLimiter(
  *        src/app/api/trpc/[trpc]/route.ts (IP-keyed, before auth resolves).
  *        Not the proxy — see the file header.
  */
-export const apiLimiter = buildLimiter('rl:api', 100, '10 s')
+export const apiLimiter = buildLimiter("rl:api", 100, "10 s");
 
 /**
  * SOURCE OF TRUTH KEYWORDS: authLimiter
@@ -100,9 +94,9 @@ export const apiLimiter = buildLimiter('rl:api', 100, '10 s')
  *        Better Auth is even imported. Not the proxy — see the file header.
  */
 /* Tight, IP-keyed: brute-force / credential stuffing. */
-export const authLimiter = buildLimiter('rl:auth', 10, '60 s')
+export const authLimiter = buildLimiter("rl:auth", 10, "60 s");
 
-const resourceLimiters = new Map<string, Ratelimit | null>()
+const resourceLimiters = new Map<string, Ratelimit | null>();
 
 /**
  * SOURCE OF TRUTH KEYWORDS: getResourceLimiter
@@ -116,22 +110,22 @@ export function getResourceLimiter(
   resource: string,
   action: string,
   count: number,
-  window: `${number} ${'s' | 'm' | 'h' | 'd'}`
+  window: `${number} ${"s" | "m" | "h" | "d"}`,
 ): Ratelimit | null {
-  const key = `${resource}.${action}`
+  const key = `${resource}.${action}`;
   if (resourceLimiters.has(key)) {
-    return resourceLimiters.get(key) ?? null
+    return resourceLimiters.get(key) ?? null;
   }
-  const limiter = buildLimiter(`rl:res:${key}`, count, window)
-  resourceLimiters.set(key, limiter)
-  return limiter
+  const limiter = buildLimiter(`rl:res:${key}`, count, window);
+  resourceLimiters.set(key, limiter);
+  return limiter;
 }
 
 export interface RateLimitResult {
-  allowed: boolean
-  limit: number
-  remaining: number
-  resetAt: number
+  allowed: boolean;
+  limit: number;
+  remaining: number;
+  resetAt: number;
 }
 
 /**
@@ -145,22 +139,22 @@ export interface RateLimitResult {
  */
 export async function checkRateLimit(
   limiter: Ratelimit | null,
-  identifier: string
+  identifier: string,
 ): Promise<RateLimitResult> {
   if (!limiter) {
-    return { allowed: true, limit: 0, remaining: 0, resetAt: 0 }
+    return { allowed: true, limit: 0, remaining: 0, resetAt: 0 };
   }
   try {
-    const result = await limiter.limit(identifier)
+    const result = await limiter.limit(identifier);
     return {
       allowed: result.success,
       limit: result.limit,
       remaining: result.remaining,
       resetAt: result.reset,
-    }
+    };
   } catch (error) {
-    console.error('[rate-limit] Redis check failed, failing open:', error)
-    return { allowed: true, limit: 0, remaining: 0, resetAt: 0 }
+    console.error("[rate-limit] Redis check failed, failing open:", error);
+    return { allowed: true, limit: 0, remaining: 0, resetAt: 0 };
   }
 }
 
@@ -174,20 +168,20 @@ export async function checkRateLimit(
  * WHERE: Used by src/proxy.ts and the tRPC error path.
  */
 export function buildRateLimitHeaders(
-  result: RateLimitResult
+  result: RateLimitResult,
 ): Record<string, string> {
   return {
-    'RateLimit-Limit': String(result.limit),
-    'RateLimit-Remaining': String(result.remaining),
-    'RateLimit-Reset': String(Math.ceil(result.resetAt / 1000)),
+    "RateLimit-Limit": String(result.limit),
+    "RateLimit-Remaining": String(result.remaining),
+    "RateLimit-Reset": String(Math.ceil(result.resetAt / 1000)),
     ...(result.allowed
       ? {}
       : {
-          'Retry-After': String(
-            Math.max(1, Math.ceil((result.resetAt - Date.now()) / 1000))
+          "Retry-After": String(
+            Math.max(1, Math.ceil((result.resetAt - Date.now()) / 1000)),
           ),
         }),
-  }
+  };
 }
 
 /**
@@ -205,32 +199,32 @@ export function buildRateLimitHeaders(
  * when the edge strips inbound client-supplied XFF — treat as a hint, never
  * for auth decisions. */
 export function getClientIp(headers: Headers): string | null {
-  const vercel = headers.get('x-vercel-forwarded-for')
+  const vercel = headers.get("x-vercel-forwarded-for");
   if (vercel) {
-    const ip = vercel.split(',')[0]?.trim()
-    if (ip) return ip
+    const ip = vercel.split(",")[0]?.trim();
+    if (ip) return ip;
   }
 
-  const cloudflare = headers.get('cf-connecting-ip')
+  const cloudflare = headers.get("cf-connecting-ip");
   if (cloudflare) {
-    const ip = cloudflare.trim()
-    if (ip) return ip
+    const ip = cloudflare.trim();
+    if (ip) return ip;
   }
 
-  const realIp = headers.get('x-real-ip')
+  const realIp = headers.get("x-real-ip");
   if (realIp) {
-    const ip = realIp.trim()
-    if (ip) return ip
+    const ip = realIp.trim();
+    if (ip) return ip;
   }
 
-  const forwarded = headers.get('x-forwarded-for')
+  const forwarded = headers.get("x-forwarded-for");
   if (forwarded) {
-    const parts = forwarded.split(',')
+    const parts = forwarded.split(",");
     for (let i = parts.length - 1; i >= 0; i--) {
-      const candidate = parts[i]?.trim()
-      if (candidate) return candidate
+      const candidate = parts[i]?.trim();
+      if (candidate) return candidate;
     }
   }
 
-  return null
+  return null;
 }

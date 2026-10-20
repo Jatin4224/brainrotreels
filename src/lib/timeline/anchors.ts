@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -32,7 +26,7 @@
  *        produced doc.words, and by the player before scrubbing.
  */
 
-import type { CaptionItem, TimelineDoc, TimeValue, Track } from './schema'
+import type { CaptionItem, TimelineDoc, TimeValue, Track } from "./schema";
 import {
   captionRangeSeconds,
   cloneDoc,
@@ -42,7 +36,7 @@ import {
   resolveTimeValue,
   roundSeconds,
   secondsToFrames,
-} from './time'
+} from "./time";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: resolveWordAnchors
@@ -54,12 +48,12 @@ import {
  * WHERE: Phase 09's pipeline; the preview player.
  */
 export function resolveWordAnchors(doc: TimelineDoc): TimelineDoc {
-  const next = cloneDoc(doc)
-  const fps = next.canvas.fps
-  let allResolved = true
+  const next = cloneDoc(doc);
+  const fps = next.canvas.fps;
+  let allResolved = true;
   const fail = (): void => {
-    allResolved = false
-  }
+    allResolved = false;
+  };
 
   /* Switched per track type rather than mapped over the union: a single
    * `{ ...track, items }` spread would widen every item to the fields the five
@@ -67,21 +61,38 @@ export function resolveWordAnchors(doc: TimelineDoc): TimelineDoc {
    * lint rules rightly forbid. */
   next.tracks = next.tracks.map((track): Track => {
     switch (track.type) {
-      case 'caption':
-        return { ...track, items: track.items.map((item) => resolveCaptionTimes(item, next, fps)) }
-      case 'video':
-        return { ...track, items: track.items.map((item) => resolveSpan(item, next, fps, fail)) }
-      case 'scene':
-        return { ...track, items: track.items.map((item) => resolveSpan(item, next, fps, fail)) }
-      case 'audio':
-        return { ...track, items: track.items.map((item) => resolveSpan(item, next, fps, fail)) }
-      case 'overlay':
-        return { ...track, items: track.items.map((item) => resolveSpan(item, next, fps, fail)) }
+      case "caption":
+        return {
+          ...track,
+          items: track.items.map((item) =>
+            resolveCaptionTimes(item, next, fps),
+          ),
+        };
+      case "video":
+        return {
+          ...track,
+          items: track.items.map((item) => resolveSpan(item, next, fps, fail)),
+        };
+      case "scene":
+        return {
+          ...track,
+          items: track.items.map((item) => resolveSpan(item, next, fps, fail)),
+        };
+      case "audio":
+        return {
+          ...track,
+          items: track.items.map((item) => resolveSpan(item, next, fps, fail)),
+        };
+      case "overlay":
+        return {
+          ...track,
+          items: track.items.map((item) => resolveSpan(item, next, fps, fail)),
+        };
     }
-  })
+  });
 
-  next.timing = allResolved ? 'resolved' : 'anchored'
-  return next
+  next.timing = allResolved ? "resolved" : "anchored";
+  return next;
 }
 
 /**
@@ -100,33 +111,37 @@ function resolveSpan<T extends { start: TimeValue; duration: TimeValue }>(
   item: T,
   doc: TimelineDoc,
   fps: number,
-  onDangling: () => void
+  onDangling: () => void,
 ): T {
-  const start = resolveOne(item.start, doc, fps)
+  const start = resolveOne(item.start, doc, fps);
   if (start === null) {
-    onDangling()
-    return item
+    onDangling();
+    return item;
   }
   /* The duration is resolved AGAINST the snapped start, so an item anchored
    * "from word 4 until word 9" keeps both edges on the frame grid rather than
    * inheriting a sub-frame offset from an unsnapped start. */
-  const resolvedEnd = resolveDuration(item.duration, start, doc.words)
+  const resolvedEnd = resolveDuration(item.duration, start, doc.words);
   if (resolvedEnd === null) {
-    onDangling()
-    return item
+    onDangling();
+    return item;
   }
   const duration = Math.max(
     roundSeconds(snapToFrame(start + resolvedEnd, fps) - start),
-    framesToSeconds(1, fps)
-  )
-  return Object.assign({}, item, { start, duration })
+    framesToSeconds(1, fps),
+  );
+  return Object.assign({}, item, { start, duration });
 }
 
 /* One TimeValue to a frame-snapped number, or null when its anchor dangles. */
-function resolveOne(value: TimeValue, doc: TimelineDoc, fps: number): number | null {
-  const seconds = resolveTimeValue(value, doc.words)
-  if (seconds === null) return null
-  return snapToFrame(seconds, fps)
+function resolveOne(
+  value: TimeValue,
+  doc: TimelineDoc,
+  fps: number,
+): number | null {
+  const seconds = resolveTimeValue(value, doc.words);
+  if (seconds === null) return null;
+  return snapToFrame(seconds, fps);
 }
 
 /**
@@ -141,16 +156,20 @@ function resolveOne(value: TimeValue, doc: TimelineDoc, fps: number): number | n
  *        would otherwise round to a duration of zero and disappear.
  * WHERE: resolveWordAnchors().
  */
-function resolveCaptionTimes(item: CaptionItem, doc: TimelineDoc, fps: number): CaptionItem {
-  const range = captionRangeSeconds(item.startWord, item.endWord, doc.words)
-  if (range === null) return item
+function resolveCaptionTimes(
+  item: CaptionItem,
+  doc: TimelineDoc,
+  fps: number,
+): CaptionItem {
+  const range = captionRangeSeconds(item.startWord, item.endWord, doc.words);
+  if (range === null) return item;
 
-  const start = snapToFrame(range.start, fps)
-  const end = snapToFrame(range.end, fps)
-  const oneFrame = framesToSeconds(1, fps)
-  const duration = Math.max(roundSeconds(end - start), oneFrame)
+  const start = snapToFrame(range.start, fps);
+  const end = snapToFrame(range.end, fps);
+  const oneFrame = framesToSeconds(1, fps);
+  const duration = Math.max(roundSeconds(end - start), oneFrame);
 
-  return { ...item, start, duration }
+  return { ...item, start, duration };
 }
 
 /**
@@ -162,7 +181,7 @@ function resolveCaptionTimes(item: CaptionItem, doc: TimelineDoc, fps: number): 
  * WHERE: Everything resolved in this file.
  */
 export function snapToFrame(seconds: number, fps: number): number {
-  return framesToSeconds(secondsToFrames(seconds, fps), fps)
+  return framesToSeconds(secondsToFrames(seconds, fps), fps);
 }
 
 /**
@@ -177,9 +196,10 @@ export function snapToFrame(seconds: number, fps: number): number {
 export function hasUnresolvedAnchors(doc: TimelineDoc): boolean {
   for (const track of doc.tracks) {
     for (const item of track.items) {
-      if (item.start !== undefined && isWordAnchor(item.start)) return true
-      if (item.duration !== undefined && isWordAnchor(item.duration)) return true
+      if (item.start !== undefined && isWordAnchor(item.start)) return true;
+      if (item.duration !== undefined && isWordAnchor(item.duration))
+        return true;
     }
   }
-  return false
+  return false;
 }

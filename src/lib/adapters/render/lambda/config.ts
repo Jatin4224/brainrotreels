@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -53,15 +47,15 @@
  *        src/app/api/webhooks/remotion/route.ts via getRemotionWebhookSecret.
  */
 
-import { assertRenderProviderActive } from '../provider'
+import { assertRenderProviderActive } from "../provider";
 
-assertRenderProviderActive('lambda')
+assertRenderProviderActive("lambda");
 
-const region = process.env['REMOTION_AWS_REGION']?.trim()
-const functionName = process.env['REMOTION_FUNCTION_NAME']?.trim()
-const siteName = process.env['REMOTION_SITE_NAME']?.trim()
-const siteVersion = process.env['REMOTION_SITE_VERSION']?.trim()
-const bucketName = process.env['REMOTION_BUCKET_NAME']?.trim()
+const region = process.env["REMOTION_AWS_REGION"]?.trim();
+const functionName = process.env["REMOTION_FUNCTION_NAME"]?.trim();
+const siteName = process.env["REMOTION_SITE_NAME"]?.trim();
+const siteVersion = process.env["REMOTION_SITE_VERSION"]?.trim();
+const bucketName = process.env["REMOTION_BUCKET_NAME"]?.trim();
 
 /**
  * SOURCE OF TRUTH KEYWORDS: LambdaRenderConfig
@@ -75,16 +69,18 @@ const bucketName = process.env['REMOTION_BUCKET_NAME']?.trim()
  * WHERE: Returned by lambdaRenderConfig().
  */
 export interface LambdaRenderConfig {
-  region: string
-  functionName: string
+  region: string;
+  functionName: string;
   /** The versioned site URL the render bundle is served from. */
-  serveUrl: string
+  serveUrl: string;
   /** The Remotion S3 bucket; outputs land here before being copied into R2. */
-  bucketName: string
+  bucketName: string;
 }
 
 export function isLambdaRenderConfigured(): boolean {
-  return Boolean(region && functionName && siteName && siteVersion && bucketName)
+  return Boolean(
+    region && functionName && siteName && siteVersion && bucketName,
+  );
 }
 
 /**
@@ -103,20 +99,27 @@ export function isLambdaRenderConfigured(): boolean {
  */
 export function lambdaRenderConfig(): LambdaRenderConfig {
   const missing = [
-    ['REMOTION_AWS_REGION', region],
-    ['REMOTION_FUNCTION_NAME', functionName],
-    ['REMOTION_SITE_NAME', siteName],
-    ['REMOTION_SITE_VERSION', siteVersion],
-    ['REMOTION_BUCKET_NAME', bucketName],
+    ["REMOTION_AWS_REGION", region],
+    ["REMOTION_FUNCTION_NAME", functionName],
+    ["REMOTION_SITE_NAME", siteName],
+    ["REMOTION_SITE_VERSION", siteVersion],
+    ["REMOTION_BUCKET_NAME", bucketName],
   ]
     .filter(([, value]) => !value)
-    .map(([key]) => key)
+    .map(([key]) => key);
 
-  if (missing.length > 0 || !region || !functionName || !siteName || !siteVersion || !bucketName) {
+  if (
+    missing.length > 0 ||
+    !region ||
+    !functionName ||
+    !siteName ||
+    !siteVersion ||
+    !bucketName
+  ) {
     throw new Error(
-      `[render/lambda] Cloud rendering is not configured. Missing: ${missing.join(', ')}. ` +
-        'Deploy the Remotion function and site, then set these in .env — see .env.example.',
-    )
+      `[render/lambda] Cloud rendering is not configured. Missing: ${missing.join(", ")}. ` +
+        "Deploy the Remotion function and site, then set these in .env — see .env.example.",
+    );
   }
 
   return {
@@ -124,7 +127,7 @@ export function lambdaRenderConfig(): LambdaRenderConfig {
     functionName,
     bucketName,
     serveUrl: `https://${bucketName}.s3.${region}.amazonaws.com/sites/${siteName}-${siteVersion}/index.html`,
-  }
+  };
 }
 
 /**
@@ -139,6 +142,6 @@ export function lambdaRenderConfig(): LambdaRenderConfig {
  * WHERE: ./index.ts and src/app/api/webhooks/remotion/route.ts.
  */
 export function getRemotionWebhookSecret(): string | null {
-  const secret = process.env['REMOTION_WEBHOOK_SECRET']?.trim()
-  return secret !== undefined && secret.length > 0 ? secret : null
+  const secret = process.env["REMOTION_WEBHOOK_SECRET"]?.trim();
+  return secret !== undefined && secret.length > 0 ? secret : null;
 }

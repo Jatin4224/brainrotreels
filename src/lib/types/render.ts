@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -46,10 +40,10 @@
  *        Re-exported from src/lib/types.
  */
 
-import { z } from 'zod'
+import { z } from "zod";
 
-import type { PlanKey } from '@/lib/config/plans'
-import { variantNameSchema, type VariantName } from './asset'
+import type { PlanKey } from "@/lib/config/plans";
+import { variantNameSchema, type VariantName } from "./asset";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: RenderQuality, renderQualitySchema, VARIANT_BY_QUALITY
@@ -88,31 +82,32 @@ import { variantNameSchema, type VariantName } from './asset'
  * WHERE: Registered in src/remotion/root.tsx; named by
  *        src/lib/adapters/render/lambda.
  */
-export const TIMELINE_COMPOSITION_ID = 'timeline'
+export const TIMELINE_COMPOSITION_ID = "timeline";
 
-export const RENDER_QUALITIES = ['preview', 'final'] as const
+export const RENDER_QUALITIES = ["preview", "final"] as const;
 
-export const renderQualitySchema = z.enum(RENDER_QUALITIES)
+export const renderQualitySchema = z.enum(RENDER_QUALITIES);
 
-export type RenderQuality = z.infer<typeof renderQualitySchema>
+export type RenderQuality = z.infer<typeof renderQualitySchema>;
 
-export const VARIANT_BY_QUALITY: Readonly<Record<RenderQuality, VariantName>> = {
-  preview: 'proxy_480',
-  final: 'vertical_1080',
-}
+export const VARIANT_BY_QUALITY: Readonly<Record<RenderQuality, VariantName>> =
+  {
+    preview: "proxy_480",
+    final: "vertical_1080",
+  };
 
 /** 30 minutes: long enough for a scrubbing session, short enough that a copied
  *  URL is useless by the time it is pasted anywhere. */
-export const PREVIEW_URL_TTL_SECONDS = 1800
+export const PREVIEW_URL_TTL_SECONDS = 1800;
 
 /** Six hours. A queued render that started five hours late must still be able
  *  to fetch its media; a render that cannot is money already spent. */
-export const FINAL_URL_TTL_SECONDS = 21600
+export const FINAL_URL_TTL_SECONDS = 21600;
 
 export const TTL_BY_QUALITY: Readonly<Record<RenderQuality, number>> = {
   preview: PREVIEW_URL_TTL_SECONDS,
   final: FINAL_URL_TTL_SECONDS,
-}
+};
 
 /**
  * SOURCE OF TRUTH KEYWORDS: ResolvedAsset, resolvedAssetSchema, AssetUrlMap,
@@ -143,16 +138,16 @@ export const resolvedAssetSchema = z
     /* The real Asset row id, copied from doc.assets — useful in a log line
      * when a render complains about media it could not fetch. */
     assetId: z.string().min(1),
-    kind: z.enum(['video', 'audio', 'image', 'font']),
+    kind: z.enum(["video", "audio", "image", "font"]),
     url: z.string().min(1).nullable(),
     variant: variantNameSchema.nullable(),
     durationInSeconds: z.number().positive().optional(),
     width: z.number().int().positive().optional(),
     height: z.number().int().positive().optional(),
   })
-  .strict()
+  .strict();
 
-export type ResolvedAsset = z.infer<typeof resolvedAssetSchema>
+export type ResolvedAsset = z.infer<typeof resolvedAssetSchema>;
 
 /**
  * SOURCE OF TRUTH KEYWORDS: AssetUrlMap, assetUrlMapSchema
@@ -167,9 +162,9 @@ export type ResolvedAsset = z.infer<typeof resolvedAssetSchema>
  *        indirection is already prone to.
  * WHERE: The `assets` prop of TimelineRenderer.
  */
-export const assetUrlMapSchema = z.record(z.string(), resolvedAssetSchema)
+export const assetUrlMapSchema = z.record(z.string(), resolvedAssetSchema);
 
-export type AssetUrlMap = z.infer<typeof assetUrlMapSchema>
+export type AssetUrlMap = z.infer<typeof assetUrlMapSchema>;
 
 /**
  * SOURCE OF TRUTH KEYWORDS: TimelineRendererProps, timelineRendererPropsSchema,
@@ -212,7 +207,7 @@ export const timelineRendererPropsSchema = z
      */
     watermark: z.boolean().optional(),
   })
-  .strict()
+  .strict();
 
 /**
  * SOURCE OF TRUTH KEYWORDS: RenderItemProps, RENDER_COMPONENT_CONTRACT
@@ -239,9 +234,9 @@ export const timelineRendererPropsSchema = z
  */
 export interface RenderItemProps {
   /** The track item being drawn, as the document holds it. */
-  item: Record<string, unknown>
+  item: Record<string, unknown>;
   /** Every resolved handle in the document. */
-  assets: AssetUrlMap
+  assets: AssetUrlMap;
   /**
    * This item's span in whole frames, in DOCUMENT coordinates.
    *
@@ -255,9 +250,9 @@ export interface RenderItemProps {
    * frames, which one thing needs: comparing against a window somewhere else
    * in the document, as audio ducking does against the narration.
    */
-  frames: { from: number; durationInFrames: number }
+  frames: { from: number; durationInFrames: number };
   /** The canvas, so a component can convert a normalized box to pixels. */
-  canvas: { width: number; height: number; fps: number }
+  canvas: { width: number; height: number; fps: number };
 }
 
 /**
@@ -275,9 +270,9 @@ export const previewProjectSchema = z.object({
   organizationId: z.string().min(1),
   id: z.string().min(1),
   quality: renderQualitySchema.optional(),
-})
+});
 
-export type PreviewProjectValues = z.infer<typeof previewProjectSchema>
+export type PreviewProjectValues = z.infer<typeof previewProjectSchema>;
 
 /**
  * SOURCE OF TRUTH KEYWORDS: RENDER_STATUSES, renderStatusSchema, RenderStatus,
@@ -304,28 +299,37 @@ export type PreviewProjectValues = z.infer<typeof previewProjectSchema>
  * WHERE: Render.status; the render panel's progress copy; the workflow's
  *        terminal writes in src/services/renders.service.ts.
  */
-export const RENDER_STATUSES = ['queued', 'rendering', 'completed', 'failed', 'timedOut'] as const
+export const RENDER_STATUSES = [
+  "queued",
+  "rendering",
+  "completed",
+  "failed",
+  "timedOut",
+] as const;
 
-export const renderStatusSchema = z.enum(RENDER_STATUSES)
+export const renderStatusSchema = z.enum(RENDER_STATUSES);
 
-export type RenderStatus = z.infer<typeof renderStatusSchema>
+export type RenderStatus = z.infer<typeof renderStatusSchema>;
 
 /** No further transition is possible from these; nothing may overwrite them. */
 export const RENDER_TERMINAL_STATUSES: readonly RenderStatus[] = [
-  'completed',
-  'failed',
-  'timedOut',
-]
+  "completed",
+  "failed",
+  "timedOut",
+];
 
 export function isTerminalRenderStatus(status: string): boolean {
-  return (RENDER_TERMINAL_STATUSES as readonly string[]).includes(status)
+  return (RENDER_TERMINAL_STATUSES as readonly string[]).includes(status);
 }
 
 /** The two states a retry is allowed from — see RETRY_ONCE in the renders router. */
-export const RENDER_RETRYABLE_STATUSES: readonly RenderStatus[] = ['failed', 'timedOut']
+export const RENDER_RETRYABLE_STATUSES: readonly RenderStatus[] = [
+  "failed",
+  "timedOut",
+];
 
 export function isRetryableRenderStatus(status: string): boolean {
-  return (RENDER_RETRYABLE_STATUSES as readonly string[]).includes(status)
+  return (RENDER_RETRYABLE_STATUSES as readonly string[]).includes(status);
 }
 
 /**
@@ -340,7 +344,7 @@ export function isRetryableRenderStatus(status: string): boolean {
  *        down and an invoice nobody authorised.
  * WHERE: `renders.retry` in src/trpc/routers/renders.ts.
  */
-export const RENDER_ATTEMPT_LIMIT = 2
+export const RENDER_ATTEMPT_LIMIT = 2;
 
 /**
  * SOURCE OF TRUTH KEYWORDS: RENDER_RESOLUTIONS, renderResolutionSchema,
@@ -364,16 +368,16 @@ export const RENDER_ATTEMPT_LIMIT = 2
  * WHERE: createRenderSchema; the download options on the render panel; the
  *        `scale` passed to the render adapter.
  */
-export const RENDER_RESOLUTIONS = ['720p', '1080p'] as const
+export const RENDER_RESOLUTIONS = ["720p", "1080p"] as const;
 
-export const renderResolutionSchema = z.enum(RENDER_RESOLUTIONS)
+export const renderResolutionSchema = z.enum(RENDER_RESOLUTIONS);
 
-export type RenderResolution = z.infer<typeof renderResolutionSchema>
+export type RenderResolution = z.infer<typeof renderResolutionSchema>;
 
 export const SCALE_BY_RESOLUTION: Readonly<Record<RenderResolution, number>> = {
-  '720p': 2 / 3,
-  '1080p': 1,
-}
+  "720p": 2 / 3,
+  "1080p": 1,
+};
 
 /**
  * SOURCE OF TRUTH KEYWORDS: RESOLUTION_PER_PLAN, LOCKED_NOT_HIDDEN,
@@ -399,34 +403,43 @@ export const SCALE_BY_RESOLUTION: Readonly<Record<RenderResolution, number>> = {
  * WHERE: The render panel's option list, and re-checked server-side by
  *        `renders.create` — a disabled radio is a courtesy, not a boundary.
  */
-export const RESOLUTION_PER_PLAN: Readonly<Record<PlanKey, readonly RenderResolution[]>> = {
-  free: ['720p'],
-  starter: ['720p', '1080p'],
-  pro: ['720p', '1080p'],
-  enterprise: ['720p', '1080p'],
-  portal: ['720p', '1080p'],
-}
+export const RESOLUTION_PER_PLAN: Readonly<
+  Record<PlanKey, readonly RenderResolution[]>
+> = {
+  free: ["720p"],
+  starter: ["720p", "1080p"],
+  pro: ["720p", "1080p"],
+  enterprise: ["720p", "1080p"],
+  portal: ["720p", "1080p"],
+};
 
 export function resolutionsForPlan(plan: PlanKey): readonly RenderResolution[] {
-  return RESOLUTION_PER_PLAN[plan]
+  return RESOLUTION_PER_PLAN[plan];
 }
 
-export function isResolutionAllowedForPlan(plan: PlanKey, resolution: RenderResolution): boolean {
-  return RESOLUTION_PER_PLAN[plan].includes(resolution)
+export function isResolutionAllowedForPlan(
+  plan: PlanKey,
+  resolution: RenderResolution,
+): boolean {
+  return RESOLUTION_PER_PLAN[plan].includes(resolution);
 }
 
 /** The highest resolution a plan includes — the sensible default to preselect. */
 export function bestResolutionForPlan(plan: PlanKey): RenderResolution {
-  const allowed = RESOLUTION_PER_PLAN[plan]
+  const allowed = RESOLUTION_PER_PLAN[plan];
   /* Ordered by RENDER_RESOLUTIONS rather than by the per-plan array, so the
    * answer does not depend on how someone happened to type the list above. */
-  const best = [...RENDER_RESOLUTIONS].reverse().find((candidate) => allowed.includes(candidate))
+  const best = [...RENDER_RESOLUTIONS]
+    .reverse()
+    .find((candidate) => allowed.includes(candidate));
   /* Checked rather than asserted: an empty per-plan list is a configuration
    * mistake, and quietly falling back to 1080p would hand it away for free. */
   if (best === undefined) {
-    throw new Error(`[types/render] No render resolution is enabled for the "${plan}" plan.`)
+    throw new Error(
+      `[types/render] No render resolution is enabled for the "${plan}" plan.`,
+    );
   }
-  return best
+  return best;
 }
 
 /**
@@ -449,15 +462,15 @@ export function bestResolutionForPlan(plan: PlanKey): RenderResolution {
  *        export is a handler remembering to ignore it.
  * WHERE: src/trpc/routers/renders.ts and the render panel.
  */
-export const RENDER_PAGE_SIZE = 10
+export const RENDER_PAGE_SIZE = 10;
 
 export const createRenderSchema = z.object({
   organizationId: z.string().min(1),
   projectId: z.string().min(1),
   resolution: renderResolutionSchema,
-})
+});
 
-export type CreateRenderValues = z.infer<typeof createRenderSchema>
+export type CreateRenderValues = z.infer<typeof createRenderSchema>;
 
 export const listRendersSchema = z.object({
   organizationId: z.string().min(1),
@@ -465,18 +478,18 @@ export const listRendersSchema = z.object({
    * workspace-wide activity view asks for all of it. */
   projectId: z.string().min(1).optional(),
   status: renderStatusSchema.optional(),
-})
+});
 
-export type ListRendersValues = z.infer<typeof listRendersSchema>
+export type ListRendersValues = z.infer<typeof listRendersSchema>;
 
 export const getRenderSchema = z.object({
   organizationId: z.string().min(1),
   id: z.string().min(1),
-})
+});
 
-export const retryRenderSchema = getRenderSchema
+export const retryRenderSchema = getRenderSchema;
 
-export type RetryRenderValues = z.infer<typeof retryRenderSchema>
+export type RetryRenderValues = z.infer<typeof retryRenderSchema>;
 
 /**
  * SOURCE OF TRUTH KEYWORDS: estimateRenderSchema, COST_ON_THE_BUTTON
@@ -492,6 +505,6 @@ export const estimateRenderSchema = z.object({
   organizationId: z.string().min(1),
   projectId: z.string().min(1),
   resolution: renderResolutionSchema,
-})
+});
 
-export type EstimateRenderValues = z.infer<typeof estimateRenderSchema>
+export type EstimateRenderValues = z.infer<typeof estimateRenderSchema>;

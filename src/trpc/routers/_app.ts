@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -19,22 +13,23 @@
  *        src/app/api/trpc/[trpc]/route.ts. Mounts routers from src/trpc/routers/*.
  */
 
-import { createTRPCRouter } from '../init'
-import { organizationRouter } from './organization'
-import { usageRouter } from './usage'
-import { auditLogsRouter } from './audit-logs'
-import { memberRouter } from './member'
-import { invitationRouter } from './invitation'
-import { organizationRolesRouter } from './organization-roles'
-import { billingRouter } from './billing'
-import { organizationSettingsRouter } from './organization-settings'
-import { portalRouter } from './portal'
-import { devRouter } from './dev'
-import { userRouter } from './user'
-import { projectsRouter } from './projects'
-import { assetsRouter } from './assets'
-import { rendersRouter } from './renders'
-import { creditsRouter } from './credits'
+import { createTRPCRouter } from "../init";
+import { organizationRouter } from "./organization";
+import { usageRouter } from "./usage";
+import { auditLogsRouter } from "./audit-logs";
+import { memberRouter } from "./member";
+import { invitationRouter } from "./invitation";
+import { organizationRolesRouter } from "./organization-roles";
+import { billingRouter } from "./billing";
+import { organizationSettingsRouter } from "./organization-settings";
+import { portalRouter } from "./portal";
+import { devRouter } from "./dev";
+import { userRouter } from "./user";
+import { projectsRouter } from "./projects";
+import { assetsRouter } from "./assets";
+import { rendersRouter } from "./renders";
+import { creditsRouter } from "./credits";
+import { scriptsRouter } from "./scripts";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: appRouter, AppRouter
@@ -51,6 +46,7 @@ export const appRouter = createTRPCRouter({
   assets: assetsRouter,
   renders: rendersRouter,
   credits: creditsRouter,
+  scripts: scriptsRouter,
   usage: usageRouter,
   auditLogs: auditLogsRouter,
   member: memberRouter,
@@ -61,6 +57,6 @@ export const appRouter = createTRPCRouter({
   portal: portalRouter,
   dev: devRouter,
   user: userRouter,
-})
+});
 
-export type AppRouter = typeof appRouter
+export type AppRouter = typeof appRouter;

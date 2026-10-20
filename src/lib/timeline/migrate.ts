@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -37,10 +31,14 @@
  * WHERE: Every read of Timeline.doc, in the service layer and in the editor.
  */
 
-import { timelineError, type ValidationError, type ValidationResult } from './errors'
-import { TIMELINE_DOC_VERSION, type TimelineDoc } from './schema'
-import { validate } from './validate'
-import type { JsonObject, JsonValue } from '@/lib/types/json'
+import {
+  timelineError,
+  type ValidationError,
+  type ValidationResult,
+} from "./errors";
+import { TIMELINE_DOC_VERSION, type TimelineDoc } from "./schema";
+import { validate } from "./validate";
+import type { JsonObject, JsonValue } from "@/lib/types/json";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: MigrationStep, MIGRATIONS
@@ -51,13 +49,13 @@ import type { JsonObject, JsonValue } from '@/lib/types/json'
  *        a missing key rather than an off-by-one in an index.
  * WHERE: runChain() below; the migration test asserts the chain is complete.
  */
-export type MigrationStep = (doc: JsonObject) => JsonObject
+export type MigrationStep = (doc: JsonObject) => JsonObject;
 
 export const MIGRATIONS: Readonly<Record<number, MigrationStep>> = {
   1: v1ToV2,
   2: v2ToV3,
   3: v3ToV4,
-}
+};
 
 /**
  * SOURCE OF TRUTH KEYWORDS: TimelineMigrationError
@@ -72,12 +70,12 @@ export const MIGRATIONS: Readonly<Record<number, MigrationStep>> = {
  * WHERE: Caught by the projects service and turned into a tRPC error.
  */
 export class TimelineMigrationError extends Error {
-  readonly errors: ValidationError[]
+  readonly errors: ValidationError[];
 
   constructor(errors: ValidationError[]) {
-    super(errors[0]?.message ?? 'This timeline could not be opened.')
-    this.name = 'TimelineMigrationError'
-    this.errors = errors
+    super(errors[0]?.message ?? "This timeline could not be opened.");
+    this.name = "TimelineMigrationError";
+    this.errors = errors;
   }
 }
 
@@ -91,9 +89,9 @@ export class TimelineMigrationError extends Error {
  * WHERE: Every read of Timeline.doc.
  */
 export function migrate(doc: unknown): TimelineDoc {
-  const result = tryMigrate(doc)
-  if (!result.ok) throw new TimelineMigrationError(result.errors)
-  return result.doc
+  const result = tryMigrate(doc);
+  if (!result.ok) throw new TimelineMigrationError(result.errors);
+  return result.doc;
 }
 
 /**
@@ -106,66 +104,74 @@ export function migrate(doc: unknown): TimelineDoc {
  * WHERE: migrate(); Phase 04's pre-flight.
  */
 export function tryMigrate(doc: unknown): ValidationResult<TimelineDoc> {
-  const object = asObject(doc)
+  const object = asObject(doc);
   if (object === null) {
     return {
       ok: false,
       errors: [
-        timelineError('document', 'UNMIGRATABLE', 'This timeline is not a document at all.'),
+        timelineError(
+          "document",
+          "UNMIGRATABLE",
+          "This timeline is not a document at all.",
+        ),
       ],
-    }
+    };
   }
 
-  const version = asNumber(object['version'])
+  const version = asNumber(object["version"]);
   if (version === null || !Number.isInteger(version) || version < 1) {
     return {
       ok: false,
       errors: [
-        timelineError('version', 'UNMIGRATABLE', 'This timeline does not say which version it is.'),
+        timelineError(
+          "version",
+          "UNMIGRATABLE",
+          "This timeline does not say which version it is.",
+        ),
       ],
-    }
+    };
   }
   if (version > TIMELINE_DOC_VERSION) {
     return {
       ok: false,
       errors: [
         timelineError(
-          'version',
-          'UNMIGRATABLE',
-          `This timeline was made by a newer version of the app (v${version}).`
+          "version",
+          "UNMIGRATABLE",
+          `This timeline was made by a newer version of the app (v${version}).`,
         ),
       ],
-    }
+    };
   }
 
-  const chained = runChain(object, version)
-  if (!chained.ok) return chained
+  const chained = runChain(object, version);
+  if (!chained.ok) return chained;
 
-  return validate(chained.doc)
+  return validate(chained.doc);
 }
 
 /* Walks the chain from the document's own version up to the current one. Each
  * iteration must advance, which is what makes a missing step a clear error
  * rather than a hang. */
 function runChain(doc: JsonObject, from: number): ValidationResult<JsonObject> {
-  let current = doc
+  let current = doc;
   for (let version = from; version < TIMELINE_DOC_VERSION; version += 1) {
-    const step = MIGRATIONS[version]
+    const step = MIGRATIONS[version];
     if (step === undefined) {
       return {
         ok: false,
         errors: [
           timelineError(
-            'version',
-            'UNMIGRATABLE',
-            `No way to upgrade a v${version} timeline. This is a bug in the migration chain.`
+            "version",
+            "UNMIGRATABLE",
+            `No way to upgrade a v${version} timeline. This is a bug in the migration chain.`,
           ),
         ],
-      }
+      };
     }
-    current = step(current)
+    current = step(current);
   }
-  return { ok: true, doc: current }
+  return { ok: true, doc: current };
 }
 
 /**
@@ -179,16 +185,16 @@ function runChain(doc: JsonObject, from: number): ValidationResult<JsonObject> {
  * WHERE: MIGRATIONS[1].
  */
 function v1ToV2(doc: JsonObject): JsonObject {
-  const next: JsonObject = { ...doc, version: 2 }
-  const width = asNumber(doc['width']) ?? 1080
-  const height = asNumber(doc['height']) ?? 1920
-  const fps = asNumber(doc['fps']) ?? 30
+  const next: JsonObject = { ...doc, version: 2 };
+  const width = asNumber(doc["width"]) ?? 1080;
+  const height = asNumber(doc["height"]) ?? 1920;
+  const fps = asNumber(doc["fps"]) ?? 30;
 
-  next['canvas'] = { width, height, fps }
-  delete next['width']
-  delete next['height']
-  delete next['fps']
-  return next
+  next["canvas"] = { width, height, fps };
+  delete next["width"];
+  delete next["height"];
+  delete next["fps"];
+  return next;
 }
 
 /**
@@ -207,27 +213,31 @@ function v1ToV2(doc: JsonObject): JsonObject {
  * WHERE: MIGRATIONS[2].
  */
 function v2ToV3(doc: JsonObject): JsonObject {
-  const next: JsonObject = { ...doc, version: 3 }
+  const next: JsonObject = { ...doc, version: 3 };
 
-  const words = asArray(doc['words']) ?? []
-  next['words'] = words.map((entry, index) => {
-    const token = asObject(entry)
-    if (token === null) return { i: index, w: '', s: 0, e: 0 }
+  const words = asArray(doc["words"]) ?? [];
+  next["words"] = words.map((entry, index) => {
+    const token = asObject(entry);
+    if (token === null) return { i: index, w: "", s: 0, e: 0 };
     const rewritten: JsonObject = {
       i: index,
-      w: asString(token['text']) ?? asString(token['w']) ?? '',
-      s: asNumber(token['start']) ?? asNumber(token['s']) ?? 0,
-      e: asNumber(token['end']) ?? asNumber(token['e']) ?? 0,
-    }
-    const speaker = asString(token['speaker'])
-    if (speaker !== null) rewritten['speaker'] = speaker
-    return rewritten
-  })
+      w: asString(token["text"]) ?? asString(token["w"]) ?? "",
+      s: asNumber(token["start"]) ?? asNumber(token["s"]) ?? 0,
+      e: asNumber(token["end"]) ?? asNumber(token["e"]) ?? 0,
+    };
+    const speaker = asString(token["speaker"]);
+    if (speaker !== null) rewritten["speaker"] = speaker;
+    return rewritten;
+  });
 
-  if (asObject(doc['style']) === null) {
-    next['style'] = { paletteId: 'default', captionStyleId: 'default', safeZone: 'none' }
+  if (asObject(doc["style"]) === null) {
+    next["style"] = {
+      paletteId: "default",
+      captionStyleId: "default",
+      safeZone: "none",
+    };
   }
-  return next
+  return next;
 }
 
 /**
@@ -250,69 +260,72 @@ function v2ToV3(doc: JsonObject): JsonObject {
  * WHERE: MIGRATIONS[3].
  */
 function v3ToV4(doc: JsonObject): JsonObject {
-  const next: JsonObject = { ...doc, version: 4 }
-  const assets: JsonObject = { ...(asObject(doc['assets']) ?? {}) }
-  const speakers: JsonObject = { ...(asObject(doc['speakers']) ?? {}) }
+  const next: JsonObject = { ...doc, version: 4 };
+  const assets: JsonObject = { ...(asObject(doc["assets"]) ?? {}) };
+  const speakers: JsonObject = { ...(asObject(doc["speakers"]) ?? {}) };
 
   const noteAsset = (id: string | null): void => {
-    if (id === null || Object.hasOwn(assets, id)) return
-    assets[id] = { assetId: id, kind: 'video', license: 'unknown' }
-  }
+    if (id === null || Object.hasOwn(assets, id)) return;
+    assets[id] = { assetId: id, kind: "video", license: "unknown" };
+  };
   const noteSpeaker = (id: string | null): void => {
-    if (id === null || Object.hasOwn(speakers, id)) return
-    speakers[id] = {}
+    if (id === null || Object.hasOwn(speakers, id)) return;
+    speakers[id] = {};
+  };
+
+  for (const entry of asArray(doc["words"]) ?? []) {
+    noteSpeaker(asString(asObject(entry)?.["speaker"]));
   }
 
-  for (const entry of asArray(doc['words']) ?? []) {
-    noteSpeaker(asString(asObject(entry)?.['speaker']))
-  }
+  next["tracks"] = (asArray(doc["tracks"]) ?? []).map((trackEntry) => {
+    const track = asObject(trackEntry);
+    if (track === null) return trackEntry;
 
-  next['tracks'] = (asArray(doc['tracks']) ?? []).map((trackEntry) => {
-    const track = asObject(trackEntry)
-    if (track === null) return trackEntry
+    const type = asString(track["type"]);
+    const items = (asArray(track["items"]) ?? []).map((itemEntry) => {
+      const item = asObject(itemEntry);
+      if (item === null) return itemEntry;
 
-    const type = asString(track['type'])
-    const items = (asArray(track['items']) ?? []).map((itemEntry) => {
-      const item = asObject(itemEntry)
-      if (item === null) return itemEntry
-
-      const upgraded: JsonObject = { ...item }
-      noteAsset(asString(item['assetId']))
-      noteSpeaker(asString(item['speaker']))
+      const upgraded: JsonObject = { ...item };
+      noteAsset(asString(item["assetId"]));
+      noteSpeaker(asString(item["speaker"]));
 
       /* `kind` was v3's name for what a scene drew; v4 calls it `render` and
        * shares the vocabulary with video and overlay items. */
-      if (type === 'scene' && asString(item['render']) === null) {
-        upgraded['render'] = asString(item['kind']) ?? 'motion'
-        delete upgraded['kind']
+      if (type === "scene" && asString(item["render"]) === null) {
+        upgraded["render"] = asString(item["kind"]) ?? "motion";
+        delete upgraded["kind"];
       }
-      if ((type === 'video' || type === 'overlay') && asString(item['render']) === null) {
-        upgraded['render'] = 'media'
+      if (
+        (type === "video" || type === "overlay") &&
+        asString(item["render"]) === null
+      ) {
+        upgraded["render"] = "media";
       }
-      return upgraded
-    })
+      return upgraded;
+    });
 
-    return { ...track, items }
-  })
+    return { ...track, items };
+  });
 
   /* An audio asset recorded as video above would fail nothing in validate,
    * but it would mislead every later reader — so the kinds are corrected from
    * the track each id was found on. */
-  for (const trackEntry of asArray(next['tracks']) ?? []) {
-    const track = asObject(trackEntry)
-    if (track === null || asString(track['type']) !== 'audio') continue
-    for (const itemEntry of asArray(track['items']) ?? []) {
-      const id = asString(asObject(itemEntry)?.['assetId'])
-      if (id === null) continue
-      const existing = asObject(assets[id])
-      if (existing !== null) assets[id] = { ...existing, kind: 'audio' }
+  for (const trackEntry of asArray(next["tracks"]) ?? []) {
+    const track = asObject(trackEntry);
+    if (track === null || asString(track["type"]) !== "audio") continue;
+    for (const itemEntry of asArray(track["items"]) ?? []) {
+      const id = asString(asObject(itemEntry)?.["assetId"]);
+      if (id === null) continue;
+      const existing = asObject(assets[id]);
+      if (existing !== null) assets[id] = { ...existing, kind: "audio" };
     }
   }
 
-  next['assets'] = assets
-  next['speakers'] = speakers
-  if (asString(doc['timing']) === null) next['timing'] = 'anchored'
-  return next
+  next["assets"] = assets;
+  next["speakers"] = speakers;
+  if (asString(doc["timing"]) === null) next["timing"] = "anchored";
+  return next;
 }
 
 /* Narrow readers for untrusted JSON. Each returns null rather than throwing, so
@@ -320,33 +333,34 @@ function v3ToV4(doc: JsonObject): JsonObject {
  * whole migration — the final validate() is what decides whether the result is
  * usable. */
 function asObject(value: JsonValue | unknown): JsonObject | null {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) return null
-  const record: Record<string, unknown> = { ...value }
-  const out: JsonObject = {}
+  if (typeof value !== "object" || value === null || Array.isArray(value))
+    return null;
+  const record: Record<string, unknown> = { ...value };
+  const out: JsonObject = {};
   for (const key of Object.keys(record)) {
-    const entry = record[key]
-    if (isJsonValue(entry)) out[key] = entry
+    const entry = record[key];
+    if (isJsonValue(entry)) out[key] = entry;
   }
-  return out
+  return out;
 }
 
 function asArray(value: JsonValue | undefined): JsonValue[] | null {
-  return Array.isArray(value) ? value : null
+  return Array.isArray(value) ? value : null;
 }
 
 function asString(value: JsonValue | undefined): string | null {
-  return typeof value === 'string' ? value : null
+  return typeof value === "string" ? value : null;
 }
 
 function asNumber(value: JsonValue | undefined): number | null {
-  return typeof value === 'number' && Number.isFinite(value) ? value : null
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
 function isJsonValue(value: unknown): value is JsonValue {
-  if (value === null) return true
-  const type = typeof value
-  if (type === 'string' || type === 'number' || type === 'boolean') return true
-  if (Array.isArray(value)) return value.every((entry) => isJsonValue(entry))
-  if (type !== 'object') return false
-  return Object.values({ ...value }).every((entry) => isJsonValue(entry))
+  if (value === null) return true;
+  const type = typeof value;
+  if (type === "string" || type === "number" || type === "boolean") return true;
+  if (Array.isArray(value)) return value.every((entry) => isJsonValue(entry));
+  if (type !== "object") return false;
+  return Object.values({ ...value }).every((entry) => isJsonValue(entry));
 }

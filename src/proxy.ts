@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -21,9 +15,9 @@
  *        RSCs and route handlers read the injected headers via `await headers()`.
  */
 
-import { NextRequest, NextResponse } from 'next/server'
-import { REGISTRATION_OPEN } from '@/lib/config/registration'
-import { AUTH_ROUTES } from '@/lib/config/auth-routes'
+import { NextRequest, NextResponse } from "next/server";
+import { REGISTRATION_OPEN } from "@/lib/config/registration";
+import { AUTH_ROUTES } from "@/lib/config/auth-routes";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: appProxy
@@ -38,20 +32,22 @@ import { AUTH_ROUTES } from '@/lib/config/auth-routes'
  * WHERE: Called by `proxy` below.
  */
 async function appProxy(request: NextRequest): Promise<NextResponse> {
-  const pathname = request.nextUrl.pathname
-  const hostname = request.headers.get('host') || request.nextUrl.hostname
+  const pathname = request.nextUrl.pathname;
+  const hostname = request.headers.get("host") || request.nextUrl.hostname;
 
   /* Belt-and-braces with the matcher below: if someone relaxes the matcher
    * later, this runtime check still keeps the function out of static-asset
    * paths. */
   if (
-    pathname.startsWith('/_next/') ||
-    pathname.startsWith('/favicon.ico') ||
-    pathname.startsWith('/images/') ||
-    pathname.startsWith('/fonts/') ||
-    /\.(png|jpg|jpeg|gif|svg|ico|webp|css|js|woff|woff2|ttf|eot)$/.test(pathname)
+    pathname.startsWith("/_next/") ||
+    pathname.startsWith("/favicon.ico") ||
+    pathname.startsWith("/images/") ||
+    pathname.startsWith("/fonts/") ||
+    /\.(png|jpg|jpeg|gif|svg|ico|webp|css|js|woff|woff2|ttf|eot)$/.test(
+      pathname,
+    )
   ) {
-    return NextResponse.next()
+    return NextResponse.next();
   }
 
   /* Registration closed — bounce sign-up attempts to the sign-in page so
@@ -60,21 +56,22 @@ async function appProxy(request: NextRequest): Promise<NextResponse> {
    * UX cleaner. Toggled by NEXT_PUBLIC_REGISTRATION_OPEN. */
   if (
     !REGISTRATION_OPEN &&
-    (pathname === AUTH_ROUTES.signUp || pathname.startsWith(`${AUTH_ROUTES.signUp}/`))
+    (pathname === AUTH_ROUTES.signUp ||
+      pathname.startsWith(`${AUTH_ROUTES.signUp}/`))
   ) {
-    const url = request.nextUrl.clone()
-    url.pathname = AUTH_ROUTES.signIn
-    return NextResponse.redirect(url, 302)
+    const url = request.nextUrl.clone();
+    url.pathname = AUTH_ROUTES.signIn;
+    return NextResponse.redirect(url, 302);
   }
 
   /* RSCs can't access the raw NextRequest, so stamp the pathname/hostname
    * onto the REQUEST headers we forward downstream. Setting them on the
    * response would only leak them to the browser — RSCs read request headers
    * via `await headers()`, not response headers. */
-  const forwardedHeaders = new Headers(request.headers)
-  forwardedHeaders.set('x-pathname', pathname)
-  forwardedHeaders.set('x-hostname', hostname)
-  return NextResponse.next({ request: { headers: forwardedHeaders } })
+  const forwardedHeaders = new Headers(request.headers);
+  forwardedHeaders.set("x-pathname", pathname);
+  forwardedHeaders.set("x-hostname", hostname);
+  return NextResponse.next({ request: { headers: forwardedHeaders } });
 }
 
 /**
@@ -92,7 +89,7 @@ async function appProxy(request: NextRequest): Promise<NextResponse> {
  * WHERE: Wired by Next.js automatically; matcher below excludes static assets.
  */
 export async function proxy(request: NextRequest): Promise<NextResponse> {
-  return appProxy(request)
+  return appProxy(request);
 }
 
 /**
@@ -104,5 +101,7 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
  * WHERE: Read by Next.js at build time; pairs with the runtime check in proxy().
  */
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|sw\\.js|images|fonts).*)'],
-}
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|sw\\.js|images|fonts).*)",
+  ],
+};

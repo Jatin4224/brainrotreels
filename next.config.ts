@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 import path from "node:path";
@@ -34,11 +28,13 @@ import type { NextConfig } from "next";
  * WHERE: Consumed by src/components/global/providers/server.tsx (surfaces) and
  *        src/lib/adapters/actions.client.ts (actions).
  */
-const providerSurfaceModule = "./src/components/global/providers/active.better-auth.tsx"
+const providerSurfaceModule =
+  "./src/components/global/providers/active.better-auth.tsx";
 
 /* Same mechanism for the two imperative client actions (switch organization,
  * sign out). Aliased rather than branched for the same measured reason. */
-const providerActionsModule = "./src/components/global/providers/better-auth/actions.ts"
+const providerActionsModule =
+  "./src/components/global/providers/better-auth/actions.ts";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: typedRoutes, TYPED_ROUTE_GUARANTEE, nav.href,
@@ -79,24 +75,28 @@ const providerActionsModule = "./src/components/global/providers/better-auth/act
  *        documented in .env.example alongside the other R2_* values.
  */
 const r2PublicHost = (() => {
-  const raw = process.env["R2_PUBLIC_URL"]?.trim()
-  if (!raw) return null
+  const raw = process.env["R2_PUBLIC_URL"]?.trim();
+  if (!raw) return null;
   try {
-    return new URL(raw).hostname
+    return new URL(raw).hostname;
   } catch {
     /* A malformed URL is the operator's typo, and failing the build over an
      * optional CDN origin would be worse than rendering no library images. */
-    console.warn(`[next.config] R2_PUBLIC_URL="${raw}" is not a valid URL — ignoring it.`)
-    return null
+    console.warn(
+      `[next.config] R2_PUBLIC_URL="${raw}" is not a valid URL — ignoring it.`,
+    );
+    return null;
   }
-})()
+})();
 
 const nextConfig: NextConfig = {
   reactCompiler: true,
   ...(r2PublicHost !== null
     ? {
         images: {
-          remotePatterns: [{ protocol: "https" as const, hostname: r2PublicHost }],
+          remotePatterns: [
+            { protocol: "https" as const, hostname: r2PublicHost },
+          ],
         },
       }
     : {}),
@@ -110,7 +110,10 @@ const nextConfig: NextConfig = {
     config.resolve.alias = {
       ...config.resolve.alias,
       "@providers-active": path.resolve(process.cwd(), providerSurfaceModule),
-      "@providers-active-actions": path.resolve(process.cwd(), providerActionsModule),
+      "@providers-active-actions": path.resolve(
+        process.cwd(),
+        providerActionsModule,
+      ),
     };
     return config;
   },

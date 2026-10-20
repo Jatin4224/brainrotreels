@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -66,26 +60,26 @@
  * WHERE: Returned by MediaAdapter.probe; consumed by src/lib/media/ingest-plan.ts.
  */
 export interface MediaProbeVideo {
-  codec: string
-  width: number
-  height: number
+  codec: string;
+  width: number;
+  height: number;
   /** Frames per second, already reduced from ffprobe's `30000/1001` form. */
-  fps: number
+  fps: number;
 }
 
 export interface MediaProbeAudio {
-  codec: string
-  channels: number
-  sampleRate: number
+  codec: string;
+  channels: number;
+  sampleRate: number;
 }
 
 export interface MediaProbe {
   /** The container, e.g. `mov,mp4,m4a` — ffprobe reports a comma-joined list. */
-  containerFormat: string
-  durationSec: number | null
-  bytes: number
-  video: MediaProbeVideo | null
-  audio: MediaProbeAudio | null
+  containerFormat: string;
+  durationSec: number | null;
+  bytes: number;
+  video: MediaProbeVideo | null;
+  audio: MediaProbeAudio | null;
 }
 
 /**
@@ -105,27 +99,27 @@ export interface MediaProbe {
  *        whole difference between them.
  * WHERE: MediaAdapter.transcode; built by planVariants in src/lib/media.
  */
-export type TranscodeFit = 'crop' | 'pad'
+export type TranscodeFit = "crop" | "pad";
 
 export interface TranscodeRequest {
-  inputPath: string
-  outputPath: string
-  width: number
-  height: number
-  fit: TranscodeFit
+  inputPath: string;
+  outputPath: string;
+  width: number;
+  height: number;
+  fit: TranscodeFit;
   /** Constant Rate Factor — lower is better quality and a bigger file. */
-  crf: number
+  crf: number;
   /** Frames per second to normalise to. Omit to keep the source's rate. */
-  fps?: number
+  fps?: number;
   /** Drop the audio track. The renderer composites narration separately. */
-  muted?: boolean
+  muted?: boolean;
   /**
    * `still` writes ONE frame as a JPEG instead of a video, through the exact
    * same fit maths. An uploaded photo needs a 1080×1920 rendition as much as a
    * clip does, and encoding it as a one-frame H.264 would be a video file that
    * every consumer then has to special-case. Defaults to `video`.
    */
-  encode?: 'video' | 'still'
+  encode?: "video" | "still";
 }
 
 /**
@@ -143,41 +137,41 @@ export interface TranscodeRequest {
  * WHERE: Thrown by every ./ffmpeg method; caught in asset-ingest.ts.
  */
 export class MediaProcessingError extends Error {
-  readonly detail: string
+  readonly detail: string;
 
-  constructor(message: string, detail: string = '') {
-    super(message)
-    this.name = 'MediaProcessingError'
-    this.detail = detail
+  constructor(message: string, detail: string = "") {
+    super(message);
+    this.name = "MediaProcessingError";
+    this.detail = detail;
   }
 }
 
 export interface MediaAdapter {
-  readonly id: MediaProviderId
+  readonly id: MediaProviderId;
 
   /** Reads a file's real shape. Never trusts the extension. */
-  probe(filePath: string): Promise<MediaProbe>
+  probe(filePath: string): Promise<MediaProbe>;
 
   /** Video (or image) to a fixed canvas. H.264 + AAC, faststart for streaming. */
-  transcode(request: TranscodeRequest): Promise<void>
+  transcode(request: TranscodeRequest): Promise<void>;
 
   /** One frame as a JPEG poster. */
   extractFrame(args: {
-    inputPath: string
-    outputPath: string
-    atSec: number
-    width: number
-  }): Promise<void>
+    inputPath: string;
+    outputPath: string;
+    atSec: number;
+    width: number;
+  }): Promise<void>;
 
   /** An audio track drawn as a PNG waveform for the editor's audio lane. */
   renderWaveform(args: {
-    inputPath: string
-    outputPath: string
-    width: number
-    height: number
-  }): Promise<void>
+    inputPath: string;
+    outputPath: string;
+    width: number;
+    height: number;
+  }): Promise<void>;
 }
 
-export const MEDIA_PROVIDER_IDS = ['ffmpeg'] as const
+export const MEDIA_PROVIDER_IDS = ["ffmpeg"] as const;
 
-export type MediaProviderId = (typeof MEDIA_PROVIDER_IDS)[number]
+export type MediaProviderId = (typeof MEDIA_PROVIDER_IDS)[number];

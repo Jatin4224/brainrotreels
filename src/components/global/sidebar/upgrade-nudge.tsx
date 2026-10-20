@@ -1,14 +1,8 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
-'use client'
+"use client";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: SidebarUpgradeNudge, useUpgradeNudge,
@@ -34,7 +28,7 @@
  * WHERE: Rendered by <AppSidebar /> in SidebarFooter, above the user menu.
  */
 
-import * as React from 'react'
+import * as React from "react";
 import {
   ArrowUpRightIcon,
   ChevronsUpIcon,
@@ -42,31 +36,35 @@ import {
   SparklesIcon,
   ZapIcon,
   type LucideIcon,
-} from 'lucide-react'
+} from "lucide-react";
 
-import { BRANDING } from '@/lib/config'
+import { BRANDING } from "@/lib/config";
 import {
   useUpgradeModal,
   useUpgradeNudge,
   type UpgradeNudge,
   type UpgradeNudgeReason,
-} from '@/components/global/upgrade-modal'
-import { Button } from '@/components/ui/button'
-import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar'
+} from "@/components/global/upgrade-modal";
+import { Button } from "@/components/ui/button";
+import {
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+} from "@/components/ui/sidebar";
 
 export function SidebarUpgradeNudge() {
-  const nudge = useUpgradeNudge()
-  const upgradeModal = useUpgradeModal()
+  const nudge = useUpgradeNudge();
+  const upgradeModal = useUpgradeModal();
 
-  if (!nudge) return null
+  if (!nudge) return null;
 
-  const open = () => upgradeModal.open({ plan: nudge.targetPlan })
+  const open = () => upgradeModal.open({ plan: nudge.targetPlan });
 
   return (
     <>
       {/* Expanded: whichever shape this nudge earned. */}
       <div className="group-data-[collapsible=icon]:hidden">
-        {nudge.variant === 'card' ? (
+        {nudge.variant === "card" ? (
           <UpgradeCard nudge={nudge} onUpgrade={open} />
         ) : (
           <InlineNudge nudge={nudge} onUpgrade={open} />
@@ -88,7 +86,7 @@ export function SidebarUpgradeNudge() {
         </SidebarMenuItem>
       </SidebarMenu>
     </>
-  )
+  );
 }
 
 /**
@@ -113,8 +111,8 @@ function UpgradeCard({
   nudge,
   onUpgrade,
 }: {
-  nudge: Extract<UpgradeNudge, { variant: 'card' }>
-  onUpgrade: () => void
+  nudge: Extract<UpgradeNudge, { variant: "card" }>;
+  onUpgrade: () => void;
 }) {
   return (
     <div className="relative overflow-hidden rounded-xl border border-border/70 bg-card shadow-sm">
@@ -142,19 +140,27 @@ function UpgradeCard({
             <p className="text-[11px] leading-none text-muted-foreground">
               {BRANDING.upgradeNudge.currentPlanLabel}
             </p>
-            <p className="mt-1 truncate text-sm font-semibold">{nudge.currentPlanLabel}</p>
+            <p className="mt-1 truncate text-sm font-semibold">
+              {nudge.currentPlanLabel}
+            </p>
           </div>
         </div>
 
-        <p className="mt-3 text-xs leading-relaxed text-muted-foreground">{nudge.body}</p>
+        <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
+          {nudge.body}
+        </p>
 
-        <Button size="sm" onClick={onUpgrade} className="mt-3 w-full gap-1.5 shadow-sm">
+        <Button
+          size="sm"
+          onClick={onUpgrade}
+          className="mt-3 w-full gap-1.5 shadow-sm"
+        >
           <ZapIcon className="size-3.5" />
           {nudge.ctaLabel}
         </Button>
       </div>
     </div>
-  )
+  );
 }
 
 /**
@@ -169,10 +175,10 @@ function InlineNudge({
   nudge,
   onUpgrade,
 }: {
-  nudge: Extract<UpgradeNudge, { variant: 'inline' }>
-  onUpgrade: () => void
+  nudge: Extract<UpgradeNudge, { variant: "inline" }>;
+  onUpgrade: () => void;
 }) {
-  const Icon = NUDGE_ICONS[nudge.reason]
+  const Icon = NUDGE_ICONS[nudge.reason];
   return (
     <SidebarMenu>
       <SidebarMenuItem>
@@ -189,7 +195,7 @@ function InlineNudge({
         </SidebarMenuButton>
       </SidebarMenuItem>
     </SidebarMenu>
-  )
+  );
 }
 
 /**
@@ -211,4 +217,4 @@ const NUDGE_ICONS: Record<UpgradeNudgeReason, LucideIcon> = {
   tier: ChevronsUpIcon,
   free: SparklesIcon,
   trial: SparklesIcon,
-}
+};

@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -44,10 +38,10 @@
  * WHERE: src/app/api/webhooks/remotion/route.ts.
  */
 
-import 'server-only'
+import "server-only";
 
-import { validateWebhookSignature } from '@remotion/lambda-client'
-import { z } from 'zod'
+import { validateWebhookSignature } from "@remotion/lambda-client";
+import { z } from "zod";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: verifyRemotionSignature, VERIFY_RETURNS_A_BOOLEAN
@@ -59,22 +53,22 @@ import { z } from 'zod'
  * WHERE: The route, before it reads or enqueues anything.
  */
 export function verifyRemotionSignature(args: {
-  secret: string
-  body: unknown
-  signatureHeader: string
+  secret: string;
+  body: unknown;
+  signatureHeader: string;
 }): boolean {
   try {
     validateWebhookSignature({
       secret: args.secret,
       body: args.body,
       signatureHeader: args.signatureHeader,
-    })
-    return true
+    });
+    return true;
   } catch {
     /* Swallowed deliberately: the message distinguishes a missing signature
      * from a wrong one, and surfacing either to a caller tells an attacker
      * which half of their forgery to fix. The route logs the refusal. */
-    return false
+    return false;
   }
 }
 
@@ -110,25 +104,27 @@ const staticFields = {
   /* Echoed back from what the adapter sent. The renderId inside it is how the
    * route finds OUR row — see RENDER_ID_FROM_CUSTOM_DATA. */
   customData: z.record(z.string(), z.unknown()).nullable().optional(),
-}
+};
 
-export const remotionWebhookPayloadSchema = z.discriminatedUnion('type', [
+export const remotionWebhookPayloadSchema = z.discriminatedUnion("type", [
   z.object({
     ...staticFields,
-    type: z.literal('success'),
+    type: z.literal("success"),
     outputUrl: z.string().min(1).nullable().optional(),
   }),
   z.object({
     ...staticFields,
-    type: z.literal('error'),
+    type: z.literal("error"),
     errors: z
       .array(z.object({ message: z.string(), name: z.string().optional() }))
       .optional(),
   }),
   z.object({
     ...staticFields,
-    type: z.literal('timeout'),
+    type: z.literal("timeout"),
   }),
-])
+]);
 
-export type RemotionWebhookPayload = z.infer<typeof remotionWebhookPayloadSchema>
+export type RemotionWebhookPayload = z.infer<
+  typeof remotionWebhookPayloadSchema
+>;

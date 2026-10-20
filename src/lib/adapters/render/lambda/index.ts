@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -53,27 +47,30 @@
  *        `@remotion/lambda*` SDK to this folder.
  */
 
-import 'server-only'
+import "server-only";
 
-import { getRenderProgress, renderMediaOnLambda } from '@remotion/lambda-client'
+import {
+  getRenderProgress,
+  renderMediaOnLambda,
+} from "@remotion/lambda-client";
 /* The region list is imported from the SDK rather than typed out, so it cannot
  * drift from the union it is validating against across a Remotion upgrade. */
-import { AWS_REGIONS, type AwsRegion } from '@remotion/lambda-client/regions'
+import { AWS_REGIONS, type AwsRegion } from "@remotion/lambda-client/regions";
 
-import type { TimelineDoc } from '@/lib/timeline'
+import type { TimelineDoc } from "@/lib/timeline";
 import {
   SCALE_BY_RESOLUTION,
   TIMELINE_COMPOSITION_ID,
   type RenderResolution,
-} from '@/lib/types/render'
+} from "@/lib/types/render";
 import type {
   RenderAdapter,
   RenderOptions,
   RenderProgressResult,
   RenderStartResult,
-} from '../types'
-import { RenderProviderError } from '../types'
-import { lambdaRenderConfig } from './config'
+} from "../types";
+import { RenderProviderError } from "../types";
+import { lambdaRenderConfig } from "./config";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: LAMBDA_FRAMES_PER_FUNCTION, CHUNK_SIZE
@@ -92,7 +89,7 @@ import { lambdaRenderConfig } from './config'
 
 /** Maps our resolution vocabulary onto the provider's scale factor. */
 function scaleFor(resolution: RenderResolution): number {
-  return SCALE_BY_RESOLUTION[resolution]
+  return SCALE_BY_RESOLUTION[resolution];
 }
 
 /**
@@ -110,38 +107,41 @@ function scaleFor(resolution: RenderResolution): number {
  * WHERE: Both methods below.
  */
 function toProviderError(error: unknown, context: string): RenderProviderError {
-  if (error instanceof RenderProviderError) return error
+  if (error instanceof RenderProviderError) return error;
 
-  const message = error instanceof Error ? error.message : String(error)
+  const message = error instanceof Error ? error.message : String(error);
 
   /* Conditions that are about the DEPLOYMENT or the DOCUMENT, not the moment.
    * A second attempt reproduces every one of them exactly. */
   const permanentSignals = [
-    'is not configured',
-    'No composition with the ID',
-    'does not exist',
-    'Function not found',
-    'ResourceNotFoundException',
-    'AccessDenied',
-    'InvalidAccessKeyId',
-    'SignatureDoesNotMatch',
-    'NoSuchBucket',
-  ]
-  const permanent = permanentSignals.some((signal) => message.includes(signal))
+    "is not configured",
+    "No composition with the ID",
+    "does not exist",
+    "Function not found",
+    "ResourceNotFoundException",
+    "AccessDenied",
+    "InvalidAccessKeyId",
+    "SignatureDoesNotMatch",
+    "NoSuchBucket",
+  ];
+  const permanent = permanentSignals.some((signal) => message.includes(signal));
 
   return new RenderProviderError(
     permanent
-      ? 'This video could not be rendered. Please contact support — the renderer is misconfigured.'
-      : 'The renderer could not be reached. This will be retried automatically.',
+      ? "This video could not be rendered. Please contact support — the renderer is misconfigured."
+      : "The renderer could not be reached. This will be retried automatically.",
     { detail: `[render/lambda] ${context}: ${message}`, permanent },
-  )
+  );
 }
 
 export const lambdaRenderAdapter: RenderAdapter = {
-  id: 'lambda',
+  id: "lambda",
 
-  async start(doc: TimelineDoc, options: RenderOptions): Promise<RenderStartResult> {
-    const config = lambdaRenderConfig()
+  async start(
+    doc: TimelineDoc,
+    options: RenderOptions,
+  ): Promise<RenderStartResult> {
+    const config = lambdaRenderConfig();
 
     try {
       const result = await renderMediaOnLambda({
@@ -160,18 +160,18 @@ export const lambdaRenderAdapter: RenderAdapter = {
           assets: options.assets,
           watermark: options.watermark,
         },
-        codec: 'h264',
+        codec: "h264",
         /* H.264 video with AAC audio: the pairing every phone and every
          * platform plays without transcoding it again. */
-        audioCodec: 'aac',
-        imageFormat: 'jpeg',
+        audioCodec: "aac",
+        imageFormat: "jpeg",
         scale: scaleFor(options.resolution),
         /* `public` so the completion URL can be streamed into R2 without this
          * process holding AWS read credentials for the Remotion bucket. The
          * object is short-lived — it is copied into R2 and then only R2's
          * signed URLs are ever handed out — and the key is an unguessable
          * render id. Grep OUTPUT_IS_COPIED_NOT_SERVED. */
-        privacy: 'public',
+        privacy: "public",
         webhook: {
           url: options.webhookUrl,
           secret: options.webhookSecret,
@@ -185,11 +185,11 @@ export const lambdaRenderAdapter: RenderAdapter = {
          * longer wait before the same answer — on a paid render, with the
          * meter running. */
         maxRetries: 2,
-      })
+      });
 
-      return { providerRenderId: result.renderId }
+      return { providerRenderId: result.renderId };
     } catch (error) {
-      throw toProviderError(error, 'renderMediaOnLambda failed')
+      throw toProviderError(error, "renderMediaOnLambda failed");
     }
   },
 
@@ -200,7 +200,7 @@ export const lambdaRenderAdapter: RenderAdapter = {
    * the render is dead or merely slow before writing `timedOut` on the row.
    */
   async getProgress(providerRenderId: string): Promise<RenderProgressResult> {
-    const config = lambdaRenderConfig()
+    const config = lambdaRenderConfig();
 
     try {
       const progress = await getRenderProgress({
@@ -210,29 +210,31 @@ export const lambdaRenderAdapter: RenderAdapter = {
         bucketName: config.bucketName,
         functionName: config.functionName,
         region: toAwsRegion(config.region),
-      })
+      });
 
       /* Order matters: a fatal error can coexist with `done`, and reading
        * `done` first would report a failed render as completed. */
       if (progress.fatalErrorEncountered) {
         return {
-          status: 'failed',
+          status: "failed",
           progress: progress.overallProgress,
           outputUrl: null,
           /* The FIRST error, not the last and not all of them. Lambda reports
            * one per failed chunk and they are usually the same cause repeated
            * fifty times; the row renders this inline. */
-          error: progress.errors[0]?.message ?? 'The render failed without reporting a reason.',
-        }
+          error:
+            progress.errors[0]?.message ??
+            "The render failed without reporting a reason.",
+        };
       }
 
       if (progress.done) {
         return {
-          status: 'completed',
+          status: "completed",
           progress: 1,
           outputUrl: progress.outputFile,
           error: null,
-        }
+        };
       }
 
       return {
@@ -240,16 +242,16 @@ export const lambdaRenderAdapter: RenderAdapter = {
          * been accepted but whose functions have not started yet reports zero
          * progress, and calling that `rendering` would make a stuck queue look
          * like a stuck render. */
-        status: progress.lambdasInvoked > 0 ? 'rendering' : 'queued',
+        status: progress.lambdasInvoked > 0 ? "rendering" : "queued",
         progress: progress.overallProgress,
         outputUrl: null,
         error: null,
-      }
+      };
     } catch (error) {
-      throw toProviderError(error, 'getRenderProgress failed')
+      throw toProviderError(error, "getRenderProgress failed");
     }
   },
-}
+};
 
 /**
  * SOURCE OF TRUTH KEYWORDS: toAwsRegion, AwsRegion, REGION_IS_VALIDATED
@@ -265,19 +267,19 @@ export const lambdaRenderAdapter: RenderAdapter = {
  * WHERE: Both methods above.
  */
 function toAwsRegion(region: string): AwsRegion {
-  const supported: readonly string[] = AWS_REGIONS
+  const supported: readonly string[] = AWS_REGIONS;
   if (!supported.includes(region)) {
     throw new RenderProviderError(
-      'This video could not be rendered. Please contact support — the renderer is misconfigured.',
+      "This video could not be rendered. Please contact support — the renderer is misconfigured.",
       {
         detail:
           `[render/lambda] REMOTION_AWS_REGION is "${region}", which Remotion Lambda does not ` +
-          `support. Choose one of: ${supported.join(', ')}.`,
+          `support. Choose one of: ${supported.join(", ")}.`,
         permanent: true,
       },
-    )
+    );
   }
   /* Narrowed by the membership test above, which is why this is not an
    * unchecked assertion: `includes` cannot narrow a widened string on its own. */
-  return region as AwsRegion
+  return region as AwsRegion;
 }

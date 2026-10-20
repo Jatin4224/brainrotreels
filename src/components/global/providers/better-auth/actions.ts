@@ -1,14 +1,8 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
-'use client'
+"use client";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: activeSetOrganization, PROVIDER_ALIAS
@@ -23,15 +17,16 @@
  *        makes the alias type-safe.
  */
 
-import { authClient } from '@/lib/better-auth/auth-client'
+import { authClient } from "@/lib/better-auth/auth-client";
 
 export async function activeSetOrganization(params: {
-  organizationId: string
-  organizationSlug?: string
+  organizationId: string;
+  organizationSlug?: string;
 }): Promise<void> {
   await authClient.organization.setActive({
     organizationId: params.organizationId,
-    ...(params.organizationSlug ? { organizationSlug: params.organizationSlug } : {}),
-  })
+    ...(params.organizationSlug
+      ? { organizationSlug: params.organizationSlug }
+      : {}),
+  });
 }
-

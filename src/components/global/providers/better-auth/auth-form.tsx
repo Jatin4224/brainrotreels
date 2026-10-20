@@ -1,14 +1,8 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
-'use client'
+"use client";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: AuthForm, AuthFormProps, GOOGLE_OAUTH_ENABLED,
@@ -28,15 +22,15 @@
  *        in src/lib/types/auth.ts.
  */
 
-import * as React from 'react'
-import type { Route } from 'next'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { Loader2Icon, MailCheckIcon } from 'lucide-react'
-import { useForm } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
+import * as React from "react";
+import type { Route } from "next";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { Loader2Icon, MailCheckIcon } from "lucide-react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 
-import { Button } from '@/components/ui/button'
+import { Button } from "@/components/ui/button";
 import {
   Form,
   FormControl,
@@ -45,20 +39,20 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from '@/components/ui/form'
-import { Input } from '@/components/ui/input'
-import { authClient } from '@/lib/better-auth/auth-client'
-import { AUTH_ROUTES, authRouteWithCallback } from '@/lib/config'
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { authClient } from "@/lib/better-auth/auth-client";
+import { AUTH_ROUTES, authRouteWithCallback } from "@/lib/config";
 /* By path, not through ./index: that barrel re-exports these very forms. */
-import { AuthError } from '@/components/global/auth/auth-error'
-import { useDevEmailToast } from '@/hooks/use-dev-email-toast'
+import { AuthError } from "@/components/global/auth/auth-error";
+import { useDevEmailToast } from "@/hooks/use-dev-email-toast";
 import {
   signInSchema,
   signUpSchema,
   type AuthFormMode,
   type SignInValues,
   type SignUpValues,
-} from '@/lib/types'
+} from "@/lib/types";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: AuthFormProps
@@ -68,12 +62,14 @@ import {
  * WHERE: Used by the (auth) route pages.
  */
 export interface AuthFormProps {
-  mode: AuthFormMode
-  callbackURL?: Route
+  mode: AuthFormMode;
+  callbackURL?: Route;
 }
 
 /* Mirrors auth.ts: Google is only wired when the public client ID is set. */
-const GOOGLE_OAUTH_ENABLED = Boolean(process.env['NEXT_PUBLIC_GOOGLE_CLIENT_ID'])
+const GOOGLE_OAUTH_ENABLED = Boolean(
+  process.env["NEXT_PUBLIC_GOOGLE_CLIENT_ID"],
+);
 
 /**
  * SOURCE OF TRUTH KEYWORDS: AuthForm
@@ -81,39 +77,42 @@ const GOOGLE_OAUTH_ENABLED = Boolean(process.env['NEXT_PUBLIC_GOOGLE_CLIENT_ID']
  * WHAT:  Selects the concrete form by `mode`.
  * WHERE: Rendered by sign-in/page.tsx and sign-up/page.tsx.
  */
-export function AuthForm({ mode, callbackURL = '/' }: AuthFormProps) {
-  return mode === 'sign-in' ? (
+export function AuthForm({ mode, callbackURL = "/" }: AuthFormProps) {
+  return mode === "sign-in" ? (
     <SignInForm callbackURL={callbackURL} />
   ) : (
     <SignUpForm callbackURL={callbackURL} />
-  )
+  );
 }
 
 /* ---------- Sign-in ---------- */
 
 function SignInForm({ callbackURL }: { callbackURL: Route }) {
   /* '/' is the default, not a destination worth threading through the URL. */
-  const carriedCallback = callbackURL === '/' ? null : callbackURL
+  const carriedCallback = callbackURL === "/" ? null : callbackURL;
   const form = useForm<SignInValues>({
     resolver: zodResolver(signInSchema),
-    defaultValues: { email: '', password: '' },
-    mode: 'onTouched',
-  })
-  const { error, setError, google } = useAuthEffects()
-  const isSubmitting = form.formState.isSubmitting
-  const isBusy = isSubmitting || google.isPending
+    defaultValues: { email: "", password: "" },
+    mode: "onTouched",
+  });
+  const { error, setError, google } = useAuthEffects();
+  const isSubmitting = form.formState.isSubmitting;
+  const isBusy = isSubmitting || google.isPending;
 
   async function onSubmit(values: SignInValues) {
-    setError(null)
+    setError(null);
     const { error: authError } = await authClient.signIn.email({
       email: values.email,
       password: values.password,
-    })
+    });
     if (authError) {
-      setError(authError.message ?? 'Could not sign in. Check your details and try again.')
-      return
+      setError(
+        authError.message ??
+          "Could not sign in. Check your details and try again.",
+      );
+      return;
     }
-    window.location.assign(callbackURL)
+    window.location.assign(callbackURL);
   }
 
   return (
@@ -124,7 +123,11 @@ function SignInForm({ callbackURL }: { callbackURL: Route }) {
       />
       <AuthError error={error} />
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-6" noValidate>
+        <form
+          onSubmit={form.handleSubmit(onSubmit)}
+          className="grid gap-6"
+          noValidate
+        >
           <FormField
             control={form.control}
             name="email"
@@ -170,7 +173,11 @@ function SignInForm({ callbackURL }: { callbackURL: Route }) {
               </FormItem>
             )}
           />
-          <AuthSubmit label="Sign in" isSubmitting={isSubmitting} isBusy={isBusy} />
+          <AuthSubmit
+            label="Sign in"
+            isSubmitting={isSubmitting}
+            isBusy={isBusy}
+          />
           <GoogleButton
             label="Continue with Google"
             onClick={() => google.run(callbackURL, setError)}
@@ -185,28 +192,30 @@ function SignInForm({ callbackURL }: { callbackURL: Route }) {
         ctaHref={authRouteWithCallback(AUTH_ROUTES.signUp, carriedCallback)}
       />
     </div>
-  )
+  );
 }
 
 /* ---------- Sign-up ---------- */
 
 function SignUpForm({ callbackURL }: { callbackURL: Route }) {
   /* '/' is the default, not a destination worth threading through the URL. */
-  const carriedCallback = callbackURL === '/' ? null : callbackURL
-  const [submittedEmail, setSubmittedEmail] = React.useState<string | null>(null)
+  const carriedCallback = callbackURL === "/" ? null : callbackURL;
+  const [submittedEmail, setSubmittedEmail] = React.useState<string | null>(
+    null,
+  );
   const form = useForm<SignUpValues>({
     resolver: zodResolver(signUpSchema),
-    defaultValues: { name: '', email: '', password: '' },
-    mode: 'onTouched',
-  })
-  const { error, setError, google } = useAuthEffects()
-  const notifyDevEmail = useDevEmailToast()
-  const router = useRouter()
-  const isSubmitting = form.formState.isSubmitting
-  const isBusy = isSubmitting || google.isPending
+    defaultValues: { name: "", email: "", password: "" },
+    mode: "onTouched",
+  });
+  const { error, setError, google } = useAuthEffects();
+  const notifyDevEmail = useDevEmailToast();
+  const router = useRouter();
+  const isSubmitting = form.formState.isSubmitting;
+  const isBusy = isSubmitting || google.isPending;
 
   async function onSubmit(values: SignUpValues) {
-    setError(null)
+    setError(null);
     /* RETURN_TO_AFTER_AUTH: passed to the SDK, not just used after it. With
      * requireEmailVerification on, the user leaves this tab and comes back
      * through the emailed link — Better Auth builds that link's destination
@@ -217,27 +226,29 @@ function SignUpForm({ callbackURL }: { callbackURL: Route }) {
       email: values.email,
       password: values.password,
       callbackURL,
-    })
+    });
     if (authError) {
-      setError(authError.message ?? 'Could not create your account. Try again.')
-      return
+      setError(
+        authError.message ?? "Could not create your account. Try again.",
+      );
+      return;
     }
 
     /* Dev-only: if Resend isn't configured, surface the verification link in a
      * toast (no-op otherwise). Awaited so the toast is mounted before we
      * navigate — a client-side push preserves it, a full reload would not. */
-    await notifyDevEmail(values.email)
+    await notifyDevEmail(values.email);
 
     /* A non-null token means Better Auth signed the user straight in, i.e.
      * requireEmailVerification is off (the dev email fallback). Go to the app
      * instead of dead-ending on a screen waiting for mail that can't arrive.
      * With verification enforced the token is null → check-your-email screen. */
     if (data?.token) {
-      router.push(callbackURL)
-      router.refresh()
-      return
+      router.push(callbackURL);
+      router.refresh();
+      return;
     }
-    setSubmittedEmail(values.email)
+    setSubmittedEmail(values.email);
   }
 
   if (submittedEmail) {
@@ -249,16 +260,21 @@ function SignUpForm({ callbackURL }: { callbackURL: Route }) {
         <div className="flex flex-col gap-2">
           <h1 className="text-2xl font-bold">Check your email</h1>
           <p className="text-balance text-sm text-muted-foreground">
-            We sent a verification link to{' '}
-            <span className="font-medium text-foreground">{submittedEmail}</span>. Click it to
-            finish creating your account.
+            We sent a verification link to{" "}
+            <span className="font-medium text-foreground">
+              {submittedEmail}
+            </span>
+            . Click it to finish creating your account.
           </p>
         </div>
-        <Link href={AUTH_ROUTES.signIn} className="text-sm underline underline-offset-4">
+        <Link
+          href={AUTH_ROUTES.signIn}
+          className="text-sm underline underline-offset-4"
+        >
           Back to sign in
         </Link>
       </div>
-    )
+    );
   }
 
   return (
@@ -269,7 +285,11 @@ function SignUpForm({ callbackURL }: { callbackURL: Route }) {
       />
       <AuthError error={error} />
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-6" noValidate>
+        <form
+          onSubmit={form.handleSubmit(onSubmit)}
+          className="grid gap-6"
+          noValidate
+        >
           <FormField
             control={form.control}
             name="name"
@@ -277,7 +297,13 @@ function SignUpForm({ callbackURL }: { callbackURL: Route }) {
               <FormItem>
                 <FormLabel>Name</FormLabel>
                 <FormControl>
-                  <Input type="text" autoComplete="name" placeholder="John Doe" disabled={isBusy} {...field} />
+                  <Input
+                    type="text"
+                    autoComplete="name"
+                    placeholder="John Doe"
+                    disabled={isBusy}
+                    {...field}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -309,14 +335,23 @@ function SignUpForm({ callbackURL }: { callbackURL: Route }) {
               <FormItem>
                 <FormLabel>Password</FormLabel>
                 <FormControl>
-                  <Input type="password" autoComplete="new-password" disabled={isBusy} {...field} />
+                  <Input
+                    type="password"
+                    autoComplete="new-password"
+                    disabled={isBusy}
+                    {...field}
+                  />
                 </FormControl>
                 <FormDescription>At least 8 characters.</FormDescription>
                 <FormMessage />
               </FormItem>
             )}
           />
-          <AuthSubmit label="Sign up" isSubmitting={isSubmitting} isBusy={isBusy} />
+          <AuthSubmit
+            label="Sign up"
+            isSubmitting={isSubmitting}
+            isBusy={isBusy}
+          />
           <GoogleButton
             label="Continue with Google"
             onClick={() => google.run(callbackURL, setError)}
@@ -331,18 +366,26 @@ function SignUpForm({ callbackURL }: { callbackURL: Route }) {
         ctaHref={authRouteWithCallback(AUTH_ROUTES.signIn, carriedCallback)}
       />
     </div>
-  )
+  );
 }
 
 /* ---------- Shared bits ---------- */
 
-function AuthHeading({ title, description }: { title: string; description: string }) {
+function AuthHeading({
+  title,
+  description,
+}: {
+  title: string;
+  description: string;
+}) {
   return (
     <div className="flex flex-col items-center gap-2 text-center">
       <h1 className="text-2xl font-bold">{title}</h1>
-      <p className="text-balance text-sm text-muted-foreground">{description}</p>
+      <p className="text-balance text-sm text-muted-foreground">
+        {description}
+      </p>
     </div>
-  )
+  );
 }
 
 function AuthSubmit({
@@ -350,16 +393,16 @@ function AuthSubmit({
   isSubmitting,
   isBusy,
 }: {
-  label: string
-  isSubmitting: boolean
-  isBusy: boolean
+  label: string;
+  isSubmitting: boolean;
+  isBusy: boolean;
 }) {
   return (
     <Button type="submit" className="w-full" disabled={isBusy}>
       {isSubmitting ? <Loader2Icon className="size-4 animate-spin" /> : null}
       {label}
     </Button>
-  )
+  );
 }
 
 function GoogleButton({
@@ -368,23 +411,35 @@ function GoogleButton({
   isPending,
   isBusy,
 }: {
-  label: string
-  onClick: () => void
-  isPending: boolean
-  isBusy: boolean
+  label: string;
+  onClick: () => void;
+  isPending: boolean;
+  isBusy: boolean;
 }) {
-  if (!GOOGLE_OAUTH_ENABLED) return null
+  if (!GOOGLE_OAUTH_ENABLED) return null;
   return (
     <>
       <div className="relative text-center text-sm after:absolute after:inset-0 after:top-1/2 after:z-0 after:flex after:items-center after:border-t after:border-border">
-        <span className="relative z-10 bg-background px-2 text-muted-foreground">Or</span>
+        <span className="relative z-10 bg-background px-2 text-muted-foreground">
+          Or
+        </span>
       </div>
-      <Button variant="outline" type="button" className="w-full" onClick={onClick} disabled={isBusy}>
-        {isPending ? <Loader2Icon className="size-4 animate-spin" /> : <GoogleGlyph />}
+      <Button
+        variant="outline"
+        type="button"
+        className="w-full"
+        onClick={onClick}
+        disabled={isBusy}
+      >
+        {isPending ? (
+          <Loader2Icon className="size-4 animate-spin" />
+        ) : (
+          <GoogleGlyph />
+        )}
         {label}
       </Button>
     </>
-  )
+  );
 }
 
 function AuthFooter({
@@ -392,50 +447,59 @@ function AuthFooter({
   ctaLabel,
   ctaHref,
 }: {
-  prompt: string
-  ctaLabel: string
+  prompt: string;
+  ctaLabel: string;
   /* TYPED_ROUTE_GUARANTEE: a cross-link destination is checked against the route
    * tree, so a renamed auth page cannot ship as a dead footer link. */
-  ctaHref: Route
+  ctaHref: Route;
 }) {
   return (
     <div className="text-center text-sm">
-      {prompt}{' '}
+      {prompt}{" "}
       <Link href={ctaHref} className="underline underline-offset-4">
         {ctaLabel}
       </Link>
     </div>
-  )
+  );
 }
 
 /* Shared error state + Google handler. */
 function useAuthEffects() {
-  const [error, setError] = React.useState<string | null>(null)
-  const [isPending, setIsPending] = React.useState(false)
+  const [error, setError] = React.useState<string | null>(null);
+  const [isPending, setIsPending] = React.useState(false);
 
   async function run(callbackURL: Route, setErr: (v: string | null) => void) {
-    if (isPending) return
-    setErr(null)
-    setIsPending(true)
+    if (isPending) return;
+    setErr(null);
+    setIsPending(true);
     try {
-      const { error: authError } = await authClient.signIn.social({ provider: 'google', callbackURL })
-      if (authError) setErr(authError.message ?? 'Google sign-in failed. Try again.')
+      const { error: authError } = await authClient.signIn.social({
+        provider: "google",
+        callbackURL,
+      });
+      if (authError)
+        setErr(authError.message ?? "Google sign-in failed. Try again.");
     } finally {
-      setIsPending(false)
+      setIsPending(false);
     }
   }
 
-  return { error, setError, google: { isPending, run } }
+  return { error, setError, google: { isPending, run } };
 }
 
 /* Inline Google "G" mark. */
 function GoogleGlyph() {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className="size-4" aria-hidden="true">
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      className="size-4"
+      aria-hidden="true"
+    >
       <path
         d="M12.48 10.92v3.28h7.84c-.24 1.84-.853 3.187-1.787 4.133-1.147 1.147-2.933 2.4-6.053 2.4-4.827 0-8.6-3.893-8.6-8.72s3.773-8.72 8.6-8.72c2.6 0 4.507 1.027 5.907 2.347l2.307-2.307C18.747 1.44 16.133 0 12.48 0 5.867 0 .307 5.387.307 12s5.56 12 12.173 12c3.573 0 6.267-1.173 8.373-3.36 2.16-2.16 2.84-5.213 2.84-7.667 0-.76-.053-1.467-.173-2.053H12.48z"
         fill="currentColor"
       />
     </svg>
-  )
+  );
 }

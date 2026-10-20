@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -21,33 +15,43 @@
  * WHERE: Every fixture in this folder.
  */
 
-import type { WordToken } from '../schema'
+import type { WordToken } from "../schema";
 
 /* Seconds per character, plus a fixed cost per word for the gap between them.
  * Chosen to land a typical sentence near real narration pace. */
-const SECONDS_PER_CHARACTER = 0.055
-const SECONDS_PER_WORD = 0.08
+const SECONDS_PER_CHARACTER = 0.055;
+const SECONDS_PER_WORD = 0.08;
 
 export function buildWords(
   text: string,
-  options: { startAt?: number; speaker?: string } = {}
+  options: { startAt?: number; speaker?: string } = {},
 ): WordToken[] {
-  const { startAt = 0, speaker } = options
-  const tokens = text.trim().split(/\s+/).filter((word) => word.length > 0)
-  const out: WordToken[] = []
-  let cursor = startAt
+  const { startAt = 0, speaker } = options;
+  const tokens = text
+    .trim()
+    .split(/\s+/)
+    .filter((word) => word.length > 0);
+  const out: WordToken[] = [];
+  let cursor = startAt;
 
   tokens.forEach((word, index) => {
-    const duration = round(word.length * SECONDS_PER_CHARACTER + SECONDS_PER_WORD)
-    const token: WordToken = { i: index, w: word, s: round(cursor), e: round(cursor + duration) }
-    if (speaker !== undefined) token.speaker = speaker
-    out.push(token)
-    cursor = cursor + duration
-  })
+    const duration = round(
+      word.length * SECONDS_PER_CHARACTER + SECONDS_PER_WORD,
+    );
+    const token: WordToken = {
+      i: index,
+      w: word,
+      s: round(cursor),
+      e: round(cursor + duration),
+    };
+    if (speaker !== undefined) token.speaker = speaker;
+    out.push(token);
+    cursor = cursor + duration;
+  });
 
-  return out
+  return out;
 }
 
 function round(value: number): number {
-  return Math.round(value * 1e6) / 1e6
+  return Math.round(value * 1e6) / 1e6;
 }

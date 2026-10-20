@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -41,7 +35,7 @@ export {
   authSchemaFor,
   forgotPasswordSchema,
   resetPasswordSchema,
-} from './auth'
+} from "./auth";
 export type {
   SignInValues,
   SignUpValues,
@@ -49,9 +43,9 @@ export type {
   AuthValuesByMode,
   ForgotPasswordValues,
   ResetPasswordValues,
-} from './auth'
-export { jsonValueSchema, jsonObjectSchema } from './json'
-export type { JsonValue, JsonObject } from './json'
+} from "./auth";
+export { jsonValueSchema, jsonObjectSchema } from "./json";
+export type { JsonValue, JsonObject } from "./json";
 export {
   PROJECT_KINDS,
   PROJECT_STATUSES,
@@ -73,7 +67,7 @@ export {
   PROJECT_FILTER_ALL,
   PROJECT_FILTER_DEFAULTS,
   PROJECT_SEARCH_MAX,
-} from './project'
+} from "./project";
 export type {
   ProjectKind,
   ProjectStatus,
@@ -83,7 +77,7 @@ export type {
   RenameProjectValues,
   DuplicateProjectValues,
   ProjectFilterValues,
-} from './project'
+} from "./project";
 export {
   ASSET_KINDS,
   ASSET_SOURCES,
@@ -124,7 +118,7 @@ export {
   uploadContentTypeSchema,
   uploadableAssetKindSchema,
   variantNameSchema,
-} from './asset'
+} from "./asset";
 export type {
   AssetFilterValues,
   AssetKind,
@@ -140,7 +134,7 @@ export type {
   UploadContentType,
   UploadableAssetKind,
   VariantName,
-} from './asset'
+} from "./asset";
 export {
   FINAL_URL_TTL_SECONDS,
   PREVIEW_URL_TTL_SECONDS,
@@ -172,7 +166,7 @@ export {
   resolvedAssetSchema,
   retryRenderSchema,
   timelineRendererPropsSchema,
-} from './render'
+} from "./render";
 export type {
   AssetUrlMap,
   CreateRenderValues,
@@ -184,12 +178,15 @@ export type {
   RenderStatus,
   ResolvedAsset,
   RetryRenderValues,
-} from './render'
-export { createOrganizationSchema, updateOrganizationSettingsSchema } from './organization'
+} from "./render";
+export {
+  createOrganizationSchema,
+  updateOrganizationSettingsSchema,
+} from "./organization";
 export type {
   CreateOrganizationValues,
   UpdateOrganizationSettingsValues,
-} from './organization'
+} from "./organization";
 export {
   inviteMemberSchema,
   updateMemberSchema,
@@ -203,13 +200,13 @@ export {
   permissionStringSchema,
   RESERVED_ROLE_NAMES,
   VALID_PERMISSION_STRINGS,
-} from './team'
+} from "./team";
 export type {
   InviteMemberValues,
   UpdateMemberValues,
   CreateRoleValues,
   UpdateRoleValues,
-} from './team'
+} from "./team";
 export {
   billingIntervalSchema,
   planKeySchema,
@@ -217,14 +214,14 @@ export {
   upgradeSubscriptionSchema,
   paymentMethodIdSchema,
   isPurchasablePlan,
-} from './billing'
+} from "./billing";
 export type {
   CreateSubscriptionValues,
   UpgradeSubscriptionValues,
   PurchasablePlanKey,
   PlanPrice,
   AvailablePlan,
-} from './billing'
+} from "./billing";
 export {
   CREDITABLE_KINDS,
   CREDIT_LEDGER_KINDS,
@@ -240,7 +237,7 @@ export {
   getBalanceSchema,
   listLedgerSchema,
   purchaseCreditsSchema,
-} from './credits'
+} from "./credits";
 export type {
   CostBreakdown,
   CostLine,
@@ -249,4 +246,4 @@ export type {
   CreditableKind,
   ListLedgerValues,
   PurchaseCreditsValues,
-} from './credits'
+} from "./credits";

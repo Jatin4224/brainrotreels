@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -29,19 +23,19 @@
  *        reads context from src/trpc/init.ts.
  */
 
-import { initTRPC, TRPCError } from '@trpc/server'
-import superjson from 'superjson'
-import { headers } from 'next/headers'
-import type { Context } from '../init'
-import { createStructuredError } from '../init'
-import { ERROR_CODES, type StructuredErrorCause } from '@/lib/errors'
+import { initTRPC, TRPCError } from "@trpc/server";
+import superjson from "superjson";
+import { headers } from "next/headers";
+import type { Context } from "../init";
+import { createStructuredError } from "../init";
+import { ERROR_CODES, type StructuredErrorCause } from "@/lib/errors";
 import {
   apiLimiter,
   checkRateLimit,
   getResourceLimiter,
   getClientIp,
-} from '@/lib/rate-limit'
-import type { Permission } from '@/lib/permissions'
+} from "@/lib/rate-limit";
+import type { Permission } from "@/lib/permissions";
 import {
   RESOURCES,
   RESOURCE_ENTRIES,
@@ -53,18 +47,18 @@ import {
   type ResourceDefinition,
   type LimitResourceKey,
   type FlagResourceKey,
-} from '@/lib/resources'
-import { checkFeatureGate, checkBooleanFeature } from '@/lib/feature-gate'
-import { incrementUsage, decrementUsage } from '@/services/usage.service'
-import { prisma } from '@/lib/config/prisma'
-import type { Prisma } from '@/generated/prisma'
+} from "@/lib/resources";
+import { checkFeatureGate, checkBooleanFeature } from "@/lib/feature-gate";
+import { incrementUsage, decrementUsage } from "@/services/usage.service";
+import { prisma } from "@/lib/config/prisma";
+import type { Prisma } from "@/generated/prisma";
 import {
   logActivity,
   auditMetadataSchema,
   type AuditEntityName,
   type AuditMetadata,
-} from '@/services/activity-log.service'
-import { getRequestForensics } from '@/lib/request-forensics'
+} from "@/services/activity-log.service";
+import { getRequestForensics } from "@/lib/request-forensics";
 
 // ---------------------------------------------------------------------------
 // tRPC instance
@@ -73,7 +67,7 @@ import { getRequestForensics } from '@/lib/request-forensics'
 const t = initTRPC.context<Context>().create({
   transformer: superjson,
   errorFormatter({ shape, error }) {
-    return { ...shape, data: { ...shape.data, cause: error.cause } }
+    return { ...shape, data: { ...shape.data, cause: error.cause } };
   },
   /* SSE numbers are tRPC defaults: survive proxy idle timeouts (~30s) while
    * staying under serverless hard caps (~10min). */
@@ -82,7 +76,7 @@ const t = initTRPC.context<Context>().create({
     ping: { enabled: true, intervalMs: 10_000 },
     client: { reconnectAfterInactivityMs: 15_000 },
   },
-})
+});
 
 /**
  * SOURCE OF TRUTH KEYWORDS: router
@@ -93,8 +87,8 @@ const t = initTRPC.context<Context>().create({
  * WHERE: Re-exported via src/trpc/procedures/index.ts and consumed in src/trpc/init.ts
  *        (as `createTRPCRouter`).
  */
-export const router = t.router
-const middleware = t.middleware
+export const router = t.router;
+const middleware = t.middleware;
 
 // ---------------------------------------------------------------------------
 // baseProcedure — public, rate-limited. Inherited by every other procedure.
@@ -112,14 +106,17 @@ const middleware = t.middleware
  */
 export const baseProcedure = t.procedure.use(
   middleware(async ({ ctx, next }) => {
-    const requestHeaders = await headers()
-    const identifier = ctx.user?.id ?? `ip:${getClientIp(requestHeaders)}`
-    const result = await checkRateLimit(apiLimiter, identifier)
+    const requestHeaders = await headers();
+    const identifier = ctx.user?.id ?? `ip:${getClientIp(requestHeaders)}`;
+    const result = await checkRateLimit(apiLimiter, identifier);
 
     if (!result.allowed) {
-      const retryAfter = Math.max(1, Math.ceil((result.resetAt - Date.now()) / 1000))
+      const retryAfter = Math.max(
+        1,
+        Math.ceil((result.resetAt - Date.now()) / 1000),
+      );
       throw new TRPCError({
-        code: 'TOO_MANY_REQUESTS',
+        code: "TOO_MANY_REQUESTS",
         message: `Rate limit exceeded. Try again in ${retryAfter} seconds.`,
         cause: {
           errorCode: ERROR_CODES.RATE_LIMITED,
@@ -129,12 +126,12 @@ export const baseProcedure = t.procedure.use(
           retryAfter,
           message: `You've exceeded the rate limit of ${result.limit} requests. Please wait ${retryAfter} seconds before trying again.`,
         } satisfies StructuredErrorCause,
-      })
+      });
     }
 
-    return next()
-  })
-)
+    return next();
+  }),
+);
 
 // ---------------------------------------------------------------------------
 // authProcedure — requires a logged-in user; no organization scoping.
@@ -151,16 +148,16 @@ export const baseProcedure = t.procedure.use(
  *        endpoints in src/trpc/routers/*.
  */
 export const authProcedure = baseProcedure.use(async ({ ctx, next }) => {
-  await ctx.resolveAuth()
+  await ctx.resolveAuth();
   if (!ctx.user) {
     throw new TRPCError({
-      code: 'UNAUTHORIZED',
-      message: 'You must be logged in to access this resource',
-    })
+      code: "UNAUTHORIZED",
+      message: "You must be logged in to access this resource",
+    });
   }
   /* Re-stamp user/session so downstream sees them as non-nullable. */
-  return next({ ctx: { ...ctx, session: ctx.session, user: ctx.user } })
-})
+  return next({ ctx: { ...ctx, session: ctx.session, user: ctx.user } });
+});
 
 // ---------------------------------------------------------------------------
 // protectedProcedure — org-scoped factory; see CLAUDE.md RULE 3.
@@ -176,12 +173,15 @@ export const authProcedure = baseProcedure.use(async ({ ctx, next }) => {
  * WHERE: Used as `ProtectedOptions['audit']` (object form); consumed by `writeAuditRow`.
  */
 export interface AuditOverride {
-  entity?: AuditEntityName
-  action?: string
+  entity?: AuditEntityName;
+  action?: string;
   /** Template string with `{input.field}` / `{output.field}` placeholders. */
-  describe?: string
-  getEntityId?: (params: { input: unknown; output: unknown }) => string | undefined
-  metadata?: AuditMetadata
+  describe?: string;
+  getEntityId?: (params: {
+    input: unknown;
+    output: unknown;
+  }) => string | undefined;
+  metadata?: AuditMetadata;
 }
 
 /**
@@ -196,16 +196,16 @@ export interface AuditOverride {
  *        routers in src/trpc/routers/*.
  */
 export interface PaginationOptions {
-  defaultPage?: number
-  defaultPageSize?: number
-  maxPageSize?: number
+  defaultPage?: number;
+  defaultPageSize?: number;
+  maxPageSize?: number;
 }
 
 export interface PaginationContext {
-  page: number
-  pageSize: number
-  skip: number
-  take: number
+  page: number;
+  pageSize: number;
+  skip: number;
+  take: number;
 }
 
 /**
@@ -228,18 +228,18 @@ export interface PaginationContext {
  */
 export interface ProtectedOptions {
   /** Member must hold one of these org roles (e.g. `['owner']`) to call. */
-  requireRole?: string[]
+  requireRole?: string[];
   /** Member must hold this `resource:action` permission. Owners always pass. */
-  requirePermission?: Permission
-  paginate?: boolean | PaginationOptions
+  requirePermission?: Permission;
+  paginate?: boolean | PaginationOptions;
   /** `false` to opt out; object to override inferred fields. */
-  audit?: boolean | AuditOverride
+  audit?: boolean | AuditOverride;
   /** Override mutation tx timeout (default 10_000ms). */
-  txTimeout?: number
+  txTimeout?: number;
 }
 
-const DEFAULT_TX_TIMEOUT_MS = 10_000
-const DEFAULT_TX_MAX_WAIT_MS = 5_000
+const DEFAULT_TX_TIMEOUT_MS = 10_000;
+const DEFAULT_TX_MAX_WAIT_MS = 5_000;
 
 /**
  * SOURCE OF TRUTH KEYWORDS: PaginationCtxFor
@@ -259,7 +259,7 @@ type PaginationCtxFor<O extends ProtectedOptions | undefined> =
     ? [P] extends [false | undefined]
       ? undefined
       : PaginationContext
-    : undefined
+    : undefined;
 
 /**
  * SOURCE OF TRUTH KEYWORDS: protectedProcedure
@@ -273,31 +273,34 @@ type PaginationCtxFor<O extends ProtectedOptions | undefined> =
  * WHERE: Used by every router in src/trpc/routers/*. Options shape: see
  *        ProtectedOptions above.
  */
-export function protectedProcedure<const O extends ProtectedOptions | undefined = undefined>(
-  options?: O
-) {
+export function protectedProcedure<
+  const O extends ProtectedOptions | undefined = undefined,
+>(options?: O) {
   return authProcedure.use(async (opts) => {
     // ─────────────────────────────────────────────────────────────────────
     // [1] REQUEST SETUP — capture start time and pull raw input safely
     //     so downstream gates can read `organizationId` and other fields.
     // ─────────────────────────────────────────────────────────────────────
-    const startedAt = Date.now()
-    const { ctx, next, type, path } = opts
+    const startedAt = Date.now();
+    const { ctx, next, type, path } = opts;
 
-    let rawInput: unknown
+    let rawInput: unknown;
     try {
-      rawInput = await opts.getRawInput()
+      rawInput = await opts.getRawInput();
     } catch {
-      rawInput = {}
+      rawInput = {};
     }
 
     // ─────────────────────────────────────────────────────────────────────
     // [2] ORGANIZATION SCOPE — every protected call MUST carry an
     //     organizationId; this is the tenant boundary for the request.
     // ─────────────────────────────────────────────────────────────────────
-    const organizationId = extractOrganizationId(rawInput)
+    const organizationId = extractOrganizationId(rawInput);
     if (!organizationId) {
-      throw new TRPCError({ code: 'BAD_REQUEST', message: 'Organization ID is required' })
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "Organization ID is required",
+      });
     }
 
     // ─────────────────────────────────────────────────────────────────────
@@ -306,34 +309,34 @@ export function protectedProcedure<const O extends ProtectedOptions | undefined 
     //     Memberships come from ctx (adapter-resolved and request-cached), so
     //     this step is provider-neutral and costs no extra round-trip.
     // ─────────────────────────────────────────────────────────────────────
-    const memberships = await ctx.getUserOrganizations()
+    const memberships = await ctx.getUserOrganizations();
     if (!memberships.length) {
       throw createStructuredError(
-        'PRECONDITION_FAILED',
-        'Please complete onboarding to access this feature',
+        "PRECONDITION_FAILED",
+        "Please complete onboarding to access this feature",
         {
           errorCode: ERROR_CODES.ONBOARDING_INCOMPLETE,
-          requiredStep: 'onboarding',
-          message: 'You need to create an organization first',
-        }
-      )
+          requiredStep: "onboarding",
+          message: "You need to create an organization first",
+        },
+      );
     }
 
     // ─────────────────────────────────────────────────────────────────────
     // [4] MEMBERSHIP CHECK — verify the caller actually belongs to the
     //     organization they're targeting (prevents cross-tenant access).
     // ─────────────────────────────────────────────────────────────────────
-    const member = memberships.find((m) => m.id === organizationId)
+    const member = memberships.find((m) => m.id === organizationId);
     if (!member) {
       throw createStructuredError(
-        'FORBIDDEN',
-        'You do not have access to this organization',
+        "FORBIDDEN",
+        "You do not have access to this organization",
         {
           errorCode: ERROR_CODES.NOT_ORGANIZATION_MEMBER,
           organizationId,
-          message: 'User is not a member of the requested organization',
-        }
-      )
+          message: "User is not a member of the requested organization",
+        },
+      );
     }
 
     // ─────────────────────────────────────────────────────────────────────
@@ -342,15 +345,15 @@ export function protectedProcedure<const O extends ProtectedOptions | undefined 
     // ─────────────────────────────────────────────────────────────────────
     if (options?.requireRole && !options.requireRole.includes(member.role)) {
       throw createStructuredError(
-        'FORBIDDEN',
-        'You do not have permission to perform this action',
+        "FORBIDDEN",
+        "You do not have permission to perform this action",
         {
           errorCode: ERROR_CODES.INSUFFICIENT_PERMISSIONS,
           required: options.requireRole,
           current: member.role,
           message: `User role ${member.role} does not have required permissions`,
-        }
-      )
+        },
+      );
     }
 
     // ─────────────────────────────────────────────────────────────────────
@@ -364,26 +367,27 @@ export function protectedProcedure<const O extends ProtectedOptions | undefined 
     //     app after a provider switch.
     // ─────────────────────────────────────────────────────────────────────
     if (options?.requirePermission) {
-      const [resourcePart, actionPart] = options.requirePermission.split(':')
+      const [resourcePart, actionPart] = options.requirePermission.split(":");
       if (!resourcePart || !actionPart) {
         throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
+          code: "INTERNAL_SERVER_ERROR",
           message: `Invalid permission format: ${options.requirePermission}. Expected format: "resource:action"`,
-        })
+        });
       }
       const hasAccess =
-        member.hasFullAccess || member.permissions.includes(options.requirePermission)
+        member.hasFullAccess ||
+        member.permissions.includes(options.requirePermission);
       if (!hasAccess) {
         throw createStructuredError(
-          'FORBIDDEN',
+          "FORBIDDEN",
           `You don't have permission to ${actionPart} ${resourcePart}`,
           {
             errorCode: ERROR_CODES.INSUFFICIENT_PERMISSIONS,
             required: [options.requirePermission],
             current: member.role,
             message: `Missing required permission: ${options.requirePermission}`,
-          }
-        )
+          },
+        );
       }
     }
 
@@ -395,12 +399,14 @@ export function protectedProcedure<const O extends ProtectedOptions | undefined 
     /* Path-derived auto-wiring. Only single-dot `<resource>.<verb>` paths
      * match a RESOURCES entry; nested-router paths fall through to explicit
      * options, by design — implicit nested behavior would be too magical. */
-    const pathResource = getResourceFromPath(path)
-    const pathSegments = path.split('.')
-    const pathAction = (pathSegments[pathSegments.length - 1] ?? '').toLowerCase()
+    const pathResource = getResourceFromPath(path);
+    const pathSegments = path.split(".");
+    const pathAction = (
+      pathSegments[pathSegments.length - 1] ?? ""
+    ).toLowerCase();
     const resourceDef: ResourceDefinition | null = pathResource
       ? lookupResourceDef(pathResource)
-      : null
+      : null;
 
     /* GUARDRAIL: a mutation whose `<resource>` segment isn't a RESOURCES key
      * silently bypasses every auto-wired behavior (limit, flag, counter,
@@ -412,16 +418,16 @@ export function protectedProcedure<const O extends ProtectedOptions | undefined 
      * The only sanctioned escape hatch is `audit: false` (token refresh, ping,
      * truly side-effect-free writes); permission or role declarations also
      * count because they prove the dev consciously scoped the procedure. */
-    if (type === 'mutation' && pathResource === null) {
+    if (type === "mutation" && pathResource === null) {
       const hasExplicitOverride =
         options?.audit !== undefined ||
         options?.requirePermission !== undefined ||
-        options?.requireRole !== undefined
+        options?.requireRole !== undefined;
       if (!hasExplicitOverride) {
         throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
+          code: "INTERNAL_SERVER_ERROR",
           message: `Procedure "${path}" is a mutation whose first segment is not in RESOURCES. Add the resource to src/lib/resources.ts, OR declare an explicit option (audit / requirePermission / requireRole) to opt into a non-conventional path.`,
-        })
+        });
       }
     }
 
@@ -430,21 +436,24 @@ export function protectedProcedure<const O extends ProtectedOptions | undefined 
     //     entry. Stacks on top of the global limiter in baseProcedure.
     // ─────────────────────────────────────────────────────────────────────
     /* Per-resource rate limiter — stacks on top of the global baseProcedure cap. */
-    const rateLimitCfg = resourceDef?.rateLimit?.[pathAction]
+    const rateLimitCfg = resourceDef?.rateLimit?.[pathAction];
     if (rateLimitCfg && pathResource) {
       const limiter = getResourceLimiter(
         pathResource,
         pathAction,
         rateLimitCfg.count,
-        rateLimitCfg.window
-      )
-      const requestHeaders = await headers()
-      const identifier = `${ctx.user.id}:${organizationId}:${getClientIp(requestHeaders)}`
-      const result = await checkRateLimit(limiter, identifier)
+        rateLimitCfg.window,
+      );
+      const requestHeaders = await headers();
+      const identifier = `${ctx.user.id}:${organizationId}:${getClientIp(requestHeaders)}`;
+      const result = await checkRateLimit(limiter, identifier);
       if (!result.allowed) {
-        const retryAfter = Math.max(1, Math.ceil((result.resetAt - Date.now()) / 1000))
+        const retryAfter = Math.max(
+          1,
+          Math.ceil((result.resetAt - Date.now()) / 1000),
+        );
         throw new TRPCError({
-          code: 'TOO_MANY_REQUESTS',
+          code: "TOO_MANY_REQUESTS",
           message: `Too many ${pathAction} requests for ${pathResource}. Try again in ${retryAfter}s.`,
           cause: {
             errorCode: ERROR_CODES.RATE_LIMITED,
@@ -454,7 +463,7 @@ export function protectedProcedure<const O extends ProtectedOptions | undefined 
             retryAfter,
             message: `Resource rate limit exceeded.`,
           },
-        })
+        });
       }
     }
 
@@ -468,13 +477,19 @@ export function protectedProcedure<const O extends ProtectedOptions | undefined 
     //     when the plan grants unlimited.
     // ─────────────────────────────────────────────────────────────────────
     const limitToCheck: LimitResourceKey | null =
-      pathAction === 'create' && isLimitResource(pathResource) ? pathResource : null
+      pathAction === "create" && isLimitResource(pathResource)
+        ? pathResource
+        : null;
     if (limitToCheck) {
-      const gateResult = await checkFeatureGate(organizationId, limitToCheck, 1)
+      const gateResult = await checkFeatureGate(
+        organizationId,
+        limitToCheck,
+        1,
+      );
       if (!gateResult.allowed) {
         throw createStructuredError(
-          'FORBIDDEN',
-          gateResult.reason || 'Plan limit reached',
+          "FORBIDDEN",
+          gateResult.reason || "Plan limit reached",
           {
             errorCode: ERROR_CODES.USAGE_LIMIT_REACHED,
             resource: limitToCheck,
@@ -484,13 +499,13 @@ export function protectedProcedure<const O extends ProtectedOptions | undefined 
             upgradeRequired: true,
             message:
               gateResult.reason ||
-              'You have reached your plan limit for this feature',
+              "You have reached your plan limit for this feature",
             /* UPGRADE_COPY_FROM_REGISTRY: the resource's own sentence, already
              * resolved against the plan the org is on. The client opens the
              * upgrade modal straight off this. */
             upgradeMessage: gateResult.upgradeMessage,
-          }
-        )
+          },
+        );
       }
     }
 
@@ -503,11 +518,11 @@ export function protectedProcedure<const O extends ProtectedOptions | undefined 
     //      enforced everywhere — no per-procedure opt-in.
     // ─────────────────────────────────────────────────────────────────────
     if (isFlagResource(pathResource)) {
-      const flagCheck = await checkBooleanFeature(organizationId, pathResource)
+      const flagCheck = await checkBooleanFeature(organizationId, pathResource);
       if (!flagCheck.enabled) {
-        const flagDef = RESOURCES[pathResource]
+        const flagDef = RESOURCES[pathResource];
         throw createStructuredError(
-          'FORBIDDEN',
+          "FORBIDDEN",
           `${flagDef.name} is not available on your current plan`,
           {
             errorCode: ERROR_CODES.FEATURE_NOT_AVAILABLE,
@@ -519,8 +534,8 @@ export function protectedProcedure<const O extends ProtectedOptions | undefined 
             upgradeRequired: true,
             message: `${flagDef.name} is locked on the current plan. Upgrade to access it.`,
             upgradeMessage: flagCheck.upgradeMessage,
-          }
-        )
+          },
+        );
       }
     }
 
@@ -528,7 +543,7 @@ export function protectedProcedure<const O extends ProtectedOptions | undefined 
     // [11] PAGINATION — resolve `{page, pageSize, skip, take}` once so
     //      handlers that opted in get a typed `ctx.pagination` slot.
     // ─────────────────────────────────────────────────────────────────────
-    const pagination = resolvePaginationFor(options, rawInput)
+    const pagination = resolvePaginationFor(options, rawInput);
 
     // ─────────────────────────────────────────────────────────────────────
     // [12] CONTEXT ENRICHMENT — attach organization, memberRole, and
@@ -542,7 +557,7 @@ export function protectedProcedure<const O extends ProtectedOptions | undefined 
        * admin" must read THIS, never compare memberRole to a literal. */
       memberHasFullAccess: member.hasFullAccess,
       pagination,
-    }
+    };
 
     // ─────────────────────────────────────────────────────────────────────
     // [13] USAGE-COUNTER PLAN (AUTO_DERIVED_FROM_RESOURCES)
@@ -554,16 +569,16 @@ export function protectedProcedure<const O extends ProtectedOptions | undefined 
     //      counter still powers UI affordances and usage analytics).
     // ─────────────────────────────────────────────────────────────────────
     const bumpResource: LimitResourceKey | null =
-      type === 'mutation' &&
-      (pathAction === 'create' || pathAction === 'delete') &&
+      type === "mutation" &&
+      (pathAction === "create" || pathAction === "delete") &&
       isLimitResource(pathResource)
         ? pathResource
-        : null
-    const bumpDirection: 'increment' | 'decrement' | null = bumpResource
-      ? pathAction === 'create'
-        ? 'increment'
-        : 'decrement'
-      : null
+        : null;
+    const bumpDirection: "increment" | "decrement" | null = bumpResource
+      ? pathAction === "create"
+        ? "increment"
+        : "decrement"
+      : null;
 
     // ─────────────────────────────────────────────────────────────────────
     // [14] HANDLER EXECUTION
@@ -575,29 +590,34 @@ export function protectedProcedure<const O extends ProtectedOptions | undefined 
     /* Type `result` against the AUGMENTED next-call so enriched fields
      * (organization, memberRole, pagination, db) flow to handlers. The plain
      * `Awaited<ReturnType<typeof next>>` pins to the base auth ctx. */
-    type EnrichedCtx = typeof enrichedCtxBase & { db: Prisma.TransactionClient }
-    let result: Awaited<ReturnType<typeof next<EnrichedCtx>>>
+    type EnrichedCtx = typeof enrichedCtxBase & {
+      db: Prisma.TransactionClient;
+    };
+    let result: Awaited<ReturnType<typeof next<EnrichedCtx>>>;
 
     try {
-      if (type === 'mutation') {
+      if (type === "mutation") {
         /* tRPC's `next()` swallows handler errors and returns `{ok:false,error}`
          * rather than throwing. Returning that envelope from `$transaction`
          * lets Prisma commit. We throw inside the tx callback to force
          * rollback, then re-surface the envelope outside. */
-        let handlerResult: Awaited<ReturnType<typeof next<EnrichedCtx>>> | undefined
-        const txTimeout = options?.txTimeout ?? DEFAULT_TX_TIMEOUT_MS
+        let handlerResult:
+          Awaited<ReturnType<typeof next<EnrichedCtx>>> | undefined;
+        const txTimeout = options?.txTimeout ?? DEFAULT_TX_TIMEOUT_MS;
         try {
           await prisma.$transaction(
             async (tx) => {
-              handlerResult = await next({ ctx: { ...enrichedCtxBase, db: tx } })
-              if (!handlerResult.ok) throw handlerResult.error
+              handlerResult = await next({
+                ctx: { ...enrichedCtxBase, db: tx },
+              });
+              if (!handlerResult.ok) throw handlerResult.error;
 
-              if (bumpResource && bumpDirection === 'increment') {
-                await incrementUsage(organizationId, bumpResource, 1, tx)
-              } else if (bumpResource && bumpDirection === 'decrement') {
-                const qty = computeDeleteDecrement(handlerResult.data)
+              if (bumpResource && bumpDirection === "increment") {
+                await incrementUsage(organizationId, bumpResource, 1, tx);
+              } else if (bumpResource && bumpDirection === "decrement") {
+                const qty = computeDeleteDecrement(handlerResult.data);
                 if (qty > 0) {
-                  await decrementUsage(organizationId, bumpResource, qty, tx)
+                  await decrementUsage(organizationId, bumpResource, qty, tx);
                 }
               }
 
@@ -612,52 +632,53 @@ export function protectedProcedure<const O extends ProtectedOptions | undefined 
                   pathResource,
                   pathAction,
                   resourceDef,
-                })
+                });
               }
             },
-            { timeout: txTimeout, maxWait: DEFAULT_TX_MAX_WAIT_MS }
-          )
+            { timeout: txTimeout, maxWait: DEFAULT_TX_MAX_WAIT_MS },
+          );
           if (!handlerResult) {
             throw new TRPCError({
-              code: 'INTERNAL_SERVER_ERROR',
-              message: 'Transaction completed without producing a handler result',
-            })
+              code: "INTERNAL_SERVER_ERROR",
+              message:
+                "Transaction completed without producing a handler result",
+            });
           }
-          result = handlerResult
+          result = handlerResult;
         } catch (txError) {
           /* If the handler itself errored, surface its original envelope so
            * tRPC's error path stays intact. Otherwise re-throw to outer catch. */
           if (handlerResult && !handlerResult.ok) {
-            result = handlerResult
+            result = handlerResult;
           } else {
-            throw txError
+            throw txError;
           }
         }
       } else {
-        result = await next({ ctx: { ...enrichedCtxBase, db: prisma } })
+        result = await next({ ctx: { ...enrichedCtxBase, db: prisma } });
       }
-    // ─────────────────────────────────────────────────────────────────────
-    // [15] ERROR OBSERVABILITY — emit a structured error log line, then
-    //      re-throw so tRPC's normal error path returns the response.
-    // ─────────────────────────────────────────────────────────────────────
+      // ─────────────────────────────────────────────────────────────────────
+      // [15] ERROR OBSERVABILITY — emit a structured error log line, then
+      //      re-throw so tRPC's normal error path returns the response.
+      // ─────────────────────────────────────────────────────────────────────
     } catch (error) {
       logRequest({
-        level: 'error',
+        level: "error",
         path,
         type,
         userId: ctx.user.id,
         organizationId,
         durationMs: Date.now() - startedAt,
-        status: 'error',
+        status: "error",
         errorCode:
           error instanceof TRPCError
             ? error.code
             : error instanceof Error
               ? error.name
-              : 'unknown',
+              : "unknown",
         errorMessage: error instanceof Error ? error.message : String(error),
-      })
-      throw error
+      });
+      throw error;
     }
 
     // ─────────────────────────────────────────────────────────────────────
@@ -665,17 +686,17 @@ export function protectedProcedure<const O extends ProtectedOptions | undefined 
     //      and return the handler result to tRPC.
     // ─────────────────────────────────────────────────────────────────────
     logRequest({
-      level: 'info',
+      level: "info",
       path,
       type,
       userId: ctx.user.id,
       organizationId,
       durationMs: Date.now() - startedAt,
-      status: 'ok',
-    })
+      status: "ok",
+    });
 
-    return result
-  })
+    return result;
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -683,120 +704,126 @@ export function protectedProcedure<const O extends ProtectedOptions | undefined 
 // ---------------------------------------------------------------------------
 
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value)
+  return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
 function readIdField(value: unknown): string | undefined {
-  if (!isRecord(value)) return undefined
-  const id = value['id']
-  return typeof id === 'string' ? id : undefined
+  if (!isRecord(value)) return undefined;
+  const id = value["id"];
+  return typeof id === "string" ? id : undefined;
 }
 
 function isLimitResource(key: ResourceKey | null): key is LimitResourceKey {
-  if (!key) return false
-  return (LIMIT_RESOURCE_KEYS as readonly string[]).includes(key)
+  if (!key) return false;
+  return (LIMIT_RESOURCE_KEYS as readonly string[]).includes(key);
 }
 
 function isFlagResource(key: ResourceKey | null): key is FlagResourceKey {
-  if (!key) return false
-  return (FLAG_RESOURCE_KEYS as readonly string[]).includes(key)
+  if (!key) return false;
+  return (FLAG_RESOURCE_KEYS as readonly string[]).includes(key);
 }
 
 function lookupResourceDef(key: ResourceKey): ResourceDefinition | null {
   for (const [entryKey, def] of RESOURCE_ENTRIES) {
-    if (entryKey === key) return def
+    if (entryKey === key) return def;
   }
-  return null
+  return null;
 }
 
 function extractOrganizationId(rawInput: unknown): string | undefined {
-  if (!isRecord(rawInput)) return undefined
-  const rawOrgId = rawInput['organizationId']
+  if (!isRecord(rawInput)) return undefined;
+  const rawOrgId = rawInput["organizationId"];
   /* Strict typeof string blocks coercion attacks (object with toString). */
-  if (typeof rawOrgId !== 'string' || rawOrgId.length === 0) return undefined
-  return rawOrgId
+  if (typeof rawOrgId !== "string" || rawOrgId.length === 0) return undefined;
+  return rawOrgId;
 }
 
 /* Deletes that don't actually delete anything (count===0) must not drift the
  * usage counter — see CLAUDE.md DELETE NO-OP rule. */
 function computeDeleteDecrement(result: unknown): number {
-  if (!result) return 0
-  if (isRecord(result) && typeof result['count'] === 'number') {
-    return result['count'] > 0 ? result['count'] : 0
+  if (!result) return 0;
+  if (isRecord(result) && typeof result["count"] === "number") {
+    return result["count"] > 0 ? result["count"] : 0;
   }
-  return 1
+  return 1;
 }
 
 function logRequest(line: {
-  level: 'info' | 'error'
-  path: string
-  type: 'query' | 'mutation' | 'subscription'
-  userId: string
-  organizationId: string
-  durationMs: number
-  status: 'ok' | 'error'
-  errorCode?: string
-  errorMessage?: string
+  level: "info" | "error";
+  path: string;
+  type: "query" | "mutation" | "subscription";
+  userId: string;
+  organizationId: string;
+  durationMs: number;
+  status: "ok" | "error";
+  errorCode?: string;
+  errorMessage?: string;
 }): void {
-  console.log(JSON.stringify({ ts: new Date().toISOString(), logger: 'trpc', ...line }))
+  console.log(
+    JSON.stringify({ ts: new Date().toISOString(), logger: "trpc", ...line }),
+  );
 }
 
 function resolvePaginationFor<O extends ProtectedOptions | undefined>(
   options: O,
-  rawInput: unknown
+  rawInput: unknown,
 ): PaginationCtxFor<O> {
   const runtimeValue = options?.paginate
     ? computePagination(options.paginate, rawInput)
-    : undefined
+    : undefined;
   /* TS can't follow the biconditional `paginate truthy ⇔ ctx is PaginationContext`
    * through the local; the runtime value matches the conditional return type
    * by construction, so this widening is the lone justified boundary cast. */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- documented above
-  return runtimeValue as any as PaginationCtxFor<O>
+  return runtimeValue as any as PaginationCtxFor<O>;
 }
 
 function computePagination(
   paginate: true | PaginationOptions,
-  rawInput: unknown
+  rawInput: unknown,
 ): PaginationContext {
-  const cfg = typeof paginate === 'object' ? paginate : {}
-  const defaultPage = cfg.defaultPage ?? 1
-  const defaultPageSize = cfg.defaultPageSize ?? 20
-  const maxPageSize = cfg.maxPageSize ?? 100
+  const cfg = typeof paginate === "object" ? paginate : {};
+  const defaultPage = cfg.defaultPage ?? 1;
+  const defaultPageSize = cfg.defaultPageSize ?? 20;
+  const maxPageSize = cfg.maxPageSize ?? 100;
 
-  let page = defaultPage
-  let pageSize = defaultPageSize
+  let page = defaultPage;
+  let pageSize = defaultPageSize;
 
   if (isRecord(rawInput)) {
-    const candidatePage = rawInput['page']
-    const candidatePageSize = rawInput['pageSize']
-    if (typeof candidatePage === 'number' && Number.isFinite(candidatePage) && candidatePage >= 1) {
-      page = Math.floor(candidatePage)
+    const candidatePage = rawInput["page"];
+    const candidatePageSize = rawInput["pageSize"];
+    if (
+      typeof candidatePage === "number" &&
+      Number.isFinite(candidatePage) &&
+      candidatePage >= 1
+    ) {
+      page = Math.floor(candidatePage);
     }
     if (
-      typeof candidatePageSize === 'number' &&
+      typeof candidatePageSize === "number" &&
       Number.isFinite(candidatePageSize) &&
       candidatePageSize >= 1
     ) {
-      pageSize = Math.min(maxPageSize, Math.floor(candidatePageSize))
+      pageSize = Math.min(maxPageSize, Math.floor(candidatePageSize));
     }
   }
 
-  return { page, pageSize, skip: (page - 1) * pageSize, take: pageSize }
+  return { page, pageSize, skip: (page - 1) * pageSize, take: pageSize };
 }
 
 /* Audit row written inside the mutation tx so it commits atomically with the
  * handler's writes. See CLAUDE.md RULE 5. */
 async function writeAuditRow(args: {
-  tx: Prisma.TransactionClient
-  options: ProtectedOptions | undefined
-  ctx: { user: { id: string } }
-  organizationId: string
-  rawInput: unknown
-  result: unknown
-  pathResource: ResourceKey | null
-  pathAction: string
-  resourceDef: ResourceDefinition | null
+  tx: Prisma.TransactionClient;
+  options: ProtectedOptions | undefined;
+  ctx: { user: { id: string } };
+  organizationId: string;
+  rawInput: unknown;
+  result: unknown;
+  pathResource: ResourceKey | null;
+  pathAction: string;
+  resourceDef: ResourceDefinition | null;
 }): Promise<void> {
   const {
     tx,
@@ -808,39 +835,42 @@ async function writeAuditRow(args: {
     pathResource,
     pathAction,
     resourceDef,
-  } = args
+  } = args;
 
-  const override = typeof options?.audit === 'object' ? options.audit : undefined
+  const override =
+    typeof options?.audit === "object" ? options.audit : undefined;
 
-  const fullPath = pathResource !== null ? `${pathResource}.${pathAction}` : pathAction
-  const segments = fullPath.split('.')
-  const lastSegment = segments[segments.length - 1] ?? 'unknown'
+  const fullPath =
+    pathResource !== null ? `${pathResource}.${pathAction}` : pathAction;
+  const segments = fullPath.split(".");
+  const lastSegment = segments[segments.length - 1] ?? "unknown";
   const inferred = {
     action: lastSegment,
-    entity: segments.slice(0, -1).join('.') || lastSegment,
-  }
+    entity: segments.slice(0, -1).join(".") || lastSegment,
+  };
 
-  const action = override?.action ?? inferred.action
+  const action = override?.action ?? inferred.action;
   const entity: AuditEntityName =
-    override?.entity ?? (pathResource ?? toFallbackEntity(inferred.entity))
+    override?.entity ?? pathResource ?? toFallbackEntity(inferred.entity);
 
   const entityId =
     override?.getEntityId?.({ input: rawInput, output: result }) ??
     readIdField(result) ??
-    readIdField(rawInput)
+    readIdField(rawInput);
 
-  const templateFromResource = resourceDef?.audit?.describe?.[pathAction] ?? null
-  const template = override?.describe ?? templateFromResource
+  const templateFromResource =
+    resourceDef?.audit?.describe?.[pathAction] ?? null;
+  const template = override?.describe ?? templateFromResource;
   const description = template
     ? interpolateAuditDescribe(template, { input: rawInput, output: result })
-    : undefined
+    : undefined;
 
-  let metadata: AuditMetadata | undefined
+  let metadata: AuditMetadata | undefined;
   if (override?.metadata !== undefined) {
-    metadata = auditMetadataSchema.parse(override.metadata)
+    metadata = auditMetadataSchema.parse(override.metadata);
   }
 
-  const forensics = await getRequestForensics()
+  const forensics = await getRequestForensics();
 
   /* Transient audit failures are swallowed (logged to stderr) so the user's
    * action still commits — the tx is already in success path here. */
@@ -857,23 +887,23 @@ async function writeAuditRow(args: {
         ipAddress: forensics.ipAddress,
         userAgent: forensics.userAgent,
       },
-      tx
-    )
+      tx,
+    );
   } catch (auditError) {
-    console.error('[protectedProcedure] audit write failed:', auditError)
+    console.error("[protectedProcedure] audit write failed:", auditError);
   }
 }
 
 function toFallbackEntity(inferred: string): AuditEntityName {
   const known: ReadonlyArray<AuditEntityName> = [
-    'organization',
-    'subscription',
-    'session',
-    'member',
-    'role',
-  ]
+    "organization",
+    "subscription",
+    "session",
+    "member",
+    "role",
+  ];
   for (const candidate of known) {
-    if (candidate === inferred) return candidate
+    if (candidate === inferred) return candidate;
   }
   /* Audit-fidelity loss: a nested-router or non-RESOURCES path resolved to
    * `inferred` which isn't in AuditEntityName. We squash to `'organization'`
@@ -881,7 +911,7 @@ function toFallbackEntity(inferred: string): AuditEntityName {
    * `inferred` to AuditEntityName in src/services/activity-log.service.ts or
    * declare an explicit `audit: { entity }` override on the procedure. */
   console.warn(
-    `[protectedProcedure] audit entity "${inferred}" not in AuditEntityName — falling back to "organization". Add it to the union or set an explicit audit.entity override.`
-  )
-  return 'organization'
+    `[protectedProcedure] audit entity "${inferred}" not in AuditEntityName — falling back to "organization". Add it to the union or set an explicit audit.entity override.`,
+  );
+  return "organization";
 }

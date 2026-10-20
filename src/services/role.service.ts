@@ -1,14 +1,8 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
-import 'server-only'
+import "server-only";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: processRole, resolveRoleName, roleDisplayName,
@@ -27,20 +21,23 @@ import 'server-only'
  *        for the statement map. Pure DB access via the passed `db`.
  */
 
-import type { DbClient } from '@/lib/config/prisma'
-import { permissionsToStatement, statementToPermissions } from '@/lib/permissions'
+import type { DbClient } from "@/lib/config/prisma";
+import {
+  permissionsToStatement,
+  statementToPermissions,
+} from "@/lib/permissions";
 
 /* Normalizes a display name to a stable role key. */
 function normalizeRoleName(name: string): string {
-  return name.trim().toLowerCase().replace(/\s+/g, '-')
+  return name.trim().toLowerCase().replace(/\s+/g, "-");
 }
 
 /* Stable short hash of a permission set → the `custom-<hash>` role name, so the
  * same custom permission set reuses one role row instead of piling up. */
 function customRoleName(permissions: string[]): string {
-  const sorted = [...permissions].sort()
-  const hash = Buffer.from(sorted.join(',')).toString('base64').slice(0, 8)
-  return `custom-${hash}`.toLowerCase()
+  const sorted = [...permissions].sort();
+  const hash = Buffer.from(sorted.join(",")).toString("base64").slice(0, 8);
+  return `custom-${hash}`.toLowerCase();
 }
 
 /* Creates the role row if (org, role) doesn't exist yet. */
@@ -48,13 +45,13 @@ async function ensureRole(
   db: DbClient,
   organizationId: string,
   role: string,
-  permissions: string[]
+  permissions: string[],
 ): Promise<void> {
   const existing = await db.organizationRole.findFirst({
     where: { organizationId, role },
     select: { id: true },
-  })
-  if (existing) return
+  });
+  if (existing) return;
   await db.organizationRole.create({
     data: {
       id: crypto.randomUUID(),
@@ -62,7 +59,7 @@ async function ensureRole(
       role,
       permission: JSON.stringify(permissionsToStatement(permissions)),
     },
-  })
+  });
 }
 
 /**
@@ -75,41 +72,42 @@ async function ensureRole(
 export async function processRole(
   db: DbClient,
   organizationId: string,
-  role: string
+  role: string,
 ): Promise<string> {
-  if (role === 'owner') return 'owner'
+  if (role === "owner") return "owner";
 
   /* Named role with embedded permissions: "<name>|||<JSON perms>". */
-  if (role.includes('|||') && role.includes('[')) {
-    const separatorIndex = role.indexOf('|||')
-    const namePart = role.slice(0, separatorIndex)
-    const permsPart = role.slice(separatorIndex + 3)
-    const permissions = safeParsePermissions(permsPart)
-    const roleName = normalizeRoleName(namePart)
-    await ensureRole(db, organizationId, roleName, permissions)
-    return roleName
+  if (role.includes("|||") && role.includes("[")) {
+    const separatorIndex = role.indexOf("|||");
+    const namePart = role.slice(0, separatorIndex);
+    const permsPart = role.slice(separatorIndex + 3);
+    const permissions = safeParsePermissions(permsPart);
+    const roleName = normalizeRoleName(namePart);
+    await ensureRole(db, organizationId, roleName, permissions);
+    return roleName;
   }
 
   /* Bare permission array → per-member custom role. */
-  if (role.startsWith('[')) {
-    const permissions = safeParsePermissions(role)
-    const roleName = customRoleName(permissions)
-    await ensureRole(db, organizationId, roleName, permissions)
-    return roleName
+  if (role.startsWith("[")) {
+    const permissions = safeParsePermissions(role);
+    const roleName = customRoleName(permissions);
+    await ensureRole(db, organizationId, roleName, permissions);
+    return roleName;
   }
 
   /* Plain, already-existing role name. */
-  return role
+  return role;
 }
 
 function safeParsePermissions(json: string): string[] {
   try {
-    const parsed: unknown = JSON.parse(json)
-    if (Array.isArray(parsed)) return parsed.filter((p): p is string => typeof p === 'string')
+    const parsed: unknown = JSON.parse(json);
+    if (Array.isArray(parsed))
+      return parsed.filter((p): p is string => typeof p === "string");
   } catch {
     /* fall through */
   }
-  return []
+  return [];
 }
 
 /**
@@ -120,9 +118,9 @@ function safeParsePermissions(json: string): string[] {
  * WHERE: member.list enrichment.
  */
 export function roleDisplayName(role: string): string {
-  if (role === 'owner') return 'owner'
-  if (role.startsWith('custom-')) return ''
-  return role
+  if (role === "owner") return "owner";
+  if (role.startsWith("custom-")) return "";
+  return role;
 }
 
 /**
@@ -136,17 +134,17 @@ export function roleDisplayName(role: string): string {
  */
 export async function getRolePermissionMap(
   db: DbClient,
-  organizationId: string
+  organizationId: string,
 ): Promise<Map<string, string[]>> {
   const rows = await db.organizationRole.findMany({
     where: { organizationId },
     select: { role: true, permission: true },
-  })
-  const map = new Map<string, string[]>()
+  });
+  const map = new Map<string, string[]>();
   for (const row of rows) {
-    map.set(row.role, parseRolePermissions(row.permission))
+    map.set(row.role, parseRolePermissions(row.permission));
   }
-  return map
+  return map;
 }
 
 /**
@@ -157,12 +155,12 @@ export async function getRolePermissionMap(
  */
 export function parseRolePermissions(raw: string): string[] {
   try {
-    const parsed: unknown = JSON.parse(raw)
-    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-      return statementToPermissions(parsed as Record<string, string[]>)
+    const parsed: unknown = JSON.parse(raw);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return statementToPermissions(parsed as Record<string, string[]>);
     }
   } catch {
     /* corrupt row — no permissions */
   }
-  return []
+  return [];
 }

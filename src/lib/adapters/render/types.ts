@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -57,8 +51,8 @@
  *        it live in the procedure layer.
  */
 
-import type { TimelineDoc } from '@/lib/timeline'
-import type { AssetUrlMap, RenderResolution } from '@/lib/types/render'
+import type { TimelineDoc } from "@/lib/timeline";
+import type { AssetUrlMap, RenderResolution } from "@/lib/types/render";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: RenderOptions, PRE_RESOLVED_ASSETS,
@@ -88,11 +82,11 @@ import type { AssetUrlMap, RenderResolution } from '@/lib/types/render'
  */
 export interface RenderOptions {
   /** Signed URLs for every handle in the document — see PRE_RESOLVED_ASSETS. */
-  assets: AssetUrlMap
-  watermark: boolean
-  resolution: RenderResolution
+  assets: AssetUrlMap;
+  watermark: boolean;
+  resolution: RenderResolution;
   /** Absolute URL the provider POSTs its completion payload to. */
-  webhookUrl: string
+  webhookUrl: string;
   /**
    * Shared secret the provider signs that payload with. Null means unsigned,
    * which the webhook route REFUSES — so this is effectively required, and is
@@ -100,7 +94,7 @@ export interface RenderOptions {
    * and silently rewriting it to a placeholder would produce a signature that
    * verifies against nothing.
    */
-  webhookSecret: string | null
+  webhookSecret: string | null;
   /**
    * Opaque data the provider echoes back on the webhook. This is how the
    * callback is tied to OUR row: the provider knows its own render id and
@@ -109,7 +103,7 @@ export interface RenderOptions {
    * `providerRenderId`, which is unset for the window between the provider
    * accepting the render and our transaction committing the id.
    */
-  customData: Record<string, string>
+  customData: Record<string, string>;
 }
 
 /**
@@ -129,7 +123,7 @@ export interface RenderOptions {
  * WHERE: Returned by start, persisted by the `start-render` step.
  */
 export interface RenderStartResult {
-  providerRenderId: string
+  providerRenderId: string;
 }
 
 /**
@@ -148,11 +142,11 @@ export interface RenderStartResult {
  * WHERE: The timeout branch of the render workflow.
  */
 export interface RenderProgressResult {
-  status: 'queued' | 'rendering' | 'completed' | 'failed'
+  status: "queued" | "rendering" | "completed" | "failed";
   /** 0..1. */
-  progress: number
-  outputUrl: string | null
-  error: string | null
+  progress: number;
+  outputUrl: string | null;
+  error: string | null;
 }
 
 /**
@@ -174,30 +168,33 @@ export interface RenderProgressResult {
  * WHERE: Thrown by ./lambda; caught in src/inngest/functions/project-render.ts.
  */
 export class RenderProviderError extends Error {
-  readonly detail: string
-  readonly permanent: boolean
+  readonly detail: string;
+  readonly permanent: boolean;
 
-  constructor(message: string, options: { detail?: string; permanent?: boolean } = {}) {
-    super(message)
-    this.name = 'RenderProviderError'
-    this.detail = options.detail ?? ''
-    this.permanent = options.permanent ?? false
+  constructor(
+    message: string,
+    options: { detail?: string; permanent?: boolean } = {},
+  ) {
+    super(message);
+    this.name = "RenderProviderError";
+    this.detail = options.detail ?? "";
+    this.permanent = options.permanent ?? false;
   }
 }
 
 export interface RenderAdapter {
-  readonly id: RenderProviderId
+  readonly id: RenderProviderId;
 
   /**
    * Hands the document to the provider and returns as soon as it is accepted.
    * Does NOT wait for the render — see the file header.
    */
-  start(doc: TimelineDoc, options: RenderOptions): Promise<RenderStartResult>
+  start(doc: TimelineDoc, options: RenderOptions): Promise<RenderStartResult>;
 
   /** Where one already-started render has got to. See RenderProgressResult. */
-  getProgress(providerRenderId: string): Promise<RenderProgressResult>
+  getProgress(providerRenderId: string): Promise<RenderProgressResult>;
 }
 
-export const RENDER_PROVIDER_IDS = ['lambda'] as const
+export const RENDER_PROVIDER_IDS = ["lambda"] as const;
 
-export type RenderProviderId = (typeof RENDER_PROVIDER_IDS)[number]
+export type RenderProviderId = (typeof RENDER_PROVIDER_IDS)[number];

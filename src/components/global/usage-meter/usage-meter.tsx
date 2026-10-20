@@ -1,14 +1,8 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
-'use client'
+"use client";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: UsageMeter, UsageMeterProps, RESOURCE_AGNOSTIC,
@@ -36,43 +30,53 @@
  *        and dashboard screens for any limit.
  */
 
-import { cn } from '@/lib/utils'
-import { formatBytes, RESOURCES, type LimitResourceKey } from '@/lib/resources'
-import { useFeatureGate } from '@/components/feature-gate'
-import { Skeleton } from '@/components/ui/skeleton'
+import { cn } from "@/lib/utils";
+import { formatBytes, RESOURCES, type LimitResourceKey } from "@/lib/resources";
+import { useFeatureGate } from "@/components/feature-gate";
+import { Skeleton } from "@/components/ui/skeleton";
 
 /** Where the bar turns to the warning colour — early enough to act on. */
-const NEARLY_FULL_THRESHOLD = 0.85
+const NEARLY_FULL_THRESHOLD = 0.85;
 
 export interface UsageMeterProps {
   /** Must be a resource declaring a `limit`; a flag has nothing to meter. */
-  resource: LimitResourceKey
+  resource: LimitResourceKey;
   /** Hides the resource's name, for a surface that already titles the section. */
-  hideLabel?: boolean
-  className?: string
+  hideLabel?: boolean;
+  className?: string;
 }
 
-export function UsageMeter({ resource, hideLabel = false, className }: UsageMeterProps) {
-  const gate = useFeatureGate(resource)
+export function UsageMeter({
+  resource,
+  hideLabel = false,
+  className,
+}: UsageMeterProps) {
+  const gate = useFeatureGate(resource);
 
-  if (gate === null) return <Skeleton className={cn('h-10 w-full', className)} />
+  if (gate === null)
+    return <Skeleton className={cn("h-10 w-full", className)} />;
 
   /* Optional-chained: `LimitResourceKey` guarantees the entry HAS a limit at
    * runtime, but RESOURCES is read through the widened ResourceDefinition, so
    * the type still says it might not. Chaining is honest and costs a character;
    * an assertion here would be a bypass for nothing. */
-  const isBytes = RESOURCES[resource].limit?.unit === 'bytes'
-  const format = (value: number) => (isBytes ? formatBytes(value) : value.toLocaleString('en-US'))
+  const isBytes = RESOURCES[resource].limit?.unit === "bytes";
+  const format = (value: number) =>
+    isBytes ? formatBytes(value) : value.toLocaleString("en-US");
 
   const ratio =
     gate.isUnlimited || gate.limit === null || gate.limit <= 0
       ? 0
-      : Math.min(1, gate.usage / gate.limit)
+      : Math.min(1, gate.usage / gate.limit);
 
   return (
-    <div className={cn('flex flex-col gap-1.5', className)}>
+    <div className={cn("flex flex-col gap-1.5", className)}>
       <div className="flex items-baseline justify-between gap-2">
-        {hideLabel ? <span /> : <p className="text-sm font-medium">{gate.featureName}</p>}
+        {hideLabel ? (
+          <span />
+        ) : (
+          <p className="text-sm font-medium">{gate.featureName}</p>
+        )}
         <p className="text-xs text-muted-foreground">
           {gate.isUnlimited || gate.limit === null
             ? `${format(gate.usage)} used · Unlimited`
@@ -92,14 +96,14 @@ export function UsageMeter({ resource, hideLabel = false, className }: UsageMete
         >
           <div
             className={cn(
-              'h-full transition-[width]',
+              "h-full transition-[width]",
               /* At the cap the bar is destructive; approaching it, the warning
                  colour. Both are theme tokens — never a hex. */
               gate.atLimit
-                ? 'bg-destructive'
+                ? "bg-destructive"
                 : ratio >= NEARLY_FULL_THRESHOLD
-                  ? 'bg-primary/70'
-                  : 'bg-primary'
+                  ? "bg-primary/70"
+                  : "bg-primary",
             )}
             style={{ width: `${Math.max(ratio * 100, ratio > 0 ? 2 : 0)}%` }}
           />
@@ -110,5 +114,5 @@ export function UsageMeter({ resource, hideLabel = false, className }: UsageMete
         <p className="text-xs text-destructive">{gate.upgradeMessage}</p>
       ) : null}
     </div>
-  )
+  );
 }

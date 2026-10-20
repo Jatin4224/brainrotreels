@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -63,22 +57,22 @@
  *        and validated by src/lib/timeline before any decision is made.
  */
 
-import { TRPCError } from '@trpc/server'
+import { TRPCError } from "@trpc/server";
 
-import { createStructuredError, createTRPCRouter } from '../init'
-import { protectedProcedure } from '../procedures'
-import { permissions } from '@/lib/permissions'
-import { checkBooleanFeature, getOrganizationTier } from '@/lib/feature-gate'
-import { enqueue } from '@/lib/adapters/jobs'
-import { incrementUsage } from '@/services/usage.service'
-import { getBalance } from '@/services/credits.service'
-import { estimateRenderCost } from '@/lib/credits'
-import { ERROR_CODES } from '@/lib/errors'
-import { findProjectWithTimeline } from '@/services/projects.service'
-import { signAssetUrl } from '@/services/assets.service'
-import * as rendersService from '@/services/renders.service'
-import { resolveWordAnchors, tryMigrate, validate } from '@/lib/timeline'
-import { planComposition, renderCacheKey } from '@/lib/render'
+import { createStructuredError, createTRPCRouter } from "../init";
+import { protectedProcedure } from "../procedures";
+import { permissions } from "@/lib/permissions";
+import { checkBooleanFeature, getOrganizationTier } from "@/lib/feature-gate";
+import { enqueue } from "@/lib/adapters/jobs";
+import { incrementUsage } from "@/services/usage.service";
+import { getBalance } from "@/services/credits.service";
+import { estimateRenderCost } from "@/lib/credits";
+import { ERROR_CODES } from "@/lib/errors";
+import { findProjectWithTimeline } from "@/services/projects.service";
+import { signAssetUrl } from "@/services/assets.service";
+import * as rendersService from "@/services/renders.service";
+import { resolveWordAnchors, tryMigrate, validate } from "@/lib/timeline";
+import { planComposition, renderCacheKey } from "@/lib/render";
 import {
   FINAL_URL_TTL_SECONDS,
   RENDER_ATTEMPT_LIMIT,
@@ -89,7 +83,7 @@ import {
   resolutionsForPlan,
   estimateRenderSchema,
   retryRenderSchema,
-} from '@/lib/types'
+} from "@/lib/types";
 
 export const rendersRouter = createTRPCRouter({
   /**
@@ -119,64 +113,72 @@ export const rendersRouter = createTRPCRouter({
         ctx.db,
         input.organizationId,
         input.projectId,
-      )
-      if (!project) throw new TRPCError({ code: 'NOT_FOUND', message: 'Project not found' })
+      );
+      if (!project)
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Project not found",
+        });
 
       if (project.timeline === null) {
         throw new TRPCError({
-          code: 'PRECONDITION_FAILED',
-          message: 'This project has no timeline yet. Generate one before rendering.',
-        })
+          code: "PRECONDITION_FAILED",
+          message:
+            "This project has no timeline yet. Generate one before rendering.",
+        });
       }
 
       /* LOCKED_NOT_HIDDEN is a client affordance; this is the boundary. A
        * disabled radio stops a mistake, not a request. */
-      const tier = await getOrganizationTier(input.organizationId)
+      const tier = await getOrganizationTier(input.organizationId);
       if (!isResolutionAllowedForPlan(tier.tier, input.resolution)) {
         throw new TRPCError({
-          code: 'FORBIDDEN',
+          code: "FORBIDDEN",
           message:
             `${input.resolution} rendering is not included in your plan. ` +
-            `Available: ${resolutionsForPlan(tier.tier).join(', ')}.`,
-        })
+            `Available: ${resolutionsForPlan(tier.tier).join(", ")}.`,
+        });
       }
 
-      const migrated = tryMigrate(project.timeline.doc)
+      const migrated = tryMigrate(project.timeline.doc);
       if (!migrated.ok) {
         throw new TRPCError({
-          code: 'UNPROCESSABLE_CONTENT',
+          code: "UNPROCESSABLE_CONTENT",
           message:
-            'This timeline was written in a format this version cannot open, so it cannot be rendered.',
-        })
+            "This timeline was written in a format this version cannot open, so it cannot be rendered.",
+        });
       }
 
-      const resolved = resolveWordAnchors(migrated.doc)
-      const validated = validate(resolved)
+      const resolved = resolveWordAnchors(migrated.doc);
+      const validated = validate(resolved);
       if (!validated.ok) {
         throw new TRPCError({
-          code: 'UNPROCESSABLE_CONTENT',
+          code: "UNPROCESSABLE_CONTENT",
           /* The first error only. `validate` returns one per problem and they
            * are usually one cause repeated; the panel renders this inline. */
-          message: `This timeline cannot be rendered: ${validated.errors[0]?.message ?? 'it is not valid.'}`,
-        })
+          message: `This timeline cannot be rendered: ${validated.errors[0]?.message ?? "it is not valid."}`,
+        });
       }
 
       /* WATERMARK_RESOLVED_ONCE — see the file header for why this is here and
        * not in `finalize`, which is where the phase put it. */
-      const watermarkFree = await checkBooleanFeature(input.organizationId, 'watermarkFree')
-      const watermark = !watermarkFree.enabled
+      const watermarkFree = await checkBooleanFeature(
+        input.organizationId,
+        "watermarkFree",
+      );
+      const watermark = !watermarkFree.enabled;
 
       const docHash = renderCacheKey({
         doc: validated.doc,
         resolution: input.resolution,
         watermark,
-      })
+      });
 
       const existing = await rendersService.findReusableRender(
         ctx.db,
         project.id,
         docHash,
-      )
+      );
       if (existing !== null) {
         /* REUSE_COSTS_NOTHING, and it takes a deliberate correction to be
          * true. The factory auto-increments the `renders` counter on ANY
@@ -206,8 +208,8 @@ export const rendersRouter = createTRPCRouter({
          * both plain queries with no limit gate, and shows Download straight
          * off them. This branch is a guard against a stale client or a
          * double-click, not the download path. */
-        await incrementUsage(input.organizationId, 'renders', -1, ctx.db)
-        return { render: existing, reused: true, cost: null }
+        await incrementUsage(input.organizationId, "renders", -1, ctx.db);
+        return { render: existing, reused: true, cost: null };
       }
 
       /**
@@ -235,21 +237,21 @@ export const rendersRouter = createTRPCRouter({
       const cost = estimateRenderCost({
         durationSeconds: planComposition(validated.doc).durationInSeconds,
         resolution: input.resolution,
-      })
+      });
 
-      const available = await getBalance(input.organizationId, ctx.db)
+      const available = await getBalance(input.organizationId, ctx.db);
       if (available < cost.total) {
         throw createStructuredError(
-          'FORBIDDEN',
+          "FORBIDDEN",
           `This render costs ${cost.total} credits and this workspace has ${available}.`,
           {
             errorCode: ERROR_CODES.INSUFFICIENT_CREDITS,
-            resource: 'credits',
+            resource: "credits",
             required: cost.total,
             available,
             message: `Not enough credits to render. ${cost.total} needed, ${available} available.`,
           },
-        )
+        );
       }
 
       const render = await rendersService.createQueuedRender(ctx.db, {
@@ -258,26 +260,26 @@ export const rendersRouter = createTRPCRouter({
         docHash,
         resolution: input.resolution,
         watermark,
-      })
+      });
 
       /* Keyed on the render id, not on the document: a retry of the SAME row
        * must be able to enqueue again (it is a new attempt of a render the
        * customer asked for twice), while a double-click on one request must
        * not produce two runs. The id is unique per row, so both hold. */
       await enqueue({
-        name: 'render/requested',
+        name: "render/requested",
         data: {
           renderId: render.id,
           organizationId: input.organizationId,
           attempt: render.attempts,
         },
         id: `render-${render.id}-attempt-${render.attempts}`,
-      })
+      });
 
       /* The cost travels back so the panel can say what the render will cost
        * without re-deriving it — and so the number the customer is told is
        * provably the number that was checked against their balance. */
-      return { render, reused: false, cost }
+      return { render, reused: false, cost };
     }),
 
   /**
@@ -316,26 +318,27 @@ export const rendersRouter = createTRPCRouter({
   estimate: protectedProcedure({ requirePermission: permissions.RENDERS_READ })
     .input(estimateRenderSchema)
     .query(async ({ ctx, input }) => {
-      const balance = await getBalance(input.organizationId, ctx.db)
+      const balance = await getBalance(input.organizationId, ctx.db);
 
       const project = await findProjectWithTimeline(
         ctx.db,
         input.organizationId,
         input.projectId,
-      )
+      );
       if (!project || project.timeline === null) {
-        return { cost: null, balance, affordable: false }
+        return { cost: null, balance, affordable: false };
       }
 
-      const migrated = tryMigrate(project.timeline.doc)
-      if (!migrated.ok) return { cost: null, balance, affordable: false }
+      const migrated = tryMigrate(project.timeline.doc);
+      if (!migrated.ok) return { cost: null, balance, affordable: false };
 
       const cost = estimateRenderCost({
-        durationSeconds: planComposition(resolveWordAnchors(migrated.doc)).durationInSeconds,
+        durationSeconds: planComposition(resolveWordAnchors(migrated.doc))
+          .durationInSeconds,
         resolution: input.resolution,
-      })
+      });
 
-      return { cost, balance, affordable: balance >= cost.total }
+      return { cost, balance, affordable: balance >= cost.total };
     }),
 
   /**
@@ -344,10 +347,13 @@ export const rendersRouter = createTRPCRouter({
    * WHAT:  A page of renders, for one project or for the whole workspace.
    * WHERE: The render panel's history, polled while anything is unfinished.
    */
-  list: protectedProcedure({ requirePermission: permissions.RENDERS_READ, paginate: true })
+  list: protectedProcedure({
+    requirePermission: permissions.RENDERS_READ,
+    paginate: true,
+  })
     .input(listRendersSchema)
     .query(async ({ ctx, input }) => {
-      const { skip, take, pageSize } = ctx.pagination
+      const { skip, take, pageSize } = ctx.pagination;
       const page = await rendersService.listRenders(
         ctx.db,
         {
@@ -356,11 +362,14 @@ export const rendersRouter = createTRPCRouter({
           status: input.status,
         },
         { skip, take },
-      )
+      );
       /* SERVER_TOTAL_PAGES — computed against the pageSize the FACTORY clamped
        * to, as in `projects.list`, so the client's pager cannot disagree with
        * the query that produced the rows. */
-      return { ...page, totalPages: Math.max(1, Math.ceil(page.total / pageSize)) }
+      return {
+        ...page,
+        totalPages: Math.max(1, Math.ceil(page.total / pageSize)),
+      };
     }),
 
   /**
@@ -391,19 +400,28 @@ export const rendersRouter = createTRPCRouter({
         ctx.db,
         input.organizationId,
         input.id,
-      )
-      if (!render) throw new TRPCError({ code: 'NOT_FOUND', message: 'Render not found' })
+      );
+      if (!render)
+        throw new TRPCError({ code: "NOT_FOUND", message: "Render not found" });
 
       const [downloadUrl, posterUrl] = await Promise.all([
         render.outputAssetId === null
           ? Promise.resolve(null)
-          : signAssetUrl(render.outputAssetId, input.organizationId, FINAL_URL_TTL_SECONDS),
+          : signAssetUrl(
+              render.outputAssetId,
+              input.organizationId,
+              FINAL_URL_TTL_SECONDS,
+            ),
         render.posterAssetId === null
           ? Promise.resolve(null)
-          : signAssetUrl(render.posterAssetId, input.organizationId, FINAL_URL_TTL_SECONDS),
-      ])
+          : signAssetUrl(
+              render.posterAssetId,
+              input.organizationId,
+              FINAL_URL_TTL_SECONDS,
+            ),
+      ]);
 
-      return { render, downloadUrl, posterUrl }
+      return { render, downloadUrl, posterUrl };
     }),
 
   /**
@@ -431,7 +449,7 @@ export const rendersRouter = createTRPCRouter({
    */
   retry: protectedProcedure({
     requirePermission: permissions.RENDERS_CREATE,
-    audit: { action: 'retry' },
+    audit: { action: "retry" },
   })
     .input(retryRenderSchema)
     .mutation(async ({ ctx, input }) => {
@@ -439,40 +457,42 @@ export const rendersRouter = createTRPCRouter({
         ctx.db,
         input.organizationId,
         input.id,
-      )
-      if (!render) throw new TRPCError({ code: 'NOT_FOUND', message: 'Render not found' })
+      );
+      if (!render)
+        throw new TRPCError({ code: "NOT_FOUND", message: "Render not found" });
 
-      if (render.status !== 'failed' && render.status !== 'timedOut') {
+      if (render.status !== "failed" && render.status !== "timedOut") {
         throw new TRPCError({
-          code: 'PRECONDITION_FAILED',
-          message: 'Only a failed render can be retried.',
-        })
+          code: "PRECONDITION_FAILED",
+          message: "Only a failed render can be retried.",
+        });
       }
 
       if (render.attempts >= RENDER_ATTEMPT_LIMIT) {
         throw new TRPCError({
-          code: 'PRECONDITION_FAILED',
+          code: "PRECONDITION_FAILED",
           message:
-            'This render has already been retried once. Start a new render, or contact support if it keeps failing.',
-        })
+            "This render has already been retried once. Start a new render, or contact support if it keeps failing.",
+        });
       }
 
       const updated = await rendersService.prepareRenderRetry(
         ctx.db,
         render.id,
         RENDER_ATTEMPT_LIMIT,
-      )
+      );
       if (updated === 0) {
         throw new TRPCError({
-          code: 'CONFLICT',
-          message: 'This render has already been retried. Refresh to see its current state.',
-        })
+          code: "CONFLICT",
+          message:
+            "This render has already been retried. Refresh to see its current state.",
+        });
       }
 
-      const attempt = render.attempts + 1
+      const attempt = render.attempts + 1;
 
       await enqueue({
-        name: 'render/requested',
+        name: "render/requested",
         data: {
           renderId: render.id,
           organizationId: input.organizationId,
@@ -483,8 +503,8 @@ export const rendersRouter = createTRPCRouter({
          * deduplicate against the original run and nothing would happen, which
          * presents as a button that does nothing. */
         id: `render-${render.id}-attempt-${attempt}`,
-      })
+      });
 
-      return { id: render.id, attempts: attempt }
+      return { id: render.id, attempts: attempt };
     }),
-})
+});

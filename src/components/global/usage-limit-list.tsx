@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -30,10 +24,10 @@
  *        (dashboard shell).
  */
 
-import { XIcon } from 'lucide-react'
+import { XIcon } from "lucide-react";
 
-import type { DowngradeBlocker } from '@/lib/feature-gate'
-import { Badge } from '@/components/ui/badge'
+import type { DowngradeBlocker } from "@/lib/feature-gate";
+import { Badge } from "@/components/ui/badge";
 
 export function UsageLimitList({
   blockers,
@@ -41,11 +35,11 @@ export function UsageLimitList({
    * additional to what must be reduced, after one there is nothing else. */
   featureLossLabel,
 }: {
-  blockers: DowngradeBlocker[]
-  featureLossLabel?: string
+  blockers: DowngradeBlocker[];
+  featureLossLabel?: string;
 }) {
-  const mustResolve = blockers.filter((blocker) => !blocker.isFeatureLoss)
-  const willLose = blockers.filter((blocker) => blocker.isFeatureLoss)
+  const mustResolve = blockers.filter((blocker) => !blocker.isFeatureLoss);
+  const willLose = blockers.filter((blocker) => blocker.isFeatureLoss);
 
   return (
     <>
@@ -74,7 +68,9 @@ export function UsageLimitList({
         <div className="rounded-lg border border-border bg-muted/30 p-4">
           <p className="text-sm font-medium">
             {featureLossLabel ??
-              (mustResolve.length > 0 ? "You'd also lose" : 'No longer included')}
+              (mustResolve.length > 0
+                ? "You'd also lose"
+                : "No longer included")}
           </p>
           <ul className="mt-3 grid gap-2 sm:grid-cols-2">
             {willLose.map((blocker) => (
@@ -90,5 +86,5 @@ export function UsageLimitList({
         </div>
       ) : null}
     </>
-  )
+  );
 }

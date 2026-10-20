@@ -1,14 +1,8 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
-import 'server-only'
+import "server-only";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: resolveOrganizationRolePermissions,
@@ -28,14 +22,14 @@ import 'server-only'
  *        src/services/role.service.ts so there is one decoder for the column.
  */
 
-import { prisma } from '@/lib/config/prisma'
-import { parseRolePermissions } from '@/services/role.service'
+import { prisma } from "@/lib/config/prisma";
+import { parseRolePermissions } from "@/services/role.service";
 
 /* Better Auth's access-control layer reserves these statement keys for its own
  * bookkeeping; they are not app features and must never surface as grantable
  * `resource:action` strings. Filtered here (rather than at each call site) so
  * every provider gets the identical permission set for a given stored role. */
-const AC_META_RESOURCES: readonly string[] = ['organization', 'ac']
+const AC_META_RESOURCES: readonly string[] = ["organization", "ac"];
 
 /**
  * SOURCE OF TRUTH KEYWORDS: resolveOrganizationRolePermissions
@@ -48,16 +42,16 @@ const AC_META_RESOURCES: readonly string[] = ['organization', 'ac']
  */
 export async function resolveOrganizationRolePermissions(
   organizationId: string,
-  role: string
+  role: string,
 ): Promise<string[]> {
   const row = await prisma.organizationRole.findFirst({
     where: { organizationId, role },
     select: { permission: true },
-  })
-  if (!row) return []
+  });
+  if (!row) return [];
 
   return parseRolePermissions(row.permission).filter((permission) => {
-    const [resource] = permission.split(':')
-    return resource !== undefined && !AC_META_RESOURCES.includes(resource)
-  })
+    const [resource] = permission.split(":");
+    return resource !== undefined && !AC_META_RESOURCES.includes(resource);
+  });
 }

@@ -1,11 +1,5 @@
 /*
- * Copyright (c) 2026 Web Prodigies LLC. All rights reserved.
- *
- * This source code is proprietary and licensed under the Architectural
- * Guardrail Community License found in the LICENSE file in the root
- * directory of this source tree. Use requires a paid AI Era membership
- * or purchase (https://www.skool.com/ai-era). Unauthorized use, copying,
- * or distribution is prohibited.
+
  */
 
 /**
@@ -55,18 +49,18 @@
  *        WATERMARK_RESOLVED_ONCE in src/trpc/routers/renders.ts.
  */
 
-import { AbsoluteFill } from 'remotion'
+import { AbsoluteFill } from "remotion";
 
-import { APP_NAME } from '@/lib/config/branding'
-import { RENDER_FONT_FAMILY } from '../fonts'
+import { APP_NAME } from "@/lib/config/branding";
+import { RENDER_FONT_FAMILY } from "../fonts";
 
 /* All three are fractions of the canvas, never pixels — the same rule as
  * PIXELS_FROM_NORMALIZED_BOX, so the mark is the same proportion of the frame
  * at 720p, at 1080p and in a 270-wide preview. */
-const SIZE_RATIO = 0.028
-const BOTTOM_INSET_RATIO = 0.06
+const SIZE_RATIO = 0.028;
+const BOTTOM_INSET_RATIO = 0.06;
 
-const MARK_COLOR = 'rgba(245, 245, 245, 0.92)'
+const MARK_COLOR = "rgba(245, 245, 245, 0.92)";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: WATERMARK_NEEDS_ITS_OWN_BACKGROUND
@@ -88,18 +82,22 @@ const MARK_COLOR = 'rgba(245, 245, 245, 0.92)'
  *        the video instead of a bar stuck across it — legible without ruining
  *        the frame, which is the balance the component header describes.
  */
-const MARK_BACKDROP = 'rgba(0, 0, 0, 0.45)'
+const MARK_BACKDROP = "rgba(0, 0, 0, 0.45)";
 
-export function Watermark({ canvas }: { canvas: { width: number; height: number } }) {
+export function Watermark({
+  canvas,
+}: {
+  canvas: { width: number; height: number };
+}) {
   return (
     <AbsoluteFill
       style={{
         /* `none` so the mark cannot intercept anything in the Player's
          * preview — the render has no pointer, but the preview does, and a
          * full-frame overlay would swallow the scrubber's clicks. */
-        pointerEvents: 'none',
-        justifyContent: 'flex-end',
-        alignItems: 'center',
+        pointerEvents: "none",
+        justifyContent: "flex-end",
+        alignItems: "center",
         paddingBottom: BOTTOM_INSET_RATIO * canvas.height,
       }}
     >
@@ -108,7 +106,7 @@ export function Watermark({ canvas }: { canvas: { width: number; height: number 
           fontFamily: RENDER_FONT_FAMILY,
           fontWeight: 700,
           fontSize: SIZE_RATIO * canvas.height,
-          letterSpacing: '0.04em',
+          letterSpacing: "0.04em",
           color: MARK_COLOR,
           /* WATERMARK_NEEDS_ITS_OWN_BACKGROUND — see the note on
            * MARK_BACKDROP. All four values scale off the canvas for the same
@@ -121,11 +119,11 @@ export function Watermark({ canvas }: { canvas: { width: number; height: number 
           borderRadius: SIZE_RATIO * canvas.height * 0.5,
           /* The mark must never wrap: a two-line watermark is a layout
            * accident, and the name is short by definition. */
-          whiteSpace: 'nowrap',
+          whiteSpace: "nowrap",
         }}
       >
         {APP_NAME}
       </span>
     </AbsoluteFill>
-  )
+  );
 }
