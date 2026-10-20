@@ -588,9 +588,12 @@ every check below is untested:
 - A free workspace's output carrying the watermark and a paid one not. The component is proven in a
   local render; the ENTITLEMENT path from `checkBooleanFeature` through the row to the prop has not
   run.
-- **The migration has NOT been applied.** `prisma/migrations/20261020120000_add_renders/` is written
-  and `prisma validate` passes, but `npx prisma migrate deploy` has not been run, so there is no
-  `render` table. Nothing in the app can create a render row until it is.
+- ~~The migration has NOT been applied.~~ **Applied 2026-10-20**, before Phase 05 started, so the
+  two phases' schema changes stay separable. `prisma migrate status` reports the database up to
+  date and `migrate diff` reports no drift. The `render` table is reachable with all 19 columns and
+  both unique constraints the logic depends on — `render_projectId_docHash_key` (what makes reuse
+  correct) and `render_providerRenderId_key` (what makes "one retry with a fresh id"
+  enforceable). It is empty, which is expected: nothing can finish a render without AWS.
 - **R2 is still unconfigured**, carried over from Phase 02, so `finalize` has never copied an output
   into a bucket and `signAssetUrl` has never produced a download link.
 
