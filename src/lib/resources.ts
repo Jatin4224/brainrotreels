@@ -539,6 +539,94 @@ export const RESOURCES = {
     },
   },
 
+  /**
+   * SOURCE OF TRUTH KEYWORDS: RESOURCES.premiumCaptionStyles,
+   *   PREMIUM_IS_A_STYLE_TIER, LOCKED_NOT_HIDDEN
+   *
+   * Whether a workspace may APPLY a gated caption style.
+   *
+   * The same shape and the same reasoning as `premiumVoices`: a flag with no
+   * `permissions` and no `nav`, because nothing calls `premiumCaptionStyles.*`
+   * — it is a pure plan entitlement read by the gallery to decide which cards
+   * wear a lock badge, and re-checked by `captionStyles.apply`.
+   *
+   * PREMIUM_IS_A_STYLE_TIER. The flag answers "may this workspace use gated
+   * styles at all"; `CaptionStyle.minPlan` answers "which ones". Two questions,
+   * two mechanisms, exactly as the voice catalogue splits them — and for the
+   * same reason: a boolean cannot express a style available from Pro upward
+   * alongside one available from Starter.
+   *
+   * `availableOnFreeTrial` is TRUE here and false for voices, which is
+   * deliberate rather than an inconsistency. A premium voice costs provider
+   * characters every time it is used; a premium caption style costs nothing to
+   * render, so letting a trial see its own video in the good styles is free
+   * upsell. The phase's registry block says the same.
+   */
+  premiumCaptionStyles: {
+    name: "Premium caption styles",
+    description: "Apply the full caption style library",
+    flag: {
+      perPlan: {
+        free: false,
+        starter: true,
+        pro: true,
+        enterprise: true,
+        portal: true,
+      },
+      availableOnFreeTrial: true,
+      upgradeMessage: "Upgrade to {nextPlan} for the full caption style library",
+    },
+  },
+
+  /**
+   * SOURCE OF TRUTH KEYWORDS: RESOURCES.captionStyles, STYLES_ARE_DATA,
+   *   ALIGNMENT_IS_PAID_WORK, RESTYLING_IS_FREE
+   *
+   * The caption style library, and the word-level alignment captions are
+   * positioned against.
+   *
+   * STYLES_ARE_DATA: there is no `limit` because there is nothing per-tenant
+   * to count. A style is config in src/lib/captions/styles/ — the same for
+   * every workspace — so the only per-tenant question is WHICH ones, which is
+   * `minPlan` plus the flag above.
+   *
+   * THE PHASE'S BLOCK DECLARES ONLY `read`, AND THAT IS NOT ENOUGH — the same
+   * gap Phase 02 found on `assets`. Two writes exist in this phase and an
+   * action with no permission to gate it is an action every member can take
+   * whatever their role:
+   *   `apply`  — set a project.s caption style, position and words-per-line.
+   *              The PROCEDURE is `captions.applyStyle`, not `apply`: tRPC
+   *              refuses `apply` as a router key (it collides with
+   *              `Function.prototype.apply`) and the failure is a build-time
+   *              error in the serve route, far from here. The audit and rate
+   *              limit keys below follow the PATH VERB, so they say
+   *              `applyStyle` too.
+   *              A workspace may reasonably let a member write a script while
+   *              reserving the look of the finished video.
+   *   `align`  — start a provider alignment. It spends credits, so it is not
+   *              a read and must not be gated as one.
+   *
+   * ALIGNMENT_IS_PAID_WORK is also why `align` is rate limited far harder than
+   * `apply`: a restyle is a document write with no provider call behind it
+   * (RESTYLING_IS_FREE — changing the style provably cannot change the
+   * timing), while an alignment is an STT round trip over the whole narration.
+   */
+  captionStyles: {
+    name: "Caption styles",
+    description: "The caption style library",
+    permissions: ["read", "apply", "align"],
+    audit: {
+      describe: {
+        applyStyle: "Changed the caption style on project {input.projectId}",
+        align: "Re-aligned captions for project {input.projectId}",
+      },
+    },
+    rateLimit: {
+      applyStyle: { count: 60, window: "1 m" },
+      align: { count: 10, window: "5 m" },
+    },
+  },
+
   invitation: {
     name: "Invitations",
     description: "Send invites and cancel pending invitations",

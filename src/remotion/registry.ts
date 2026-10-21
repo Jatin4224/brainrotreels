@@ -55,8 +55,9 @@ import { TextOverlay } from "./components/text-overlay";
  *
  * Captions are NOT a render kind and never will be: a caption item carries a
  * word range rather than a `render` field (WORD_RANGE_NOT_TEXT in the timeline
- * schema), so Phase 08 adds a caption LAYER to the composition rather than an
- * entry here.
+ * schema). Phase 08 added them as a LAYER in TimelineRenderer — one component
+ * reading `doc.words` and a style from src/lib/captions/ — rather than as an
+ * entry here. Grep CAPTIONS_ARE_A_LAYER.
  */
 export const RENDER_COMPONENTS: Partial<
   Record<RenderKind, ComponentType<RenderItemProps>>

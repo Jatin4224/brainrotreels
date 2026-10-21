@@ -28,6 +28,7 @@ import { useRouter } from "next/navigation";
 import {
   Copy,
   FileTextIcon,
+  CaptionsIcon,
   MicIcon,
   Loader2Icon,
   MoreHorizontal,
@@ -186,6 +187,17 @@ export function ProjectRowActions({
           >
             <MicIcon className="size-4" />
             Voices
+          </DropdownMenuItem>
+          {/* Captions come after the narration, because they are TIMED
+              against it — the style can be chosen at any point, but the
+              words cannot be placed until there is audio to place them on. */}
+          <DropdownMenuItem
+            onClick={() =>
+              router.push(`/dashboard/projects/${project.id}/captions`)
+            }
+          >
+            <CaptionsIcon className="size-4" />
+            Captions
           </DropdownMenuItem>
           {canUpdate ? (
             <DropdownMenuItem onClick={() => setRenaming(true)}>
