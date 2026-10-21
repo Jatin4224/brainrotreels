@@ -457,6 +457,88 @@ export const RESOURCES = {
     },
   },
 
+  /**
+   * SOURCE OF TRUTH KEYWORDS: RESOURCES.premiumVoices, PREMIUM_IS_A_MIN_PLAN,
+   *   PREVIEWS_ARE_NEVER_GATED, WATERMARK_BY_ENTITLEMENT
+   *
+   * Whether a workspace may ASSIGN a gated voice.
+   *
+   * A flag with no `permissions` and no `nav`, which is the registry's shape
+   * for a pure plan entitlement — nothing calls `premiumVoices.*`, so there is
+   * no procedure path for the factory's flag gate to fire on. It is read
+   * directly by the picker, to decide which voices wear a lock badge.
+   *
+   * PREMIUM_IS_A_MIN_PLAN is the other half and the two are not redundant.
+   * This flag answers "may this workspace use gated voices AT ALL", which is
+   * one boolean and belongs here. `Voice.minPlan` answers "which ones", which
+   * is a per-row plan threshold and cannot be a registry flag — a boolean
+   * cannot express a voice available from Pro upward alongside one available
+   * from Starter. The server checks BOTH on assignment.
+   *
+   * PREVIEWS_ARE_NEVER_GATED, and it is a deliberate product decision rather
+   * than an oversight: hearing a voice costs no credits and is available on
+   * every plan, because hearing what you cannot yet use is the upsell. Only
+   * ASSIGNING is gated. Previews are served from a pre-rendered asset, so they
+   * cost no provider call either.
+   */
+  premiumVoices: {
+    name: "Premium voices",
+    description: "Assign the full voice catalogue to your speakers",
+    flag: {
+      perPlan: {
+        free: false,
+        starter: true,
+        pro: true,
+        enterprise: true,
+        portal: true,
+      },
+      availableOnFreeTrial: false,
+      upgradeMessage: "Upgrade to {nextPlan} to use the full voice catalogue",
+    },
+  },
+
+  /**
+   * SOURCE OF TRUTH KEYWORDS: RESOURCES.voices, SHARED_CATALOGUE,
+   *   PORTAL_ONLY_SYNC
+   *
+   * The voice catalogue and the speaker assignments built on it.
+   *
+   * SHARED_CATALOGUE: `Voice` rows have no `organizationId` — they are the
+   * operator's licensed library, read by every workspace, exactly like library
+   * Assets. So this entry declares no `limit`: there is nothing per-tenant to
+   * count, and the thing a plan gates is WHICH voices, which lives on
+   * `Voice.minPlan` and on the `premiumVoices` flag.
+   *
+   * `sync` is a permission of its own rather than `create`, for two reasons:
+   * the factory auto-gates and auto-counts on the path verb `create`, which
+   * must not happen for an operator action, and PORTAL_ONLY_SYNC means this
+   * verb is additionally refused outside the portal workspace. Pulling the
+   * provider's library is not a tenant action.
+   *
+   * `assign` covers attaching a voice to a speaker, which is the only write a
+   * tenant makes here — and it is worth its own permission because a workspace
+   * may reasonably let a member edit a script while reserving the cast.
+   */
+  voices: {
+    name: "Voices",
+    description: "The voice catalogue and speaker assignments",
+    permissions: ["read", "assign", "sync"],
+    audit: {
+      describe: {
+        assign: "Assigned a voice to a speaker",
+        sync: "Synced the voice catalogue from the provider",
+      },
+    },
+    /* A preview is a signed URL for a pre-rendered asset, so it is cheap — but
+     * a client looping the picker would still hold a drawer of valid URLs.
+     * The sync is an operator action against a provider API and has no
+     * business being called in a loop at all. */
+    rateLimit: {
+      preview: { count: 120, window: "1 m" },
+      sync: { count: 3, window: "5 m" },
+    },
+  },
+
   invitation: {
     name: "Invitations",
     description: "Send invites and cancel pending invitations",

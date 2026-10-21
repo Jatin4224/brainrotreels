@@ -30,6 +30,26 @@ const eslintConfig = defineConfig([
         "error",
         { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
       ],
+      // CREDENTIAL_IS_FENCED — the TTS seam talks to a REST API with fetch
+      // and has no SDK to restrict, so the fence is on the CREDENTIAL, which
+      // is the thing actually worth confining: a key read outside its adapter
+      // folder is a key that can end up in a page bundle. Lifted only for
+      // src/lib/adapters/tts/elevenlabs/** in the allowlist block below.
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector:
+            "MemberExpression[object.object.name='process'][object.property.name='env'] > Literal[value='ELEVENLABS_API_KEY']",
+          message:
+            "PROVIDER_ISOLATION: read ELEVENLABS_API_KEY only inside src/lib/adapters/tts/elevenlabs/**. Elsewhere, use getTtsAdapter() from @/lib/adapters/tts.",
+        },
+        {
+          selector:
+            "MemberExpression[object.object.name='process'][object.property.name='env'] > Identifier[name='ELEVENLABS_API_KEY']",
+          message:
+            "PROVIDER_ISOLATION: read ELEVENLABS_API_KEY only inside src/lib/adapters/tts/elevenlabs/**. Elsewhere, use getTtsAdapter() from @/lib/adapters/tts.",
+        },
+      ],
       "no-restricted-imports": [
         "error",
         {
@@ -164,8 +184,16 @@ const eslintConfig = defineConfig([
       // things here with security consequences — are unit testable without a
       // model, a key, or a network.
       "src/lib/adapters/llm/anthropic/**/*.ts",
+      // TTS seam. Only this folder may read ELEVENLABS_API_KEY; the fence is on
+      // the credential rather than an import, because this adapter uses fetch
+      // and has no SDK. src/lib/narration/ stays pure so line splitting and the
+      // cache key are testable with no key and no provider.
+      "src/lib/adapters/tts/elevenlabs/**/*.ts",
     ],
     rules: {
+      // These folders ARE the translation layer, so the credential fence is
+      // lifted here and only here — this is where the key is meant to be read.
+      "no-restricted-syntax": "off",
       "no-restricted-imports": [
         "error",
         {

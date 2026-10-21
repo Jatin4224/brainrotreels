@@ -18,7 +18,9 @@ worse than an empty box.
 - [ ] Phase 06: Script generation — built, and **generating real scripts against Claude**. Unticked
       on the PDF path (needs R2) and the workflow/UI round trip. Found and fixed a double-charging
       bug in Phase 05. See the note.
-- [ ] Phase 07: Voices and TTS
+- [ ] Phase 07: Voices and TTS — built; **blocked on an ELEVENLABS_API_KEY**, so no audio has ever
+      been synthesised and the catalogue is empty. Loudness normalisation IS verified against real
+      ffmpeg. See the note.
 - [ ] Phase 08: Alignment and captions
 - [ ] Phase 09: The generate pipeline
 - [ ] Phase 10: Safety, limits and launch — **ships public beta**
@@ -936,3 +938,142 @@ and the real extraction paths, then was deleted):
 - **A formatter ran across the repo mid-phase** and emptied the proprietary licence header from
   ~347 files, leaving `/*\n\n */`. You confirmed that was deliberate, so new files in this phase
   match it. If it was not intended, the headers are recoverable from git history.
+
+### Phase 07 — 2026-10-21
+
+Built: the `Voice` / `Speaker` / `NarrationLine` models and their migration (**applied**), the
+`premiumVoices` flag and the `voices` registry entry, `src/lib/types/voice.ts`,
+`src/lib/narration/` (the pure splitter and the cache key), `src/lib/voices/map-labels.ts`, the
+**TTS adapter seam** (`src/lib/adapters/tts/` — contract, selector, ElevenLabs implementation with
+the backup model) and its credential fence, `normalizeLoudness` on the media seam,
+`voices.service.ts`, `narration.service.ts`, the `voices` router, the `project.tts` fan-out, the
+shared `narrate-line` path, `line.resynth`, and the casting screen at
+`/dashboard/projects/[id]/voices`. 33 new tests; the suite is 517 and green, `tsc --noEmit`,
+`eslint` and `next build` are clean.
+
+**The catalogue is populated by an operator, not by a seed file.** This was settled before the
+phase started: the brief forbids an agent-written seed, and the provider voice ids only exist in a
+real account — a hand-written list would be both a fiction and immediately stale. So
+`voices.sync` pulls the licensed library from the provider and upserts it, gated to the PORTAL
+workspace on top of the `voices:sync` permission. `Voice` rows are shared by every tenant, so a
+tenant able to write them could rename or withdraw voices for everyone.
+
+**Decisions worth knowing about, because none of them were in the phase file:**
+
+- **The sync preserves operator edits, and that is what makes it re-runnable.** The provider owns
+  the NAME and the voice id; the operator owns `minPlan`, `isActive` and the descriptive labels.
+  An update writes only the provider's fields — otherwise every sync would reset a carefully
+  tiered catalogue back to `free`, and the second press of the button would silently give away
+  every premium voice. Grep `SYNC_PRESERVES_OPERATOR_EDITS`.
+- **A withdrawn voice is deactivated, never deleted.** It is still referenced by speakers, by
+  narration lines already recorded with it, and by the `textHash` of every one of those lines.
+  Deleting would orphan all of that and — worse — change what those hashes mean, so the next
+  generation would miss the cache and re-synthesise audio that already exists in a voice that no
+  longer does. Grep `DEACTIVATE_NEVER_DELETE`.
+- **`textHash` covers the voice, not just the text**, which is the whole point of the cache. A
+  hash of the text alone hands a customer the PREVIOUS speaker's audio the moment they change the
+  cast, and nothing errors because the hit is a real row with real audio behind it. This is the
+  same class of mistake as the Phase 04 render key that shipped: a key describing the INPUT rather
+  than the OUTPUT.
+- **Cache reuse is scoped to one workspace.** Two workspaces writing the same sentence in the same
+  voice each pay once. Sharing across tenants would be cheaper and is not worth it: the audio is a
+  tenant's asset, under their storage prefix and deletable by them, so a cross-tenant reuse would
+  hand one workspace a file another can delete out from under it. Grep
+  `REUSE_WITHIN_THE_WORKSPACE`.
+- **Line splitting is on sentence boundaries only, and abbreviations are not endings.** The naive
+  "split on a dot" rule cuts `Dr. Chen` and `4.2 percent` in half, and each half is then
+  synthesised as a complete thought — a speaker saying "Dr", pausing, then "Chen said". That is
+  immediately audible and invisible to any test that only checks types, so it is asserted directly.
+- **A fragment too short to stand alone stays with its neighbour.** "Yes." is not worth a provider
+  call, and alone it is synthesised without the sentence it answers.
+- **A single sentence longer than the cap is NOT split.** There is no safe place to cut one, and
+  the provider handles a long sentence far better than an arbitrary break would.
+- **The backup model is a different FAMILY, not a smaller version of the primary.** A backup that
+  shares the primary's failure mode is not a backup — if the multilingual model is having a bad
+  hour so is every variant of it, and the fallback buys one more failed call. The fallback also
+  deliberately does NOT fire on permanent failures: a bad voice id, a bad key and an exhausted
+  quota all fail identically on the backup, and retrying the quota case doubles the bill.
+- **The eslint fence is on the CREDENTIAL, not an import.** This adapter talks to a REST API with
+  `fetch` and has no SDK to restrict, so `ELEVENLABS_API_KEY` is what is confined — which is the
+  thing actually worth confining. Probed: it rejects both `process.env["..."]` and
+  `process.env....` from outside the adapter folder and stays silent inside it.
+- **Loudness is normalised per line, before storage.** Synthesised lines come back at different
+  levels, and cut together untouched a narration audibly jumps in volume at every line break —
+  which also makes the Phase 03 ducking curve duck against a moving target. Single-pass
+  `loudnorm`, because two-pass means two ffmpeg invocations per line across dozens of lines.
+- **The stored duration is MEASURED from the normalised file**, never the provider's estimate. The
+  timeline positions captions, cuts and the music bed against these numbers, so an estimate
+  compounds into visible desynchronisation. Grep `DURATION_IS_MEASURED_NOT_CLAIMED`.
+- **Both narration workflows share ONE recording path.** `narrate-line.ts` was extracted the moment
+  `line.resynth` needed what `project.tts` already had, rather than duplicated. Two copies would
+  drift within a phase and the drift would be audible: one path normalising and the other not is a
+  narration that jumps in volume exactly at the lines somebody edited.
+- **A failure is recorded against the LINE, not the project.** One line failing is recoverable —
+  the whole caching design exists so a re-run synthesises only what is missing — and a
+  project-level flag would throw away every successful line's work.
+- **The credit hold covers only the lines that will ACTUALLY be synthesised.** A fully cached
+  re-run reserves nothing. The hold is sized on a per-line estimate and settled against the
+  MEASURED narration length, so a shorter-than-expected recording releases the difference.
+- **Previews are never gated, deliberately.** A free workspace can play every premium voice. It
+  looks like a hole and is the upsell — hearing what you cannot yet use — and it costs nothing
+  because a preview is a pre-rendered asset rather than a synthesis. Only ASSIGNING is gated, on
+  both the `premiumVoices` flag and the voice's own `minPlan`, and the server re-checks both.
+- **`minPlan` and the `premiumVoices` flag are both needed and are not redundant.** The flag
+  answers "may this workspace use gated voices at all" — one boolean, which is what a trial turns
+  off wholesale. `minPlan` answers "which ones", a per-row threshold a boolean cannot express.
+- **Label mapping is lossy on purpose, and falls back to `other` rather than guessing.** A
+  provider labels voices with whatever its catalogue team typed; surfacing that gives the picker
+  thirty filter options for forty voices. A voice mislabelled `british` because the mapper reached
+  for the nearest option is worse than one labelled `other` — the customer filters, gets a result,
+  and hears something else.
+- **Assignments survive regeneration.** `upsertSpeakers` never clears the cast: the customer picked
+  those voices, the tags usually stay the same, and wiping them would invalidate every `textHash`
+  and re-record the entire narration at full price.
+
+**Verified.**
+
+- **Loudness normalisation against real ffmpeg**, which is the one provider-independent half of
+  this phase. A deliberately quiet tone measured **−44.4 LUFS** went through `normalizeLoudness`
+  and came out at **−16.4 LUFS** — on target — with the duration measured from the normalised file
+  (3.5s source, 3.5s measured) rather than estimated.
+- **The credential fence was probed**, as described above.
+- **33 tests over the two pure decisions**: 24 on splitting and hashing (including the `Dr.` and
+  `4.2` cases, the short-fragment merge, position stability across regeneration, and the voice
+  being part of the cache key), 9 on label mapping (including the `female` / `male` and
+  `african american` / `american` substring traps).
+- **The migration is applied**; `migrate status` reports up to date and `migrate diff` reports no
+  drift.
+- **All four workflows register and serve.** `/api/inngest` reports **13 functions**, and the
+  Inngest dev server lists `rotreels-project-tts`, `rotreels-line-resynth` and both failure
+  handlers by name.
+- `next build` succeeds with `/dashboard/projects/[id]/voices` present.
+
+**NOT verified, and this is why the box is unticked — needs an `ELEVENLABS_API_KEY`.**
+
+No key is set, so **no audio has ever been synthesised and the catalogue is empty**. Every one of
+the phase's seven "done when" checks is untested:
+
+- A two-speaker script producing one asset per line with the right voice on each.
+- Re-running with unchanged text making zero provider calls. The cache lookup is unit-reasoned and
+  the hash is tested, but no provider call has ever been skipped.
+- Editing one line re-synthesising that line only.
+- Generation being blocked with the speakers named. The validation is implemented and surfaced in
+  two places; it has never refused a real run.
+- A free workspace seeing premium voices locked. The gating is implemented on both halves and
+  re-checked server-side; the picker has never rendered against a populated catalogue.
+- Previews playing without spending credits. There are no previews yet — see below.
+- A primary model failure falling back to the backup. The classification decides which failures are
+  worth a retry, and no real failure has occurred.
+
+**Also outstanding:**
+
+- **Voice previews are a separate pass.** The sync records that a voice has none rather than
+  fetching one: storing a sample per voice needs object storage, and doing it inline would make a
+  sync a multi-megabyte download inside a request. The picker omits the play button until then.
+  R2 is also still unconfigured from Phase 02. Grep `PREVIEWS_ARE_A_SEPARATE_PASS`.
+- **Narration audio needs R2**, like everything else that stores bytes.
+- **Phase 08 owns re-alignment.** `line.resynth` deliberately does not call an aligner — a call to
+  one that does not exist would be a claim that timings were refreshed, which later phases would
+  be entitled to believe. Grep `ALIGNMENT_IS_PHASE_08`.
+- **The credit rates are still placeholders** (Phase 05). Narration now charges on them.
+- **Phase 04's AWS deploy** remains open.

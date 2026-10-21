@@ -212,6 +212,8 @@ model Organization {
   renders           Render[]
   creditLedger      CreditLedger[]
   scriptBlocks      ScriptBlock[]
+  speakers          Speaker[]
+  narrationLines    NarrationLine[]
 
   @@map("organization")
 }
@@ -456,6 +458,8 @@ model Project {
   timeline     Timeline?
   renders      Render[]
   scriptBlocks ScriptBlock[]
+  speakers     Speaker[]
+  narrationLines NarrationLine[]
 
   @@index([organizationId])
   @@index([organizationId, createdAt])
@@ -783,4 +787,148 @@ model ScriptBlock {
   @@index([organizationId])
   @@index([projectId, position])
   @@map("script_block")
+}
+
+// ============================================================================
+// VOICES AND NARRATION — who speaks, and the audio of them speaking
+// ============================================================================
+
+/// Voice — one entry in the SHARED voice catalogue.
+///
+/// NO organizationId, deliberately: this is a catalogue every workspace reads,
+/// exactly like a library Asset with a null organizationId. Voices are
+/// licensed by the operator once, not per tenant, so a per-workspace copy
+/// would be the same licence duplicated per customer and a catalogue update
+/// that had to be fanned out across every tenant.
+///
+/// NO CLONES OF REAL PEOPLE OR THIRD-PARTY CHARACTERS, EVER. That is a legal
+/// position, not a preference, and it is why `providerVoiceId` points at a
+/// LICENSED library voice rather than at anything this product generated.
+/// Phase 07's brief states it; nothing in this schema should ever be used to
+/// store a cloned voice.
+///
+/// `minPlan` gates the voice, and it is a STRING matching a PlanKey rather
+/// than a boolean "premium" flag — a boolean cannot express a voice available
+/// from Pro upward while another is available from Starter, and the first time
+/// a third tier of voices is wanted the boolean has to be migrated anyway.
+///
+/// `previewAssetId` points at a PRE-RENDERED sample. Previews are served from
+/// that asset rather than synthesised on demand, so hearing a voice costs no
+/// credits and no provider call — see the preview note in the phase brief: the
+/// upsell is hearing what you cannot yet use.
+///
+/// SOURCE OF TRUTH KEYWORD: Voice
+model Voice {
+  id              String  @id @default(cuid())
+  name            String
+  gender          String
+  accent          String
+  tone            String
+  providerVoiceId String
+  provider        String  @default("elevenlabs")
+  minPlan         String  @default("free")
+  previewAssetId  String?
+  isActive        Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// One row per provider voice. The sync upserts on this, so re-running it
+  /// updates the catalogue rather than duplicating it.
+  @@unique([provider, providerVoiceId])
+  @@index([minPlan])
+  @@index([isActive])
+  @@map("voice")
+}
+
+/// Speaker — a role in one project's script, and the voice assigned to it.
+///
+/// `tag` is the label the SCRIPT uses ("A", "OP", "narrator"), which is what
+/// makes a speaker addressable before a voice has been chosen: Phase 06 writes
+/// `ScriptBlock.speakerTag` with no knowledge of voices, and Phase 12 splits a
+/// Reddit thread into tags long before anybody picks who sounds like what.
+///
+/// `@@unique([projectId, tag])` is what makes assignment well-defined — two
+/// rows for tag "A" would mean a line could be synthesised in two voices
+/// depending on which row was read.
+///
+/// `voiceId` is NULLABLE and that is the whole point of the `state` column: a
+/// project with an unassigned speaker must be BLOCKED from generating rather
+/// than silently narrated in a default voice. See validateAssignments.
+///
+/// `avatarId` is unused in this phase — Phase 12 pairs a speaker with a
+/// character. It is here now because adding it later means a migration on a
+/// table that by then holds every project's cast.
+///
+/// SOURCE OF TRUTH KEYWORD: Speaker
+model Speaker {
+  id             String  @id @default(cuid())
+  organizationId String
+  projectId      String
+  tag            String
+  voiceId        String?
+  avatarId       String?
+  state          String  @default("unassigned") // unassigned | ready
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project      Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, tag])
+  @@index([organizationId])
+  @@map("speaker")
+}
+
+/// NarrationLine — one spoken line and the audio of it.
+///
+/// A `ScriptBlock` becomes one or more of these: split by speaker, and by
+/// sentence where a block is long enough that re-recording it whole would be
+/// wasteful. The line is the unit of SYNTHESIS and of re-synthesis, which is
+/// why it is a row rather than a field on the block.
+///
+/// `textHash` IS THE CACHE KEY AND IT COVERS THE VOICE. It is
+/// `hash(text + voiceId)`, because the same words in a different voice are a
+/// different recording — a hash of the text alone would hand a customer the
+/// previous speaker's audio the moment they changed the cast. Grep
+/// TEXT_HASH_COVERS_THE_VOICE.
+///
+/// The `@@index([textHash, voiceId])` is what makes the cache lookup cheap:
+/// before synthesising, a ready line with the same hash is reused. Re-running
+/// generation on unchanged text therefore makes ZERO provider calls, which is
+/// one of the phase's "done when" checks.
+///
+/// `durationSec` is the MEASURED duration, written after loudness
+/// normalisation — not the provider's estimate. The timeline positions every
+/// other element against these numbers, so an estimate here desynchronises the
+/// whole video.
+///
+/// `status` is String, not a Prisma enum — zero enum blocks in this schema;
+/// the validated union lives in src/lib/types/voice.ts.
+///
+/// SOURCE OF TRUTH KEYWORD: NarrationLine
+model NarrationLine {
+  id             String   @id @default(cuid())
+  organizationId String
+  projectId      String
+  position       Int
+  speakerTag     String
+  voiceId        String?
+  text           String
+  textHash       String
+  audioAssetId   String?
+  durationSec    Float?
+  status         String   @default("pending") // pending | synthesizing | ready | failed
+  error          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project      Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([projectId, position])
+  @@index([textHash, voiceId])
+  @@map("narration_line")
 }

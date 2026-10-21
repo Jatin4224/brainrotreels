@@ -170,6 +170,35 @@ export interface MediaAdapter {
     width: number;
     height: number;
   }): Promise<void>;
+
+  /**
+   * SOURCE OF TRUTH KEYWORDS: normalizeLoudness, LOUDNESS_IS_NORMALISED,
+   *   DURATION_IS_MEASURED_NOT_CLAIMED
+   *
+   * WHAT:  Brings one audio file to a consistent loudness and reports how long
+   *        it actually is.
+   *
+   * WHY:   LOUDNESS_IS_NORMALISED, which is Phase 07's step 6. Synthesised
+   *        lines are NOT uniformly loud — different voices, and even different
+   *        lines in one voice, come back at different levels. Cut together
+   *        untouched, a narration audibly jumps in volume at every line break,
+   *        and the ducking curve in Phase 03 then ducks the music against a
+   *        moving target. Normalising per line, before anything is stored, is
+   *        what makes a stitched narration sound like one take.
+   *
+   *        DURATION_IS_MEASURED_NOT_CLAIMED is why this returns a duration
+   *        rather than being a `void` transcode. The provider's figure is an
+   *        estimate, and the timeline positions every other element against
+   *        these numbers — captions, cuts, the music bed — so an estimate
+   *        compounds into visible desynchronisation across a video. The
+   *        measurement is taken from the NORMALISED file, because that is the
+   *        file that gets stored and played.
+   * WHERE: The TTS workflow, after every synthesis.
+   */
+  normalizeLoudness(args: {
+    inputPath: string;
+    outputPath: string;
+  }): Promise<{ durationSec: number }>;
 }
 
 export const MEDIA_PROVIDER_IDS = ["ffmpeg"] as const;

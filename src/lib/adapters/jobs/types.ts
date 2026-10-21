@@ -73,6 +73,14 @@ export const JOB_EVENT_NAMES = [
    * replacing it.
    */
   'script/requested',
+  /**
+   * NARRATION_IS_ITS_OWN_EVENT. Sent once a script exists and the cast is
+   * complete. Separate from `script/requested` because narration is
+   * re-runnable on its own: editing one line re-synthesises that line without
+   * rewriting the script, and Phase 15's editor drives exactly that. Phase 09
+   * composes this step rather than replacing it.
+   */
+  'tts/requested',
   'asset/uploaded',
   'footage/requested',
   'line/changed',

@@ -28,6 +28,7 @@ import {
   FilmIcon,
   HardDriveIcon,
   KeyRoundIcon,
+  MicIcon,
   PlayCircleIcon,
   ShieldCheckIcon,
   SparklesIcon,
@@ -51,6 +52,7 @@ const SETUP_ICONS: Record<string, LucideIcon> = {
   Film: FilmIcon,
   Clapperboard: ClapperboardIcon,
   Sparkles: SparklesIcon,
+  Mic: MicIcon,
 };
 
 function iconFor(name: string): LucideIcon {

@@ -374,4 +374,61 @@ export const ffmpegMediaAdapter: MediaAdapter = {
       "A waveform could not be drawn for this audio.",
     );
   },
+
+  /**
+   * SOURCE OF TRUTH KEYWORDS: normalizeLoudness, LOUDNESS_IS_NORMALISED,
+   *   EBU_R128, SINGLE_PASS_LOUDNORM
+   *
+   * WHY:   EBU_R128 via ffmpeg's `loudnorm`, targeting −16 LUFS. That target
+   *        is the streaming-platform convention for spoken content: loud
+   *        enough to sit over a music bed, quiet enough that the platform's
+   *        own normalisation does not pull it back down and take the dynamics
+   *        with it.
+   *
+   *        SINGLE_PASS_LOUDNORM, and the tradeoff is deliberate. Two-pass is
+   *        more accurate — it measures the whole file, then applies a
+   *        correction — but it means two ffmpeg invocations per line, and a
+   *        script is dozens of lines. One pass is accurate enough for speech,
+   *        where the dynamic range is narrow and the content is a few seconds
+   *        long. If narration ever includes music or long dynamic passages,
+   *        this is the line to revisit.
+   *
+   *        `-ar 44100` is pinned because `loudnorm` resamples to 192kHz
+   *        internally and will happily emit that if not told otherwise —
+   *        producing files several times larger for no audible gain.
+   */
+  async normalizeLoudness({ inputPath, outputPath }): Promise<{
+    durationSec: number;
+  }> {
+    await runTool(
+      ffmpegBinary(),
+      [
+        "-y",
+        "-i",
+        inputPath,
+        "-af",
+        "loudnorm=I=-16:TP=-1.5:LRA=11",
+        "-ar",
+        "44100",
+        "-c:a",
+        "libmp3lame",
+        "-b:a",
+        "128k",
+        outputPath,
+      ],
+      "That narration could not be levelled.",
+    );
+
+    /* Measured from the OUTPUT, not the input — the file that gets stored and
+     * played is the one the timeline has to agree with. */
+    const probed = await ffmpegMediaAdapter.probe(outputPath);
+    if (probed.durationSec === null || probed.durationSec <= 0) {
+      throw new MediaProcessingError(
+        "That narration came out empty.",
+        `[media/ffmpeg] normalised ${outputPath} has no duration`,
+      );
+    }
+
+    return { durationSec: probed.durationSec };
+  },
 };
