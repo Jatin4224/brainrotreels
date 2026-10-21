@@ -31,6 +31,7 @@ These docs explain how this boilerplate is shaped and why. The README tells you 
 15. `15-phase5.md` — credits: a ledger rather than a counter, and how a failed render gives the money back
 16. `16-phase6.md` — script generation: a schema as the contract, and why untrusted text is never the prompt
 17. `17-phase7.md` — voices and TTS: the line as the unit of re-synthesis, and why the cache key covers the voice
+18. `18-phase8.md` — alignment and captions: why the transcript is never the script, and why a failed aligner still ships a video
 
 ## If you only have five minutes
 
