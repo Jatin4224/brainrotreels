@@ -30,6 +30,7 @@ import { assetsRouter } from "./assets";
 import { rendersRouter } from "./renders";
 import { creditsRouter } from "./credits";
 import { scriptsRouter } from "./scripts";
+import { voicesRouter } from "./voices";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: appRouter, AppRouter
@@ -47,6 +48,7 @@ export const appRouter = createTRPCRouter({
   renders: rendersRouter,
   credits: creditsRouter,
   scripts: scriptsRouter,
+  voices: voicesRouter,
   usage: usageRouter,
   auditLogs: auditLogsRouter,
   member: memberRouter,

@@ -28,6 +28,7 @@ import { useRouter } from "next/navigation";
 import {
   Copy,
   FileTextIcon,
+  MicIcon,
   Loader2Icon,
   MoreHorizontal,
   Pencil,
@@ -175,6 +176,16 @@ export function ProjectRowActions({
           >
             <FileTextIcon className="size-4" />
             Script
+          </DropdownMenuItem>
+          {/* Casting comes after the script, because the speakers come FROM
+              it — there is nothing to cast until one exists. */}
+          <DropdownMenuItem
+            onClick={() =>
+              router.push(`/dashboard/projects/${project.id}/voices`)
+            }
+          >
+            <MicIcon className="size-4" />
+            Voices
           </DropdownMenuItem>
           {canUpdate ? (
             <DropdownMenuItem onClick={() => setRenaming(true)}>

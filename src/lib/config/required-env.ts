@@ -286,6 +286,36 @@ export const OPTIONAL_ENV: readonly OptionalEnvVar[] = [
       },
     ],
   },
+  /* Narration. The fourth media dependency, failing at yet another point:
+   * without this a project can be written and previewed but never SPOKEN, and
+   * everything downstream of narration — captions, the timeline, the render —
+   * has nothing to sit against. */
+  {
+    id: "tts",
+    label: "Narration (ElevenLabs)",
+    purpose:
+      "Needed before a script can be turned into speech. Scripts can still be written and edited without it; the Narrate button refuses. Voice previews also come from this catalogue, so the voice picker will be empty until the catalogue has been synced from the portal.",
+    help:
+      "Create an API key at elevenlabs.io, then sync the catalogue once from the portal (Voices → Sync from provider) — there is no seed file, and the voice ids only exist in a real account. ELEVENLABS_MODEL and ELEVENLABS_BACKUP_MODEL are optional overrides; the backup is used automatically when the primary model fails, and it deliberately defaults to a DIFFERENT family so it does not share the primary failure mode. Narration SPENDS CREDITS per line.",
+    icon: "Mic",
+    link: {
+      label: "Create an ElevenLabs API key",
+      url: "https://elevenlabs.io/app/settings/api-keys",
+    },
+    keys: [
+      { key: "ELEVENLABS_API_KEY", label: "API key" },
+      {
+        key: "ELEVENLABS_MODEL",
+        label: "Primary model (blank means the quality default)",
+        optional: true,
+      },
+      {
+        key: "ELEVENLABS_BACKUP_MODEL",
+        label: "Backup model (blank means the turbo default)",
+        optional: true,
+      },
+    ],
+  },
   /* Cloud rendering. A third media row rather than part of the other two,
    * because it fails at a different point again and the fix is in a different
    * cloud: without R2 nothing can be uploaded, without ffmpeg nothing can be
