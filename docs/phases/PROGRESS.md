@@ -15,8 +15,9 @@ worse than an empty box.
       which are untested.
 - [ ] Phase 05: Credits and entitlements — built; **blocked on the Neon database being unreachable**
       and on Phase 04's AWS gap, so no credit has ever moved. Rates are PLACEHOLDERS. See the note.
-- [ ] Phase 06: Script generation — built; **blocked on an ANTHROPIC_API_KEY**, so no script has
-      ever been generated. Found and fixed a double-charging bug in Phase 05. See the note.
+- [ ] Phase 06: Script generation — built, and **generating real scripts against Claude**. Unticked
+      on the PDF path (needs R2) and the workflow/UI round trip. Found and fixed a double-charging
+      bug in Phase 05. See the note.
 - [ ] Phase 07: Voices and TTS
 - [ ] Phase 08: Alignment and captions
 - [ ] Phase 09: The generate pipeline
@@ -885,24 +886,48 @@ Review did not catch this. A probe against a real database did.
   dev server lists `rotreels-script-generate` and `rotreels-script-generate-failure` by name.
 - `next build` succeeds with `/dashboard/projects/[id]/script` present.
 
-**NOT verified, and this is why the box is unticked — needs an `ANTHROPIC_API_KEY`.**
+**Verified against the real model** (key added 2026-10-21; a throwaway probe drove the real adapter
+and the real extraction paths, then was deleted):
 
-No key is set, so **no script has ever been generated**. Everything below is untested:
+- **Pasted text produces a valid, well-formed script**, and it was READ rather than only asserted
+  on. From a short news item at a 30-second target it returned a hook plus four body blocks,
+  estimated at 32.4s:
 
-- A topic, a news URL and a 10-page PDF each producing a valid script.
-- Model output failing the schema being retried once with the error, then failing cleanly. The
-  retry is implemented and the failure classification is unit-reasoned, but no real malformed
-  response has been seen.
-- Regenerating the hook leaving every other block byte-identical. The mechanism is a single-row
-  update by id and the model is given a one-field schema so it *cannot* return a second block, but
-  no real rewrite has run.
-- A script over 60 seconds showing the warning before generation proceeds. The threshold and the
-  arithmetic are unit-tested; the banner has never rendered against a real script.
-- The PDF path end to end. `unpdf` is wired and the furniture-stripping is unit-tested against
-  synthetic pages, but no real PDF has been read — and the PDF path additionally needs R2, which is
-  still unconfigured from Phase 02.
-- The live URL path. The guard is tested exhaustively with an injected resolver and a fake fetch;
-  no real network fetch has run.
+  > *hook:* "A space station recycler just recovered ninety-nine point four percent of its water.
+  > The goal was only ninety-three."
+
+  Three prompt rules are demonstrably working in that output: the hook opens on the most surprising
+  concrete fact with no throat-clearing; every number is EXPANDED FOR SPEECH ("ninety-nine point
+  four percent", "twenty thousand dollars") rather than left as digits a voice would mangle; and no
+  CTA was invented, because the system prompt says to add one "only if it fits naturally". Nothing
+  was fabricated beyond the source.
+- **The output parses against `scriptDraftSchema`**, the first block is a `hook`, bodies follow,
+  and no block contains markdown, emoji or stage directions.
+- **The pacing total is the sum of its parts** — the per-block estimates and the reported total
+  agree to within half a second.
+- **A real block rewrite returns one block's worth of text**, not a script, and not a JSON object
+  with a section field.
+- **A real public URL is fetched through the SSRF guard and extracted to prose** — the first live
+  network fetch through `guardedFetch`, `htmlToReadableText` and the whole ingest path.
+
+**NOT verified, and this is why the box is still unticked:**
+
+- **The PDF path.** `unpdf` is wired and the furniture-stripping is unit-tested against synthetic
+  pages, but no real PDF has been read — and this path additionally needs R2, still unconfigured
+  from Phase 02.
+- **The schema retry against a real malformed response.** The retry is implemented and the first
+  attempt has not failed in testing, so the second attempt has never run. Forcing it needs a
+  deliberately hostile schema, which would be a probe that proves the harness rather than the
+  product.
+- **The over-60s warning against a real script.** The threshold and the arithmetic are unit-tested
+  and the banner is wired, but every generated script so far has come in under the limit — which is
+  the model following its word budget, not a gap in the check.
+- **The whole path through the WORKFLOW and the UI.** The probe called `generateScript` directly.
+  `scripts.generate` → `script/requested` → the workflow → `replaceScript` → the editor has not been
+  driven end to end in a browser, and neither has the credit hold/commit around it.
+
+> **Note for whoever runs the suite:** vitest does not load `.env` (Next does), so a probe that
+> needs the key must `import "dotenv/config"` itself. That cost one confusing run.
 
 **Also outstanding:**
 
