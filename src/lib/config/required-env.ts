@@ -292,11 +292,11 @@ export const OPTIONAL_ENV: readonly OptionalEnvVar[] = [
    * has nothing to sit against. */
   {
     id: "tts",
-    label: "Narration (ElevenLabs)",
+    label: "Narration and caption timing (ElevenLabs)",
     purpose:
-      "Needed before a script can be turned into speech. Scripts can still be written and edited without it; the Narrate button refuses. Voice previews also come from this catalogue, so the voice picker will be empty until the catalogue has been synced from the portal.",
+      "Needed before a script can be turned into speech, and before captions can be timed against it — both use this one key. Scripts can still be written and edited without it; the Narrate button refuses, and captions cannot be timed. Voice previews also come from this catalogue, so the voice picker will be empty until the catalogue has been synced from the portal.",
     help:
-      "Create an API key at elevenlabs.io, then sync the catalogue once from the portal (Voices → Sync from provider) — there is no seed file, and the voice ids only exist in a real account. ELEVENLABS_MODEL and ELEVENLABS_BACKUP_MODEL are optional overrides; the backup is used automatically when the primary model fails, and it deliberately defaults to a DIFFERENT family so it does not share the primary failure mode. Narration SPENDS CREDITS per line.",
+      "Create an API key at elevenlabs.io, then sync the catalogue once from the portal (Voices → Sync from provider) — there is no seed file, and the voice ids only exist in a real account. ELEVENLABS_MODEL and ELEVENLABS_BACKUP_MODEL are optional overrides; the backup is used automatically when the primary model fails, and it deliberately defaults to a DIFFERENT family so it does not share the primary failure mode. Narration SPENDS CREDITS per line, and caption timing spends them per second of narration — re-running either with nothing changed costs nothing.",
     icon: "Mic",
     link: {
       label: "Create an ElevenLabs API key",
@@ -312,6 +312,15 @@ export const OPTIONAL_ENV: readonly OptionalEnvVar[] = [
       {
         key: "ELEVENLABS_BACKUP_MODEL",
         label: "Backup model (blank means the turbo default)",
+        optional: true,
+      },
+      /* CAPTION ALIGNMENT SHARES THIS CREDENTIAL, so it is listed here rather
+       * than as a row of its own — a checklist row a customer can never
+       * satisfy separately is a row that makes the list look longer and the
+       * setup look harder. The optional model override belongs with it. */
+      {
+        key: "ELEVENLABS_STT_MODEL",
+        label: "Caption timing model (blank means the default aligner)",
         optional: true,
       },
     ],

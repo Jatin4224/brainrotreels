@@ -21,7 +21,10 @@ worse than an empty box.
 - [ ] Phase 07: Voices and TTS — built; **blocked on an ELEVENLABS_API_KEY**, so no audio has ever
       been synthesised and the catalogue is empty. Loudness normalisation IS verified against real
       ffmpeg. See the note.
-- [ ] Phase 08: Alignment and captions
+- [ ] Phase 08: Alignment and captions — built; **blocked on an ELEVENLABS_API_KEY**, so no
+      audio has ever been aligned. The pure halves — the back-match, the degrade
+      distribution, the cache key, the 38-style library and its contrast rule — are
+      verified by 91 new tests. See the note.
 - [ ] Phase 09: The generate pipeline
 - [ ] Phase 10: Safety, limits and launch — **ships public beta**
 - [ ] Phase 11: Backgrounds library
@@ -1077,3 +1080,132 @@ the phase's seven "done when" checks is untested:
   be entitled to believe. Grep `ALIGNMENT_IS_PHASE_08`.
 - **The credit rates are still placeholders** (Phase 05). Narration now charges on them.
 - **Phase 04's AWS deploy** remains open.
+
+### Phase 08 — 2026-10-22
+
+Built: the `Alignment` model and its migration (**applied**), the `captionStyles` and
+`premiumCaptionStyles` registry entries, `src/lib/types/caption.ts`, the **STT adapter seam**
+(`src/lib/adapters/stt/` — contract, selector, ElevenLabs Scribe) and its credential fence,
+`src/lib/alignment/` (the pure back-match, the degrade distribution, the stitching and the cache
+key), `src/lib/captions/` (**38 styles** as data, the chunker, `buildCaptionTrack`, the safe-zone
+maths, the contrast rule), the global `<CaptionCard>` / `<CaptionPreview>`, the caption LAYER in
+`TimelineRenderer`, `alignment.service.ts`, the `captions` router, the `project.align` workflow,
+and the style gallery at `/dashboard/projects/[id]/captions`. 91 new tests; the suite is 608 and
+green, `tsc --noEmit`, `eslint` and `next build` are clean.
+
+**Decisions worth knowing about, because none of them were in the phase file:**
+
+- **Alignment runs PER NARRATION LINE, against that line's own audio**, and the results are
+  offset and re-indexed into one narration. Aligning the whole thing as one file would need the
+  lines concatenated into a temporary file first, would re-align everything when one line is
+  re-recorded, and could not attribute a word to a speaker. Speaker attribution therefore comes
+  from the LINE, not from diarisation — this app chose the voice, so paying a model to guess it
+  back would be a worse answer to an answered question. Grep `PER_LINE_ALIGNMENT`.
+- **The back-match is a Needleman–Wunsch alignment, not a two-pointer walk.** The naive walk
+  works until the first mismatch and then drifts for the rest of the line — the failure that
+  looks fine in a demo and desynchronises a real script at the first number. Unmatched HEARD
+  tokens are absorbed into the written word before them, which is what makes the phase's own
+  example work: `AITA` heard as `ay eye tee ay` holds the screen for all four. Asserted directly.
+- **`captionStyles` needed `apply` and `align` permissions**, which the phase's registry block
+  omits while asking for both actions. The same gap Phase 02 found on `assets`: an action with no
+  permission to gate it is an action every member can take whatever their role.
+- **The procedure is `captions.applyStyle`, not `captions.apply`.** tRPC refuses `apply` as a
+  router key — it collides with `Function.prototype.apply` — and the failure is a build-time
+  error in the serve route, a long way from the router. The audit and rate-limit keys follow the
+  PATH VERB, so they say `applyStyle` too (the same rule Phase 02 wrote down).
+- **Caption settings live on `Project.settings`, not only in the timeline document.** The
+  document is the render's input and does not exist until Phase 09 builds one, so a gallery that
+  could only write into a document would be unusable on every project until then. The project row
+  holds the INTENT; `applyCaptionsToTimeline` realises it whenever a document exists, and reports
+  honestly when there is none. Grep `CAPTION_SETTINGS_LIVE_ON_THE_PROJECT`.
+- **Re-aligning a DEGRADED alignment is not a cache hit.** Its `audioHash` matches its audio
+  perfectly, which is exactly why treating it as done would freeze a project's captions at
+  evenly distributed guesses for good. Grep `DEGRADED_IS_NOT_A_CACHE_HIT`.
+- **A fully degraded alignment is NOT charged.** The hold is released rather than committed:
+  nothing was timed, the words are a weighted guess, and billing for that is how a provider
+  outage becomes a refund request. A partial degrade is still charged — most of the narration
+  really was aligned.
+- **Two attempts then degrade, INSIDE the step, not as workflow retries.** Inngest retries end in
+  a FAILED run, and this phase's rule is that a failed aligner still produces a renderable video.
+  Grep `TWO_ATTEMPTS_THEN_DEGRADE`.
+- **Every style has to carry its legibility in an OUTLINE, and the contrast rule says so.** The
+  obvious implementation checks the fill against the background and rejects every white-on-light
+  style — which would delete most of the library, because that is not how captions work. No
+  single colour can pass 4.5:1 against both white and black, so a style with no load-bearing
+  stroke cannot exist; the rule treats the stroke as a participant and refuses one too thin to
+  see. Four styles failed the check as first written and were fixed before the library shipped.
+- **The stroke is a ring of `text-shadow`s, not `-webkit-text-stroke`.** The webkit property
+  strokes the glyph centre line, eating into the letterform, and renders at subtly different
+  widths in the Player's browser and in Remotion's headless Chrome — a preview that does not
+  match the paid output. Grep `STROKE_WITHOUT_WEBKIT`.
+- **One caption renderer, mounted by three surfaces.** `CaptionCard` lives in
+  `components/global/caption-preview/` and takes TIME as a prop; the Remotion layer passes a
+  frame-derived second and the gallery passes an animated one. Three implementations would agree
+  on the day they were written and drift by the next style. Grep `ONE_CAPTION_RENDERER`.
+- **`RENDER_FONT_FAMILY` moved into `src/lib/captions/fonts.ts`** and `src/remotion/fonts.ts`
+  re-exports it. Otherwise the caption library — imported by the gallery, by the apply mutation
+  and by a test — would pull the `remotion` package, whose module body expects a Remotion bundle.
+  Grep `CAPTIONS_STAY_PURE`.
+- **Position is three BANDS, not a pixel slider, which departs from the phase's wording.** The
+  band is clamped into the platform's safe zone at render time, so two nearby slider positions
+  would often produce the identical frame and the control would feel broken. Phase 15's editor is
+  where a caption gets nudged by hand against a real frame. Grep `POSITION_IS_A_BAND`.
+- **Phase 07's open hook is closed.** `line.resynth` now ends by enqueuing `align/requested`, as
+  an event rather than a call — chaining a second provider round trip inside an interactive
+  editor's run doubles how long it holds its concurrency slot. Grep
+  `RE_RECORDING_INVALIDATES_THE_ALIGNMENT`.
+- **The STT seam has its own selector although it defaults to the same vendor as TTS.** The
+  realistic first swap is a cheaper aligner with the same voices, which one shared switch would
+  make impossible.
+
+**Verified.**
+
+- **91 tests over the four decisions that can be wrong without anything erroring**: the back-match
+  (the `AITA` expansion, a misheard word keeping the customer's spelling, an interpolated word
+  weighted by length, a hallucinated run of filler not causing drift), the degrade distribution,
+  the cache key (re-recording one line, re-ordering the same lines, the concatenation trap), and
+  the caption grouping (punctuation breaks, the hyphen rule, the pause break, no orphan card).
+- **The contrast rule runs over all 38 styles**, and the test also proves the checker REFUSES
+  something — a pale style and a hairline stroke are both rejected by name.
+- **The hostile line**: four of the longest words in English at 0.12s each, through every style
+  and every platform's safe zone, asserting the box stays inside the frame and the whole text
+  block — not merely its centre — stays inside the safe area.
+- **Document-level tests**: a caption track built by this phase `validate()`s in every style,
+  resolves its anchors, and a DEGRADED alignment still produces a valid, resolvable document.
+  Two styles with the same `maxWords` produce byte-identical word ranges — the restyle guarantee.
+- **The credential fence was probed**: `ELEVENLABS_API_KEY` is rejected outside the two adapter
+  folders and silent inside `src/lib/adapters/stt/elevenlabs/`.
+- **The migration is applied**; `migrate deploy` ran against Neon and `migrate diff` reports no
+  drift.
+- **`/api/inngest` reports 15 functions**, up from 13 — `project-align` and its failure handler.
+- `next build` succeeds with `/dashboard/projects/[id]/captions` present.
+
+**NOT verified, and this is why the box is unticked — needs an `ELEVENLABS_API_KEY`.**
+
+No key is set, so **no audio has ever been aligned**. Four of the phase's seven "done when" checks
+are untested:
+
+- Captions landing within ~50ms of the spoken word on a 60-second sample. The back-match is tested
+  against synthetic transcripts; it has never seen a real one.
+- A forced STT failure producing a renderable, flagged video. The degrade path is tested as a pure
+  function and the warning is in the UI, but no provider has actually failed.
+- Re-aligning unchanged audio making zero provider calls. The cache is checked in two places and
+  the hash is tested; no provider call has ever been skipped.
+- The same document producing identical captions in the Player and in a cloud render. There is now
+  ONE renderer rather than three, which is the only structural guarantee available — but Phase
+  04's AWS gap means no cloud render has ever run at all.
+
+**Also outstanding:**
+
+- **The captions screen has not been driven in a browser.** It builds and type-checks; it has not
+  been clicked through on a real project, because there is no aligned project to click through.
+- **Phase 09 owns the chain.** `project.tts` deliberately does NOT enqueue `align/requested` when
+  a narration finishes — the generate pipeline composes the steps, and auto-triggering from here
+  would race its orchestration. The single-line path (`line.resynth`) does enqueue it, because
+  that edit has no pipeline behind it.
+- **Caption styles are the only place in the app allowed literal colours.** That exception is paid
+  for by the contrast test; if a style is ever added by hand without running it, the gallery
+  surfaces a `Low contrast` label as a second line of defence.
+- **The credit rates are still placeholders** (Phase 05). Alignment now charges on them.
+- **R2 is still unconfigured**, so there is no narration audio to align even with a key, and
+  **Phase 04's AWS deploy** remains open.

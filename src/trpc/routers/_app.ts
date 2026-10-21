@@ -30,6 +30,7 @@ import { assetsRouter } from "./assets";
 import { rendersRouter } from "./renders";
 import { creditsRouter } from "./credits";
 import { scriptsRouter } from "./scripts";
+import { captionsRouter } from "./captions";
 import { voicesRouter } from "./voices";
 
 /**
@@ -49,6 +50,7 @@ export const appRouter = createTRPCRouter({
   credits: creditsRouter,
   scripts: scriptsRouter,
   voices: voicesRouter,
+  captions: captionsRouter,
   usage: usageRouter,
   auditLogs: auditLogsRouter,
   member: memberRouter,

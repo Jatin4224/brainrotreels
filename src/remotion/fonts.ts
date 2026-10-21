@@ -41,16 +41,17 @@
 
 import { continueRender, delayRender, staticFile } from "remotion";
 
+import { RENDER_FONT_FAMILY } from "@/lib/captions/fonts";
+
 /**
  * SOURCE OF TRUTH KEYWORDS: RENDER_FONT_FAMILY
  *
- * The family name components set in `fontFamily`. It is a LOCAL name declared
- * by the FontFace below, not a lookup into whatever happens to be installed —
- * which is why it does not carry a fallback stack. A missing face must show up
- * as unstyled text during development, not as a system font that looks close
- * enough to ship.
+ * Re-exported from src/lib/captions/fonts.ts, which OWNS the name — see
+ * CAPTIONS_STAY_PURE there. Every text-drawing component reads it from
+ * either module; the definition is kept out of this file so the caption
+ * library can be imported without pulling the `remotion` package.
  */
-export const RENDER_FONT_FAMILY = "GeistRender";
+export { RENDER_FONT_FAMILY };
 
 /* Mirrors the two weights copied into public/fonts. 400 for body, 700 for the
  * emphatic short-form text this product mostly draws. */

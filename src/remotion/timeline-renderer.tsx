@@ -52,9 +52,15 @@ import {
   planTimeline,
   type PlannedItem,
 } from "@/lib/render";
-import { timelineDocSchema, type TimelineDoc } from "@/lib/timeline";
+import { DEFAULT_CAPTION_STYLE_ID } from "@/lib/captions";
+import {
+  timelineDocSchema,
+  type TimelineDoc,
+  type WordToken,
+} from "@/lib/timeline";
 import type { AssetUrlMap, RenderItemProps } from "@/lib/types";
 import { AudioClip } from "./components/audio-clip";
+import { CaptionGroup } from "./components/captions";
 import { Watermark } from "./components/watermark";
 import { loadRenderFonts } from "./fonts";
 import { resolveRenderComponent } from "./registry";
@@ -116,6 +122,7 @@ export function TimelineRenderer({
   const timeline = parsed.data;
   const planned = planTimeline(timeline);
   const narrationWindows = collectNarrationWindows(planned);
+  const captionStyleByItem = collectCaptionStyles(timeline);
 
   return (
     /* Black, explicitly. A composition with no background is transparent, and
@@ -140,6 +147,9 @@ export function TimelineRenderer({
             assets={assets}
             canvas={timeline.canvas}
             narrationWindows={narrationWindows}
+            words={timeline.words}
+            safeZone={timeline.style.safeZone}
+            captionStyleByItem={captionStyleByItem}
           />
         </Sequence>
       ))}
@@ -166,10 +176,10 @@ export function TimelineRenderer({
  *        Track types are fixed by the schema at five and have been since
  *        Phase 01.
  *
- *        Caption items also have no `render` and are not drawn in this phase.
- *        They are a LAYER rather than an item family (WORD_RANGE_NOT_TEXT), and
- *        Phase 08 adds that layer here — which is the one sanctioned reason to
- *        edit this file again.
+ *        Caption items also have no `render`: they are a LAYER rather than an
+ *        item family (WORD_RANGE_NOT_TEXT). Phase 08 added that layer here,
+ *        which was the one sanctioned reason to edit this file again — see
+ *        CAPTIONS_ARE_A_LAYER below.
  * WHERE: One per planned item, inside its Sequence.
  */
 function PlannedItemRenderer({
@@ -177,11 +187,17 @@ function PlannedItemRenderer({
   assets,
   canvas,
   narrationWindows,
+  words,
+  safeZone,
+  captionStyleByItem,
 }: {
   plan: PlannedItem;
   assets: AssetUrlMap;
   canvas: TimelineDoc["canvas"];
   narrationWindows: readonly { from: number; durationInFrames: number }[];
+  words: readonly WordToken[];
+  safeZone: TimelineDoc["style"]["safeZone"];
+  captionStyleByItem: ReadonlyMap<string, string>;
 }) {
   /* `item` is a document value, which is JSON by construction — the props
    * every component receives are deliberately loose, and each one narrows what
@@ -195,6 +211,30 @@ function PlannedItemRenderer({
 
   if (plan.trackType === "audio") {
     return <AudioClip {...props} narrationWindows={narrationWindows} />;
+  }
+
+  /* CAPTIONS_ARE_A_LAYER. The sanctioned second branch on TRACK TYPE, added
+   * by Phase 08 — a caption item carries a word RANGE and no `render` field
+   * (WORD_RANGE_NOT_TEXT), so there is nothing for the registry to choose
+   * between. This is not a WALK_DONT_BRANCH violation for the same reason
+   * the audio branch is not: the rule forbids branching on FORMAT, which
+   * grows with every phase, and track types have been fixed at five since
+   * Phase 01. */
+  if (plan.trackType === "caption") {
+    const item = plan.item;
+    if (!("startWord" in item) || !("endWord" in item)) return null;
+
+    return (
+      <CaptionGroup
+        range={{ startWord: item.startWord, endWord: item.endWord }}
+        words={words}
+        styleId={captionStyleByItem.get(plan.id) ?? DEFAULT_CAPTION_STYLE_ID}
+        safeZone={safeZone}
+        canvas={canvas}
+        frames={props.frames}
+        y={item.position?.y}
+      />
+    );
   }
 
   const component = resolveRenderComponent(plan.render);
@@ -241,4 +281,31 @@ function collectNarrationWindows(
   }
 
   return windows;
+}
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: collectCaptionStyles, TRACK_STYLE_OVERRIDES_DOC
+ *
+ * WHAT:  Which caption style each caption ITEM is drawn in.
+ * WHY:   TRACK_STYLE_OVERRIDES_DOC. The document carries one caption style
+ *        (`doc.style.captionStyleId`) and a caption TRACK may override it
+ *        (`track.styleId`), which is how a second lane — a translation —
+ *        gets a look of its own. The plan flattens tracks away, so the
+ *        mapping has to be built here, from the document, before the walk.
+ *
+ *        Keyed by ITEM id rather than track id because `PlannedItem` does not
+ *        carry its track: adding a `trackId` to the plan for this would make
+ *        every other consumer of the plan carry a field only captions use.
+ * WHERE: TimelineRenderer, once per render; read per caption item.
+ */
+function collectCaptionStyles(doc: TimelineDoc): ReadonlyMap<string, string> {
+  const byItem = new Map<string, string>();
+
+  for (const track of doc.tracks) {
+    if (track.type !== "caption") continue;
+    const styleId = track.styleId ?? doc.style.captionStyleId;
+    for (const item of track.items) byItem.set(item.id, styleId);
+  }
+
+  return byItem;
 }

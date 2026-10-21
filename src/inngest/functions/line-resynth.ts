@@ -25,11 +25,12 @@
  *        not a contrived case — undoing an edit is the most common thing
  *        somebody does in an editor.
  *
- *        Phase 08 re-aligns the line and patches the timeline document after
- *        this. The hook is deliberately absent rather than stubbed: a call to
- *        an aligner that does not exist would be a claim that timings were
- *        refreshed, which every later phase would be entitled to believe.
- *        Grep ALIGNMENT_IS_PHASE_08.
+ *        RE_RECORDING_INVALIDATES_THE_ALIGNMENT. Phase 08 filled the hook
+ *        this file left open (ALIGNMENT_IS_PHASE_08): the run ends by
+ *        enqueuing `align/requested`, because new audio for one line moves
+ *        every word timing after it and the captions would otherwise stay
+ *        confidently wrong. It is an event rather than a call — see the step
+ *        for why.
  * WHERE: Registered in src/inngest/functions/index.ts. Triggered by
  *        `line/changed`.
  */
@@ -37,6 +38,7 @@
 import { NonRetriableError } from "inngest";
 import { z } from "zod";
 
+import { enqueue } from "@/lib/adapters/jobs";
 import { inngestClient } from "@/lib/adapters/jobs/inngest/client";
 import { prisma } from "@/lib/config/prisma";
 import { narrationTextHash } from "@/lib/narration";
@@ -181,7 +183,30 @@ export const lineResynthFunction = inngestClient.createFunction(
       }),
     );
 
-    /* ALIGNMENT_IS_PHASE_08 — deliberately not called. See the file header. */
+    // ───────────────────────────────────────────────────────────────────────
+    // [3] RE-ALIGN — the line's audio changed, so every word timing in the
+    //     project is now wrong from this line onwards.
+    // ───────────────────────────────────────────────────────────────────────
+    /* RE_RECORDING_INVALIDATES_THE_ALIGNMENT. This is the hook Phase 07 left
+     * open (ALIGNMENT_IS_PHASE_08). It is an EVENT rather than a call: the
+     * alignment is a provider round trip per line and this step has already
+     * spent one on the synthesis, so chaining them inside one run doubles the
+     * time a run holds its concurrency slot in an interactive editor.
+     *
+     * The align run is cheap when little changed — its own cache skips every
+     * line whose audio it has already timed — and it is enqueued even on a
+     * CACHED re-record, because the cache hit means this line's audio is now
+     * a DIFFERENT recording from the one the stored alignment was built on.
+     * Its idempotency key covers the audio hash, so a run per edit collapses
+     * to one per distinct narration. */
+    await step.run("request-realignment", async () => {
+      await enqueue({
+        name: "align/requested",
+        data: { projectId: prepared.projectId, organizationId },
+        id: `align-after-line-${lineId}-${prepared.textHash}`,
+      });
+      return { queued: true };
+    });
 
     return { lineId, cached: result.cached, durationSec: result.durationSec };
   },

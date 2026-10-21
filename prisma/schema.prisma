@@ -460,6 +460,7 @@ model Project {
   scriptBlocks ScriptBlock[]
   speakers     Speaker[]
   narrationLines NarrationLine[]
+  alignment      Alignment?
 
   @@index([organizationId])
   @@index([organizationId, createdAt])
@@ -931,4 +932,55 @@ model NarrationLine {
   @@index([projectId, position])
   @@index([textHash, voiceId])
   @@map("narration_line")
+}
+
+/// Alignment — the word-level timings for one project's narration.
+///
+/// KEYED BY projectId, WITH NO SURROGATE ID. A project has exactly one
+/// alignment, the same way it has exactly one Timeline: the words are a
+/// property of the narration as a whole, not a list of per-line fragments.
+/// Storing one row per line was the alternative and it loses the only thing
+/// the renderer actually wants — a single array whose index IS the
+/// `wordIndex` a caption item and a motion anchor resolve against.
+///
+/// `words` IS A `WordToken[]` AS JSON, validated by `wordTokenSchema` in
+/// src/lib/timeline/schema.ts on every read. Json rather than a table of
+/// words because a sixty-second video is roughly 180 of them, they are
+/// written once as a unit, read once as a unit, and never queried
+/// individually — a `word` table would be 180 rows per project earning
+/// nothing but a join.
+///
+/// `audioHash` IS THE CACHE KEY AND IT COVERS EVERY LINE'S AUDIO. Alignment
+/// is paid provider work and audio rarely changes, so a re-run whose hash
+/// matches the stored one skips the provider entirely — one of the phase's
+/// "done when" checks. The hash is built from the ordered `textHash` of every
+/// ready narration line (see alignmentAudioHash in src/lib/alignment/hash.ts),
+/// so re-recording ONE line changes it and a restyle does not. Grep
+/// AUDIO_HASH_COVERS_EVERY_LINE.
+///
+/// `degraded` MEANS THE TIMINGS ARE EVENLY DISTRIBUTED, NOT MEASURED. The
+/// phase's rule is degrade, never fail: if the aligner fails twice, words are
+/// spread across the known narration duration and the video still renders,
+/// flagged. The flag is the only thing standing between that and a customer
+/// believing the captions are accurate, so it is a column rather than an
+/// inference. Grep DEGRADE_NEVER_FAIL.
+///
+/// `engine` records WHICH aligner produced this — the provider id, or
+/// `even-distribution` for a degraded row. A sudden run of degraded rows is
+/// the signal that the provider is unhealthy.
+///
+/// SOURCE OF TRUTH KEYWORD: Alignment
+model Alignment {
+  projectId String   @id
+  words     Json
+  audioHash String
+  engine    String
+  degraded  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([audioHash])
+  @@map("alignment")
 }

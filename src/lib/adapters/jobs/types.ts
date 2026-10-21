@@ -81,6 +81,15 @@ export const JOB_EVENT_NAMES = [
    * composes this step rather than replacing it.
    */
   'tts/requested',
+  /**
+   * ALIGNMENT_IS_ITS_OWN_EVENT. Sent once every narration line is recorded.
+   * Separate from `tts/requested` for the same reason narration is separate
+   * from the script: alignment is re-runnable on its own, it is the step a
+   * re-recorded line invalidates, and Phase 09 composes it rather than
+   * replacing it. It is also the one step that is allowed to DEGRADE rather
+   * than fail, which only makes sense as a run of its own.
+   */
+  'align/requested',
   'asset/uploaded',
   'footage/requested',
   'line/changed',

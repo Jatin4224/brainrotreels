@@ -34,20 +34,21 @@ const eslintConfig = defineConfig([
       // and has no SDK to restrict, so the fence is on the CREDENTIAL, which
       // is the thing actually worth confining: a key read outside its adapter
       // folder is a key that can end up in a page bundle. Lifted only for
-      // src/lib/adapters/tts/elevenlabs/** in the allowlist block below.
+      // the two src/lib/adapters/*/elevenlabs/** folders in the allowlist
+      // block below — the voices and the aligner share one vendor key.
       "no-restricted-syntax": [
         "error",
         {
           selector:
             "MemberExpression[object.object.name='process'][object.property.name='env'] > Literal[value='ELEVENLABS_API_KEY']",
           message:
-            "PROVIDER_ISOLATION: read ELEVENLABS_API_KEY only inside src/lib/adapters/tts/elevenlabs/**. Elsewhere, use getTtsAdapter() from @/lib/adapters/tts.",
+            "PROVIDER_ISOLATION: read ELEVENLABS_API_KEY only inside src/lib/adapters/tts/elevenlabs/** or src/lib/adapters/stt/elevenlabs/**. Elsewhere, use getTtsAdapter() from @/lib/adapters/tts or getSttAdapter() from @/lib/adapters/stt.",
         },
         {
           selector:
             "MemberExpression[object.object.name='process'][object.property.name='env'] > Identifier[name='ELEVENLABS_API_KEY']",
           message:
-            "PROVIDER_ISOLATION: read ELEVENLABS_API_KEY only inside src/lib/adapters/tts/elevenlabs/**. Elsewhere, use getTtsAdapter() from @/lib/adapters/tts.",
+            "PROVIDER_ISOLATION: read ELEVENLABS_API_KEY only inside src/lib/adapters/tts/elevenlabs/** or src/lib/adapters/stt/elevenlabs/**. Elsewhere, use getTtsAdapter() from @/lib/adapters/tts or getSttAdapter() from @/lib/adapters/stt.",
         },
       ],
       "no-restricted-imports": [
@@ -189,6 +190,12 @@ const eslintConfig = defineConfig([
       // and has no SDK. src/lib/narration/ stays pure so line splitting and the
       // cache key are testable with no key and no provider.
       "src/lib/adapters/tts/elevenlabs/**/*.ts",
+      // STT seam. The SAME credential, a SECOND folder: Scribe is the same
+      // vendor as the voices, and the fence is on the key rather than on an
+      // import, so the aligner needs an entry of its own. src/lib/alignment/
+      // and src/lib/captions/ stay pure, so the back-match, the degrade
+      // distribution and the contrast rule are testable with no key.
+      "src/lib/adapters/stt/elevenlabs/**/*.ts",
     ],
     rules: {
       // These folders ARE the translation layer, so the credential fence is
