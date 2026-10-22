@@ -123,6 +123,25 @@ export const scriptGenerateFunction = inngestClient.createFunction(
      * other tenant waits. */
     concurrency: { key: "event.data.organizationId", limit: 1 },
     /**
+     * SOURCE OF TRUTH KEYWORDS: CANCEL_STOPS_PAID_WORK
+     *
+     * Phase 09 added this. The generate pipeline invokes this workflow as a
+     * CHILD run, and cancelling a parent does NOT cancel its children — so
+     * without this a customer who pressed Cancel would go on paying a provider
+     * for output nobody will ever see. Matched on the PROJECT, so a workspace
+     * cancelling its own run cannot stop another tenant's.
+     *
+     * Inngest does not run `onFailure` for a cancellation, so a hold this run
+     * was holding is released by `projects.cancel` instead — see
+     * CANCEL_RELEASES_EVERY_HOLD in src/services/pipeline.service.ts.
+     */
+    cancelOn: [
+      {
+        event: "project/cancelled",
+        if: "event.data.projectId == async.data.projectId",
+      },
+    ],
+    /**
      * The net under every transient failure. Without it a run that exhausted
      * its retries leaves the project on `generating` forever and the credits
      * reserved against a script that will never exist.

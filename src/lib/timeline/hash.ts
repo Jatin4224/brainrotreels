@@ -61,7 +61,32 @@ const MASK_64 = 0xffffffffffffffffn;
  * WHERE: Stored as the render's `docHash` in Phase 04.
  */
 export function hashDoc(doc: TimelineDoc): string {
-  return fnv1a64(stableStringify(canonicalize(doc)));
+  return hashValue(doc);
+}
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: hashValue, SAME_HASH_FOR_ANY_SHAPE
+ *
+ * WHAT:  The same stable digest, over any JSON-shaped value rather than a
+ *        document.
+ *
+ * WHY:   Phase 09 needs to hash something that is NOT a timeline document. Its
+ *        idempotency key is `projectId + docHash`, but on a first run there is
+ *        no document — building one is the point of the run — so what gets
+ *        hashed is the INPUT shape the run would consume: the project's kind,
+ *        aspect and settings, plus its script and narration state
+ *        (IDEMPOTENCY_IS_PROJECT_PLUS_SHAPE in src/services/pipeline.service.ts).
+ *
+ *        SAME_HASH_FOR_ANY_SHAPE: this is the function `hashDoc` has always
+ *        been, with its argument widened, rather than a second hasher. A
+ *        `JSON.stringify` at the callsite was the alternative and it is the
+ *        exact bug this module exists to prevent — key order would change the
+ *        hash, so adding a settings field would invalidate every key and a
+ *        double-click would start two runs.
+ * WHERE: hashDoc above, and src/services/pipeline.service.ts.
+ */
+export function hashValue(value: unknown): string {
+  return fnv1a64(stableStringify(canonicalize(value)));
 }
 
 /**

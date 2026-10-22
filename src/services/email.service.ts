@@ -6,7 +6,8 @@ import "server-only";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: sendVerificationEmail, sendPasswordResetEmail,
- *   sendOrganizationInvitationEmail, EmailSendResult, renderAndSend
+ *   sendOrganizationInvitationEmail, sendProjectReadyEmail, EmailSendResult,
+ *   renderAndSend
  *
  * WHAT:  The single transactional-email abstraction — renders a React Email
  *        template to HTML and sends it through Resend.
@@ -30,8 +31,10 @@ import {
 import {
   EmailVerificationEmail,
   PasswordResetEmail,
+  ProjectReadyEmail,
   TeamInvitationEmail,
 } from "@/lib/email-templates";
+import { APP_URL } from "@/lib/config/branding";
 import { recordDevEmail } from "@/lib/dev-email-outbox";
 
 /**
@@ -140,6 +143,40 @@ export function sendPasswordResetEmail(args: {
       resetLink: args.resetLink,
     }),
     devLink: args.resetLink,
+  });
+}
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: sendProjectReadyEmail, LINK_GOES_TO_THE_PREVIEW,
+ *   LINK_IS_BUILT_HERE
+ *
+ * WHAT:  Sends the "your video is ready" message.
+ * WHY:   LINK_IS_BUILT_HERE, from `APP_URL` and the project id, rather than
+ *        being passed in. Every other sender takes a link because the link is
+ *        a CREDENTIAL somebody else minted — a verification token, an invite
+ *        token. This one is just a route, and asking a workflow to assemble a
+ *        URL would put the app's own path shape inside a background job.
+ *
+ *        No `devLink`. The dev outbox exists so a developer with no Resend key
+ *        can still complete an auth flow that is BLOCKED without the email;
+ *        this message is a convenience, and the video is sitting on the
+ *        project screen either way.
+ * WHERE: The `notify` step of src/inngest/functions/project-generate.ts.
+ */
+export function sendProjectReadyEmail(args: {
+  to: string;
+  projectId: string;
+  projectTitle: string;
+  recipientName?: string | null;
+}): Promise<EmailSendResult> {
+  return renderAndSend({
+    to: args.to,
+    subject: `${args.projectTitle} is ready to watch`,
+    template: React.createElement(ProjectReadyEmail, {
+      projectTitle: args.projectTitle,
+      previewLink: `${APP_URL}/dashboard/projects/${args.projectId}/preview`,
+      ...(args.recipientName ? { recipientName: args.recipientName } : {}),
+    }),
   });
 }
 

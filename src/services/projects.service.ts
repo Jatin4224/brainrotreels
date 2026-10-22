@@ -4,7 +4,7 @@
 
 /**
  * SOURCE OF TRUTH KEYWORDS: listProjects, findProjectForOrganization,
- *   findProjectWithTimeline, PROJECT_LIST_SELECT,
+ *   findProjectWithTimeline, saveTimelineDocument, PROJECT_LIST_SELECT,
  *   ProjectListItem, ProjectWithTimeline, TENANT_SCOPED_QUERY, DbClient
  *
  * WHAT:  The Prisma reads of the `project` and `timeline` tables that more than
@@ -145,4 +145,70 @@ export async function findProjectWithTimeline(
     where: { id, organizationId },
     include: { timeline: true },
   });
+}
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: saveTimelineDocument, UPSERT_BY_PROJECT,
+ *   REVISION_IS_BUMPED_ON_EVERY_WRITE, TENANT_SCOPED_QUERY
+ *
+ * WHAT:  Writes a project's timeline document, creating the row if the project
+ *        has never had one.
+ *
+ * WHY:   An UPSERT keyed on `projectId`, because `Timeline` is strictly 1:1
+ *        with a project and a regeneration REPLACES the document rather than
+ *        adding a version — branching a manually-edited project is a new
+ *        PROJECT with a `parentId` (BRANCH_POLICY in the router), not a second
+ *        timeline row.
+ *
+ *        REVISION_IS_BUMPED_ON_EVERY_WRITE. `revision` is the editor's
+ *        optimistic-concurrency counter, and a generation is as much an edit as
+ *        a drag in the editor is: a client holding the old revision has to be
+ *        told its view is stale rather than silently overwriting a document the
+ *        pipeline just rebuilt. `docVersion` is the DOCUMENT SCHEMA version and
+ *        comes off the document itself — two different numbers that are easy to
+ *        confuse (see the note on the model in prisma/schema.prisma).
+ *
+ *        TENANT_SCOPED_QUERY is enforced by requiring `organizationId` and
+ *        checking the project first. `timeline` has no organization column of
+ *        its own, so an upsert straight onto `projectId` would let a workflow
+ *        with a guessed id write into another workspace's video. The ownership
+ *        re-check matters here more than in a router, because the one caller is
+ *        a background workflow that gets none of `protectedProcedure`'s gates.
+ *        Returns false rather than throwing when the project is not ours, so a
+ *        run whose project was deleted mid-flight logs a miss instead of a
+ *        Prisma P2025 three steps from the cause.
+ *
+ *        This is a pure Prisma write and nothing more: validating the document
+ *        is the CALLER's job (the `timeline` stage does it with the timeline
+ *        module's own `validate`), because the service layer holds no business
+ *        rules.
+ * WHERE: The `timeline` stage of src/inngest/functions/project-generate.ts.
+ */
+export async function saveTimelineDocument(
+  db: DbClient,
+  organizationId: string,
+  projectId: string,
+  args: { doc: Prisma.InputJsonValue; docVersion: number },
+): Promise<boolean> {
+  const owned = await db.project.findFirst({
+    where: { id: projectId, organizationId },
+    select: { id: true },
+  });
+  if (owned === null) return false;
+
+  await db.timeline.upsert({
+    where: { projectId },
+    create: {
+      projectId,
+      doc: args.doc,
+      docVersion: args.docVersion,
+      revision: 0,
+    },
+    update: {
+      doc: args.doc,
+      docVersion: args.docVersion,
+      revision: { increment: 1 },
+    },
+  });
+  return true;
 }

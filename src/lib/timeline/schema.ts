@@ -186,6 +186,15 @@ export const RENDER_KINDS = [
   "redditCard",
   "characterOverlay",
   "text",
+  /* ADDING_A_KIND_IS_NOT_A_MIGRATION. Phase 09 added `backdrop` — a styled
+   * gradient fill, which is what a `voiceover` project has behind the words
+   * until Phase 11's footage library exists. No `docVersion` bump went with
+   * it, deliberately: this is a NEW value in an open-ended enum, so every
+   * stored document is still valid under the new schema and there is nothing
+   * for a migration step to change. A bump with an empty migration would be a
+   * claim that documents needed rewriting, which the next reader of
+   * migrate.ts would have to disprove. */
+  "backdrop",
 ] as const;
 
 export const renderKindSchema = z.enum(RENDER_KINDS);

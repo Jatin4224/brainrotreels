@@ -37,6 +37,7 @@ import type { ComponentType } from "react";
 
 import { RENDER_KINDS, type RenderKind } from "@/lib/timeline";
 import type { RenderItemProps } from "@/lib/types";
+import { Backdrop } from "./components/backdrop";
 import { MediaClip } from "./components/media-clip";
 import { TextOverlay } from "./components/text-overlay";
 
@@ -46,6 +47,9 @@ import { TextOverlay } from "./components/text-overlay";
  * Implemented in Phase 03:
  *   media → MediaClip   (video, image; cover/contain/fill, looping, Ken Burns)
  *   text  → TextOverlay (a positioned text badge)
+ *
+ * Added in Phase 09:
+ *   backdrop → Backdrop (a full-frame gradient in one of src/lib/palettes)
  *
  * Deliberately absent, each with the phase that adds it:
  *   motion           → Phase 16 (motion graphics studio)
@@ -64,6 +68,7 @@ export const RENDER_COMPONENTS: Partial<
 > = {
   media: MediaClip,
   text: TextOverlay,
+  backdrop: Backdrop,
 };
 
 /* One warning per unknown kind per process, not per frame. A 60-second render

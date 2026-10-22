@@ -17,7 +17,9 @@
  *   assetKindSchema, createUploadUrlSchema, completeUploadSchema,
  *   RenderItemProps, AssetUrlMap, VARIANT_BY_QUALITY, previewProjectSchema,
  *   listAssetsSchema, renameAssetSchema, CONTENT_TYPE_ALLOWLIST,
- *   UPLOAD_BYTES_PER_PLAN, VARIANT_NAMES, ASSET_TABS
+ *   UPLOAD_BYTES_PER_PLAN, VARIANT_NAMES, ASSET_TABS,
+ *   PIPELINE_STAGES, stageUpdateSchema, generateProjectSchema,
+ *   cancelProjectSchema, projectStagesSchema
  *
  * WHAT:  Barrel re-export for `src/lib/types/*` — the single import surface
  *        for custom (non-Prisma) types and their backing zod schemas.
@@ -247,3 +249,27 @@ export type {
   ListLedgerValues,
   PurchaseCreditsValues,
 } from "./credits";
+export {
+  PIPELINE_POLL_MS,
+  PIPELINE_STAGES,
+  PIPELINE_STAGE_LABELS,
+  PIPELINE_STAGE_STATUSES,
+  PIPELINE_TERMINAL_STATUSES,
+  cancelProjectSchema,
+  generateProjectSchema,
+  generateSettingsSchema,
+  isTerminalStageStatus,
+  pipelineStageNameSchema,
+  pipelineStageStatusSchema,
+  projectProgressSchema,
+  projectStagesSchema,
+  stageUpdateSchema,
+} from "./pipeline";
+export type {
+  CancelProjectValues,
+  GenerateProjectValues,
+  GenerateSettings,
+  PipelineStageName,
+  PipelineStageStatus,
+  StageUpdate,
+} from "./pipeline";

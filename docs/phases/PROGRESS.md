@@ -25,7 +25,10 @@ worse than an empty box.
       audio has ever been aligned. The pure halves — the back-match, the degrade
       distribution, the cache key, the 38-style library and its contrast rule — are
       verified by 91 new tests. See the note.
-- [ ] Phase 09: The generate pipeline
+- [ ] Phase 09: The generate pipeline — built; **blocked on an ELEVENLABS_API_KEY and R2**, so
+      no generation has ever completed past the `tts` stage. The pure halves — the generator, the
+      stage mapping, the idempotency hash and the palettes — are verified by 41 new tests, and the
+      workflow registers and serves. See the note.
 - [ ] Phase 10: Safety, limits and launch — **ships public beta**
 - [ ] Phase 11: Backgrounds library
 - [ ] Phase 12: Reddit story format
@@ -1209,3 +1212,150 @@ are untested:
 - **The credit rates are still placeholders** (Phase 05). Alignment now charges on them.
 - **R2 is still unconfigured**, so there is no narration audio to align even with a key, and
   **Phase 04's AWS deploy** remains open.
+
+### Phase 09 — 2026-10-22
+
+Built: the `PipelineStage` model and its migration (**applied**), the `projects.generate` /
+`projects.cancel` permissions and the `generate` rate limit on the registry entry,
+`src/lib/types/pipeline.ts` (the twelve fixed stages, the five statuses, `StageUpdate`),
+`src/lib/generators/` (the contract, the registry, the **voiceover generator**),
+`src/lib/palettes/` (what `style.paletteId` has always meant but nothing resolved), the `backdrop`
+render kind and its Remotion component, `pipeline.service.ts`, `saveTimelineDocument`, `hashValue`,
+the `project.generate` workflow, the four pipeline procedures — including **the first
+`.subscription()` in this codebase** — the global `<StageProgress>`, the project-ready email, and
+the screen at `/dashboard/projects/[id]/generate`. 41 new tests; the suite is 649 and green, and
+`tsc --noEmit`, `eslint` and `next build` are clean.
+
+**Decisions worth knowing about, because none of them were in the phase file:**
+
+- **The pipeline INVOKES the three existing workflows rather than repeating their steps.** The phase
+  lists `script` → `voices` → `tts` → `align` as steps, and all three already existed as workflows
+  with their own holds, caches, fan-outs and degrade rules. `step.invoke` keeps each child owning
+  its own money (a cached narration reserves nothing; a fully degraded alignment is not charged) and
+  its own caching (the phase's "re-run makes zero provider calls" comes for free), and it keeps a
+  thirty-step narration fan-out out of this run's replay. Grep `COMPOSE_DONT_REIMPLEMENT`.
+- **That forced `cancelOn` into the three children.** Cancelling a parent does not cancel its
+  children, so without it pressing Cancel would stop the orchestrator while a provider kept billing.
+  This is the one change Phase 09 made to existing workflows. Grep `CANCEL_STOPS_PAID_WORK`.
+- **Cancellation needed its own hold release, because Inngest does not run `onFailure` for a
+  cancelled run.** There is no failure, so nothing settles, and a hold would sit against the balance
+  until Phase 05's reconciler noticed. `releaseProjectHolds` releases all three of a project's
+  ledger namespaces by name — never "everything for this workspace", which would cancel a render the
+  customer started separately. Grep `CANCEL_RELEASES_EVERY_HOLD`.
+- **The pipeline does NOT render, and `render` is written `skipped` with that reason.** Rendering is
+  a separate paid action with its own hold, cap and resolution choice (`renders.create`), and this
+  phase's goal is a PREVIEWABLE video. Rendering here would charge for an output nobody asked for.
+- **`qa` runs BEFORE `timeline`, so it checks the pieces rather than the document.** The stage order
+  puts it there and a progress list must never go green out of order, so `qa` verifies that every
+  line has audio and a measured duration; the built document is validated inside `timeline` itself
+  with the timeline module's own `validate()`, where a failure can name the item that broke.
+- **Idempotency hashes the INPUTS, not a document.** The phase asks for `projectId + docHash`, but
+  on a first run there is no document — building one is the point. What is hashed is the project's
+  kind, aspect, settings and source plus its script blocks and narration text hashes. This needed
+  `hashDoc`'s argument widened (`hashValue`) rather than a `JSON.stringify` at the callsite, because
+  key order would otherwise change the key and every new settings field would break the guarantee.
+  Grep `IDEMPOTENCY_IS_PROJECT_PLUS_SHAPE`.
+- **A status check could not have delivered "one run per click".** Both requests read `draft` before
+  either writes `generating`. The guarantee is the enqueue key; the `generating` check that remains
+  is an ANSWER for the UI, not the mechanism.
+- **The progress subscription polls the database, on the server.** There is no pub/sub in this stack
+  and the writes come from Inngest workers in other processes, so nothing in the web process can be
+  notified when a row changes — the honest options were a poll or new infrastructure. Putting it on
+  the server is what the customer gains: one connection instead of a request every two seconds. Each
+  yield is a COMPLETE snapshot, which makes reconnection trivially correct and needs no `tracked()`
+  id. Grep `WHY_THE_SERVER_POLLS` and `SNAPSHOT_NOT_DELTA`.
+- **`getStages` returns exactly what `progress` yields**, so the component renders one shape and the
+  fallback is a `refetchInterval` rather than a second renderer. Grep
+  `STREAM_AND_POLL_ARE_ONE_READ`.
+- **`projects` needed `generate` and `cancel` permissions** — the same gap Phase 02 found on
+  `assets` and Phase 08 on `captionStyles`. Gating `generate` as an `update` would mean anyone who
+  can rename a project can spend its balance.
+- **There is no up-front credit check on `projects.generate`, deliberately.** The run's cost is
+  three jobs whose sizes are unknown until the script exists, so any number compared here would be a
+  guess that refuses runs which would have succeeded. Each child refuses with its own exact figure
+  and the pipeline turns that into a plain-language stage failure with the credits released. Grep
+  `CREDITS_ARE_REFUSED_BY_THE_CHILDREN`.
+- **`style.paletteId` had never been resolved by anything.** It has been in the document since Phase
+  01, and a `voiceover` project is narration over a STYLED background, so `src/lib/palettes/` is the
+  first module to answer what `warm` means — using **the ids existing documents already hold**
+  (`warm`, `mono`, `electric`, `noir` from the fixtures, `default` from the v1 migration). New names
+  would have left every stored document pointing at a palette that does not exist; a test asserts
+  every fixture's palette resolves.
+- **`backdrop` is a new render kind, and adding it was not a document migration.** A MediaClip draws
+  an ASSET — a handle, a signed URL, an ingest behind it — and a gradient has no bytes, so
+  expressing it as media would mean minting an Asset row for two colours and metering it against the
+  workspace's storage quota. A new value in an open-ended enum leaves every stored document valid,
+  so no `docVersion` bump went with it. Grep `BACKDROP_IS_NOT_MEDIA` and
+  `ADDING_A_KIND_IS_NOT_A_MIGRATION`.
+- **`GENERATORS` is a Partial record, unlike `FIXTURES_BY_KIND`.** A fixture must exist for every
+  kind — that is what makes the validation tests cover a format the day it is declared — but a
+  generator is the real thing, and demanding one per kind would mean declaring a format and building
+  it in the same change. A stub returning an empty document would be a silent, black, paid-for
+  video. Grep `DOCUMENTED_GAP_NOT_A_STUB`.
+- **Which stages a kind skips lives on its GENERATOR**, so Phase 12 cannot leave the orchestrator
+  with a stale list of hard-coded exceptions. Grep `SKIPS_LIVE_ON_THE_GENERATOR`.
+- **`failStage` takes a reason and nothing else.** The no-stack-trace rule is enforced by the
+  signature rather than by reviewer discipline — there is no parameter a provider message could
+  travel through by being the easiest thing to hand. Unexpected failures go through
+  `explainFailure`, which MATCHES against the engine's message and never shows it. Grep
+  `NEVER_SURFACE_A_PROVIDER_MESSAGE`.
+- **The strip is narration tiles, not thumbnails.** The phase asks for "a thumbnail strip filling
+  in"; nothing here renders video frames outside a render, so real thumbnails would mean rasterising
+  frames mid-pipeline — work the customer pays for in order to watch a progress bar. One tile per
+  narration line answers the same question with information that is true. A deliberate substitution,
+  not an oversight. Grep `TILES_NOT_THUMBNAILS`.
+- **The elapsed clock counts local ticks on top of the server's figure.** `elapsedMs` is derived
+  server-side so a skewed browser clock cannot show a negative duration, and the row's stopwatch
+  then advances by counting — not by reading `Date.now()` during render, which this codebase's
+  eslint purity rules forbid. Resetting it on a new reading is done by KEYING the component, because
+  `setState` in an effect body is also forbidden here. Grep `ELAPSED_TICKS_LOCALLY`.
+- **The "email me" recipient is a USER ID, not an address.** A `Project` belongs to the workspace and
+  has no creator column, so the member who asked is recorded and the address is resolved at send
+  time — storing it would copy personal data into a settings blob that `projects.duplicate` copies
+  verbatim. Grep `ADDRESS_IS_RESOLVED_NOT_STORED`.
+- **The `moderate` stage completes with a warning saying it is not implemented**, rather than a green
+  tick with no check behind it. A tick that is not true is the thing the next phase has to discover.
+
+**Verified.**
+
+- **41 new tests** over everything provable without a provider: the generated document against the
+  timeline module's own `validate()` in BOTH its anchored and resolved forms; the audio item offsets
+  matching Phase 08's `concatAlignedLines` stitching exactly (asserted directly, because a drift
+  there desynchronises captions further with every line and nothing else would notice); ducking and
+  speaker tagging; the no-words, no-lines, captions-off and malformed-settings cases; the stage
+  mapping's ordering, completeness, unknown-name and unknown-status handling and its clock-skew
+  clamp; the hash's key-order insensitivity and its sensitivity to a changed script, setting or
+  re-recorded line; every fixture palette resolving, and every palette's text colour passing the
+  caption library's own contrast rule.
+- **The migration is applied**; `migrate status` reports up to date and `migrate diff` reports no
+  drift. The Neon database was reachable this time, unlike in Phase 05.
+- **The workflow registers and serves.** `/api/inngest` reports **17 functions** — the ten
+  registered entries plus the seven failure handlers.
+- `next build` succeeds with `/dashboard/projects/[id]/generate` present.
+
+**NOT verified, and this is why the box is unticked — needs an `ELEVENLABS_API_KEY` and R2.**
+
+`ANTHROPIC_API_KEY`, `DATABASE_URL` and `RESEND_API_KEY` are set, so `moderate`, `script` and
+`voices` have everything they need. `tts` has neither a provider key nor anywhere to put the bytes,
+so **no generation has ever completed** and every end-to-end check in the phase file is untested:
+
+- A prompt producing a narrated, captioned vertical video that previews and renders.
+- Killing the dev server mid-run and resuming from the failed step rather than from the start.
+- Cancelling stopping the run, marking the project `cancelled` and releasing the hold.
+- Two rapid identical requests producing exactly one run. The hash is tested; no duplicate enqueue
+  has ever been collapsed by a real queue.
+- Every stage transition appearing in the UI over SSE without a refresh.
+- Killing the subscription and the UI continuing on the poll.
+- Closing the tab not stopping the job.
+- A degraded-captions completion with a visible warning.
+- A screen reader announcing each transition. The `aria-live` region is implemented and the
+  announcement is unit-reasoned, but it has never been heard.
+
+**Also outstanding:**
+
+- **A music bed has no picker.** The generator reads `settings.generate.musicAssetId` and the
+  timeline honours it with ducking, but nothing sets it — it needs Phase 11's library.
+- **Three formats have no generator.** `reddit-story`, `quiz` and `motion` are refused by name.
+- **Real moderation is Phase 10**; the stage says so on screen.
+- **The credit rates are still placeholders** (Phase 05).
+- **Phase 04's AWS deploy** and **Phase 02's R2** remain open.

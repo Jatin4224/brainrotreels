@@ -34,6 +34,7 @@ import {
   MoreHorizontal,
   Pencil,
   PlayIcon,
+  SparklesIcon,
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -198,6 +199,20 @@ export function ProjectRowActions({
           >
             <CaptionsIcon className="size-4" />
             Captions
+          </DropdownMenuItem>
+          {/* Last in the list and first in the workflow, which is the right way
+              round: the four items above are the pieces a customer inspects or
+              adjusts, and this is the one button that does all of it. Gated on
+              `read` like the rest — the screen is a progress display anybody
+              who can see the project may watch, and STARTING a run is checked
+              by `projects:generate` on the button itself. */}
+          <DropdownMenuItem
+            onClick={() =>
+              router.push(`/dashboard/projects/${project.id}/generate`)
+            }
+          >
+            <SparklesIcon className="size-4" />
+            Generate
           </DropdownMenuItem>
           {canUpdate ? (
             <DropdownMenuItem onClick={() => setRenaming(true)}>
