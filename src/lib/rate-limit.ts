@@ -135,7 +135,21 @@ export interface RateLimitResult {
  * WHY:   Fails open on null limiter or Redis exception — rate limiting is a
  *        guardrail, not authentication; refusing traffic on Redis outage is
  *        almost always worse than letting it through.
- * WHERE: Used by src/proxy.ts and the per-procedure rate-limit path.
+ *        FAILING OPEN IS A DECISION WITH A LIMIT, and Phase 10 drew it: the
+ *        MODERATION layer does the OPPOSITE and refuses work when its provider
+ *        is unreachable (THIS_SEAM_FAILS_CLOSED in
+ *        src/lib/adapters/moderation/types.ts). The difference is what the
+ *        failure costs. Letting extra requests through during a Redis outage
+ *        costs some money and some noise; letting unclassified content through
+ *        during a classifier outage publishes something that should never have
+ *        been published. Do not "make these consistent".
+ * WHERE: `baseProcedure` and the per-procedure rate-limit path in
+ *        src/trpc/procedures/protected.ts, src/app/api/trpc/[trpc]/route.ts,
+ *        the POST branch of src/app/api/auth/[...all]/route.ts, and
+ *        src/lib/safety/ for the per-plan daily caps.
+ *
+ *        NOT src/proxy.ts. This line used to say so and it was never true —
+ *        see the file header.
  */
 export async function checkRateLimit(
   limiter: Ratelimit | null,
@@ -165,7 +179,14 @@ export async function checkRateLimit(
  *        the request was blocked).
  * WHY:   Centralises header naming so every gate (proxy, tRPC) emits the same
  *        wire format clients can rely on.
- * WHERE: Used by src/proxy.ts and the tRPC error path.
+ * WHERE: src/app/api/trpc/[trpc]/route.ts and the POST branch of
+ *        src/app/api/auth/[...all]/route.ts. The tRPC procedure path carries
+ *        the same numbers as a structured error `cause` rather than headers,
+ *        because a batched tRPC response has one status line for several
+ *        calls.
+ *
+ *        NOT src/proxy.ts. This line used to say so and it was never true —
+ *        see the file header.
  */
 export function buildRateLimitHeaders(
   result: RateLimitResult,

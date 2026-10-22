@@ -106,6 +106,24 @@ export interface JobEvent {
    * Omit only for events where a duplicate run is genuinely harmless.
    */
   id?: string
+  /**
+   * REQUEST_ID_CROSSES_THE_QUEUE. The correlation id of the request that
+   * enqueued this, carried so a workflow's logs and error reports join up with
+   * the API call that started it — the Phase 10 requirement that an error be
+   * traceable from the render all the way back to the request that caused it.
+   *
+   * It is a FIELD ON THE ENVELOPE rather than a key inside `data`, because
+   * `data` is the domain payload that every workflow parses with its own
+   * STRICT Zod schema: putting it there would mean adding `requestId` to a
+   * dozen event schemas, and any schema that forgot it would fail the parse
+   * outright rather than merely losing a log field. The adapter merges it into
+   * the sent payload, so a workflow can read it without its schema having to
+   * demand it.
+   *
+   * Optional, because some events have no request behind them at all — a cron
+   * tick, a provider webhook. Those mint their own id instead.
+   */
+  requestId?: string
 }
 
 export interface JobsAdapter {

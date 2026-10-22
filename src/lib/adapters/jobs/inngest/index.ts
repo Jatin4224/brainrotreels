@@ -32,7 +32,18 @@ function toInngestPayload(event: JobEvent): {
 } {
   return {
     name: event.name,
-    data: event.data,
+    /* REQUEST_ID_CROSSES_THE_QUEUE — merged INTO the data, which is the only
+     * channel a workflow can read on the far side. It is spread FIRST so a
+     * domain payload that genuinely carries its own `requestId` wins instead of
+     * being overwritten by the envelope's.
+     *
+     * The event schemas are strict about the fields they NAME but ignore extra
+     * keys, so this costs nothing; see the note on `JobEvent.requestId` for why
+     * it is not declared on each of them. */
+    data: {
+      ...(event.requestId !== undefined ? { requestId: event.requestId } : {}),
+      ...event.data,
+    },
     ...(event.id !== undefined ? { id: event.id } : {}),
   };
 }

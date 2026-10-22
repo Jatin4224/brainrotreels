@@ -84,6 +84,11 @@ import { NonRetriableError } from "inngest";
 import { z } from "zod";
 
 import { inngestClient } from "@/lib/adapters/jobs/inngest/client";
+import {
+  flushAnalytics,
+  readRequestId,
+  trackFunnelEvent,
+} from "@/lib/observability";
 import { getMediaAdapter } from "@/lib/adapters/media";
 import { MediaProcessingError } from "@/lib/adapters/media/types";
 import { getRenderAdapter, RenderProviderError } from "@/lib/adapters/render";
@@ -499,9 +504,27 @@ export const projectRenderFunction = inngestClient.createFunction(
 
     const outputUrl = outcome.data.outputUrl;
 
-    return await step.run("finalize", () =>
+    const finalised = await step.run("finalize", () =>
       storeRenderOutput(renderId, outputUrl, preflight),
     );
+
+    /* THE_FUNNEL_IS_FIVE_EVENTS. The LAST product step before money: a
+     * customer with a finished file has got everything the product promised.
+     * Emitted here rather than in `storeRenderOutput`, because that function is
+     * also reached from the timeout-recovery path — and a render recovered from
+     * a missed webhook is the same conversion, so it is tracked there too. */
+    await step.run("track", async () => {
+      trackFunnelEvent({
+        event: "first_render",
+        organizationId: preflight.organizationId,
+        requestId: readRequestId(event.data),
+        properties: { renderId, projectId: preflight.projectId },
+      });
+      await flushAnalytics();
+      return { tracked: true };
+    });
+
+    return finalised;
   },
 );
 

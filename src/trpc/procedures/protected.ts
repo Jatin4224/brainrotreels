@@ -59,6 +59,7 @@ import {
   type AuditMetadata,
 } from "@/services/activity-log.service";
 import { getRequestForensics } from "@/lib/request-forensics";
+import { captureError, logLine } from "@/lib/observability";
 
 // ---------------------------------------------------------------------------
 // tRPC instance
@@ -662,22 +663,42 @@ export function protectedProcedure<
       //      re-throw so tRPC's normal error path returns the response.
       // ─────────────────────────────────────────────────────────────────────
     } catch (error) {
-      logRequest({
-        level: "error",
-        path,
-        type,
-        userId: ctx.user.id,
-        organizationId,
-        durationMs: Date.now() - startedAt,
-        status: "error",
-        errorCode:
-          error instanceof TRPCError
-            ? error.code
-            : error instanceof Error
-              ? error.name
-              : "unknown",
-        errorMessage: error instanceof Error ? error.message : String(error),
-      });
+      const errorCode =
+        error instanceof TRPCError
+          ? error.code
+          : error instanceof Error
+            ? error.name
+            : "unknown";
+
+      /* EXPECTED_REFUSALS_ARE_NOT_INCIDENTS. A gate doing its job — a plan cap,
+       * a missing permission, a 404, a rate limit, a policy refusal — is a
+       * LOG LINE, not a Sentry event. Reporting them would bury the genuine
+       * exceptions under thousands of working refusals, which is the fastest
+       * way to make an error tracker useless. Everything else, including every
+       * INTERNAL_SERVER_ERROR and every unhandled throw, is reported with the
+       * request id attached. */
+      if (isExpectedRefusal(error)) {
+        logLine({
+          level: "warn",
+          logger: "trpc",
+          event: "refused",
+          requestId: ctx.requestId,
+          userId: ctx.user.id,
+          organizationId,
+          durationMs: Date.now() - startedAt,
+          data: { path, type, errorCode },
+        });
+      } else {
+        captureError(error, {
+          requestId: ctx.requestId,
+          logger: "trpc",
+          event: "handler_failed",
+          userId: ctx.user.id,
+          organizationId,
+          extra: { path, type, errorCode, durationMs: Date.now() - startedAt },
+        });
+      }
+
       throw error;
     }
 
@@ -685,14 +706,15 @@ export function protectedProcedure<
     // [16] SUCCESS OBSERVABILITY — log duration + path on the happy path
     //      and return the handler result to tRPC.
     // ─────────────────────────────────────────────────────────────────────
-    logRequest({
+    logLine({
       level: "info",
-      path,
-      type,
+      logger: "trpc",
+      event: "ok",
+      requestId: ctx.requestId,
       userId: ctx.user.id,
       organizationId,
       durationMs: Date.now() - startedAt,
-      status: "ok",
+      data: { path, type },
     });
 
     return result;
@@ -748,19 +770,39 @@ function computeDeleteDecrement(result: unknown): number {
   return 1;
 }
 
-function logRequest(line: {
-  level: "info" | "error";
-  path: string;
-  type: "query" | "mutation" | "subscription";
-  userId: string;
-  organizationId: string;
-  durationMs: number;
-  status: "ok" | "error";
-  errorCode?: string;
-  errorMessage?: string;
-}): void {
-  console.log(
-    JSON.stringify({ ts: new Date().toISOString(), logger: "trpc", ...line }),
+/**
+ * SOURCE OF TRUTH KEYWORDS: isExpectedRefusal, EXPECTED_REFUSALS_ARE_NOT_INCIDENTS
+ *
+ * WHAT:  Whether an error is the system working correctly rather than breaking.
+ *
+ * WHY:   EXPECTED_REFUSALS_ARE_NOT_INCIDENTS. Every gate in this factory
+ *         refuses by throwing a `TRPCError`, so without this distinction the
+ *         error tracker would receive one event for every plan cap hit, every
+ *         403, every 404 and every rate limit — and the three real exceptions a
+ *         week would be invisible among them.
+ *
+ *         The list is the codes that mean "the caller asked for something they
+ *         may not have". `INTERNAL_SERVER_ERROR` is deliberately ABSENT: a
+ *         handler that threw unexpectedly produces one, and it is exactly what
+ *         a tracker is for. `TOO_MANY_REQUESTS` is present but is still logged
+ *         at `warn`, because a sustained flood is worth seeing in the log
+ *         stream even though no single occurrence is an incident.
+ * WHERE: The error path above.
+ */
+const EXPECTED_REFUSAL_CODES: readonly string[] = [
+  "UNAUTHORIZED",
+  "FORBIDDEN",
+  "NOT_FOUND",
+  "BAD_REQUEST",
+  "CONFLICT",
+  "PRECONDITION_FAILED",
+  "UNPROCESSABLE_CONTENT",
+  "TOO_MANY_REQUESTS",
+];
+
+function isExpectedRefusal(error: unknown): boolean {
+  return (
+    error instanceof TRPCError && EXPECTED_REFUSAL_CODES.includes(error.code)
   );
 }
 

@@ -39,7 +39,9 @@ import { hasGenerator } from "@/lib/generators";
 import { createStructuredError, createTRPCRouter } from "../init";
 import { protectedProcedure } from "../procedures";
 import { permissions } from "@/lib/permissions";
-import { checkFeatureGate } from "@/lib/feature-gate";
+import { checkFeatureGate, getOrganizationTier } from "@/lib/feature-gate";
+import { getUpgradeMessage } from "@/lib/resources";
+import { checkDailyGenerationCap, requiresVerifiedEmail } from "@/lib/safety";
 import { ERROR_CODES } from "@/lib/errors";
 import { incrementUsage } from "@/services/usage.service";
 import { signDocumentAssets } from "@/services/assets.service";
@@ -450,9 +452,16 @@ export const projectsRouter = createTRPCRouter({
    *        failure with the credits released (RELEASE_ON_FAILURE). A guessed
    *        paywall here would refuse runs that would have succeeded.
    *
-   *        The daily cap is the registry's (`rateLimit.generate`, 30 an hour)
-   *        and the factory applies it off the path verb — see
-   *        DAILY_CAP_ON_GENERATE in src/lib/resources.ts. Nothing here reads it.
+   *        THREE GUARDRAILS, added in Phase 10, all of them pre-flight: a
+   *        verified email on the free tier, the per-plan daily cap, and the
+   *        registry's burst limit. The first two are explicit below; the THIRD
+   *        is not, because the procedure factory applies `rateLimit.generate`
+   *        off the path verb (DAILY_CAP_ON_GENERATE in src/lib/resources.ts).
+   *
+   *        The burst limit and the daily cap are not redundant and neither
+   *        replaces the other: 30 an hour stops a loop, and 5 a day stops a
+   *        free workspace running up a provider bill all afternoon at a
+   *        perfectly human pace.
    * WHERE: The Generate button on the project's generate screen.
    */
   generate: protectedProcedure({
@@ -476,6 +485,59 @@ export const projectsRouter = createTRPCRouter({
         throw new TRPCError({
           code: "PRECONDITION_FAILED",
           message: `${project.kind} videos cannot be generated yet. Only voiceover projects can.`,
+        });
+      }
+
+      /* LAUNCH_GUARDRAILS, both before anything is enqueued. They run AFTER
+       * the format refusal above because that one is free, and BEFORE the
+       * settings write below because a refused request should leave nothing
+       * behind.
+       *
+       * The plan is read ONCE and both guardrails use it: two reads could
+       * disagree across an upgrade that landed between them. */
+      const tier = await getOrganizationTier(input.organizationId);
+
+      /* VERIFICATION_IS_A_GENERATION_GATE. Better Auth already enforces
+       * verification at sign-in; this is the separate check the phase asks
+       * for, and it exists because a free workspace is allowed to look around
+       * before we know its address is real. */
+      if (requiresVerifiedEmail(tier.tier) && !ctx.user.emailVerified) {
+        throw createStructuredError(
+          "FORBIDDEN",
+          "Verify your email address before generating a video.",
+          {
+            errorCode: ERROR_CODES.EMAIL_NOT_VERIFIED,
+            email: ctx.user.email,
+            message:
+              "Check your inbox for the verification link, then try again.",
+          },
+        );
+      }
+
+      /* A_RATE_NOT_A_QUOTA — the per-plan daily cap. It CONSUMES an allowance,
+       * so it is the last refusal in the handler: anything checked after it
+       * would be refusing a request whose allowance had already been spent.
+       * The idempotency key on the enqueue is what keeps a double-clicked
+       * button from spending two.
+       *
+       * Reported as USAGE_LIMIT_REACHED rather than RATE_LIMITED because
+       * upgrading genuinely raises it — the client should open the upgrade
+       * modal, not tell the customer to slow down. The reset hint is in the
+       * message the cap built. */
+      const cap = await checkDailyGenerationCap(
+        input.organizationId,
+        tier.tier,
+      );
+      if (!cap.allowed) {
+        throw createStructuredError("FORBIDDEN", cap.message, {
+          errorCode: ERROR_CODES.USAGE_LIMIT_REACHED,
+          resource: "projects",
+          limit: cap.limit ?? 0,
+          current: cap.limit ?? 0,
+          currentPlan: tier.tier,
+          upgradeRequired: true,
+          message: cap.message,
+          upgradeMessage: getUpgradeMessage("projects", tier.tier),
         });
       }
 
@@ -505,6 +567,7 @@ export const projectsRouter = createTRPCRouter({
       );
 
       await enqueue({
+        requestId: ctx.requestId,
         name: "project/requested",
         data: { projectId: input.id, organizationId: input.organizationId },
         id: idempotencyKey,
@@ -579,6 +642,7 @@ export const projectsRouter = createTRPCRouter({
       );
 
       await enqueue({
+        requestId: ctx.requestId,
         name: "project/cancelled",
         data: { projectId: input.id, organizationId: input.organizationId },
         /* No idempotency key. Cancelling twice is harmless — the second event

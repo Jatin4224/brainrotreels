@@ -214,6 +214,7 @@ model Organization {
   scriptBlocks      ScriptBlock[]
   speakers          Speaker[]
   narrationLines    NarrationLine[]
+  moderationRecords ModerationRecord[]
 
   @@map("organization")
 }
@@ -1027,4 +1028,60 @@ model PipelineStage {
   @@unique([projectId, stage])
   @@index([projectId])
   @@map("pipeline_stage")
+}
+
+/// ModerationRecord — one content-safety decision, kept forever.
+///
+/// WHY A TABLE WHEN `Project` AND `Asset` ALREADY HAVE `moderationStatus`.
+/// Those columns answer "may this be used right now"; this table answers "what
+/// was decided, when, by what, and why". Three readers need the second
+/// question and none of them can be served by a boolean: the portal's flagged
+/// queue, an operator handling an appeal, and anybody asked afterwards to show
+/// that a refusal was not arbitrary.
+///
+/// IT IS AN AUDIT TRAIL, SO IT OUTLIVES ITS SUBJECT. `subjectType` +
+/// `subjectId` is a loose reference rather than a foreign key precisely so a
+/// customer deleting the project they were refused for does not delete the
+/// record of the refusal. The cascade is on `organizationId` only, because a
+/// deleted workspace genuinely has no retention basis for the rows.
+///
+/// `status` IS A VERDICT, NOT A STATUS. Its values are
+/// `approved | rejected | flagged` — the classifier's conclusion — and they are
+/// deliberately NOT the same union as `Asset.moderationStatus`
+/// (`pending | approved | rejected | skipped`), which is where a row stands.
+/// `flagged` has no equivalent there: it means a human should look, which on an
+/// asset is still `pending`. Grep `VERDICT_IS_NOT_A_STATUS`.
+///
+/// `categories` is jsonb holding a string array from the closed
+/// `MODERATION_CATEGORIES` list in src/lib/types/moderation.ts. A relation
+/// table was the alternative and it buys nothing: nothing joins on a category,
+/// the portal filters on `status`, and the list is validated on write.
+///
+/// `engine` RECORDS WHICH CLASSIFIER DECIDED — the adapter id, or `manual` when
+/// an operator overrode it. Without it, a model change silently reinterprets
+/// every historical decision, and an appeal cannot be told apart from a
+/// classification.
+///
+/// `@@index([status, createdAt])` is the flagged queue's own index: it reads
+/// "newest flagged first" across every workspace, which is the one query here
+/// with no `organizationId` in it.
+///
+/// SOURCE OF TRUTH KEYWORD: ModerationRecord
+model ModerationRecord {
+  id             String   @id @default(cuid())
+  organizationId String
+  subjectType    String // project | asset | prompt | script
+  subjectId      String
+  status         String // approved | rejected | flagged
+  categories     Json?
+  reason         String?
+  engine         String
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([subjectType, subjectId])
+  @@index([status, createdAt])
+  @@map("moderation_record")
 }

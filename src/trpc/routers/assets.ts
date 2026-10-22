@@ -278,6 +278,7 @@ export const assetsRouter = createTRPCRouter({
       await incrementUsage(input.organizationId, "storage", head.bytes, ctx.db);
 
       await enqueue({
+        requestId: ctx.requestId,
         name: "asset/uploaded",
         data: { assetId: asset.id, organizationId: input.organizationId },
         id: `asset-ingest-${asset.id}`,

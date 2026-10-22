@@ -34,6 +34,7 @@ import { uploadFile, withStagingDir } from "@/lib/media";
 import {
   createProcessingAsset,
   markAssetReady,
+  setModerationStatus,
 } from "@/services/assets.service";
 import {
   findCachedAudio,
@@ -200,6 +201,20 @@ export async function narrateOneLine(args: {
     await markAssetReady(prisma, asset.id, {
       durationSec: measured.durationSec,
     });
+
+    /* MODERATION_IS_NOT_APPLICABLE_TO_OUR_OWN_SYNTHESIS. Phase 10 made
+     * `Asset.moderationStatus` load-bearing: anything not cleared is withheld
+     * from every render (NOT_APPROVED_DOES_NOT_RENDER in
+     * src/services/assets.service.ts), and the column defaults to `pending`.
+     * Narration is this app's own synthesis of a SCRIPT that the pipeline
+     * already classified as text before a word of it was spoken, so sending
+     * the audio to a classifier would be paying to moderate our own output —
+     * and leaving it `pending` would withhold the narration from the video it
+     * was recorded for. `skipped` is the honest value: moderation applies, and
+     * it happened upstream. Written as a separate, deliberate call because
+     * `createProcessingAsset` refuses to let a creation claim a moderation
+     * state. */
+    await setModerationStatus(prisma, asset.id, "skipped");
 
     await markLineReady(prisma, organizationId, line.id, {
       audioAssetId: asset.id,

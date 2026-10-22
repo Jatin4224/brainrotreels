@@ -184,6 +184,7 @@ export const scriptsRouter = createTRPCRouter({
        * request's shape, so a double-click produces one run while a genuine
        * second attempt with different settings produces another. */
       await enqueue({
+        requestId: ctx.requestId,
         name: 'script/requested',
         data: {
           projectId: project.id,

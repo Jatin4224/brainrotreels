@@ -267,6 +267,7 @@ export const rendersRouter = createTRPCRouter({
        * customer asked for twice), while a double-click on one request must
        * not produce two runs. The id is unique per row, so both hold. */
       await enqueue({
+        requestId: ctx.requestId,
         name: "render/requested",
         data: {
           renderId: render.id,
@@ -492,6 +493,7 @@ export const rendersRouter = createTRPCRouter({
       const attempt = render.attempts + 1;
 
       await enqueue({
+        requestId: ctx.requestId,
         name: "render/requested",
         data: {
           renderId: render.id,

@@ -237,6 +237,11 @@ export const RESOURCES = {
       },
     },
     rateLimit: {
+      /* A burst guard, not a quota. The plan cap above is what limits how many
+       * projects a workspace HOLDS; this stops a loop creating three thousand
+       * empty drafts before that cap is reached on a high tier, and stops a
+       * free workspace discovering its cap three hundred times a second. */
+      create: { count: 20, window: "1 m" },
       generate: { count: 30, window: "1 h" },
     },
   },

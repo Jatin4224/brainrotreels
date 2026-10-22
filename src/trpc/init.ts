@@ -5,7 +5,8 @@
 /**
  * SOURCE OF TRUTH KEYWORDS: createTRPCContext, Context, createStructuredError,
  *   createTRPCRouter, baseProcedure, authProcedure, protectedProcedure,
- *   ContextOrganization, PROVIDER_NEUTRAL_TENANCY
+ *   ContextOrganization, PROVIDER_NEUTRAL_TENANCY, requestId,
+ *   ONE_ID_ACROSS_THE_WHOLE_JOURNEY
  *
  * WHAT:  tRPC request-context factory plus the sole sanctioned error-throw helper
  *        for procedures, and the re-export surface for the procedure factories.
@@ -27,6 +28,7 @@
 import { cache } from "react";
 import { headers } from "next/headers";
 import { TRPCError } from "@trpc/server";
+import { resolveRequestId } from "@/lib/observability";
 import { prisma } from "@/lib/config";
 import {
   getAuthAdapter,
@@ -148,8 +150,17 @@ export const createTRPCContext = cache(async () => {
     },
   );
 
+  /* ONE_ID_ACROSS_THE_WHOLE_JOURNEY. Resolved ONCE per request and held on the
+   * context, so every procedure, log line, error report and enqueued event in
+   * this request carries the same id. src/proxy.ts has already stamped the
+   * header; this reads it rather than minting a second one, and falls back to
+   * minting only for a request that never passed through the proxy (a direct
+   * Server Component render in a test, for instance). */
+  const requestId = resolveRequestId(await headers());
+
   return {
     prisma,
+    requestId,
     get session() {
       return session;
     },

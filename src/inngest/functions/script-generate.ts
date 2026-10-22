@@ -48,6 +48,11 @@ import { NonRetriableError } from "inngest";
 import { z } from "zod";
 
 import { inngestClient } from "@/lib/adapters/jobs/inngest/client";
+import {
+  flushAnalytics,
+  readRequestId,
+  trackFunnelEvent,
+} from "@/lib/observability";
 import { LlmError } from "@/lib/adapters/llm";
 import { prisma } from "@/lib/config/prisma";
 import { estimate } from "@/lib/credits";
@@ -338,6 +343,22 @@ export const scriptGenerateFunction = inngestClient.createFunction(
 
         return { blocks: count, creditsCharged: actual.total };
       });
+    });
+
+    /* THE_FUNNEL_IS_FIVE_EVENTS. Emitted from the WORKFLOW, not the router:
+     * the router only knows a script was REQUESTED, and the step the funnel
+     * measures is a script that actually exists. Its own step so a replayed
+     * run does not re-emit it, and flushed because the worker may be frozen
+     * the moment this returns. */
+    await step.run("track", async () => {
+      trackFunnelEvent({
+        event: "first_script",
+        organizationId,
+        requestId: readRequestId(event.data),
+        properties: { projectId, blocks: saved.blocks },
+      });
+      await flushAnalytics();
+      return { tracked: true };
     });
 
     return {

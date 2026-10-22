@@ -41,10 +41,29 @@
  *        this backwards means either four pointless transcodes of a broken file
  *        or a permanent failure on a blip.
  *
- *        MODERATION_STUB: moderation is `skipped`, not `approved`. Phase 10
- *        makes it real. Writing `approved` here would be a claim that something
- *        checked the file, and every later phase would be entitled to believe
- *        it — a lie that is cheap to tell now and expensive to find later.
+ *        MODERATION_IS_PARTIAL, and this is the honest version of what Phase 10
+ *        was able to build. Two different things could be checked about an
+ *        uploaded file and only one of them can be:
+ *
+ *          The FILENAME is text, so it goes through the real classifier. It is
+ *          a weak signal and a genuine one — people name files what they are.
+ *
+ *          The PIXELS are not text, and this product has no vision classifier.
+ *          The moderation seam is deliberately text-only (CLASSIFY_IS_ONE_METHOD
+ *          in src/lib/adapters/moderation/types.ts) rather than carrying a
+ *          method that always returned `approved`.
+ *
+ *        So an upload whose filename is clean is NOT approved — it is left
+ *        `pending` and recorded as `flagged`, which blocks it from every render
+ *        (NOT_APPROVED_DOES_NOT_RENDER in src/services/assets.service.ts) and
+ *        puts it in the portal's review queue for a person to clear. That is
+ *        this phase's fail-closed rule applied literally: the check that
+ *        matters did not happen, so the file does not get used.
+ *
+ *        This replaces Phase 02's `skipped`, which was honest about checking
+ *        nothing but did NOT block anything. Writing `approved` here would be
+ *        the real lie — a claim that something examined the file, which every
+ *        later phase would be entitled to believe.
  * WHERE: Registered in src/inngest/functions/index.ts, served at /api/inngest.
  *        Triggered by `asset/uploaded`, sent by assets.completeUpload.
  */
@@ -74,6 +93,20 @@ import {
   setModerationStatus,
   upsertAssetVariant,
 } from "@/services/assets.service";
+import { moderateText, recordModeration } from "@/services/moderation.service";
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: VISUAL_REVIEW_ENGINE, PIXELS_ARE_UNCHECKED
+ *
+ * WHAT:  The `engine` recorded when only an upload's filename was classified.
+ * WHY:   A sentinel, like UNAVAILABLE_ENGINE in the moderation service and for
+ *        the same reason: "a classifier looked at this and was unsure" and
+ *        "nothing has looked at the pixels" are different operational facts,
+ *        and a queue that cannot tell them apart cannot be prioritised. Grep it
+ *        to find every asset waiting on a review that no model can perform yet.
+ * WHERE: The `moderate` step below, and the portal's review queue.
+ */
+const VISUAL_REVIEW_ENGINE = "awaiting-visual-review";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: assetUploadedEventSchema, EVENT_PAYLOAD_PARSED
@@ -301,11 +334,51 @@ export const assetIngestFunction = inngestClient.createFunction(
     }
 
     // ───────────────────────────────────────────────────────────────────────
-    // [3] MODERATE — stubbed. See MODERATION_STUB in the file header.
+    // [3] MODERATE — after the variants, because you cannot classify a video
+    //     you have not transcoded. See MODERATION_IS_PARTIAL in the header for
+    //     what is and is not actually checked.
     // ───────────────────────────────────────────────────────────────────────
     await step.run("moderate", async () => {
-      await setModerationStatus(prisma, assetId, "skipped");
-      return { moderationStatus: "skipped" };
+      const asset = await findAssetById(prisma, assetId);
+      if (asset === null) {
+        /* The row vanished mid-ingest. Nothing to mark, and nothing to leak:
+         * an asset that does not exist cannot reach a render. */
+        return { moderationStatus: "rejected", checked: false };
+      }
+
+      /* The filename is the only TEXT an upload carries. Classified under the
+       * `input` standard rather than `prompt`: it is material the customer
+       * supplied, not a request they made. */
+      const outcome = await moderateText(prisma, {
+        organizationId: asset.organizationId ?? probed.organizationId,
+        subjectType: "asset",
+        subjectId: assetId,
+        text: asset.filename,
+        context: "input",
+        purpose: "ingest.filename",
+      });
+
+      if (outcome.blocked && outcome.status === "rejected") {
+        await setModerationStatus(prisma, assetId, "rejected");
+        return { moderationStatus: "rejected", checked: true };
+      }
+
+      /* PIXELS_ARE_UNCHECKED. A clean filename says nothing about the frames,
+       * so this does not approve the asset — it leaves it `pending`, which the
+       * signing path refuses to hand to a renderer, and records the reason so
+       * the portal queue can show an operator what is waiting and why. */
+      await recordModeration(prisma, {
+        organizationId: asset.organizationId ?? probed.organizationId,
+        subjectType: "asset",
+        subjectId: assetId,
+        status: "flagged",
+        categories: [],
+        reason:
+          "Filename passed. The file's visual content has not been classified — this product has no vision classifier yet, so it needs a person.",
+        engine: VISUAL_REVIEW_ENGINE,
+      });
+      await setModerationStatus(prisma, assetId, "pending");
+      return { moderationStatus: "pending", checked: true };
     });
 
     // ───────────────────────────────────────────────────────────────────────

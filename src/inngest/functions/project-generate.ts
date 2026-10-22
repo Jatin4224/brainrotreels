@@ -82,6 +82,14 @@ import { z } from "zod";
 
 import { inngestClient } from "@/lib/adapters/jobs/inngest/client";
 import { prisma } from "@/lib/config/prisma";
+import {
+  captureError,
+  flushSentry,
+  flushAnalytics,
+  logLine,
+  readRequestId,
+  trackFunnelEvent,
+} from "@/lib/observability";
 import { estimateRenderCost } from "@/lib/credits";
 import {
   GeneratorNotImplementedError,
@@ -92,6 +100,7 @@ import { resolveWordAnchors, validate } from "@/lib/timeline";
 import { jsonObjectSchema } from "@/lib/types/json";
 import { scriptToneSchema } from "@/lib/types/script";
 import { countScriptBlocks, listScriptBlocks } from "@/services/scripts.service";
+import { moderateText } from "@/services/moderation.service";
 import { splitScriptIntoLines } from "@/lib/narration";
 import { sendProjectReadyEmail } from "@/services/email.service";
 import {
@@ -171,6 +180,23 @@ const storedScriptRequestSchema = z.object({
   targetSeconds: z.number().int().positive(),
   tone: scriptToneSchema,
   sourceText: z.string().min(1),
+});
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: storedScriptSourceSchema, MODERATE_BEFORE_PAYING
+ *
+ * WHAT:  Just the source text, for the moderation step to classify.
+ * WHY:   A LOOSER schema than `storedScriptRequestSchema` on purpose. That one
+ *        demands a target length and a tone because the script workflow cannot
+ *        run without them; this one needs only the text, because a project
+ *        whose stored request is half-written must still have its source
+ *        material classified. Reusing the strict schema here would mean a
+ *        malformed settings blob silently skipped the safety check — the one
+ *        failure mode this phase exists to prevent.
+ * WHERE: The `moderate` step.
+ */
+const storedScriptSourceSchema = z.object({
+  sourceText: z.string(),
 });
 
 /**
@@ -258,7 +284,13 @@ export const projectGenerateFunction = inngestClient.createFunction(
       await markRunFailed({
         ...parsed.data.data.event.data,
         failure: parsed.data.data.error?.message,
+        requestId: readRequestId(parsed.data.data.event.data),
       });
+      /* FLUSH_BEFORE_THE_PROCESS_DIES. This handler is the LAST thing this run
+       * does, so a buffered error report would be lost if the worker is frozen
+       * the moment it returns — and the report from a failure handler is the
+       * one nobody can reconstruct from a log timestamp. */
+      await flushSentry();
     },
   },
   async ({ event, step }) => {
@@ -269,6 +301,18 @@ export const projectGenerateFunction = inngestClient.createFunction(
       );
     }
     const { projectId, organizationId } = input.data;
+    /* Read from the payload rather than minted, so every line this run emits
+       joins up with the request that enqueued it. */
+    const requestId = readRequestId(event.data);
+
+    logLine({
+      level: "info",
+      logger: "pipeline",
+      event: "generate_started",
+      requestId,
+      organizationId,
+      data: { projectId },
+    });
 
     // ───────────────────────────────────────────────────────────────────────
     // [1] SEED — the whole stage list, before any work, so the customer sees
@@ -303,20 +347,100 @@ export const projectGenerateFunction = inngestClient.createFunction(
     const parsedKind = projectKindSchema.parse(kind);
 
     // ───────────────────────────────────────────────────────────────────────
-    // [2] MODERATE — stubbed until Phase 10, and SAYS SO on the stage.
+    // [2] MODERATE — the real classifier, BEFORE any paid step.
+    //     Phase 09 shipped this as a stub that completed with a warning; Phase
+    //     10 replaced it. See MODERATE_BEFORE_PAYING below.
     // ───────────────────────────────────────────────────────────────────────
     await step.run("moderate", async () => {
       await beginStage(prisma, projectId, "moderate");
-      /* A green tick with no check behind it would be a lie the next phase has
-       * to discover. The stage completes — nothing is blocking — with the
-       * warning that makes the gap visible on the screen itself. */
-      await completeStage(
-        prisma,
-        projectId,
-        "moderate",
-        "Automated content checks arrive in a later release.",
-      );
-      return { moderated: false };
+
+      const project = await prisma.project.findFirst({
+        /* RECHECK_OWNERSHIP_IN_THE_WORKFLOW — never by id alone. */
+        where: { id: projectId, organizationId },
+        select: { sourceRef: true, settings: true, title: true },
+      });
+      if (project === null) {
+        const reason = "This project is no longer available.";
+        await failStage(prisma, projectId, "moderate", reason);
+        throw new NonRetriableError(`[project.generate] ${projectId}: ${reason}`);
+      }
+
+      /* MODERATE_BEFORE_PAYING — this step runs before the script workflow,
+       * which is the first thing that spends a credit. A refusal here costs
+       * one classification; the same refusal after the narration costs the
+       * narration. */
+      const settings = jsonObjectSchema.safeParse(project.settings);
+      const stored = settings.success
+        ? storedScriptSourceSchema.safeParse(settings.data["script"])
+        : null;
+
+      /* TWO_TEXTS_TWO_STANDARDS. The REQUEST and the SOURCE MATERIAL are
+       * judged differently and have to be classified separately — a prompt
+       * asking for something disallowed is refused, while an article that
+       * merely describes a crime is not (CONTEXT_SETS_THE_STANDARD). Judging
+       * them together under one context would mean picking which of the two
+       * standards to get wrong. */
+      const subjects: {
+        text: string;
+        context: "prompt" | "input";
+        subjectType: "prompt" | "project";
+      }[] = [];
+
+      /* The prompt is whatever the customer typed to start this: a topic, a
+       * URL, a title. A URL is skipped — there is nothing to classify in a
+       * hostname, and what it RESOLVED to is the source text below. */
+      const prompt = project.sourceRef?.trim() ?? "";
+      if (prompt.length > 0 && !looksLikeUrl(prompt)) {
+        subjects.push({
+          text: prompt,
+          context: "prompt",
+          subjectType: "prompt",
+        });
+      }
+
+      const sourceText = stored?.success ? stored.data.sourceText : "";
+      if (sourceText.trim().length > 0) {
+        subjects.push({
+          text: sourceText,
+          context: "input",
+          subjectType: "project",
+        });
+      }
+
+      /* Nothing to classify. Not a pass granted by default — there is
+       * genuinely no customer text yet, and the SCRIPT this run is about to
+       * write is classified in full before anything is spoken. */
+      if (subjects.length === 0) {
+        await completeStage(prisma, projectId, "moderate");
+        return { checked: 0, blocked: false };
+      }
+
+      for (const subject of subjects) {
+        const outcome = await moderateText(prisma, {
+          organizationId,
+          subjectType: subject.subjectType,
+          subjectId: projectId,
+          text: subject.text,
+          context: subject.context,
+          purpose: `generate.${subject.context}`,
+        });
+
+        if (outcome.blocked) {
+          /* The customer-facing message names the category
+           * (REFUSAL_NAMES_THE_REASON) and is built by the service, so this
+           * step adds nothing to it. */
+          await failStage(prisma, projectId, "moderate", outcome.message);
+          await setProjectStatus(prisma, organizationId, projectId, "failed");
+          /* NonRetriable: a policy refusal does not clear on a second
+           * attempt, and retrying would re-bill the classification. */
+          throw new NonRetriableError(
+            `[project.generate] ${projectId}: refused by moderation (${outcome.status}: ${outcome.categories.join(", ") || "unspecified"})`,
+          );
+        }
+      }
+
+      await completeStage(prisma, projectId, "moderate");
+      return { checked: subjects.length, blocked: false };
     });
 
     // ───────────────────────────────────────────────────────────────────────
@@ -375,6 +499,37 @@ export const projectGenerateFunction = inngestClient.createFunction(
         await failStage(prisma, projectId, "script", reason);
         throw new NonRetriableError(`[project.generate] ${projectId}: ${reason}`);
       }
+      /* MODERATE_THE_SCRIPT_TOO, and this is the pass that matters most: the
+       * script is what will be narrated and published in our name, so it is
+       * judged by the strictest standard (CONTEXT_SETS_THE_STANDARD). It runs
+       * HERE — at the end of the script stage — because the next step after it
+       * is the narration, and the phase's rule is that nothing paid happens
+       * after unclassified text.
+       *
+       * It is not a second `moderate` stage, deliberately: a stage that went
+       * green and then later went red would be the one thing a progress list
+       * must never do (STAGE_ORDER_IS_THE_TUPLE). The refusal fails the
+       * `script` stage instead, which is the stage that produced the text
+       * being refused, and the message names the policy reason so the customer
+       * is not left guessing which step broke. */
+      const narration = await readNarrationText(organizationId, projectId);
+      const verdict = await moderateText(prisma, {
+        organizationId,
+        subjectType: "script",
+        subjectId: projectId,
+        text: narration,
+        context: "script",
+        purpose: "generate.script",
+      });
+
+      if (verdict.blocked) {
+        await failStage(prisma, projectId, "script", verdict.message);
+        await setProjectStatus(prisma, organizationId, projectId, "failed");
+        throw new NonRetriableError(
+          `[project.generate] ${projectId}: script refused by moderation (${verdict.status}: ${verdict.categories.join(", ") || "unspecified"})`,
+        );
+      }
+
       await completeStage(
         prisma,
         projectId,
@@ -626,6 +781,23 @@ export const projectGenerateFunction = inngestClient.createFunction(
       notifyIfRequested({ organizationId, projectId }),
     );
 
+    /* THE_FUNNEL_IS_FIVE_EVENTS. Emitted from the WORKFLOW rather than the
+     * router, because the router only knows a run was requested — this is the
+     * first point at which a generation has actually succeeded, which is the
+     * step the funnel is measuring. Fire-and-forget by contract; the step
+     * exists so a replay does not re-emit it. */
+    await step.run("track", async () => {
+      trackFunnelEvent({
+        event: "first_generation",
+        organizationId,
+        requestId,
+        properties: { projectId, kind: parsedKind },
+      });
+      /* The run may be frozen the instant it returns. */
+      await flushAnalytics();
+      return { tracked: true };
+    });
+
     return {
       projectId,
       kind: parsedKind,
@@ -663,13 +835,27 @@ async function markRunFailed(args: {
   organizationId: string;
   /** The engine's error message, if it gave us one. Never shown verbatim. */
   failure?: string | undefined;
+  /** The id of the request that started this run — see readRequestId. */
+  requestId: string;
 }): Promise<void> {
-  const { projectId, organizationId } = args;
+  const { projectId, organizationId, requestId } = args;
 
-  /* Logged in full for an operator, mapped to one sentence for the customer. */
-  if (args.failure !== undefined) {
-    console.error(`[project.generate] ${projectId} failed: ${args.failure}`);
-  }
+  /* ONE_ID_ACROSS_THE_WHOLE_JOURNEY, cashed in. This is the report the phase's
+   * own check asks for: a forced error that appears in Sentry carrying the
+   * requestId of the API call that started the pipeline, with the project it
+   * died on attached — so a customer saying "my video failed" becomes one
+   * search rather than a trawl through four workflows' logs by timestamp.
+   *
+   * The engine's raw message goes HERE, to the operator. What the customer
+   * sees is `explainFailure`'s one sentence (NEVER_SURFACE_A_PROVIDER_MESSAGE). */
+  captureError(new Error(args.failure ?? "pipeline run failed"), {
+    requestId,
+    logger: "pipeline",
+    event: "generate_failed",
+    organizationId,
+    extra: { projectId },
+  });
+
   const reason = explainFailure(args.failure);
 
   try {
@@ -830,6 +1016,55 @@ async function notifyIfRequested(args: {
     );
     return { notified: false };
   }
+}
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: looksLikeUrl, A_URL_IS_NOT_A_PROMPT
+ *
+ * WHAT:  Whether the customer's `sourceRef` is a link rather than something
+ *        they typed.
+ * WHY:   A_URL_IS_NOT_A_PROMPT. `sourceRef` holds whichever of the two the
+ *        customer gave — a topic to write about, or a page to summarise — and
+ *        classifying a hostname spends a paid call on a string with no content
+ *        in it. What the URL RESOLVED to is the source text, which IS
+ *        classified, in full, under the `input` standard.
+ *
+ *        Deliberately crude: a scheme check, not a parse. The only question is
+ *        "is this worth classifying as prose", and the asymmetry decides the
+ *        implementation — a false negative costs one extra classification of a
+ *        short string, while a false positive would skip a prompt entirely. So
+ *        it errs toward classifying. Whether a URL may be FETCHED is a
+ *        different and genuinely security-critical question, answered by the
+ *        URL guard in src/lib/script with a real parser behind it.
+ * WHERE: The `moderate` step.
+ */
+function looksLikeUrl(value: string): boolean {
+  return /^https?:[/][/]\S+$/i.test(value.trim());
+}
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: readNarrationText, MODERATE_THE_SCRIPT_TOO
+ *
+ * WHAT:  The whole script as one piece of prose, for classification.
+ * WHY:   It is the NARRATION text that is classified, not the on-screen text
+ *        or the block metadata: narration is what will be spoken and published,
+ *        and it is the exact field the TTS step is about to send to a provider.
+ *
+ *        Joined into ONE string rather than classified per block, which is the
+ *        part that matters. A sentence split across two blocks reads as two
+ *        harmless halves, and a per-block check is therefore trivially evaded
+ *        by putting a line break in the right place.
+ * WHERE: The `script-done` step.
+ */
+async function readNarrationText(
+  organizationId: string,
+  projectId: string,
+): Promise<string> {
+  const blocks = await listScriptBlocks(prisma, organizationId, projectId);
+  return blocks
+    .map((block) => block.narrationText.trim())
+    .filter((text) => text.length > 0)
+    .join("\n\n");
 }
 
 /**

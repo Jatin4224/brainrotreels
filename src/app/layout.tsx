@@ -35,6 +35,7 @@ import {
 import { TRPCReactProvider } from "@/trpc/react-provider";
 import { UpgradeModalProvider } from "@/components/global/upgrade-modal";
 import { AuthBoundary } from "@/components/global/providers/server";
+import { AnalyticsProvider } from "@/components/global/providers/analytics";
 import { ThemeProvider } from "@/components/theme-provider";
 import { SetupChecklist } from "@/components/global/setup-checklist";
 import { Toaster } from "@/components/ui/sonner";
@@ -101,7 +102,14 @@ export default function RootLayout({
                     for plan reasons — see UpgradeModalProvider. Mounting it here
                     rather than per feature is what makes every gate, current and
                     future, land on the same screen. */}
-                <UpgradeModalProvider>{children}</UpgradeModalProvider>
+                {/* PAGEVIEWS_ARE_THE_CLIENT_HALF. Innermost, and on purpose:
+                    it renders nothing and loads nothing without a key, so it
+                    is the one provider whose absence must change nothing about
+                    the tree. The FUNNEL is emitted server-side — see
+                    SERVER_SIDE_FUNNEL. */}
+                <AnalyticsProvider>
+                  <UpgradeModalProvider>{children}</UpgradeModalProvider>
+                </AnalyticsProvider>
               </TRPCReactProvider>
             </AuthBoundary>
           )}

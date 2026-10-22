@@ -37,6 +37,17 @@ export const ERROR_CODES = {
   FEATURE_NOT_AVAILABLE: "FEATURE_NOT_AVAILABLE",
   USAGE_LIMIT_REACHED: "USAGE_LIMIT_REACHED",
   INSUFFICIENT_CREDITS: "INSUFFICIENT_CREDITS",
+  /* Phase 10. A SEPARATE code from INSUFFICIENT_PERMISSIONS on purpose: the
+   * customer is permitted to do this and simply has not proved their address,
+   * so the client's response is "resend the link" rather than "ask an admin".
+   * Grep VERIFICATION_IS_A_GENERATION_GATE. */
+  EMAIL_NOT_VERIFIED: "EMAIL_NOT_VERIFIED",
+  /* Phase 10. Content refused by moderation. Distinct from VALIDATION_ERROR
+   * because the input was well-formed and the refusal is a POLICY decision the
+   * customer can act on — and distinct from a bare FORBIDDEN so the client can
+   * render the named category rather than a generic failure. Grep
+   * REFUSAL_NAMES_THE_REASON. */
+  CONTENT_POLICY: "CONTENT_POLICY",
   RATE_LIMITED: "RATE_LIMITED",
   PENDING_INVITATION: "PENDING_INVITATION",
   INVITATION_NOT_FOUND: "INVITATION_NOT_FOUND",
@@ -107,6 +118,25 @@ export type StructuredErrorCause =
       resource: ResourceKey;
       required: number;
       available: number;
+      message: string;
+    }
+  | {
+      errorCode: typeof ERROR_CODES.EMAIL_NOT_VERIFIED;
+      /* The address the link was sent to, so the client can say WHICH inbox to
+       * check — the commonest cause of "I never got it" is a typo the customer
+       * cannot see from the error. */
+      email: string;
+      message: string;
+    }
+  | {
+      errorCode: typeof ERROR_CODES.CONTENT_POLICY;
+      /* The named categories, already customer-facing. Carried separately from
+       * `message` so a client can render them as chips without parsing a
+       * sentence. */
+      categories: string[];
+      /* `flagged` means a person will look; `rejected` means edit and retry.
+       * The client's copy differs, so the distinction is on the error. */
+      review: boolean;
       message: string;
     }
   | {

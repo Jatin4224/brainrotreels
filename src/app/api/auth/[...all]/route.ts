@@ -31,6 +31,32 @@ import {
   checkRateLimit,
   getClientIp,
 } from "@/lib/rate-limit";
+import { checkSignupIpLimit } from "@/lib/safety";
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: SIGNUP_PATHS, SIGNUP_IS_NOT_SIGN_IN
+ *
+ * WHAT:  The Better Auth POST paths that create an account.
+ * WHY:   The per-IP sign-up cap must fire on these and nothing else — see
+ *        SIGNUP_IS_NOT_SIGN_IN in src/lib/safety/signup-limit.ts. Matching on
+ *        the path is crude and is the only signal available at this layer: the
+ *        request body is a stream that Better Auth needs to read, so consuming
+ *        it here to inspect the action would break the handler.
+ *
+ *        Matched with `endsWith` rather than equality because Better Auth is
+ *        mounted under a catch-all and the base path is configurable.
+ *        Social sign-in is deliberately NOT in the list: an OAuth callback also
+ *        creates accounts, but it arrives from a provider rather than from the
+ *        client, and capping it per IP would throttle every user behind one
+ *        corporate egress.
+ * WHERE: POST, below.
+ */
+const SIGNUP_PATHS = ["/sign-up/email", "/sign-up"] as const;
+
+function isSignupRequest(request: Request): boolean {
+  const { pathname } = new URL(request.url);
+  return SIGNUP_PATHS.some((path) => pathname.endsWith(path));
+}
 
 /* PROVIDER_ISOLATION: when Better Auth is not the selected provider this route
  * must not exist. Returning 404 keeps a stale bookmark or a probing request from
@@ -95,6 +121,31 @@ export async function POST(request: Request): Promise<Response> {
         },
       },
     );
+  }
+
+  /* ONE_PERSON_ONE_WORKSPACE. Stacked ON TOP of the auth limiter above rather
+   * than replacing it: that one stops a burst of attempts, this one stops a
+   * slow farm of free workspaces, and the two have different shapes. Checked
+   * after the auth limiter so a flood pays the cheaper check first. */
+  if (isSignupRequest(request)) {
+    const signup = await checkSignupIpLimit(ip);
+    if (!signup.allowed) {
+      return new Response(
+        JSON.stringify({
+          error: "TOO_MANY_REQUESTS",
+          message:
+            "Too many accounts have been created from this network recently. Please try again later.",
+          retryAfter: signup.retryAfterSeconds,
+        }),
+        {
+          status: 429,
+          headers: {
+            "Content-Type": "application/json",
+            "Retry-After": String(signup.retryAfterSeconds),
+          },
+        },
+      );
+    }
   }
 
   const handlers = await loadBetterAuthHandlers();
