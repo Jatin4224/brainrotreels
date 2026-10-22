@@ -301,6 +301,7 @@ export const captionsRouter = createTRPCRouter({
       }
 
       await enqueue({
+        requestId: ctx.requestId,
         name: "align/requested",
         data: {
           projectId: input.projectId,

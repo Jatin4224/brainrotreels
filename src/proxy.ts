@@ -18,6 +18,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { REGISTRATION_OPEN } from "@/lib/config/registration";
 import { AUTH_ROUTES } from "@/lib/config/auth-routes";
+/* Imported from the leaf module, not the barrel: this file runs in the EDGE
+ * runtime, and the barrel pulls in `server-only`, the Sentry SDK and the
+ * PostHog client — none of which exist there. `request-id.ts` is pure for
+ * exactly this reason. */
+import {
+  REQUEST_ID_HEADER,
+  resolveRequestId,
+} from "@/lib/observability/request-id";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: appProxy
@@ -71,7 +79,24 @@ async function appProxy(request: NextRequest): Promise<NextResponse> {
   const forwardedHeaders = new Headers(request.headers);
   forwardedHeaders.set("x-pathname", pathname);
   forwardedHeaders.set("x-hostname", hostname);
-  return NextResponse.next({ request: { headers: forwardedHeaders } });
+
+  /* ONE_ID_ACROSS_THE_WHOLE_JOURNEY. Stamped HERE, at the outermost point the
+   * app controls, so that every downstream reader — a route handler, a tRPC
+   * procedure, a Server Component — sees the SAME id rather than each minting
+   * its own. It prefers an id the platform already supplied, so our logs and
+   * Vercel's correlate (ID_IS_CARRIED_NOT_DERIVED).
+   *
+   * Also echoed on the RESPONSE, which is the half that makes it useful in
+   * support: a customer can read the id out of their network tab, or quote it
+   * from an error screen, and it matches the server's logs exactly. */
+  const requestId = resolveRequestId(request.headers);
+  forwardedHeaders.set(REQUEST_ID_HEADER, requestId);
+
+  const response = NextResponse.next({
+    request: { headers: forwardedHeaders },
+  });
+  response.headers.set(REQUEST_ID_HEADER, requestId);
+  return response;
 }
 
 /**

@@ -6,8 +6,8 @@ import "server-only";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: sendVerificationEmail, sendPasswordResetEmail,
- *   sendOrganizationInvitationEmail, sendProjectReadyEmail, EmailSendResult,
- *   renderAndSend
+ *   sendOrganizationInvitationEmail, sendProjectReadyEmail,
+ *   sendRenderFailedEmail, sendLowBalanceEmail, EmailSendResult, renderAndSend
  *
  * WHAT:  The single transactional-email abstraction — renders a React Email
  *        template to HTML and sends it through Resend.
@@ -30,8 +30,10 @@ import {
 } from "@/lib/config/resend";
 import {
   EmailVerificationEmail,
+  LowBalanceEmail,
   PasswordResetEmail,
   ProjectReadyEmail,
+  RenderFailedEmail,
   TeamInvitationEmail,
 } from "@/lib/email-templates";
 import { APP_URL } from "@/lib/config/branding";
@@ -176,6 +178,90 @@ export function sendProjectReadyEmail(args: {
       projectTitle: args.projectTitle,
       previewLink: `${APP_URL}/dashboard/projects/${args.projectId}/preview`,
       ...(args.recipientName ? { recipientName: args.recipientName } : {}),
+    }),
+  });
+}
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: sendRenderFailedEmail, REFUND_IS_THE_HEADLINE
+ *
+ * WHAT:  Sends the "that render did not finish" message.
+ * WHY:   `reason` is REQUIRED and is expected to be the plain sentence the
+ *        pipeline already built — there is no optional fallback, so a caller
+ *        cannot send this email without having decided what to tell the
+ *        customer. A generic "something went wrong" email is worse than none.
+ *
+ *        `refundedCredits` is optional because the two cases differ in the
+ *        copy: credits returned, or nothing charged at all. Passing `0` and
+ *        passing nothing therefore mean the same thing to the template, which
+ *        is handled there rather than here.
+ * WHERE: The render workflow's failure path.
+ */
+export function sendRenderFailedEmail(args: {
+  to: string;
+  projectId: string;
+  projectTitle: string;
+  reason: string;
+  refundedCredits?: number;
+  recipientName?: string | null;
+}): Promise<EmailSendResult> {
+  return renderAndSend({
+    to: args.to,
+    /* The refund in the SUBJECT, not just the body — most people decide
+     * whether to worry from the subject line alone. */
+    subject:
+      args.refundedCredits !== undefined && args.refundedCredits > 0
+        ? `${args.projectTitle} could not be rendered — credits refunded`
+        : `${args.projectTitle} could not be rendered`,
+    template: React.createElement(RenderFailedEmail, {
+      projectTitle: args.projectTitle,
+      projectLink: `${APP_URL}/dashboard/projects/${args.projectId}/preview`,
+      reason: args.reason,
+      ...(args.refundedCredits !== undefined
+        ? { refundedCredits: args.refundedCredits }
+        : {}),
+      ...(args.recipientName ? { recipientName: args.recipientName } : {}),
+    }),
+  });
+}
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: sendLowBalanceEmail, ONE_WARNING_NOT_A_DRIP,
+ *   WARN_BEFORE_IT_BITES
+ *
+ * WHAT:  Sends the "running low on credits" warning.
+ *
+ * WHY:   ONE_WARNING_NOT_A_DRIP is the CALLER's responsibility and is stated
+ *        here because it is the thing that will be got wrong. A balance below
+ *        a threshold is a STATE, not an event: anything that checks it on a
+ *        timer or on every read would send this email repeatedly, and a
+ *        warning that arrives daily is a warning that gets filtered. Whatever
+ *        calls this must remember that it already has — there is no
+ *        suppression inside this function, because the sender cannot know what
+ *        the right window is for a given plan.
+ *
+ *        No `devLink`. The dev outbox exists so a developer with no Resend key
+ *        can complete an auth flow that is BLOCKED without the email; this one
+ *        is a courtesy and the balance is on screen anyway.
+ * WHERE: Phase 10's cost-alert path; not yet wired to a scheduled check — see
+ *        the Phase 10 notes.
+ */
+export function sendLowBalanceEmail(args: {
+  to: string;
+  organizationName: string;
+  balance: number;
+  approximateVideosLeft?: number;
+}): Promise<EmailSendResult> {
+  return renderAndSend({
+    to: args.to,
+    subject: `${args.organizationName} is running low on credits`,
+    template: React.createElement(LowBalanceEmail, {
+      organizationName: args.organizationName,
+      balance: args.balance,
+      topUpLink: `${APP_URL}/dashboard/settings/credits`,
+      ...(args.approximateVideosLeft !== undefined
+        ? { approximateVideosLeft: args.approximateVideosLeft }
+        : {}),
     }),
   });
 }

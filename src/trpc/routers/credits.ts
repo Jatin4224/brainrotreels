@@ -48,6 +48,7 @@ import { permissions } from "@/lib/permissions";
 import { getStripeClient, isStripeConfigured } from "@/lib/config";
 import { ensureStripeCustomer } from "@/services/payment.service";
 import * as creditsService from "@/services/credits.service";
+import { trackFunnelEvent } from "@/lib/observability";
 import {
   CREDIT_PACKS,
   getBalanceSchema,
@@ -246,6 +247,23 @@ export const creditsRouter = createTRPCRouter({
         amount: CREDIT_PACKS[input.packKey].credits,
         paymentIntentId: intent.id,
         packKey: input.packKey,
+      });
+
+      /* THE_FUNNEL_IS_FIVE_EVENTS — the last step, and the only one that is
+       * money. Emitted whether or not THIS call wrote the ledger row: `granted`
+       * being false means the Stripe webhook got there first, which is still a
+       * purchase and must still count once. The payment intent id is the
+       * property that makes a double count detectable downstream. */
+      trackFunnelEvent({
+        event: "purchased",
+        organizationId: input.organizationId,
+        requestId: ctx.requestId,
+        userId: ctx.user.id,
+        properties: {
+          packKey: input.packKey,
+          credits: CREDIT_PACKS[input.packKey].credits,
+          paymentIntentId: intent.id,
+        },
       });
 
       return {

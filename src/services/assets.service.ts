@@ -53,6 +53,7 @@ import {
 } from "@/lib/types/render";
 import type { Prisma } from "@/generated/prisma";
 import {
+  moderationStatusSchema,
   variantNameSchema,
   type AssetKind,
   type AssetSource,
@@ -574,7 +575,8 @@ export async function sumAssetBytes(
 
 /**
  * SOURCE OF TRUTH KEYWORDS: signDocumentAssets, AUDIO_HAS_NO_VIDEO_VARIANT,
- *   VARIANT_WITH_FALLBACK, ONE_QUERY_PER_DOCUMENT, SIGNING_BOUNDARY
+ *   VARIANT_WITH_FALLBACK, ONE_QUERY_PER_DOCUMENT, SIGNING_BOUNDARY,
+ *   NOT_APPROVED_DOES_NOT_RENDER, isModerationCleared
  *
  * WHAT:  Resolves every asset handle in a timeline document to a signed URL at
  *        the requested quality, as the map the Remotion composition is handed.
@@ -608,9 +610,71 @@ export async function sumAssetBytes(
  *        workspace's media — the document is data, and a stored id is not
  *        authority to read it. Every URL additionally goes through
  *        signScopedKey's own key check (SIGNING_BOUNDARY).
+ *
+ *        NOT_APPROVED_DOES_NOT_RENDER, added in Phase 10. An asset that has not
+ *        been cleared by moderation resolves to `url: null`, exactly as a
+ *        missing one does — so a renderer draws a gap and the rest of the video
+ *        still renders (MISSING_ASSET_IS_NOT_AN_ERROR), rather than compositing
+ *        media nobody has approved into a file a customer can publish.
+ *
+ *        THIS is the chokepoint, and that is the whole reason the check lives
+ *        here rather than in the render pre-flight. Every path to a rendered
+ *        frame goes through this function — the preview, the Lambda render, and
+ *        anything Phase 15's editor adds — so a check here cannot be bypassed
+ *        by a caller that forgot it. A pre-flight check would protect exactly
+ *        the one caller that implemented it.
  * WHERE: `projects.preview` in src/trpc/routers/projects.ts; the render
  *        pre-flight in Phase 04, which asks for `final`.
  */
+/**
+ * SOURCE OF TRUTH KEYWORDS: isModerationCleared, NOT_APPROVED_DOES_NOT_RENDER,
+ *   SKIPPED_IS_CLEARED
+ *
+ * WHAT:  Whether an asset's moderation state permits it to be rendered.
+ *
+ * WHY:   TWO of the four states pass, and the one worth explaining is
+ *        `skipped`. SKIPPED_IS_CLEARED means "moderation does not apply to
+ *        this", and it is what the app writes for media it produced ITSELF —
+ *        a finished render's output file, and the narration audio it
+ *        synthesised from a script that was already classified as text. Asking
+ *        a classifier to judge our own output is paying to moderate ourselves,
+ *        and blocking it would mean no generated video could ever play.
+ *
+ *        `pending` does NOT pass, which is the change Phase 10 made and the
+ *        reason it is a change at all: before it, nothing anywhere consulted
+ *        this column, so `pending` and `approved` behaved identically and the
+ *        field was decoration. An upload now sits `pending` until something
+ *        clears it (see MODERATION_IS_PARTIAL in the ingest workflow).
+ *
+ *        Written as an exhaustive switch over the union rather than
+ *        `!== 'rejected'`, so adding a fifth state is a compile error here
+ *        instead of a new state that silently renders.
+ * WHERE: signDocumentAssets below — the one chokepoint every render passes
+ *        through.
+ */
+export function isModerationCleared(status: string): boolean {
+  const parsed = moderationStatusSchema.safeParse(status);
+  if (!parsed.success) {
+    /* A value this build does not recognise, written by a newer release.
+     * Refused, because the alternative is rendering something whose state we
+     * cannot read — and this is the one place in the codebase where the
+     * unknown case must fail closed rather than degrade. */
+    console.warn(
+      `[assets.service] Unrecognised moderation status "${status}"; withholding the asset.`,
+    );
+    return false;
+  }
+
+  switch (parsed.data) {
+    case "approved":
+    case "skipped":
+      return true;
+    case "pending":
+    case "rejected":
+      return false;
+  }
+}
+
 export async function signDocumentAssets(
   db: DbClient,
   handles: readonly {
@@ -645,6 +709,22 @@ export async function signDocumentAssets(
     if (row === undefined) {
       map[handle] = {
         assetId: ref.assetId,
+        kind: ref.kind,
+        url: null,
+        variant: null,
+      };
+      continue;
+    }
+
+    /* NOT_APPROVED_DOES_NOT_RENDER — see the file header. Deliberately the
+     * same shape as the missing-row branch above, so nothing downstream needs
+     * to learn a new case. */
+    if (!isModerationCleared(row.moderationStatus)) {
+      console.warn(
+        `[assets.service] Asset ${row.id} is ${row.moderationStatus} and was withheld from a render.`,
+      );
+      map[handle] = {
+        assetId: row.id,
         kind: ref.kind,
         url: null,
         variant: null,

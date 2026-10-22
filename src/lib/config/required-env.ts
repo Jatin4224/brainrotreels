@@ -355,6 +355,70 @@ export const OPTIONAL_ENV: readonly OptionalEnvVar[] = [
       { key: "REMOTION_WEBHOOK_SECRET", label: "Webhook signing secret" },
     ],
   },
+  /* Phase 10's launch integrations. All three are fail-soft and all three are
+   * worth seeing on the checklist for different reasons: an operator needs to
+   * know that error reports are going nowhere, that the funnel is not being
+   * recorded, and — most importantly — that the spend tripwire is armed. */
+  {
+    id: "observability",
+    label: "Error reporting (Sentry)",
+    purpose:
+      "Optional, and strongly recommended before opening sign-ups. Without a DSN the SDK is never even loaded: failures still produce a structured JSON log line carrying the request id, but nothing groups them, nothing keeps the stack trace and nothing tells you an error is new. With it, every unexpected failure arrives tagged with the request id that caused it — so a customer saying 'my video failed' is one search rather than a trawl through four workflows' logs.",
+    help:
+      "Create a Sentry project and put its DSN below. The DSN is a write-only ingest key and is meant to be public, which is why it carries the NEXT_PUBLIC_ prefix — the browser SDK ships it. " +
+      "SENTRY_TRACES_SAMPLE_RATE is the share of requests traced for performance; it defaults to 0.1, and traces are the part of Sentry that gets expensive quietly, so raise it deliberately.",
+    icon: "ShieldAlert",
+    link: {
+      label: "Create a Sentry project",
+      url: "https://sentry.io/signup/",
+    },
+    keys: [
+      { key: "NEXT_PUBLIC_SENTRY_DSN", label: "DSN" },
+      {
+        key: "SENTRY_TRACES_SAMPLE_RATE",
+        label: "Trace sample rate (defaults to 0.1)",
+        optional: true,
+      },
+    ],
+  },
+  {
+    id: "analytics",
+    label: "Product analytics (PostHog)",
+    purpose:
+      "Optional. Without a key no analytics SDK is loaded and no cookie banner is shown, because there is nothing to ask permission for. With it, the signup → script → generation → render → purchase funnel is recorded SERVER-side (so the counts survive ad blockers) and page views are recorded in the browser — but only after a visitor accepts analytics cookies. Automatic click capture and session recording are deliberately switched off, so the contents of a customer's script editor are never sent.",
+    help:
+      "Create a PostHog project and put its project API key below. Like the Sentry DSN it is a write-only ingest key and is public by design. " +
+      "Set NEXT_PUBLIC_POSTHOG_HOST only if you are self-hosting or using the EU region; it defaults to the US cloud.",
+    icon: "ChartBar",
+    link: {
+      label: "Create a PostHog project",
+      url: "https://posthog.com/signup",
+    },
+    keys: [
+      { key: "NEXT_PUBLIC_POSTHOG_KEY", label: "Project API key" },
+      {
+        key: "NEXT_PUBLIC_POSTHOG_HOST",
+        label: "Host (defaults to US cloud)",
+        optional: true,
+      },
+    ],
+  },
+  {
+    id: "cost-alert",
+    label: "Daily spend alert",
+    purpose:
+      "Optional, with a working default. A daily job totals the previous day's estimated provider spend and raises an alert when it crosses a threshold — generative work can run up a bill faster than anybody checks a dashboard. The figures are OUR OWN usage records priced at list, not a provider invoice, so set the threshold well below the number that would actually hurt. The alert goes to the log stream and, when Sentry is configured, to Sentry.",
+    help:
+      "COST_ALERT_THRESHOLD_USD is the daily figure in US dollars that fires the alert; it defaults to 50. The job runs whether or not this is set — the only thing the variable changes is the threshold.",
+    icon: "CircleDollarSign",
+    keys: [
+      {
+        key: "COST_ALERT_THRESHOLD_USD",
+        label: "Daily threshold in USD (defaults to 50)",
+        optional: true,
+      },
+    ],
+  },
 ];
 
 export interface OptionalEnvKeyStatus extends OptionalEnvKey {

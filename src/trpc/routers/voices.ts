@@ -404,6 +404,7 @@ export const voicesRouter = createTRPCRouter({
       }
 
       await enqueue({
+        requestId: ctx.requestId,
         name: "tts/requested",
         data: {
           projectId: input.projectId,

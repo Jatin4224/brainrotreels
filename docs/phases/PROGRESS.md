@@ -29,7 +29,11 @@ worse than an empty box.
       no generation has ever completed past the `tts` stage. The pure halves — the generator, the
       stage mapping, the idempotency hash and the palettes — are verified by 41 new tests, and the
       workflow registers and serves. See the note.
-- [ ] Phase 10: Safety, limits and launch — **ships public beta**
+- [ ] Phase 10: Safety, limits and launch — **ships public beta** — built; **blocked on the same
+      ELEVENLABS_API_KEY and R2 gap** that stops any generation completing, so no classifier has ever
+      run end to end. Redis IS configured, so the rate limits and the per-plan daily caps are live.
+      Visual moderation of uploads is **not implemented** and the legal copy **needs a lawyer**;
+      both are launch blockers. 75 new tests cover the pure halves. See the note.
 - [ ] Phase 11: Backgrounds library
 - [ ] Phase 12: Reddit story format
 - [ ] Phase 13: Quiz format
@@ -1358,4 +1362,208 @@ so **no generation has ever completed** and every end-to-end check in the phase 
 - **Three formats have no generator.** `reddit-story`, `quiz` and `motion` are refused by name.
 - **Real moderation is Phase 10**; the stage says so on screen.
 - **The credit rates are still placeholders** (Phase 05).
+- **Phase 04's AWS deploy** and **Phase 02's R2** remain open.
+
+### Phase 10 — 2026-10-22
+
+Built: the **moderation adapter seam** (`src/lib/adapters/moderation/` — contract, selector, and a
+Claude implementation that goes through the EXISTING LLM seam rather than opening its own client),
+`src/lib/types/moderation.ts`, the `ModerationRecord` model and its migration (**applied**),
+`moderation.service.ts` (where fail-closed actually lives), the real `moderate` stage replacing
+Phase 09's stub, script-level classification before narration, filename moderation on upload, a
+**render chokepoint** that withholds uncleared assets, `src/lib/safety/` (per-plan daily caps, the
+per-IP signup cap, the verified-email rule), `src/lib/observability/` (the correlation id, one
+structured logger, Sentry, the five-event funnel), `src/lib/costs/` and its daily spend alert,
+`video-ops.service.ts` with the portal's video-operations console and moderation review queue, two
+new transactional email templates, and a `(marketing)` route group with registry-driven pricing and
+four scaffolded legal documents. 75 new tests; the suite is 724 and green, and `tsc --noEmit`,
+`eslint` and `next build` are clean.
+
+**Three findings about the phase file itself, because they change what was worth doing:**
+
+- **The registry premise was outdated.** The phase says `rateLimit` "has never been used, so that
+  path is currently dead code" — but SEVEN resources already declare it (Phases 02, 05, 08, 09).
+  The only limit genuinely missing was `projects.create`, which was added. `assets.create` and
+  `scripts.create` do not exist as procedures; their real equivalents (`createUploadUrl`,
+  `generate`) were already limited at the phase's own numbers.
+- **`renders.create` was left TIGHTER than asked.** The phase specifies 20 per 5 minutes; the
+  existing limit is 10 per minute, which is stricter on burst. A render is the single most expensive
+  action in the product, so loosening a working limit to match a document was the wrong direction.
+- **Item 4 was already half-done.** `docs/06` and the `rate-limit.ts` FILE HEADER already carried
+  the correction about `src/proxy.ts`. Two function docblocks inside that same file still named the
+  proxy, and those were fixed.
+
+**Decisions worth knowing about, because none of them were in the phase file:**
+
+- **This is the only seam in the codebase that fails CLOSED, and the contract enforces it.** There
+  is no "unknown" verdict and no nullable return — an adapter returns a verdict or throws — so no
+  caller can mistake an outage for a pass. `moderateText` is the single place a throw becomes a
+  refusal, and it never throws. The rate limiter's fail-OPEN comment now carries a note saying not
+  to "make these consistent", because the asymmetry is the whole point. Grep
+  `THIS_SEAM_FAILS_CLOSED`.
+- **An outage is `flagged`, not `rejected`.** Both block the work. But telling a customer their
+  content was rejected when the classifier was merely unreachable is an accusation, and it produces
+  no operational signal — a pile of `flagged` rows with engine `unavailable` is a monitoring alert,
+  while a pile of `rejected` rows looks like a busy day. Grep `UNAVAILABLE_ENGINE`.
+- **The Claude classifier holds no key and imports no SDK.** It calls `getLlmAdapter()` with a Zod
+  schema, so the LLM seam keeps owning the key, the model, the effort level and the
+  retry-once-on-schema-failure behaviour — and the schema stays the boundary, so there is no path
+  where the adapter holds raw model text and decides for itself whether a classification happened.
+  An LLM is the WRONG long-term tool for this and the seam exists because of that. Grep
+  `REUSES_THE_LLM_SEAM`.
+- **Three contexts, three standards, chosen by the CALLER.** A prompt, source material and a
+  finished script are judged differently — judging them alike either refuses every history
+  documentary or publishes things it should not. `context` is a closed enum and is never derived
+  from the text, which is what stops a pasted article declaring itself a prompt to get the looser
+  bar. Grep `CONTEXT_SETS_THE_STANDARD`.
+- **The pipeline classifies TWICE**, and script classification runs at the end of the `script` stage
+  rather than as a second `moderate` stage. A stage that went green and then later went red is the
+  one thing a progress list must never do, so the refusal fails the stage that produced the text.
+  Grep `MODERATE_THE_SCRIPT_TOO`.
+- **A verdict is not a status, and they are different unions on purpose.**
+  `approved | rejected | flagged` is what a classifier concluded; `pending | approved | rejected |
+  skipped` is where a row stands. `flagged` has no equivalent in the second — it means a human
+  should look, which on an asset is still `pending`. One function maps between them and a test
+  asserts the unions only overlap where they should. Grep `VERDICT_IS_NOT_A_STATUS`.
+- **Upload moderation is PARTIAL and the gap is enforced rather than hidden.** The filename is text
+  and is really classified; the pixels are not, and this product has no vision classifier. So a
+  clean filename does NOT approve the asset — it is left `pending`, recorded as `flagged` with
+  engine `awaiting-visual-review`, and withheld from every render until a person clears it. The seam
+  stayed text-only rather than growing a method that always returned `approved`. Grep
+  `MODERATION_IS_PARTIAL`.
+- **The render gate is in `signDocumentAssets`, not the render pre-flight.** Every path to a frame
+  goes through that function — preview, Lambda render, and whatever Phase 15 adds — so a check there
+  cannot be bypassed by a caller who forgot it, whereas a pre-flight check protects exactly the one
+  caller that implemented it. An uncleared asset resolves to `url: null`, which is the shape a
+  MISSING asset already has, so no new failure mode was invented. Grep
+  `NOT_APPROVED_DOES_NOT_RENDER`.
+- **Before this phase, `moderationStatus` was decoration.** Nothing anywhere read it, so `pending`
+  rendered exactly like `approved`. Making it load-bearing required one consequential fix:
+  narration audio is now explicitly `skipped`, because it is our own synthesis of a script already
+  classified as text, and leaving it `pending` would have withheld every generated video's own
+  audio. Grep `SKIPPED_IS_CLEARED`.
+- **The daily cap is in Redis, not the usage counter, and that needed defending.** The registry's
+  `limit` is the BILLING quota: counted in `UsageMetrics`, `period` union of `'month'` only, driven
+  by a reset cron. A daily cap is an abuse guardrail — rolling window, no cron, and a workspace
+  hitting it is going too fast rather than being over its plan. Modelling it as a registry limit
+  would have meant extending the period union, teaching the cron a second cadence, and putting a
+  non-billing number in the billing counter. The per-plan FIGURES still live in one constant typed
+  as a full `Record<PlanKey, …>`, so adding a plan is a compile error. Grep
+  `CAP_IS_IN_REDIS_NOT_THE_COUNTER`.
+- **The burst limit and the daily cap are not redundant.** Thirty an hour stops a loop; five a day
+  stops a free workspace running up a provider bill all afternoon at a human pace.
+- **The per-IP signup cap is not `authLimiter`.** That one is tuned for credential stuffing —
+  hundreds of attempts a minute — and the threat here is the opposite shape: one free workspace
+  every few minutes, all day. Hours-long window, small count, both limiters apply. The count is 5
+  rather than 1 because an IP is a poor proxy for a person and an office shares one. Grep
+  `SIGNUP_IS_NOT_SIGN_IN`.
+- **Every plan lookup falls back to the SAFE side.** `Subscription.plan` is a string column, so an
+  unrecognised value is reachable: it gets the free cap and requires verification. The unsafe
+  direction has to be the one somebody types out deliberately. Grep `UNKNOWN_PLAN_IS_FREE`.
+- **`requestId` rides the job ENVELOPE, not `data`.** Every workflow parses `data` with its own
+  strict schema, so a field added there would mean editing a dozen schemas and any that forgot it
+  would fail the parse outright. The adapter merges it in on the way out, and `readRequestId` is the
+  one reader on the far side. It is also sanitised and length-bounded, because an inbound header is
+  attacker-controlled and the value lands in log lines and a Sentry tag. Grep
+  `REQUEST_ID_CROSSES_THE_QUEUE`.
+- **Expected refusals are not Sentry events.** Every gate refuses by throwing a `TRPCError`, so
+  without a distinction the tracker would get one event per plan cap, 403, 404 and rate limit — and
+  the three real exceptions a week would be invisible. A list of refusal codes logs at `warn`;
+  everything else reports. Grep `EXPECTED_REFUSALS_ARE_NOT_INCIDENTS`.
+- **The funnel is emitted server-side, from workflows rather than routers.** A browser event is lost
+  to an ad blocker or a closed tab, and the funnel's purpose is comparing counts BETWEEN steps — a
+  client-side `first_render` under-reporting by 30% looks exactly like a product problem. It
+  identifies by ORGANIZATION, because the product is bought by a workspace and keying on users would
+  show five conversions for one five-seat team. Grep `SERVER_SIDE_FUNNEL`.
+- **The cookie banner actually gates the SDK.** Consent is read with `useSyncExternalStore` and
+  gates the dynamic import itself, so declining means no request and no cookie rather than a tracker
+  that loads anyway. Autocapture and session recording are off — this app has customer scripts in
+  text areas. Grep `CONSENT_GATES_THE_SDK`.
+- **Cost and revenue are computed by DIFFERENT code on purpose.** Cost from counted provider units
+  at list prices, revenue from committed ledger rows. One calculation producing both would make a
+  pricing mistake cancel itself out and the margin always look fine. The cost side is explicitly
+  **not an invoice** — it cannot see minimum charges, tiered discounts or egress — and the panel says
+  so on screen rather than in a tooltip. Grep `MARGIN_IS_THE_POINT` and
+  `OUR_RECORDS_NOT_THEIR_INVOICE`.
+- **Failure rate excludes `skipped` from BOTH numerator and denominator.** A stage a format never
+  runs would otherwise sit at 0% and dilute the average, hiding the stage that is actually broken.
+  Grep `RATE_NEEDS_A_DENOMINATOR`.
+- **Queue depth's headline is the STALE count, not the depth.** Depth alone cannot tell a busy
+  afternoon from a silent breakage; work in flight for over an hour can. Grep `STALE_IS_THE_ALARM`.
+- **The spend alert logs every day, including the quiet ones.** A check that only writes something
+  when it fires has a silence nobody can distinguish from a broken cron. It names the biggest
+  contributor, because "spend is high" sends an operator to a dashboard and "Lambda was 94% of it"
+  sends them to the render queue. It goes to Sentry rather than email — that is where on-call
+  already looks and it needs no recipient list. Grep `EVALUATE_EVERY_DAY_FIRE_RARELY`.
+- **The pricing page reuses the upgrade modal's own comparison table.** It takes nothing but plan
+  keys, so the public page and the in-app modal render the same component over the same registry and
+  cannot describe different products. `<PricingCard>` was deliberately NOT reused: it needs a
+  current plan and a trial state, and faking six props for an anonymous visitor is worse than simple
+  cards. No prices are printed, because the amounts live in Stripe and a figure on the page would be
+  a hardcoded duplicate of a value only Stripe knows. Grep `PRICING_IS_REGISTRY_DERIVED` and
+  `AMOUNTS_LIVE_IN_STRIPE`.
+- **The legal documents are scaffolding and say so loudly**, in a destructive-variant banner driven
+  by one prop per page. The drafts were written from what the CODE does — the content policy mirrors
+  the category list, the refund clauses mirror how the ledger actually behaves, and the privacy
+  subprocessor list is the provider seams this app really has. The words still need counsel. Grep
+  `PLACEHOLDER_IS_LOUD`.
+- **A `(marketing)` route group was added** rather than putting public pages under `(dashboard)`,
+  which would inherit its route gate and bounce every visitor to sign-in — for a PRICING page, that
+  is the whole audience. Nothing beneath it reads a session, so all six routes prerender.
+- **npm could not install the new packages** until `--legacy-peer-deps` was used: the repo's
+  existing tree hits a known arborist bug in `better-auth`'s peer graph (`canvas`), and plain
+  `npm install` with no arguments fails the same way on a clean checkout. Pre-existing, not caused
+  by this phase, but worth knowing before the next dependency change.
+
+**Verified.**
+
+- **75 new tests** over everything provable without a provider: the refusal sentence naming its
+  categories, listing several readably and using different copy for `flagged`; `flagged` blocking;
+  the two unions overlapping only at `approved` and `rejected`; the verdict schema refusing an
+  invented category, an unknown verdict and an extra field; the classifier prompt fencing hostile
+  text, stripping the delimiter in any case, restating the task AFTER a long input, giving each
+  context a different standard and judging source material more permissively than a script; the
+  daily cap and the verification rule falling back to `free` for an unknown plan; the render gate
+  clearing only `approved` and `skipped` and failing closed on an unrecognised value; the cost table
+  having no `NaN` paths and pricing an unknown resolution at the HIGHER rate; the alert firing
+  exactly AT the threshold, naming the top contributor, and not dividing by zero on an idle day; and
+  the request id preferring an inbound value, bounding its length, and stripping what a forged log
+  line would need.
+- **The migration is applied**; `migrate status` is up to date and `migrate diff` reports no drift.
+- **18 functions serve** at `/api/inngest` — eleven registered entries plus seven failure handlers,
+  the new one being the daily cost alert.
+- `next build` is clean with `/pricing` and the four legal routes **prerendered as static**.
+
+**NOT verified, and this is why the box is unticked.**
+
+No classification has ever run. `ANTHROPIC_API_KEY` is set so the adapter CAN reach a model, but the
+pipeline still cannot get past `tts`, so nothing has been moderated end to end. Specifically
+untested:
+
+- A disallowed prompt refused before any provider is called.
+- Taking the classifier offline refusing the work rather than allowing it through.
+- A 429 with a reset hint from a hammered generate endpoint. Redis IS configured, so the limiters
+  are live rather than failing open — but no request has actually been refused, so the wire format
+  of the refusal has never been observed.
+- A free workspace with an unverified email being unable to generate.
+- Sentry receiving a forced error with its request id — no DSN is set.
+- The portal console against real data. Every panel renders; the database has no completed renders.
+- A stranger signing up, paying, generating and downloading unassisted.
+
+**Also outstanding:**
+
+- **Visual moderation of uploads is not implemented** — the largest gap. Uploads are held for human
+  review because nothing can classify their frames; this needs a vision provider behind the existing
+  contract.
+- **The render-failed and low-balance emails are built but not triggered.** Both templates and
+  senders exist and are exported; wiring them needs a recipient, and neither `Render` nor a balance
+  check has one. The project's `generate.notifyUserId` is the obvious reuse and was not assumed.
+- **`signed_up` is the one funnel event not emitted** — it belongs on an auth hook rather than a
+  router.
+- **Uptime monitoring and a status page** are an external service.
+- **A landing page with real sample videos** — no samples exist, and the root route is a
+  load-bearing auth probe that was deliberately left alone.
+- **The legal copy needs a lawyer** and the takedown address is a placeholder. Both are launch
+  blockers.
+- **The credit rates and the provider unit costs are both placeholders** (Phase 05 for the former).
 - **Phase 04's AWS deploy** and **Phase 02's R2** remain open.
