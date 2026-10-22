@@ -29,11 +29,11 @@ worse than an empty box.
       no generation has ever completed past the `tts` stage. The pure halves — the generator, the
       stage mapping, the idempotency hash and the palettes — are verified by 41 new tests, and the
       workflow registers and serves. See the note.
-- [ ] Phase 10: Safety, limits and launch — **ships public beta** — built; **blocked on Redis
-      being unconfigured** (every rate limit and both caps currently fail open), on a **Sentry DSN**,
-      and on the same ELEVENLABS/R2 gap that stops any generation completing — so no classifier has
-      ever run end to end. Visual moderation of uploads is **not implemented** and the legal copy
-      **needs a lawyer**; both are launch blockers. 75 new tests cover the pure halves. See the note.
+- [ ] Phase 10: Safety, limits and launch — **ships public beta** — built; **blocked on the same
+      ELEVENLABS_API_KEY and R2 gap** that stops any generation completing, so no classifier has ever
+      run end to end. Redis IS configured, so the rate limits and the per-plan daily caps are live.
+      Visual moderation of uploads is **not implemented** and the legal copy **needs a lawyer**;
+      both are launch blockers. 75 new tests cover the pure halves. See the note.
 - [ ] Phase 11: Backgrounds library
 - [ ] Phase 12: Reddit story format
 - [ ] Phase 13: Quiz format
@@ -1537,14 +1537,14 @@ four scaffolded legal documents. 75 new tests; the suite is 724 and green, and `
 **NOT verified, and this is why the box is unticked.**
 
 No classification has ever run. `ANTHROPIC_API_KEY` is set so the adapter CAN reach a model, but the
-pipeline still cannot get past `tts`, so nothing has been moderated end to end. And **Redis is
-unconfigured**, which means every rate limit and both new caps currently fail open — the single
-highest-value thing to set before opening sign-ups. Specifically untested:
+pipeline still cannot get past `tts`, so nothing has been moderated end to end. Specifically
+untested:
 
 - A disallowed prompt refused before any provider is called.
 - Taking the classifier offline refusing the work rather than allowing it through.
-- A 429 with a reset hint from a hammered generate endpoint. No request has ever been refused,
-  because there is no Redis.
+- A 429 with a reset hint from a hammered generate endpoint. Redis IS configured, so the limiters
+  are live rather than failing open — but no request has actually been refused, so the wire format
+  of the refusal has never been observed.
 - A free workspace with an unverified email being unable to generate.
 - Sentry receiving a forced error with its request id — no DSN is set.
 - The portal console against real data. Every panel renders; the database has no completed renders.

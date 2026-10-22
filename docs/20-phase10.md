@@ -433,8 +433,9 @@ end-to-end generation has been moderated. Specifically untested:
 - Taking the classifier offline refusing the work. The fail-closed path is
   unit-reasoned and has never been exercised against a real outage.
 - A 429 with a reset hint from a hammered generate endpoint. The limits are
-  declared and the factory applies them; **Redis is not configured**, so every
-  limiter currently fails open and no request has been refused.
+  declared, the factory applies them and Redis is configured — so they are live.
+  No request has actually been refused, though, so the refusal's wire format is
+  unobserved.
 - A free workspace with an unverified email being unable to generate.
 - Sentry receiving a forced error with its request id — **no DSN is set**.
 - The portal console against real data. Every panel renders, and the database it
@@ -458,8 +459,10 @@ end-to-end generation has been moderated. Specifically untested:
   root route is a load-bearing auth probe that was deliberately left alone.
 - **The legal copy needs a lawyer**, and the takedown address is a placeholder.
   Both are launch blockers, tracked as such.
-- **Redis is unconfigured**, so every rate limit and both caps currently fail
-  open. This is the single highest-value thing to set before opening sign-ups.
+
+Redis IS configured, so the rate limits and the per-plan daily caps are live
+rather than failing open — but no request has actually been refused yet, so the
+wire format of a 429 has never been observed.
 
 ## Where to go next
 
