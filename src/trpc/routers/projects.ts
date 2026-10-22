@@ -5,7 +5,9 @@
 /**
  * SOURCE OF TRUTH KEYWORDS: projectsRouter, projects.create, projects.list,
  *   projects.get, projects.rename, projects.delete, projects.duplicate,
- *   BRANCH_POLICY, EXPLICIT_GATE_ON_DUPLICATE, AUTO_DERIVED_FROM_RESOURCES
+ *   projects.generate, projects.cancel, projects.getStages, projects.progress,
+ *   BRANCH_POLICY, EXPLICIT_GATE_ON_DUPLICATE, AUTO_DERIVED_FROM_RESOURCES,
+ *   FIRST_SUBSCRIPTION, STREAM_AND_POLL_ARE_ONE_READ
  *
  * WHAT:  The CRUD surface for projects: create, paginated list, single read
  *        with its migrated timeline, rename, delete and duplicate.
@@ -31,6 +33,8 @@
 import { TRPCError } from "@trpc/server";
 
 import type { Prisma } from "@/generated/prisma";
+import { enqueue } from "@/lib/adapters/jobs";
+import { hasGenerator } from "@/lib/generators";
 
 import { createStructuredError, createTRPCRouter } from "../init";
 import { protectedProcedure } from "../procedures";
@@ -57,8 +61,25 @@ import {
   getProjectSchema,
   listProjectsSchema,
   previewProjectSchema,
+  projectKindSchema,
   renameProjectSchema,
 } from "@/lib/types";
+import {
+  PIPELINE_POLL_MS,
+  isTerminalStageStatus,
+  cancelProjectSchema,
+  generateProjectSchema,
+  projectProgressSchema,
+  projectStagesSchema,
+  type StageUpdate,
+} from "@/lib/types/pipeline";
+import {
+  listStages,
+  pipelineIdempotencyKey,
+  releaseProjectHolds,
+  setProjectStatus,
+  writeGenerateSettings,
+} from "@/services/pipeline.service";
 
 export const projectsRouter = createTRPCRouter({
   /* No gate, no counter, no audit row written here — the factory does all three
@@ -385,7 +406,347 @@ export const projectsRouter = createTRPCRouter({
       await incrementUsage(input.organizationId, "projects", 1, ctx.db);
       return copy;
     }),
+
+  /**
+   * SOURCE OF TRUTH KEYWORDS: projects.generate, ONE_CLICK_ONE_RUN,
+   *   IDEMPOTENCY_IS_PROJECT_PLUS_SHAPE, REFUSE_AN_UNBUILT_FORMAT,
+   *   CREDITS_ARE_REFUSED_BY_THE_CHILDREN
+   *
+   * WHAT:  Starts the whole pipeline: script, cast, narration, caption timing,
+   *        document.
+   *
+   * WHY:   ONE_CLICK_ONE_RUN. The handler does almost nothing — it checks what
+   *        can be checked for free, records the "email me" choice, and enqueues.
+   *        A mutation runs inside a 10-second Prisma transaction and this work
+   *        takes minutes across three providers, so anything other than an
+   *        enqueue here would be a request that times out while the work it
+   *        started carries on invisibly.
+   *
+   *        IDEMPOTENCY_IS_PROJECT_PLUS_SHAPE is the phase's "two rapid
+   *        identical generate requests produce exactly one run", and it is
+   *        enforced by the enqueue KEY rather than by a status check. A status
+   *        check cannot work: both requests read `draft` before either writes
+   *        `generating`, which is the classic double-submit race. The key is
+   *        computed from the project's inputs, so two identical clicks collapse
+   *        to one run inside the queue itself — see
+   *        `pipelineIdempotencyKey`. The `generating` check below is still worth
+   *        having, but as an ANSWER for the UI ("it is already running") rather
+   *        than as the guarantee.
+   *
+   *        REFUSE_AN_UNBUILT_FORMAT: three of the four kinds have no generator
+   *        until Phases 12, 13 and 16. They are refused HERE, before a run
+   *        starts, with the format named — rather than after a pipeline has
+   *        written a script and recorded a narration and then discovered it
+   *        cannot assemble them. The workflow re-checks anyway
+   *        (UNBUILT_KIND_IS_NAMED), because a kind could be changed between the
+   *        click and the run.
+   *
+   *        CREDITS_ARE_REFUSED_BY_THE_CHILDREN, deliberately. There is no
+   *        balance check here, unlike `scripts.generate` and `renders.create`:
+   *        this run's cost is the sum of three jobs whose sizes are not known
+   *        until the script exists, so any number this handler could compare
+   *        against would be a guess. Each child refuses with its own exact
+   *        figure, and the pipeline turns that into a plain-language stage
+   *        failure with the credits released (RELEASE_ON_FAILURE). A guessed
+   *        paywall here would refuse runs that would have succeeded.
+   *
+   *        The daily cap is the registry's (`rateLimit.generate`, 30 an hour)
+   *        and the factory applies it off the path verb — see
+   *        DAILY_CAP_ON_GENERATE in src/lib/resources.ts. Nothing here reads it.
+   * WHERE: The Generate button on the project's generate screen.
+   */
+  generate: protectedProcedure({
+    requirePermission: permissions.PROJECTS_GENERATE,
+    audit: { action: "generate" },
+  })
+    .input(generateProjectSchema)
+    .mutation(async ({ ctx, input }) => {
+      const project = await findProjectForOrganization(
+        ctx.db,
+        input.organizationId,
+        input.id,
+      );
+      if (!project)
+        throw new TRPCError({ code: "NOT_FOUND", message: "Project not found" });
+
+      /* REFUSE_AN_UNBUILT_FORMAT — the kind column is a String, so an
+       * unrecognised value lands here too and gets the same honest answer. */
+      const kind = projectKindSchema.safeParse(project.kind);
+      if (!kind.success || !hasGenerator(kind.data)) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: `${project.kind} videos cannot be generated yet. Only voiceover projects can.`,
+        });
+      }
+
+      if (project.status === "generating" && input.force !== true) {
+        /* Not an error: the customer pressed a button that is already doing
+         * what they asked for, and the screen they are on is the progress
+         * screen. An error toast here would be noise on a working run. */
+        return { queued: false, alreadyRunning: true };
+      }
+
+      /* Recorded BEFORE the enqueue, so the run cannot reach its `notify` step
+       * before the preference it reads has been written. SETTINGS_ARE_MERGED —
+       * only the `generate` key is touched. */
+      if (input.notifyWhenDone !== undefined) {
+        await writeGenerateSettings(ctx.db, input.organizationId, input.id, {
+          notifyWhenDone: input.notifyWhenDone,
+          /* ADDRESS_IS_RESOLVED_NOT_STORED — the id, never the address. */
+          ...(input.notifyWhenDone ? { notifyUserId: ctx.user.id } : {}),
+        });
+      }
+
+      const idempotencyKey = await pipelineIdempotencyKey(
+        ctx.db,
+        input.organizationId,
+        input.id,
+        { force: input.force === true },
+      );
+
+      await enqueue({
+        name: "project/requested",
+        data: { projectId: input.id, organizationId: input.organizationId },
+        id: idempotencyKey,
+      });
+
+      return { queued: true, alreadyRunning: false };
+    }),
+
+  /**
+   * SOURCE OF TRUTH KEYWORDS: projects.cancel, CANCEL_IS_THREE_WRITES,
+   *   CANCEL_RELEASES_EVERY_HOLD
+   *
+   * WHAT:  Stops a running generation.
+   *
+   * WHY:   CANCEL_IS_THREE_WRITES, and all three are needed because Inngest
+   *        does NOT run a function's `onFailure` when a run is cancelled —
+   *        there is no failure, so the cleanup the failure path performs never
+   *        happens:
+   *
+   *          The EVENT stops the run, and the children with it: the pipeline
+   *          and all three sub-workflows carry a `cancelOn` matching this
+   *          event's `projectId` (CANCEL_STOPS_PAID_WORK), so a cancel during
+   *          narration stops the narration rather than paying for audio nobody
+   *          will hear.
+   *
+   *          The STATUS write is what the projects list reads. Left alone, a
+   *          cancelled project would sit at `generating` forever with no run
+   *          behind it.
+   *
+   *          The HOLD RELEASE is the money. Each child holds credits under its
+   *          own ledger reference and settles them itself on the happy path; a
+   *          cancellation is the one exit where nobody settles, so the holds
+   *          are released here, by name, for this project only — see
+   *          CANCEL_RELEASES_EVERY_HOLD.
+   *
+   *        The writes happen BEFORE the event is sent, deliberately. If the
+   *        send fails the customer is told, and they are left with a cancelled
+   *        project and no held credits rather than a `generating` project with
+   *        money reserved against it. The worst case is a run that finishes
+   *        work nobody is charged for, which is strictly better than the
+   *        reverse.
+   * WHERE: The Cancel button on the progress screen.
+   */
+  cancel: protectedProcedure({
+    requirePermission: permissions.PROJECTS_CANCEL,
+    audit: { action: "cancel" },
+  })
+    .input(cancelProjectSchema)
+    .mutation(async ({ ctx, input }) => {
+      const project = await findProjectForOrganization(
+        ctx.db,
+        input.organizationId,
+        input.id,
+      );
+      if (!project)
+        throw new TRPCError({ code: "NOT_FOUND", message: "Project not found" });
+
+      if (project.status !== "generating") {
+        return { cancelled: false, released: 0 };
+      }
+
+      await setProjectStatus(
+        ctx.db,
+        input.organizationId,
+        input.id,
+        "cancelled",
+      );
+      const released = await releaseProjectHolds(
+        ctx.db,
+        input.id,
+        "generation cancelled",
+      );
+
+      await enqueue({
+        name: "project/cancelled",
+        data: { projectId: input.id, organizationId: input.organizationId },
+        /* No idempotency key. Cancelling twice is harmless — the second event
+         * finds nothing to cancel — and a key would make a SECOND cancel of a
+         * re-started run silently do nothing. */
+      });
+
+      return { cancelled: true, released };
+    }),
+
+  /**
+   * SOURCE OF TRUTH KEYWORDS: projects.getStages, STREAM_AND_POLL_ARE_ONE_READ,
+   *   PIPELINE_POLL_MS
+   *
+   * WHAT:  Every stage of a project's pipeline, with its status and elapsed
+   *        time.
+   *
+   * WHY:   STREAM_AND_POLL_ARE_ONE_READ. This is the phase's step 7 — the
+   *        fallback for clients and proxies that will not hold a stream, and
+   *        the read Phase 17's REST API uses, which must not depend on SSE at
+   *        all. It returns exactly what `progress` yields (`StageUpdate[]`), so
+   *        the component renders one shape and neither transport has a
+   *        renderer of its own.
+   *
+   *        A query, so the factory writes no audit row: watching a progress
+   *        bar is not an event worth recording, and at a two-second poll it
+   *        would be the single largest producer of audit rows in the app.
+   * WHERE: The progress screen's fallback poll, and Phase 17's REST read.
+   */
+  getStages: protectedProcedure({ requirePermission: permissions.PROJECTS_READ })
+    .input(projectStagesSchema)
+    .query(({ ctx, input }) =>
+      listStages(ctx.db, input.organizationId, input.projectId),
+    ),
+
+  /**
+   * SOURCE OF TRUTH KEYWORDS: projects.progress, FIRST_SUBSCRIPTION,
+   *   SNAPSHOT_NOT_DELTA, WHY_THE_SERVER_POLLS, PROGRESS_STREAM_MAX_MS
+   *
+   * WHAT:  Stage transitions, pushed as they happen.
+   *
+   * WHY:   FIRST_SUBSCRIPTION — the first `.subscription()` in this codebase,
+   *        and it needed no new infrastructure, which is the point. The SSE
+   *        transport has been configured and unused since Phase 00: `initTRPC`
+   *        carries the `sse` block with its five-minute cap and ten-second
+   *        ping, the client's `splitLink` already routes subscriptions to
+   *        `httpSubscriptionLink`, and the route already sets
+   *        `X-Accel-Buffering: no` so no proxy buffers the chunks.
+   *
+   *        SNAPSHOT_NOT_DELTA. Each yield is the COMPLETE stage list, not the
+   *        one row that changed. A delta stream would be smaller and would be
+   *        wrong the first time a client missed an event: twelve rows is under
+   *        a kilobyte, and a snapshot makes reconnection trivially correct —
+   *        the client throws away what it had and renders what arrived, so
+   *        there is no state to resynchronise and no `tracked()` id to resume
+   *        from.
+   *
+   *        WHY_THE_SERVER_POLLS, and it is worth being plain about: there is no
+   *        pub/sub in this stack. The writes come from Inngest workers in other
+   *        processes, so nothing in THIS process can be notified when a stage
+   *        row changes — the only honest options are a database poll or new
+   *        infrastructure. The poll lives on the SERVER rather than in the
+   *        browser, which is what the customer actually gains: one HTTP
+   *        connection instead of a request every two seconds, no tab-throttling
+   *        of a background timer, and a transition on screen within the poll
+   *        interval of it being written. If a real pub/sub arrives, the change
+   *        is the body of this loop and nothing else — the client, the fallback
+   *        query and the component are all unaffected.
+   *
+   *        PROGRESS_STREAM_MAX_MS stops the generator just under the transport's
+   *        own five-minute cap, so the server closes a finished stream cleanly
+   *        and the client reconnects (and immediately receives a fresh
+   *        snapshot) rather than the connection being severed mid-yield. The
+   *        loop also returns the moment nothing can change again, so a stream
+   *        watching a finished run does not hold a connection for five minutes
+   *        polling a row that will never move.
+   * WHERE: The progress screen. Falls back to `getStages` when the stream drops
+   *        — see STREAM_AND_POLL_ARE_ONE_READ.
+   */
+  progress: protectedProcedure({ requirePermission: permissions.PROJECTS_READ })
+    .input(projectProgressSchema)
+    .subscription(async function* ({ ctx, input, signal }) {
+      let lastFingerprint = "";
+      const closeAt = Date.now() + PROGRESS_STREAM_MAX_MS;
+
+      while (!signal?.aborted && Date.now() < closeAt) {
+        const stages = await listStages(
+          ctx.db,
+          input.organizationId,
+          input.projectId,
+        );
+
+        /* Only yield on a CHANGE. An unchanged snapshot every two seconds
+         * would re-render the list — and re-trigger its aria-live
+         * announcement — for a run that is sitting in a provider call. The
+         * fingerprint deliberately excludes `elapsedMs`, which ticks on every
+         * read by construction and would make every snapshot a change. */
+        const fingerprint = fingerprintStages(stages);
+        if (fingerprint !== lastFingerprint) {
+          lastFingerprint = fingerprint;
+          yield stages;
+        }
+
+        /* Nothing can change again: every stage has reached a terminal state.
+         * Returning closes the stream, which is what tells the client to stop
+         * holding a connection open. */
+        if (stages.every((stage) => isTerminalStageStatus(stage.status))) return;
+
+        await sleep(PIPELINE_POLL_MS, signal);
+      }
+    }),
 });
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: PROGRESS_STREAM_MAX_MS
+ *
+ * Just under the `sse.maxDurationMs` configured on `initTRPC` (five minutes).
+ * The generator returning is a clean close the client reconnects from; the
+ * transport hitting its own cap severs the response mid-stream.
+ */
+const PROGRESS_STREAM_MAX_MS = 4 * 60 * 1_000;
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: fingerprintStages, SNAPSHOT_NOT_DELTA
+ *
+ * WHAT:  A string that changes exactly when something worth re-rendering has
+ *        changed.
+ * WHY:   `elapsedMs` is excluded on purpose — it is derived from the clock on
+ *        every read (ELAPSED_IS_DERIVED_ON_THE_SERVER), so including it would
+ *        make every poll a "change" and defeat the comparison entirely. The
+ *        client renders a running stage's elapsed time from its own ticking
+ *        clock, which is what a stopwatch wants anyway.
+ * WHERE: The `progress` loop above.
+ */
+function fingerprintStages(stages: readonly StageUpdate[]): string {
+  return stages
+    .map((stage) => `${stage.stage}:${stage.status}:${stage.error ?? ""}`)
+    .join("|");
+}
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: sleep, ABORTABLE_SLEEP
+ *
+ * WHAT:  A delay that ends early when the client disconnects.
+ * WHY:   ABORTABLE_SLEEP. A bare `setTimeout` promise would keep the loop — and
+ *        its database handle — alive for the rest of the interval after the
+ *        browser has gone, which at a two-second poll means every closed tab
+ *        leaves one more query in flight. The listener is removed on both exits
+ *        so a long stream does not accumulate them on one signal.
+ * WHERE: The `progress` loop above.
+ */
+function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  if (signal?.aborted) return Promise.resolve();
+
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+
+    function onAbort() {
+      clearTimeout(timer);
+      resolve();
+    }
+
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
+}
 
 /* Re-exported so a caller catching a failed migration from `get` does not have
  * to reach into the timeline module for the error class. */

@@ -50,25 +50,25 @@ datasource db {
 /// User — the primary identity record. Links to all auth credentials,
 /// organization memberships, sessions, and audit logs.
 model User {
-  id                 String     @id
-  name               String
-  email              String     @unique
-  emailVerified      Boolean    @default(false)
-  image              String?
-  createdAt          DateTime   @default(now())
-  updatedAt          DateTime   @default(now()) @updatedAt
+  id            String   @id
+  name          String
+  email         String   @unique
+  emailVerified Boolean  @default(false)
+  image         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @default(now()) @updatedAt
 
   // Better Auth twoFactor plugin — flag indicating 2FA is enabled
-  twoFactorEnabled   Boolean?   @default(false)
+  twoFactorEnabled Boolean? @default(false)
 
   // Better Auth admin plugin — 'admin' grants impersonation + admin endpoint access
-  role               String?
-  banExpires         DateTime?
-  banReason          String?
-  banned             Boolean?   @default(false)
+  role       String?
+  banExpires DateTime?
+  banReason  String?
+  banned     Boolean?  @default(false)
 
   // Application-level fields
-  onboardingComplete Boolean    @default(false)
+  onboardingComplete Boolean @default(false)
   firstName          String?
   lastName           String?
 
@@ -88,20 +88,20 @@ model User {
 /// `activeOrganizationId` powers the org-scoped procedure (set lazily by
 /// Better Auth's organization plugin or by our session-create hook).
 model Session {
-  id                   String   @id
-  expiresAt            DateTime
-  token                String   @unique
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
-  ipAddress            String?
-  userAgent            String?
-  userId               String
+  id        String   @id
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
 
   // Better Auth organization plugin — current active org for this session
   activeOrganizationId String?
 
   // Better Auth admin plugin — impersonation chain (admin user ID)
-  impersonatedBy       String?
+  impersonatedBy String?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -275,12 +275,12 @@ model Invitation {
 ///
 /// SOURCE OF TRUTH KEYWORD: OrganizationRole
 model OrganizationRole {
-  id             String       @id
+  id             String    @id
   organizationId String
   role           String
   permission     String
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime?    @updatedAt
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime? @updatedAt
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
@@ -298,20 +298,20 @@ model OrganizationRole {
 ///
 /// SOURCE OF TRUTH KEYWORD: Subscription
 model Subscription {
-  id                   String       @id
-  plan                 String       // Must match a key in `PLANS` (src/lib/config/plans.ts)
-  referenceId          String       // Organization ID this subscription belongs to
+  id                   String    @id
+  plan                 String // Must match a key in `PLANS` (src/lib/config/plans.ts)
+  referenceId          String // Organization ID this subscription belongs to
   stripeCustomerId     String?
   stripeSubscriptionId String?
-  status               String       @default("incomplete") // incomplete|active|trialing|past_due|canceled
+  status               String    @default("incomplete") // incomplete|active|trialing|past_due|canceled
   periodStart          DateTime?
   periodEnd            DateTime?
-  cancelAtPeriodEnd    Boolean      @default(false)
+  cancelAtPeriodEnd    Boolean   @default(false)
   seats                Int?
   trialStart           DateTime?
   trialEnd             DateTime?
-  createdAt            DateTime     @default(now())
-  updatedAt            DateTime     @updatedAt
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
 
   organization Organization @relation(fields: [referenceId], references: [id], onDelete: Cascade)
 
@@ -330,7 +330,7 @@ model Subscription {
 model CardFingerprint {
   id            String   @id @default(cuid())
   userId        String
-  fingerprint   String   // Stripe card fingerprint (pm.card.fingerprint)
+  fingerprint   String // Stripe card fingerprint (pm.card.fingerprint)
   usedFreeTrial Boolean  @default(false)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -363,7 +363,7 @@ model CardFingerprint {
 model UsageMetrics {
   id             String   @id @default(cuid())
   organizationId String
-  featureKey     String   // A LimitResourceKey from `RESOURCES` (src/lib/resources.ts)
+  featureKey     String // A LimitResourceKey from `RESOURCES` (src/lib/resources.ts)
   currentUsage   Int      @default(0)
   lastResetAt    DateTime @default(now())
   createdAt      DateTime @default(now())
@@ -394,15 +394,15 @@ model UsageMetrics {
 /// SOURCE OF TRUTH KEYWORD: ActivityLog
 model ActivityLog {
   id             String   @id @default(cuid())
-  userId         String   // Actor — the user who performed the action
-  organizationId String   // Tenant scope
-  action         String   // "create" | "update" | "delete" | <custom verb>
-  entity         String   // Entity type — e.g., "project", "member", "invitation"
-  entityId       String?  // Affected entity ID (optional for org-level actions)
-  description    String?  // Human-readable summary, e.g., "Renamed Project 'A' → 'B'"
-  metadata       Json?    // Structured before/after diff or extra context
-  ipAddress      String?  // FORENSIC ONLY — never exposed to frontend
-  userAgent      String?  // FORENSIC ONLY — never exposed to frontend
+  userId         String // Actor — the user who performed the action
+  organizationId String // Tenant scope
+  action         String // "create" | "update" | "delete" | <custom verb>
+  entity         String // Entity type — e.g., "project", "member", "invitation"
+  entityId       String? // Affected entity ID (optional for org-level actions)
+  description    String? // Human-readable summary, e.g., "Renamed Project 'A' → 'B'"
+  metadata       Json? // Structured before/after diff or extra context
+  ipAddress      String? // FORENSIC ONLY — never exposed to frontend
+  userAgent      String? // FORENSIC ONLY — never exposed to frontend
   createdAt      DateTime @default(now())
 
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -452,15 +452,16 @@ model Project {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  parent       Project?     @relation("ProjectVersions", fields: [parentId], references: [id])
-  versions     Project[]    @relation("ProjectVersions")
-  timeline     Timeline?
-  renders      Render[]
-  scriptBlocks ScriptBlock[]
-  speakers     Speaker[]
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  parent         Project?        @relation("ProjectVersions", fields: [parentId], references: [id])
+  versions       Project[]       @relation("ProjectVersions")
+  timeline       Timeline?
+  renders        Render[]
+  scriptBlocks   ScriptBlock[]
+  speakers       Speaker[]
   narrationLines NarrationLine[]
   alignment      Alignment?
+  pipelineStages PipelineStage[]
 
   @@index([organizationId])
   @@index([organizationId, createdAt])
@@ -983,4 +984,47 @@ model Alignment {
 
   @@index([audioHash])
   @@map("alignment")
+}
+
+/// PipelineStage — one step of one project's generate pipeline, with when it
+/// started, when it ended, and why it stopped if it did.
+///
+/// WHY A TABLE AND NOT A JSON COLUMN ON `project`. Three different readers want
+/// this: the progress subscription, the plain polling query it falls back to,
+/// and the failure screen that has to name the stage that broke. A jsonb blob
+/// would make "which stage is running" a read-modify-write of the whole
+/// document from inside a workflow step — two stages finishing at once would
+/// lose one of them. A row per stage makes each transition its own upsert,
+/// which is what lets the fan-out write concurrently and still be correct.
+///
+/// THE STAGE NAMES ARE FIXED and listed in src/lib/types/pipeline.ts. `stage`
+/// is a String for the same reason every other status column here is — this
+/// schema has zero enum blocks — so PIPELINE_STAGES is the only thing standing
+/// between a typo and a progress list with a phantom row in it.
+///
+/// A KIND THAT SKIPS A STAGE WRITES `skipped`, NEVER OMITS IT. The progress UI
+/// renders the full ordered list, so an omitted stage would make the list
+/// reshuffle as the run proceeds — the one thing a progress display must not
+/// do. Grep SKIPPED_NOT_OMITTED.
+///
+/// `@@unique([projectId, stage])` is what makes a step's entry and exit write
+/// an UPSERT rather than an insert, and therefore what makes a replayed
+/// Inngest step idempotent: a resumed run re-entering `script` updates the row
+/// it already wrote instead of adding a second one.
+///
+/// SOURCE OF TRUTH KEYWORD: PipelineStage
+model PipelineStage {
+  id         String    @id @default(cuid())
+  projectId  String
+  stage      String
+  status     String    @default("pending") // pending | running | completed | failed | skipped
+  error      String?
+  startedAt  DateTime?
+  finishedAt DateTime?
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, stage])
+  @@index([projectId])
+  @@map("pipeline_stage")
 }

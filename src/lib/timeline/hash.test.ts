@@ -25,6 +25,7 @@ import {
   CACHE_IRRELEVANT_FIELDS,
   canonicalize,
   hashDoc,
+  hashValue,
   stableStringify,
 } from "./hash";
 import { apply } from "./ops";
@@ -248,5 +249,84 @@ describe("stableStringify", () => {
     const forwards = { a: 1, b: { c: 2, d: 3 } };
     const backwards = { b: { d: 3, c: 2 }, a: 1 };
     expect(stableStringify(forwards)).toBe(stableStringify(backwards));
+  });
+});
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: hashValue tests, SAME_HASH_FOR_ANY_SHAPE,
+ *   IDEMPOTENCY_IS_PROJECT_PLUS_SHAPE, ONE_CLICK_ONE_RUN
+ *
+ * WHAT:  The widened hash Phase 09 keys its generate pipeline on.
+ * WHY:   This is what makes "two rapid identical generate requests produce
+ *        exactly one run" true, so its two properties are asserted directly:
+ *        the same INPUTS must hash the same however the object was assembled
+ *        (or a double-click starts two paid runs), and a genuine change must
+ *        hash differently (or a real second attempt is swallowed as a
+ *        duplicate and the customer's edit never gets generated).
+ */
+describe("hashValue", () => {
+  it("agrees with hashDoc on a document", () => {
+    const doc = quizFixture();
+    expect(hashValue(doc)).toBe(hashDoc(doc));
+  });
+
+  it("is key-order insensitive on the pipeline's own input shape", () => {
+    /* The shape `pipelineIdempotencyKey` builds. A plain JSON.stringify would
+     * hash these two differently, which is exactly the bug: a settings field
+     * added by a later phase would change every key. */
+    const forwards = {
+      kind: "voiceover",
+      aspect: "9:16",
+      sourceRef: null,
+      settings: { captions: { styleId: "bold-pop", enabled: true } },
+      blocks: [{ position: 0, narrationText: "Hello.", speakerTag: "N" }],
+      lines: [{ position: 0, textHash: "abc", status: "ready" }],
+    };
+    const backwards = {
+      lines: [{ status: "ready", textHash: "abc", position: 0 }],
+      blocks: [{ speakerTag: "N", narrationText: "Hello.", position: 0 }],
+      settings: { captions: { enabled: true, styleId: "bold-pop" } },
+      sourceRef: null,
+      aspect: "9:16",
+      kind: "voiceover",
+    };
+
+    expect(hashValue(forwards)).toBe(hashValue(backwards));
+  });
+
+  it("notices a changed script, a changed setting and a re-recorded line", () => {
+    const base = {
+      kind: "voiceover",
+      blocks: [{ position: 0, narrationText: "Hello.", speakerTag: "N" }],
+      lines: [{ position: 0, textHash: "abc", status: "ready" }],
+    };
+    const digest = hashValue(base);
+
+    expect(
+      hashValue({
+        ...base,
+        blocks: [{ position: 0, narrationText: "Goodbye.", speakerTag: "N" }],
+      }),
+    ).not.toBe(digest);
+
+    expect(hashValue({ ...base, kind: "quiz" })).not.toBe(digest);
+
+    /* A re-recorded line changes its textHash, which is what makes a genuine
+     * second attempt a different run rather than a swallowed duplicate. */
+    expect(
+      hashValue({
+        ...base,
+        lines: [{ position: 0, textHash: "def", status: "ready" }],
+      }),
+    ).not.toBe(digest);
+  });
+
+  it("does not throw on the values a jsonb column can actually hold", () => {
+    expect(() => hashValue(null)).not.toThrow();
+    expect(() => hashValue([])).not.toThrow();
+    expect(() => hashValue({ nested: [{ deep: { value: true } }] })).not.toThrow();
+    /* An ORDER change in an array IS a change — the script's block order is
+     * part of the input, and reordering blocks produces a different video. */
+    expect(hashValue([1, 2])).not.toBe(hashValue([2, 1]));
   });
 });

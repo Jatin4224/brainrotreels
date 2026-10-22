@@ -78,6 +78,7 @@ export {
 } from "./anchors";
 export {
   hashDoc,
+  hashValue,
   canonicalize,
   stableStringify,
   CACHE_IRRELEVANT_FIELDS,

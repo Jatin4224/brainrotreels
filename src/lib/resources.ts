@@ -180,10 +180,35 @@ export const RESOURCES = {
    * how many projects a workspace HOLDS, so deleting one frees a slot. Adding
    * `period` here would refill the cap monthly and let a free workspace
    * accumulate projects forever (see src/lib/usage-period.ts). */
+  /**
+   * SOURCE OF TRUTH KEYWORDS: PIPELINE_ACTIONS_ARE_PERMISSIONED,
+   *   projects.generate, projects.cancel, GENERATE_IS_NOT_AN_UPDATE,
+   *   DAILY_CAP_ON_GENERATE
+   *
+   * Phase 09 adds two verbs that are not CRUD, and each needed a permission of
+   * its own — the same gap Phase 02 found on `assets` and Phase 08 found on
+   * `captionStyles`. An action with no permission to gate it is an action every
+   * member can take whatever their role:
+   *   `generate` — start the whole pipeline. GENERATE_IS_NOT_AN_UPDATE: it
+   *                spends credits against three providers, so gating it as an
+   *                `update` would mean anyone allowed to rename a project is
+   *                also allowed to spend its balance.
+   *   `cancel`   — stop a running pipeline. Separate from `generate` because
+   *                stopping a run somebody else started is a different trust
+   *                decision from starting your own.
+   *
+   * DAILY_CAP_ON_GENERATE is the phase's own rate limit, enforced by the
+   * procedure factory off the path verb like every other one — per
+   * (user, organization, ip). Thirty an hour is far above any human pace and
+   * far below a loop that would empty a workspace's balance before anybody
+   * noticed. It is NOT a plan limit: `limit` below caps how many projects a
+   * workspace holds, and the thing worth capping here is how often the paid
+   * pipeline may be STARTED.
+   */
   projects: {
     name: "Projects",
     description: "Videos being made in this workspace",
-    permissions: ["create", "read", "update", "delete"],
+    permissions: ["create", "read", "update", "delete", "generate", "cancel"],
     limit: {
       perPlan: {
         free: 3,
@@ -207,7 +232,12 @@ export const RESOURCES = {
         create: "Created project {output.title}",
         update: "Updated project {output.title}",
         delete: "Deleted project {input.id}",
+        generate: "Started generating project {input.id}",
+        cancel: "Cancelled generation of project {input.id}",
       },
+    },
+    rateLimit: {
+      generate: { count: 30, window: "1 h" },
     },
   },
 
