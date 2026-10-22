@@ -14,6 +14,7 @@
  */
 
 import { assetIngestFunction } from "./asset-ingest";
+import { costAlertFunction } from "./cost-alert";
 import { creditsReconcileFunction } from "./credits-reconcile";
 import { helloFunction } from "./hello";
 import { lineResynthFunction } from "./line-resynth";
@@ -35,4 +36,5 @@ export const INNGEST_FUNCTIONS = [
   lineResynthFunction,
   projectAlignFunction,
   projectGenerateFunction,
+  costAlertFunction,
 ];

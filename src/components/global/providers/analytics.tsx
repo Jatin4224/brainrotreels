@@ -30,6 +30,12 @@
  *        inside the effect, so an unconfigured deployment never downloads the
  *        SDK at all.
  *
+ *        CONSENT_GATES_THE_SDK. It also loads nothing until the visitor has
+ *        ACCEPTED analytics cookies — the consent value comes from
+ *        ./cookie-consent and gates the dynamic import itself, so declining
+ *        means no request and no cookie rather than a tracker that runs anyway.
+ *        That is the only version of a cookie banner worth having.
+ *
  *        Pageviews are sent MANUALLY rather than by PostHog's own history
  *        listener, because this is an App Router app: the SDK's automatic
  *        capture misses client-side navigations in some configurations and
@@ -41,6 +47,8 @@
 
 import * as React from "react";
 import { usePathname, useSearchParams } from "next/navigation";
+
+import { useAnalyticsConsent } from "./cookie-consent";
 
 /* Resolved at module scope: these are NEXT_PUBLIC_ variables, inlined at build
  * time, so reading them per render would buy nothing. */
@@ -82,10 +90,15 @@ export function AnalyticsProvider({
 function PageViewTracker() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const { consent } = useAnalyticsConsent();
   const [ready, setReady] = React.useState(false);
 
   React.useEffect(() => {
-    if (!POSTHOG_KEY) return;
+    /* CONSENT_GATES_THE_SDK. Until somebody accepts, the module is never
+     * imported — so no request is made and no cookie is set. A banner that
+     * recorded a choice and loaded the tracker anyway would be theatre, and
+     * exactly what the rules it claims to satisfy prohibit. */
+    if (!POSTHOG_KEY || consent !== "granted") return;
     let cancelled = false;
 
     void (async () => {
@@ -113,10 +126,10 @@ function PageViewTracker() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [consent]);
 
   React.useEffect(() => {
-    if (!ready || !POSTHOG_KEY) return;
+    if (!ready || !POSTHOG_KEY || consent !== "granted") return;
 
     void (async () => {
       try {
@@ -129,7 +142,7 @@ function PageViewTracker() {
         /* Already reported by the init effect if the module is unavailable. */
       }
     })();
-  }, [ready, pathname, searchParams]);
+  }, [ready, consent, pathname, searchParams]);
 
   return null;
 }

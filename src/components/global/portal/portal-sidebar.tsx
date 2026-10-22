@@ -24,6 +24,8 @@ import {
   ScrollText,
   ArrowLeft,
   ShieldCheck,
+  Clapperboard,
+  ShieldAlert,
 } from "lucide-react";
 
 import {
@@ -48,6 +50,23 @@ const PORTAL_NAV = [
     exact: false,
   },
   { label: "Users", href: portalRoute("/users"), icon: Users, exact: false },
+  /* Phase 10 added these two. PORTAL_NAV is deliberately STATIC and not
+   * registry-derived — RESOURCES describes TENANT features, and these are
+   * operator surfaces no tenant has. `Videos` sits above `Audit logs` because
+   * it is the screen an operator opens every morning; the queue is directly
+   * under it because the one leads to the other. */
+  {
+    label: "Videos",
+    href: portalRoute("/videos"),
+    icon: Clapperboard,
+    exact: true,
+  },
+  {
+    label: "Moderation",
+    href: portalRoute("/videos/moderation"),
+    icon: ShieldAlert,
+    exact: false,
+  },
   {
     label: "Audit logs",
     href: portalRoute("/audit-logs"),

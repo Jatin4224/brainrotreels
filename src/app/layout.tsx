@@ -36,6 +36,7 @@ import { TRPCReactProvider } from "@/trpc/react-provider";
 import { UpgradeModalProvider } from "@/components/global/upgrade-modal";
 import { AuthBoundary } from "@/components/global/providers/server";
 import { AnalyticsProvider } from "@/components/global/providers/analytics";
+import { CookieConsent } from "@/components/global/providers/cookie-consent";
 import { ThemeProvider } from "@/components/theme-provider";
 import { SetupChecklist } from "@/components/global/setup-checklist";
 import { Toaster } from "@/components/ui/sonner";
@@ -109,6 +110,11 @@ export default function RootLayout({
                     SERVER_SIDE_FUNNEL. */}
                 <AnalyticsProvider>
                   <UpgradeModalProvider>{children}</UpgradeModalProvider>
+                  {/* CONSENT_GATES_THE_SDK — the banner and the provider read
+                      the same hook, so declining means the tracker is never
+                      imported rather than loaded and ignored. It renders
+                      nothing at all when analytics is unconfigured. */}
+                  <CookieConsent />
                 </AnalyticsProvider>
               </TRPCReactProvider>
             </AuthBoundary>

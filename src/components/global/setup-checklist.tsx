@@ -19,7 +19,9 @@
  */
 
 import {
+  ChartBarIcon,
   CheckIcon,
+  CircleDollarSignIcon,
   CircleIcon,
   ClapperboardIcon,
   CreditCardIcon,
@@ -30,6 +32,7 @@ import {
   KeyRoundIcon,
   MicIcon,
   PlayCircleIcon,
+  ShieldAlertIcon,
   ShieldCheckIcon,
   SparklesIcon,
   type LucideIcon,
@@ -53,6 +56,13 @@ const SETUP_ICONS: Record<string, LucideIcon> = {
   Clapperboard: ClapperboardIcon,
   Sparkles: SparklesIcon,
   Mic: MicIcon,
+  /* Phase 10's launch integrations. A name missing from this map falls back to
+   * a bare circle, which reads as a row nobody finished rather than as a
+   * deliberate choice — so adding an OPTIONAL_ENV row means adding its icon
+   * here in the same change. */
+  ShieldAlert: ShieldAlertIcon,
+  ChartBar: ChartBarIcon,
+  CircleDollarSign: CircleDollarSignIcon,
 };
 
 function iconFor(name: string): LucideIcon {
