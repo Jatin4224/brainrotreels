@@ -75,6 +75,11 @@ function contextFor(
     speakers: { N: "voice_n", A: "voice_a" },
     aspect: "9:16",
     settings: {},
+    /* Phase 11: the DEFAULT case is still the styled backdrop, because the
+     * shipped catalogue is empty (MANIFEST_IS_EMPTY_ON_PURPOSE) and because a
+     * generator has to build a complete video without footage. The tests that
+     * care pass one in. */
+    background: null,
     db: NO_DB,
     ...overrides,
   };
@@ -286,6 +291,113 @@ describe("buildVoiceoverDocument", () => {
     const doc = buildVoiceoverDocument(contextFor({ lines: [], words: [] }));
     expect(doc.tracks).toEqual([]);
     expect(validate(doc).ok).toBe(true);
+  });
+});
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: background tests, FOOTAGE_OR_BACKDROP_NEVER_BOTH,
+ *   LOOP_TO_THE_NARRATION, BACKGROUND_IS_A_FACT
+ *
+ * Phase 11. The background is resolved BEFORE the generator runs
+ * (RESOLVED_BEFORE_THE_GENERATOR), so these tests hand one in rather than
+ * standing up a library — which is the property worth having: the document
+ * build stays provable with no database at all.
+ */
+describe("buildVoiceoverDocument with a background", () => {
+  const FOOTAGE = {
+    assetId: "ast_loop",
+    durationSec: 4,
+    license: "licensed" as const,
+    width: 1080,
+    height: 1920,
+  };
+
+  it("produces a document the timeline module still accepts", () => {
+    const doc = buildVoiceoverDocument(contextFor({ background: FOOTAGE }));
+    const verdict = validate(doc);
+    expect(verdict.ok, JSON.stringify(verdict.ok ? [] : verdict.errors)).toBe(
+      true,
+    );
+  });
+
+  /* FOOTAGE_OR_BACKDROP_NEVER_BOTH. A backdrop on the scene track composites
+   * ABOVE a video item, so keeping both would draw a gradient over the footage
+   * the customer chose — and the bug would read as "my background did not
+   * apply". */
+  it("replaces the backdrop rather than layering over it", () => {
+    const doc = buildVoiceoverDocument(contextFor({ background: FOOTAGE }));
+    expect(doc.tracks.some((track) => track.id === "background")).toBe(false);
+
+    const footage = doc.tracks.find((track) => track.id === "footage");
+    expect(footage?.type).toBe("video");
+  });
+
+  /* LOOP_TO_THE_NARRATION — the item spans the whole narration and asks to be
+   * looped; the repetition itself is the renderer's
+   * (LOOP_VIA_REMOTION_LOOP). */
+  it("spans the narration, loops, and stays muted", () => {
+    const doc = buildVoiceoverDocument(contextFor({ background: FOOTAGE }));
+    const footage = doc.tracks.find((track) => track.id === "footage");
+    const item = footage?.type === "video" ? footage.items[0] : undefined;
+
+    expect(item?.start).toBe(0);
+    /* The lines are 3 + 2.5 + 3.5; a 4-second clip has to repeat. */
+    expect(item?.duration).toBe(9);
+    expect(item?.loop).toBe(true);
+    expect(item?.muted).toBe(true);
+    /* CROP_AT_TRANSCODE — the ingest already produced a 9:16 master, so there
+     * is no geometry here. */
+    expect(item?.fit).toBe("cover");
+  });
+
+  /* The loop divides by the source length, so without one there is nothing to
+   * divide by (LOOP_IS_A_MODULO). A clip that holds on its last frame is
+   * honest; a loop with no modulus is a division by zero. */
+  it("does not ask to loop a clip whose length was never measured", () => {
+    const doc = buildVoiceoverDocument(
+      contextFor({ background: { ...FOOTAGE, durationSec: null } }),
+    );
+    const footage = doc.tracks.find((track) => track.id === "footage");
+    const item = footage?.type === "video" ? footage.items[0] : undefined;
+
+    expect(item?.loop).toBe(false);
+    expect(doc.assets["background"]?.durationInSeconds).toBeUndefined();
+  });
+
+  it("carries the licence and the asset id, and no URL", () => {
+    const doc = buildVoiceoverDocument(contextFor({ background: FOOTAGE }));
+    const ref = doc.assets["background"];
+
+    expect(ref?.assetId).toBe("ast_loop");
+    expect(ref?.kind).toBe("video");
+    /* The licence travels WITH the document so a render can be refused months
+     * later without re-reading anybody's terms. */
+    expect(ref?.license).toBe("licensed");
+    expect(ref?.durationInSeconds).toBe(4);
+    expect(ref !== undefined && "url" in ref).toBe(false);
+  });
+
+  /* A background and a music bed are independent choices on independent
+   * tracks; picking footage must not silently drop the bed. */
+  it("keeps the music bed alongside the footage", () => {
+    const doc = buildVoiceoverDocument(
+      contextFor({
+        background: FOOTAGE,
+        settings: { generate: { musicAssetId: "ast_music" } },
+      }),
+    );
+    expect(doc.tracks.some((track) => track.id === "footage")).toBe(true);
+    expect(doc.tracks.some((track) => track.id === "music")).toBe(true);
+  });
+
+  /* An empty run must emit no background at all rather than a zero-length one,
+   * which `validate()` refuses — the same rule the backdrop already follows. */
+  it("emits no footage when there is no narration", () => {
+    const doc = buildVoiceoverDocument(
+      contextFor({ background: FOOTAGE, lines: [], words: [] }),
+    );
+    expect(doc.tracks).toHaveLength(0);
+    expect(doc.assets["background"]).toBeUndefined();
   });
 });
 

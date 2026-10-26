@@ -35,13 +35,18 @@ export {
 export { STORAGE_PROVIDER, DEFAULT_STORAGE_PROVIDER } from "./provider";
 export {
   assertKeySegment,
+  assetObjectKey,
   isLibraryKey,
   isOwnedByOrganization,
   libraryKey,
+  libraryKindForAssetKind,
+  LIBRARY_KIND_BY_ASSET_KIND,
+  LIBRARY_KINDS,
   projectKey,
   renderKey,
   tmpKey,
   TMP_PREFIX,
+  type AssetKeyOwner,
   type LibraryKind,
   type ProjectAssetKind,
 } from "./keys";

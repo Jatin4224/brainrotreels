@@ -34,7 +34,11 @@ worse than an empty box.
       run end to end. Redis IS configured, so the rate limits and the per-plan daily caps are live.
       Visual moderation of uploads is **not implemented** and the legal copy **needs a lawyer**;
       both are launch blockers. 75 new tests cover the pure halves. See the note.
-- [ ] Phase 11: Backgrounds library
+- [ ] Phase 11: Backgrounds library — built; the mechanism is complete and the **catalogue is
+      deliberately empty**, because the gameplay-footage licensing position is still an open owner
+      decision and a licence string nobody has verified is the one fiction this product cannot
+      afford. Also **blocked on R2**, so no library asset has ever been fetched or served. 53 new
+      tests cover the pure halves. See the note.
 - [ ] Phase 12: Reddit story format
 - [ ] Phase 13: Quiz format
 - [ ] Phase 14: Voiceover visuals
@@ -1567,3 +1571,212 @@ untested:
   blockers.
 - **The credit rates and the provider unit costs are both placeholders** (Phase 05 for the former).
 - **Phase 04's AWS deploy** and **Phase 02's R2** remain open.
+
+### Phase 11 — 2026-10-26
+
+Built: `src/lib/types/background.ts` (the catalogue vocabulary, the manifest schema and the plan
+ladder), `src/lib/library/backgrounds.manifest.ts` (the catalogue as data — **empty on purpose**,
+see below), `assetObjectKey` / `libraryKindForAssetKind` in the storage key convention, `publicUrl`
+on the storage contract and its R2 implementation, CDN serving for library objects inside
+`signScopedKey`, `backgrounds.service.ts` (the catalogue queries, the breadth cursor and
+the one background resolver), the `backgroundLibrary` registry entry with its breadth limit,
+`src/trpc/routers/backgrounds.ts` (`list` / `applyBackground` / `sync`), the `library/requested`
+event and `library-ingest.ts`, a library-aware `asset-ingest` (two prefixes, and `approved` for a
+curated row), `backgroundAssetId` on `settings.generate`, a resolved background on
+`GeneratorContext`, the voiceover generator's footage track, and
+`src/components/global/background-picker/`. 53 new tests; the suite is 777 and green, and
+`tsc --noEmit`, `eslint` and `next build` are clean. **No migration** — `Asset` already carried
+`source`, `license`, `minPlan` and `durationSec`, and the phase file's "no new models" was taken to
+mean no new columns either.
+
+**The catalogue is empty, and that is the deliverable rather than a gap.**
+
+The phase opens by requiring the owner to settle the gameplay-footage licensing position before
+anything is seeded, and says in so many words: build the gating, the picker, the licence column and
+the looping, and leave the catalogue thin. That is what happened. Writing plausible rows would have
+meant inventing source URLs and licence sentences nobody has verified — the same fiction
+`voices.sync` refused when it declined to ship a seed file, except that here the fiction would live
+in a licence column. The discipline is enforced instead: the manifest schema refuses the `"owned"`
+column default, the empty string, `"CC0"`, `"fair use"` and eleven other placeholders, refuses a
+duplicate key, and parses at module scope so a bad row fails the build. An empty catalogue is a
+working product — the picker offers the styled backdrop and the workspace's own uploads.
+
+**Four findings about the phase file itself, because they changed what was worth doing:**
+
+- **`licenseKind` in the phase's `BackgroundManifestEntry` contract had nowhere to live.** `Asset`
+  has no column for it and the phase forbids new models, so a declared `licenseKind` would have been
+  validated and then discarded — exactly the decoration Phase 10 spent its time removing. The
+  document's licence CATEGORY is derived from `Asset.source` instead (`licenseCategoryForSource`),
+  where `library` becomes `licensed`, and an unrecognised source maps to `unknown` rather than
+  `owned`. The prose TERMS still live on `Asset.license`, which is the field an operator needs.
+- **The phase's `listBackgrounds` contract returns one `items` array; it had to be two.** The
+  breadth cap applies to the CATALOGUE and not to a customer's own files, so in one interleaved list
+  a workspace that had uploaded twenty clips would push catalogue rows past its plan's breadth and
+  lock backgrounds it had paid for. Grep `LIBRARY_IS_ITS_OWN_QUERY`.
+- **The registry block names one permission (`read`); the entry declares three.** A mutation with no
+  permission is gated by nothing — the procedure builder refuses an ungated mutation outright — so
+  the write needs `apply`, and the operator's catalogue import needs `sync` for the same reason
+  `voices.sync` does. Both follow that entry's shape exactly.
+- **Step 4 was already true.** `signAssetUrl` has handled "mine or library" since Phase 02 and
+  needed no change; what it needed was the CDN branch (step 3), which went into the same function.
+
+**Decisions worth knowing about, because none of them were in the phase file:**
+
+- **The breadth cap is a CURSOR, not a row index, and the first version of it was wrong.** "The
+  first N of the catalogue" looks like `skip + index` on the page being rendered, which the list
+  handler has for free — and that is correct only while the page IS the catalogue in order. Under a
+  SEARCH it is the rank among the matches, so a free workspace searching "rain" would have seen the
+  first ten hits unlocked even if they were rows thirty to forty, clicked one, and been refused by a
+  server that re-checks properly. The cap is now resolved once into the `(createdAt, id)` of the last
+  included row, and one PURE function compares every row against it — the same function on the read
+  and the write, which is the only reason the badge and the refusal cannot drift. Grep
+  `A_CURSOR_NOT_A_ROW_INDEX`.
+- **The catalogue is ordered OLDEST FIRST**, the only ordering in this codebase that is not newest
+  first, and it is load-bearing. A plan's breadth is "the first N of the catalogue", so on a
+  newest-first list every background the operator added would silently push a different one out of
+  reach and a customer would find the loop they used last week locked. Oldest first means the set a
+  plan can use only ever grows. Grep `CATALOGUE_ORDER_IS_STABLE`.
+- **The breadth cap is a registry `limit` that counts nothing.** It is declared there so the pricing
+  page and the upgrade modal's comparison table get it for free — catalogue breadth is a thing
+  customers buy — but the resource has no `create` verb, so the procedure builder's plan gate and
+  counter bump never fire and `UsageMetrics` stays empty for it. It is applied at read time as a
+  CURSOR comparison, and the write recomputes the cursor rather than trusting a boundary the client
+  sent. Grep `BREADTH_NOT_A_COUNTER` and `BREADTH_IS_APPLIED_AT_READ_TIME`.
+- **The manifest key is the asset's PRIMARY KEY** (`lib-<key>`), not a new column. That is what makes
+  a re-sync an update: without it, correcting a licence string would mint a new asset, leave the old
+  one in the catalogue and strand every project pointing at it. It also makes the object key stable,
+  so the bytes are fetched once. Grep `MANIFEST_KEY_IS_THE_IDENTITY`.
+- **The ingest had exactly one place it could go wrong, and it was the keys.** A library asset's
+  variants written under `orgs/<whoever-synced-it>/uploads/…` fail `isLibraryKey`, so `signScopedKey`
+  refuses them for every OTHER workspace — the catalogue would be invisible to the tenants it exists
+  for, and it would look like a signing bug. `assetObjectKey` is a discriminated union with no
+  default, so the library case cannot be forgotten and an organization id cannot be passed for a
+  shared row. Grep `ONE_OWNER_ONE_PREFIX`.
+- **The CDN decision is four lines inside `signScopedKey`, not a branch in three callers.** Every
+  path that turns an asset into a URL already goes through that function — the picker's thumbnails, a
+  voice preview, and `signDocumentAssets` on the way to a render — so putting it anywhere else would
+  have meant two callers signing a public object forever. The ownership check still runs first for
+  tenant keys, so no amount of CDN configuration can make a customer's upload public. Grep
+  `LIBRARY_IS_SERVED_FROM_THE_CDN`.
+- **A library row is `approved`, which is the only exception to Phase 10's fail-closed moderation.**
+  An upload is held `pending` because nothing has looked at its pixels; a library row exists only
+  because somebody added it to the manifest, which is a code change a person reads and which carries
+  the licence they established. Holding it afterwards would mean asking an operator to clear, in a
+  queue, the thing they just committed — and until they did, every picker would be empty. It is
+  `approved` rather than `skipped` because `skipped` means "moderation does not apply" and is for our
+  OWN output; a curated loop is somebody else's footage that a person vouched for. The record names
+  `library-manifest` as its engine, so the queue can tell a model's verdict from a human's. Grep
+  `LIBRARY_IS_APPROVED_BY_REVIEW`.
+- **One resolver feeds both the picker and the pipeline.** If each had resolved its own background,
+  the picker could pre-select one row while the generator used another, and the customer would get a
+  video with a background they can see they did not choose — with nothing on either side looking
+  wrong in isolation. Three places are tried in order (the project's choice, the workspace's last
+  pick, the catalogue default), and EVERY candidate is re-checked including the stored one, because a
+  background can be deleted, rejected by a later review, or fall out of reach on a downgrade. Grep
+  `ONE_RESOLVER_TWO_CALLERS` and `THREE_PLACES_TO_LOOK`.
+- **The background is resolved BEFORE the generator and handed to it as a fact.** `GeneratorContext`
+  carries a `db` and the obvious reading is that the generator queries the library — but choosing one
+  weighs three candidates against the plan, and `GENERATOR_CONTEXT_IS_FACTS` says a generator must
+  not be able to read a plan. So the plan is resolved in the workflow (where the render pre-flight
+  already reads one), the resolution happens in a service, and generators stay pure. The `db` on the
+  context remains unused. Grep `RESOLVED_BEFORE_THE_GENERATOR`.
+- **The plan is read FRESH in the workflow, not taken from the event.** A run that waited in a queue
+  while the workspace downgraded must use the plan it has now.
+- **Footage REPLACES the backdrop rather than layering with it.** A backdrop sits on the scene track
+  and composites above a video item, so a document carrying both would draw a gradient over the
+  footage the customer chose, and the bug would read as "my background did not apply". Grep
+  `FOOTAGE_OR_BACKDROP_NEVER_BOTH`.
+- **A clip with no measured duration is emitted with `loop: false`**, and the tile says "plays once"
+  on screen. The loop divides by the source length, so a loop with no modulus is a division by zero —
+  and silently promising a seamless loop the renderer cannot deliver is worse than saying so.
+- **Changing the background rewrites no document.** `captions.applyStyle` can restyle an existing
+  timeline because a restyle provably cannot change the timing; swapping the footage changes what
+  every frame looks like, and half-rewriting a document from a router would produce a preview the
+  pipeline never built. The handler returns `appliesToNextGeneration` so the UI says so rather than
+  leaving the customer to notice.
+- **The picker is a `radiogroup`, not twenty buttons.** The tiles are a single-select, and the
+  phase's "fully keyboard navigable" means a roving tabindex with arrow keys — a grid of buttons is
+  reachable with Tab but makes a screen-reader user hear twenty unrelated controls instead of one
+  choice with twenty options. The COLUMN COUNT is measured from the laid-out tiles rather than
+  hard-coded, because the grid is responsive and Up/Down have to move exactly one row. Grep
+  `RADIOGROUP_NOT_A_LIST_OF_BUTTONS` and `ROVING_TABINDEX`.
+- **A locked tile stays focusable.** `disabled` would take it out of the keyboard order, so a
+  keyboard user could not discover the thing exists — which defeats the entire point of
+  `LOCKED_NOT_HIDDEN`. Clicking it opens the upgrade modal.
+- **"No footage" is a TILE in the group, not a Clear button beside it.** The styled backdrop is one
+  of the options and a customer going back to it is choosing a look, not undoing something. Grep
+  `BACKDROP_IS_A_CHOICE`.
+- **The licence is printed on every tile.** It is the answer to the riskiest question in this
+  product, and somebody about to publish something monetised should not have to open anything to
+  read it.
+- **`writeGenerateSettings` gained a `clear` argument**, because `patch` cannot express removal:
+  `exactOptionalPropertyTypes` refuses an explicit `undefined`, and a key left present with an
+  undefined value is not what "back to the styled backdrop" means. The clearable keys are DERIVED
+  from the schema, so `notifyWhenDone` can never be deleted by mistake. Grep
+  `CLEARING_IS_NOT_PATCHING`.
+- **`backgroundLibrary.applyBackground`, not `.apply`** — tRPC reserves `apply` (it collides with
+  `Function.prototype.apply`) and the router throws during `next build`. This is also why
+  `captionStyles` is reached at `applyStyle`; the phase file's contract named `apply` and could not
+  have worked. The PERMISSION is still `backgroundLibrary:apply`.
+- **`visuals` stays `skipped` for voiceover, now deliberately rather than pending.** Choosing a
+  background is one read and one decision taken before the build, not a stage's worth of work, and a
+  stage that goes from pending to complete in the same instant is noise on a progress list somebody
+  is watching. Phase 14's per-block stock search is what fills that stage in.
+
+**Verified.**
+
+- **53 new tests** over everything provable without a provider: the manifest schema refusing the
+  `"owned"` default, fourteen placeholder licences, a one-word licence, a non-hyphenated key, a kind
+  with no library shelf, an extra field and a duplicate key; the licence category enum matching the
+  timeline document's own union exactly, and an unrecognised `source` mapping to `unknown` rather
+  than `owned`; a library asset id surviving the storage traversal guard; `assetObjectKey` putting a
+  library object where `isLibraryKey` accepts it and `isOwnedByOrganization` does not, and keeping
+  the traversal guard on that path; every library folder being reachable from some asset kind; the
+  plan ladder locking a row above the plan, freeing an ungated one, and LOCKING an unrecognised
+  `minPlan`; `plansUpTo` selecting exactly what `backgroundAvailableOnPlan` allows over every plan
+  pair; `publicUrl` answering null with no CDN configured and needing no credentials; the registry
+  entry declaring no `create` verb and no period; the breadth cursor including its own boundary row,
+  locking everything on a zero cap, breaking a tie on id exactly as the catalogue ordering does, and
+  giving one verdict per row whatever query found it; and the generator replacing the backdrop, spanning
+  and looping the narration, staying muted, refusing to loop an unmeasured clip, carrying the
+  licence and no URL, keeping the music bed alongside, and emitting no footage at all for an empty
+  run.
+- **The suite is 777 and green**; `tsc --noEmit`, `eslint --max-warnings=0` and `next build` are all
+  clean, with `/pricing` and the four legal routes still prerendered.
+- **No migration was needed**, and `migrate status` confirms the database is up to date.
+- **12 workflows are registered**, the new `library-ingest` among them with its own failure handler.
+
+**NOT verified, and this is why the box is unticked.**
+
+No library asset has ever existed. Specifically untested:
+
+- A library background rendering in a generated video, cropped to 9:16 and looping to the narration
+  length. This needs R2 (Phase 02's open blocker) and a real clip, and the looping itself is Phase
+  03 code that has never run against a short source.
+- A background shorter than the narration looping without a visible seam — a thing only a human can
+  judge, against footage that does not exist yet.
+- A library asset resolving for a workspace that does not own it, and a CDN URL being served at all.
+  `R2_PUBLIC_URL` is unset, so even with a catalogue the code would fall back to signing.
+- A gated library asset being refused below its `minPlan` over the wire, and the breadth cursor
+  refusing a row. Both are unit-tested as pure functions; neither has refused a real
+  request.
+- The sync, the fetch and the library ingest end to end. No bytes have moved.
+- The picker against real data. It renders, and it renders the empty state.
+
+**Also outstanding:**
+
+- **The licensing position is still an open owner decision** — footage AND music — and it is the
+  reason the catalogue is empty. It is the first unchecked box under "Blocked on an owner decision"
+  and nothing in this phase changes that.
+- **No music or SFX picker.** The manifest, the ingest, the licence discipline, the key convention
+  and the plan gate all already cover the audio kinds, and `settings.generate.musicAssetId` has
+  existed since Phase 09 — but nothing is wired to it, so a bed can only be chosen by writing the
+  setting directly. Deferred deliberately: there is nothing to choose from until the music licences
+  are settled, which is the same owner decision.
+- **No operator console for `sync`.** The mutation has no screen, the same state `voices.sync` has
+  been in since Phase 07. An import against an empty manifest is a button with nothing to do.
+- **A library asset cannot be withdrawn from a screen.** Raising a row's `minPlan` is a manifest edit
+  plus a re-sync; deleting one is `assets.delete`. A sync deliberately never deletes, because
+  projects point at these rows.
+- **Phase 02's R2** and **Phase 04's AWS deploy** remain open, and both of them block this phase's
+  end-to-end checks.

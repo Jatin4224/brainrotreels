@@ -273,3 +273,38 @@ export type {
   PipelineStageStatus,
   StageUpdate,
 } from "./pipeline";
+
+export {
+  BACKGROUND_ASSET_KINDS,
+  BACKGROUND_AUDIO_KINDS,
+  BACKGROUND_PAGE_SIZE,
+  LIBRARY_ID_PREFIX,
+  LICENSE_KINDS,
+  PLACEHOLDER_LICENSES,
+  applyBackgroundSchema,
+  backgroundAssetKindSchema,
+  backgroundAudioKindSchema,
+  backgroundAvailableOnPlan,
+  backgroundManifestEntrySchema,
+  backgroundManifestSchema,
+  isPlaceholderLicense,
+  libraryAssetId,
+  libraryAssetKindSchema,
+  licenseCategoryForSource,
+  licenseKindSchema,
+  licenseTermsSchema,
+  listBackgroundsSchema,
+  plansUpTo,
+  syncBackgroundLibrarySchema,
+} from "./background";
+export type {
+  ApplyBackgroundValues,
+  BackgroundAssetKind,
+  BackgroundAudioKind,
+  BackgroundLicenseKind,
+  BackgroundManifestEntry,
+  LibraryAssetKind,
+  ListBackgroundsValues,
+  SyncBackgroundLibraryValues,
+} from "./background";
+export type { ClearableGenerateSettingKey } from "./pipeline";

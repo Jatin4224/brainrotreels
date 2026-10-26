@@ -4,6 +4,7 @@
 
 /**
  * SOURCE OF TRUTH KEYWORDS: Generator, GeneratorContext, NarrationLineInput,
+ *   ResolvedBackgroundInput, BACKGROUND_IS_A_FACT,
  *   GENERATOR_CONTRACT, BUILD_IS_THE_WHOLE_CONTRACT, SKIPS_LIVE_ON_THE_GENERATOR,
  *   GeneratorNotImplementedError
  *
@@ -45,7 +46,7 @@
  */
 
 import type { DbClient } from "@/lib/config/prisma";
-import type { TimelineDoc, WordToken } from "@/lib/timeline";
+import type { AssetRef, TimelineDoc, WordToken } from "@/lib/timeline";
 import type { AspectRatio, ProjectKind } from "@/lib/types/project";
 import type { PipelineStageName } from "@/lib/types/pipeline";
 
@@ -103,6 +104,51 @@ export interface NarrationLineInput {
  *        database read inside the generator.
  * WHERE: The single argument of `Generator.build`.
  */
+/**
+ * SOURCE OF TRUTH KEYWORDS: ResolvedBackgroundInput, BACKGROUND_IS_A_FACT,
+ *   RESOLVED_BEFORE_THE_GENERATOR
+ *
+ * WHAT:  The background a generator should put behind the narration, already
+ *        chosen and already proven usable.
+ *
+ * WHY:   BACKGROUND_IS_A_FACT, and this is the shape Phase 11 takes BECAUSE of
+ *        GENERATORS_STAY_PURE. The context carries a `db`, and the obvious
+ *        reading of that is "the generator queries the library itself" — but
+ *        picking a background means deciding between the project's stored
+ *        choice, the workspace's last pick and a catalogue default, and
+ *        checking each candidate against the plan. That is an entitlement
+ *        decision and a three-table read, and GENERATOR_CONTEXT_IS_FACTS says
+ *        in so many words that a generator must not be able to read a plan.
+ *
+ *        So the resolution happens in `resolveProjectBackground`
+ *        (src/services/backgrounds.service.ts) before the generator runs, and
+ *        the generator receives the ANSWER. The same function also feeds the
+ *        picker, which is what keeps "what the customer sees selected" and
+ *        "what ends up in the video" the same row (ONE_RESOLVER_TWO_CALLERS).
+ *
+ *        `durationSec` is here and is nullable, because it is what decides
+ *        whether a clip can be LOOPED to the narration's length: without a
+ *        known source length there is nothing to loop against
+ *        (LOOP_IS_A_MODULO in src/remotion/components/media-clip.tsx), so the
+ *        clip plays once and holds. A generator must therefore be able to see
+ *        that it is missing rather than discovering it at render time.
+ *
+ *        `license` is the CATEGORY, not the terms — see
+ *        LICENSE_TERMS_ARE_NOT_A_CATEGORY in src/lib/types/background.ts. The
+ *        document carries it so a render can be refused months later without
+ *        re-reading anybody's licence.
+ * WHERE: `GeneratorContext.background`, assembled by `generatorContextFor`.
+ */
+export interface ResolvedBackgroundInput {
+  /** The real `Asset` row id the document's handle will point at. */
+  assetId: string;
+  /** Null when the ingest could not measure one — the clip then holds. */
+  durationSec: number | null;
+  license: AssetRef["license"];
+  width: number | null;
+  height: number | null;
+}
+
 export interface GeneratorContext {
   organizationId: string;
   projectId: string;
@@ -116,6 +162,13 @@ export interface GeneratorContext {
   aspect: AspectRatio;
   /** `Project.settings`, already parsed by the caller. */
   settings: Readonly<Record<string, unknown>>;
+  /**
+   * The resolved background, or null for "no footage" — which means the styled
+   * backdrop and is a complete video, not a missing choice. See
+   * ResolvedBackgroundInput above for why this is resolved rather than looked
+   * up here.
+   */
+  background: ResolvedBackgroundInput | null;
   db: DbClient;
 }
 

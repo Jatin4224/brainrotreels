@@ -4,7 +4,9 @@
 
 /**
  * SOURCE OF TRUTH KEYWORDS: storageKeys, STORAGE_KEY_CONVENTION, libraryKey,
- *   uploadKey, projectKey, renderKey, tmpKey, assertKeySegment, KEY_TRAVERSAL_GUARD
+ *   uploadKey, projectKey, renderKey, tmpKey, assertKeySegment, KEY_TRAVERSAL_GUARD,
+ *   assetObjectKey, AssetKeyOwner, libraryKindForAssetKind, LIBRARY_KINDS,
+ *   ONE_OWNER_ONE_PREFIX
  *
  * WHAT:  Builds every object key used in the bucket, and is the only place
  *        that knows the layout.
@@ -24,10 +26,19 @@
  *        Pure — no SDK, no env, safe to unit test and to import anywhere.
  */
 
+import type { AssetKind } from "@/lib/types/asset";
+
 /** Matches the lifecycle rule that deletes scratch objects after 24 hours. */
 export const TMP_PREFIX = "tmp";
 
-export type LibraryKind = "backgrounds" | "music" | "sfx" | "avatars";
+export const LIBRARY_KINDS = [
+  "backgrounds",
+  "music",
+  "sfx",
+  "avatars",
+] as const;
+
+export type LibraryKind = (typeof LIBRARY_KINDS)[number];
 
 export type ProjectAssetKind = "audio" | "footage" | "renders";
 
@@ -146,4 +157,80 @@ export function isOwnedByOrganization(
 /** Library objects are readable by everyone; nothing else is, without a check. */
 export function isLibraryKey(key: string): boolean {
   return key.startsWith("library/");
+}
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: LIBRARY_KIND_BY_ASSET_KIND, libraryKindForAssetKind
+ *
+ * WHAT:  Which library folder an asset of a given kind belongs in.
+ * WHY:   The bucket's layout groups library objects by what they ARE
+ *        (`library/music/…`) while `Asset.kind` names what the product treats
+ *        them as (`audio_music`), and the two vocabularies are not going to be
+ *        merged: the folder is a CDN cache boundary and a lifecycle-rule
+ *        target, and the kind is a picker and a timeline lane. One declared
+ *        map, so a new kind that belongs in the library is a compile error
+ *        here rather than an object written to a path nothing serves.
+ *
+ *        `null` for every kind that is NOT shared — an upload, a render output,
+ *        a synthesised narration line. Those are tenant objects and belong
+ *        under `orgs/`, so the absence is the answer rather than a missing
+ *        case; `assetObjectKey` below is where the two paths meet.
+ * WHERE: assetObjectKey; the library sync and ingest.
+ */
+export const LIBRARY_KIND_BY_ASSET_KIND: Readonly<
+  Record<AssetKind, LibraryKind | null>
+> = {
+  background: "backgrounds",
+  ai_footage: "backgrounds",
+  audio_music: "music",
+  sfx: "sfx",
+  avatar: "avatars",
+  /* Tenant-owned by definition — see the WHY above. */
+  upload: null,
+  image: null,
+  audio_tts: null,
+  render_output: null,
+};
+
+export function libraryKindForAssetKind(kind: AssetKind): LibraryKind | null {
+  return LIBRARY_KIND_BY_ASSET_KIND[kind];
+}
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: AssetKeyOwner, assetObjectKey,
+ *   ONE_OWNER_ONE_PREFIX
+ *
+ * WHAT:  Who an asset's objects belong to, and the key they therefore get.
+ *
+ * WHY:   ONE_OWNER_ONE_PREFIX. `Asset.organizationId` is nullable so that
+ *        library rows can be shared by every workspace, which means an
+ *        asset's objects live under one of TWO prefixes — and before Phase 11
+ *        the ingest only knew about one of them. A library asset whose
+ *        variants were written with `uploadKey` would land under
+ *        `orgs/<whoever-triggered-the-sync>/uploads/…`, which `isLibraryKey`
+ *        rejects and `signScopedKey` therefore refuses for every OTHER
+ *        workspace: the catalogue would be invisible to the tenants it exists
+ *        for, and the failure would look like a signing bug rather than a key
+ *        bug.
+ *
+ *        So the choice is made ONCE, from the row, by this discriminated
+ *        union. A caller cannot pass an organization id for a library asset
+ *        because the library variant of the union has no field to put it in,
+ *        and it cannot forget the library case because the union has no
+ *        default.
+ * WHERE: src/inngest/functions/asset-ingest.ts (every variant key) and
+ *        src/inngest/functions/library-ingest.ts (the original object).
+ */
+export type AssetKeyOwner =
+  | { readonly scope: "organization"; readonly organizationId: string }
+  | { readonly scope: "library"; readonly libraryKind: LibraryKind };
+
+export function assetObjectKey(
+  owner: AssetKeyOwner,
+  assetId: string,
+  filename: string,
+): string {
+  return owner.scope === "library"
+    ? libraryKey(owner.libraryKind, assetId, filename)
+    : uploadKey(owner.organizationId, assetId, filename);
 }

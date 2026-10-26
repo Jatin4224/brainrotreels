@@ -27,5 +27,10 @@
 
 export { GENERATORS, generatorSkipsFor, hasGenerator, resolveGenerator } from "./registry";
 export { GeneratorNotImplementedError } from "./types";
-export type { Generator, GeneratorContext, NarrationLineInput } from "./types";
+export type {
+  Generator,
+  GeneratorContext,
+  NarrationLineInput,
+  ResolvedBackgroundInput,
+} from "./types";
 export { buildVoiceoverDocument, voiceoverGenerator } from "./voiceover";

@@ -91,6 +91,21 @@ export const JOB_EVENT_NAMES = [
    */
   'align/requested',
   'asset/uploaded',
+  /**
+   * LIBRARY_IS_ITS_OWN_EVENT. Sent by `backgroundLibrary.sync`, one per
+   * manifest row, so the FETCH of a third party's bytes happens in a durable
+   * run rather than inside the request's 10-second Prisma transaction — a
+   * sync of forty loops is forty downloads and forty transcodes.
+   *
+   * Separate from `asset/uploaded` rather than reusing it, because the two
+   * start from different places: an upload's bytes are ALREADY in the bucket
+   * (the browser put them there with a signed URL) and a library row's are at
+   * somebody else's URL. This run does the fetch and then sends
+   * `asset/uploaded` itself, so the probe, the variants and the readiness
+   * transition stay in the one ingest workflow that owns them. Two producers,
+   * one pipeline.
+   */
+  'library/requested',
   'footage/requested',
   'line/changed',
 ] as const
