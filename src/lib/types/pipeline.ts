@@ -230,11 +230,53 @@ export const generateSettingsSchema = z.object({
   notifyUserId: z.string().trim().min(1).max(120).optional(),
   /** An Asset id, if this workspace picked a music bed. */
   musicAssetId: z.string().trim().min(1).max(120).optional(),
+  /**
+   * SOURCE OF TRUTH KEYWORDS: backgroundAssetId, BACKGROUND_IS_A_SETTING,
+   *   NULL_CLEARS_THE_CHOICE
+   *
+   * The library row or upload that plays behind the narration, from Phase 11.
+   * Absent means "the styled backdrop", which is a real and reasonable video
+   * rather than a missing choice — see MUSIC_IS_OPTIONAL above for the same
+   * argument applied to the music bed.
+   *
+   * BACKGROUND_IS_A_SETTING and not a column, which the phase file asks for
+   * explicitly. It is a preference that STEERS a run, so it belongs with the
+   * other preferences on `settings.generate` rather than in the timeline
+   * document the run produces — a document does not exist until after the
+   * thing it was meant to influence. It is also what the workspace's NEXT
+   * project defaults from (see lastBackgroundAssetId in
+   * src/services/backgrounds.service.ts), which a column on `Project` would
+   * have served equally badly and at the cost of a migration.
+   */
+  backgroundAssetId: z.string().trim().min(1).max(120).optional(),
   /** Which palette the styled background uses. Defaults per kind. */
   paletteId: z.string().trim().min(1).max(60).optional(),
 });
 
 export type GenerateSettings = z.infer<typeof generateSettingsSchema>;
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: ClearableGenerateSettingKey,
+ *   CLEARING_IS_NOT_PATCHING
+ *
+ * WHAT:  The generate settings that can be REMOVED rather than only replaced.
+ * WHY:   Derived from the schema rather than listed, so a new optional
+ *        preference is clearable the moment it is declared and a REQUIRED one
+ *        (`notifyWhenDone`, which carries a default) can never be deleted by
+ *        mistake — deleting it would leave a settings object that
+ *        `generateSettingsSchema` refuses, and the symptom would be a run that
+ *        silently fell back to every default.
+ * WHERE: The `clear` argument of writeGenerateSettings in
+ *        src/services/pipeline.service.ts.
+ */
+export type ClearableGenerateSettingKey = {
+  [K in keyof GenerateSettings]-?: Record<never, never> extends Pick<
+    GenerateSettings,
+    K
+  >
+    ? K
+    : never;
+}[keyof GenerateSettings];
 
 /**
  * SOURCE OF TRUTH KEYWORDS: generateProjectSchema, GenerateProjectValues,

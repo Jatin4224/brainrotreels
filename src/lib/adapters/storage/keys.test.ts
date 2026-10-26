@@ -20,11 +20,16 @@
 
 import { describe, expect, it } from "vitest";
 
+import { ASSET_KINDS } from "@/lib/types/asset";
+
 import {
   assertKeySegment,
+  assetObjectKey,
   isLibraryKey,
   isOwnedByOrganization,
   libraryKey,
+  libraryKindForAssetKind,
+  LIBRARY_KINDS,
   projectKey,
   renderKey,
   tmpKey,
@@ -153,5 +158,85 @@ describe("TENANCY_KEY_CHECK", () => {
     expect(isOwnedByOrganization(key, ORG)).toBe(false);
     expect(isLibraryKey(key)).toBe(true);
     expect(isLibraryKey(uploadKey(ORG, "a", "b.mp4"))).toBe(false);
+  });
+});
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: assetObjectKey tests, ONE_OWNER_ONE_PREFIX,
+ *   libraryKindForAssetKind, LIBRARY_KIND_BY_ASSET_KIND
+ *
+ * WHAT:  Tests for Phase 11's owner-to-prefix resolution.
+ * WHY:   This is the function that decides whether a curated background is
+ *        readable by every workspace or by none of them: a library row whose
+ *        variants land under `orgs/…` fails `isLibraryKey`, so `signScopedKey`
+ *        refuses it for every tenant and the catalogue is silently invisible.
+ *        The assertions are deliberately paired with `isLibraryKey` and
+ *        `isOwnedByOrganization`, because that pairing IS the property that
+ *        matters — not the literal string.
+ * WHERE: Run by `npm test`. Guards assetObjectKey in ./keys.ts.
+ */
+describe("assetObjectKey", () => {
+  it("puts a workspace's objects under its own prefix", () => {
+    const key = assetObjectKey(
+      { scope: "organization", organizationId: ORG },
+      "ast_1",
+      "vertical.mp4",
+    );
+    expect(key).toBe(uploadKey(ORG, "ast_1", "vertical.mp4"));
+    expect(isOwnedByOrganization(key, ORG)).toBe(true);
+    expect(isLibraryKey(key)).toBe(false);
+  });
+
+  it("puts a library asset's objects where every workspace can read them", () => {
+    const key = assetObjectKey(
+      { scope: "library", libraryKind: "backgrounds" },
+      "lib-waves",
+      "vertical.mp4",
+    );
+    expect(key).toBe("library/backgrounds/lib-waves/vertical.mp4");
+    expect(isLibraryKey(key)).toBe(true);
+    /* The crucial half: it belongs to NO workspace, which is what makes it
+     * shared rather than one tenant's. */
+    expect(isOwnedByOrganization(key, ORG)).toBe(false);
+  });
+
+  it("keeps the traversal guard on the library path", () => {
+    expect(() =>
+      assetObjectKey(
+        { scope: "library", libraryKind: "backgrounds" },
+        "../../etc",
+        "passwd",
+      ),
+    ).toThrow();
+  });
+});
+
+describe("libraryKindForAssetKind", () => {
+  it("routes every shared kind to a folder and every tenant kind to none", () => {
+    expect(libraryKindForAssetKind("background")).toBe("backgrounds");
+    expect(libraryKindForAssetKind("ai_footage")).toBe("backgrounds");
+    expect(libraryKindForAssetKind("audio_music")).toBe("music");
+    expect(libraryKindForAssetKind("sfx")).toBe("sfx");
+    expect(libraryKindForAssetKind("avatar")).toBe("avatars");
+
+    /* These are a workspace's own by definition — a null here is the answer,
+     * not a gap, and `assetObjectKey` relies on it. */
+    expect(libraryKindForAssetKind("upload")).toBeNull();
+    expect(libraryKindForAssetKind("image")).toBeNull();
+    expect(libraryKindForAssetKind("audio_tts")).toBeNull();
+    expect(libraryKindForAssetKind("render_output")).toBeNull();
+  });
+
+  /* Every folder the convention declares must be reachable from some asset
+   * kind. One that is not is either a dead prefix or a kind nobody mapped. */
+  it("leaves no library folder unreachable", () => {
+    const reachable = new Set(
+      ASSET_KINDS.map((kind) => libraryKindForAssetKind(kind)).filter(
+        (value): value is (typeof LIBRARY_KINDS)[number] => value !== null,
+      ),
+    );
+    for (const folder of LIBRARY_KINDS) {
+      expect([...reachable], `${folder} is unreachable`).toContain(folder);
+    }
   });
 });

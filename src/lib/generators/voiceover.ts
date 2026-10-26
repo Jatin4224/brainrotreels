@@ -5,7 +5,8 @@
 /**
  * SOURCE OF TRUTH KEYWORDS: voiceoverGenerator, buildVoiceoverDocument,
  *   NARRATION_IS_SEQUENTIAL, MUSIC_IS_OPTIONAL, DUCK_IS_A_REQUEST,
- *   BACKDROP_SPANS_THE_NARRATION, EMPTY_WORDS_STILL_BUILDS,
+ *   BACKDROP_SPANS_THE_NARRATION, FOOTAGE_OR_BACKDROP_NEVER_BOTH,
+ *   LOOP_TO_THE_NARRATION, EMPTY_WORDS_STILL_BUILDS,
  *   GENERATED_DOC_IS_ANCHORED, MUSIC_GAIN, VOICEOVER_SKIPS
  *
  * WHAT:  The first generator: narration over a styled background, with captions
@@ -78,6 +79,8 @@ import type { Generator, GeneratorContext } from "./types";
 
 /* Document-local handles, not database ids — see ASSET_HANDLE_INDIRECTION. */
 const BACKDROP_ITEM_ID = "backdrop";
+const BACKGROUND_ITEM_ID = "background-clip";
+const BACKGROUND_HANDLE = "background";
 const NARRATION_TRACK_ID = "narration";
 const MUSIC_TRACK_ID = "music";
 const MUSIC_ITEM_ID = "music-bed";
@@ -158,10 +161,75 @@ export function buildVoiceoverDocument(ctx: GeneratorContext): TimelineDoc {
   const totalSec = offsetSec;
   const tracks: Track[] = [];
 
-  /* BACKDROP_SPANS_THE_NARRATION. Zero-length when there is no narration at
-   * all, which `validate()` refuses — so an empty run emits no backdrop rather
-   * than an invisible one. */
-  if (totalSec > 0) {
+  /**
+   * SOURCE OF TRUTH KEYWORDS: FOOTAGE_OR_BACKDROP_NEVER_BOTH,
+   *   BACKDROP_SPANS_THE_NARRATION, LOOP_TO_THE_NARRATION
+   *
+   * Phase 11's half of BACKDROP_SPANS_THE_NARRATION, and the exclusivity is
+   * the point: a backdrop on the SCENE track composites ABOVE a video item
+   * (LAYER_ORDER in src/lib/render), so emitting both would draw a gradient
+   * over the footage the customer chose and the bug would look like "my
+   * background did not apply".
+   *
+   * LOOP_TO_THE_NARRATION. The item spans the whole narration and asks to be
+   * looped; the repetition itself is the renderer's, with Remotion's `<Loop>`
+   * rather than the element's own playhead (LOOP_VIA_REMOTION_LOOP), which is
+   * what keeps a frame a pure function of its number and therefore keeps
+   * Phase 04's render reuse correct. `durationInSeconds` on the asset ref is
+   * what the loop divides by, which is why a background with no measured
+   * duration is emitted with `loop: false` — a clip that holds on its last
+   * frame is honest, and a loop with no modulus is a division by zero.
+   *
+   * `muted: true` because a gameplay loop carries a second soundtrack nobody
+   * asked for under the narration. The ingest already dropped the audio track
+   * for `background` and `ai_footage` kinds (MUTE_BACKGROUNDS_NOT_UPLOADS), so
+   * for a catalogue row this is belt and braces — but a customer's own UPLOAD
+   * keeps its audio, and that is exactly the row this flag is load-bearing
+   * for.
+   *
+   * `fit: "cover"` and no geometry anywhere: the ingest produced a 9:16
+   * master, so there is nothing to crop at render time (CROP_AT_TRANSCODE).
+   *
+   * Zero-length when there is no narration at all, which `validate()` refuses
+   * — so an empty run emits no background rather than an invisible one.
+   */
+  const background = ctx.background;
+
+  if (totalSec > 0 && background !== null) {
+    const loopable =
+      background.durationSec !== null && background.durationSec > 0;
+
+    tracks.push({
+      id: "footage",
+      type: "video",
+      label: "Background",
+      items: [
+        {
+          id: BACKGROUND_ITEM_ID,
+          start: 0,
+          duration: totalSec,
+          assetId: BACKGROUND_HANDLE,
+          fit: "cover",
+          loop: loopable,
+          muted: true,
+          render: "media",
+        },
+      ],
+    });
+
+    assets[BACKGROUND_HANDLE] = {
+      assetId: background.assetId,
+      kind: "video",
+      /* The licence travels WITH the document so a render can be refused
+       * months later without re-reading a provider's terms — see AssetRef. */
+      license: background.license,
+      ...(loopable && background.durationSec !== null
+        ? { durationInSeconds: background.durationSec }
+        : {}),
+      ...(background.width !== null ? { width: background.width } : {}),
+      ...(background.height !== null ? { height: background.height } : {}),
+    };
+  } else if (totalSec > 0) {
     tracks.push({
       id: "background",
       type: "scene",
@@ -263,8 +331,17 @@ export function buildVoiceoverDocument(ctx: GeneratorContext): TimelineDoc {
  * WHAT:  The registry entry for `voiceover`.
  * WHY:   VOICEOVER_SKIPS names the four stages this kind does not run, and each
  *        is a deferral rather than an omission:
- *          `visuals`    — Phase 11 owns the footage library. Until it exists
- *                         the background is a gradient, chosen with no work.
+ *          `visuals`    — still skipped, and now deliberately rather than
+ *                         pending. Phase 11 built the footage library, and
+ *                         choosing from it is ONE read and one decision taken
+ *                         before the build (RESOLVED_BEFORE_THE_GENERATOR in
+ *                         ./types.ts), not a stage's worth of work. A stage
+ *                         that goes from pending to complete in the same
+ *                         instant is noise on a progress list somebody is
+ *                         watching, and a `skipped` row with a reason is the
+ *                         honest one. The stage fills in for a format that
+ *                         genuinely chooses visuals per BLOCK — Phase 14's
+ *                         stock search.
  *          `storyboard` — there is nothing to sequence: one background, one
  *                         narration. A storyboard is what a multi-shot format
  *                         needs (Phases 12 to 14).

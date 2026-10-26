@@ -109,3 +109,35 @@ describe('retired resources', () => {
     },
   )
 })
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: backgroundLibrary invariants, BREADTH_NOT_A_COUNTER,
+ *   LOCKED_NOT_HIDDEN
+ *
+ * Phase 11. `backgroundLibrary.limit` is a BREADTH cap applied at read time,
+ * not a counter — so the two properties worth pinning are the ones that would
+ * quietly turn it into one.
+ */
+describe('backgroundLibrary breadth', () => {
+  /* A `create` verb would arm section 9 of the procedure builder (the plan gate)
+   * and section 13 (the counter bump) against a resource that counts nothing,
+   * so every workspace would accumulate usage against a cap that means
+   * something else entirely. */
+  it('declares no create verb', () => {
+    expect(RESOURCES.backgroundLibrary.permissions).not.toContain('create')
+  })
+
+  /* BREADTH_NOT_A_COUNTER — a breadth cap that refilled monthly would be
+   * meaningless: nothing is consumed, so there is nothing to reset. */
+  it('is absolute rather than periodic', () => {
+    expect(asLimit(RESOURCES.backgroundLibrary.limit).period).toBeUndefined()
+  })
+
+  /* LOCKED_NOT_HIDDEN depends on there being something to unlock: a plan whose
+   * breadth equalled the top plan's would make the upsell copy a lie. */
+  it('grows with the plan', () => {
+    const { perPlan } = asLimit(RESOURCES.backgroundLibrary.limit)
+    expect(perPlan.free).toBeLessThan(Number(perPlan.starter))
+    expect(perPlan.pro).toBe('unlimited')
+  })
+})

@@ -6,6 +6,7 @@
 
 /**
  * SOURCE OF TRUTH KEYWORDS: GeneratePanel, NarrationStrip, STREAM_THEN_POLL,
+ *   BACKGROUND_IS_CHOSEN_BEFORE_THE_RUN,
  *   FALLBACK_IS_AUTOMATIC, FAILURE_OFFERS_RETRY, NOTIFY_IS_A_PREFERENCE,
  *   CLOSING_THE_TAB_IS_SAFE, SERVER_IS_THE_SOURCE_OF_TRUTH
  *
@@ -60,6 +61,7 @@ import {
   useActiveOrganization,
   useActiveOrganizationId,
 } from "@/hooks/use-active-organization";
+import { BackgroundPicker } from "@/components/global/background-picker";
 import { StageProgress } from "@/components/global/stage-progress";
 import { permissions } from "@/lib/permissions";
 import {
@@ -219,6 +221,20 @@ export function GeneratePanel({ projectId }: { projectId: string }) {
           />
         </CardContent>
       </Card>
+
+      {/* BACKGROUND_IS_CHOSEN_BEFORE_THE_RUN. The picker lives on this screen
+          rather than beside the preview, because the choice steers a
+          GENERATION: it is read by the pipeline when the document is built, so
+          changing it after a run has finished does nothing until the next one.
+          Disabled mid-run for the same reason the notify switch is — a control
+          that silently does nothing is worse than one that is visibly
+          unavailable. */}
+      <BackgroundPicker
+        organizationId={organizationId}
+        projectId={projectId}
+        disabled={run.active || busy}
+        className="lg:col-start-1"
+      />
 
       <div className="flex flex-col gap-4">
         <Card>

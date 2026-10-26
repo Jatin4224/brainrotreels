@@ -27,6 +27,7 @@ import { devRouter } from "./dev";
 import { userRouter } from "./user";
 import { projectsRouter } from "./projects";
 import { assetsRouter } from "./assets";
+import { backgroundsRouter } from "./backgrounds";
 import { rendersRouter } from "./renders";
 import { creditsRouter } from "./credits";
 import { scriptsRouter } from "./scripts";
@@ -46,6 +47,7 @@ export const appRouter = createTRPCRouter({
   organization: organizationRouter,
   projects: projectsRouter,
   assets: assetsRouter,
+  backgroundLibrary: backgroundsRouter,
   renders: rendersRouter,
   credits: creditsRouter,
   scripts: scriptsRouter,

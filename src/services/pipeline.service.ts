@@ -53,9 +53,16 @@ import type { GeneratorContext } from "@/lib/generators";
 import { type DbClient } from "@/lib/config/prisma";
 import { hashValue, wordTokenSchema, type WordToken } from "@/lib/timeline";
 import { jsonObjectSchema } from "@/lib/types/json";
+import type { PlanKey } from "@/lib/config/plans";
+import {
+  BACKGROUND_ASSET_KINDS,
+  licenseCategoryForSource,
+} from "@/lib/types/background";
+import { resolveProjectBackground } from "./backgrounds.service";
 import {
   PIPELINE_STAGES,
   generateSettingsSchema,
+  type ClearableGenerateSettingKey,
   type GenerateSettings,
   type PipelineStageName,
   type StageUpdate,
@@ -470,11 +477,22 @@ export async function readGenerateSettings(
   return generate.success ? generate.data : { ...DEFAULT_GENERATE_SETTINGS };
 }
 
+/**
+ * SOURCE OF TRUTH KEYWORDS: writeGenerateSettings, CLEARING_IS_NOT_PATCHING
+ *
+ * `clear` names keys to REMOVE, and it exists because `patch` cannot express
+ * removal. `exactOptionalPropertyTypes` is on, so an explicit `undefined` is
+ * not assignable to an optional field — and even if it were, spreading it would
+ * leave the key present with an undefined value, which is not what "the
+ * customer went back to the styled backdrop" means. Phase 11's
+ * NULL_CLEARS_THE_CHOICE needs a real delete.
+ */
 export async function writeGenerateSettings(
   db: DbClient,
   organizationId: string,
   projectId: string,
   patch: Partial<GenerateSettings>,
+  clear: readonly ClearableGenerateSettingKey[] = [],
 ): Promise<boolean> {
   const project = await db.project.findFirst({
     where: { id: projectId, organizationId },
@@ -490,6 +508,9 @@ export async function writeGenerateSettings(
     ...(current.success ? current.data : DEFAULT_GENERATE_SETTINGS),
     ...patch,
   };
+  for (const key of clear) {
+    delete generate[key];
+  }
 
   await db.project.update({
     where: { id: projectId },
@@ -530,6 +551,7 @@ export async function generatorContextFor(
   db: DbClient,
   organizationId: string,
   projectId: string,
+  plan: PlanKey,
 ): Promise<{ ctx: GeneratorContext; kind: ProjectKind } | null> {
   const project = await db.project.findFirst({
     /* RECHECK_OWNERSHIP_IN_THE_WORKFLOW — never by id alone. */
@@ -546,7 +568,7 @@ export async function generatorContextFor(
     return null;
   }
 
-  const [speakers, lines, alignment] = await Promise.all([
+  const [speakers, lines, alignment, background] = await Promise.all([
     db.speaker.findMany({
       where: { organizationId, projectId },
       select: { tag: true, voiceId: true },
@@ -567,6 +589,26 @@ export async function generatorContextFor(
     db.alignment.findFirst({
       where: { projectId, project: { organizationId } },
       select: { words: true },
+    }),
+    /**
+     * SOURCE OF TRUTH KEYWORDS: RESOLVED_BEFORE_THE_GENERATOR,
+     *   ONE_RESOLVER_TWO_CALLERS, BACKGROUND_IS_A_FACT
+     *
+     * Phase 11. Resolved HERE rather than inside the generator, because
+     * choosing a background means weighing three candidates against the plan
+     * and generators resolve no entitlements (GENERATOR_CONTEXT_IS_FACTS). The
+     * same function feeds the picker, which is what keeps what the customer
+     * sees selected and what ends up in the video the same row.
+     *
+     * Null is the normal answer on a shipped checkout — the catalogue is empty
+     * until the licensing position is settled — and it means the styled
+     * backdrop, which is a complete video.
+     */
+    resolveProjectBackground(db, {
+      organizationId,
+      projectId,
+      plan,
+      kinds: [...BACKGROUND_ASSET_KINDS],
     }),
   ]);
 
@@ -602,6 +644,21 @@ export async function generatorContextFor(
       ),
       aspect: aspect.success ? aspect.data : "9:16",
       settings: settings.success ? settings.data : {},
+      background:
+        background === null
+          ? null
+          : {
+              assetId: background.row.id,
+              durationSec: background.row.durationSec,
+              /* LICENSE_TERMS_ARE_NOT_A_CATEGORY — the row's `license` column
+               * holds the real terms, which the document's closed enum cannot
+               * express. `licenseCategoryFor` maps one to the other and falls
+               * back to `unknown`, which is a value a render can be refused on
+               * rather than a claim nobody checked. */
+              license: licenseCategoryForSource(background.row.source),
+              width: background.row.width,
+              height: background.row.height,
+            },
       db,
     },
   };

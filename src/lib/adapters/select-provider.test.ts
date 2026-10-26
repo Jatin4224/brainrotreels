@@ -88,6 +88,10 @@ describe("jobs seam", () => {
        * test suite would notice it being renamed. */
       "render/finished",
       "asset/uploaded",
+      /* Phase 11's catalogue import. Its producer is a portal-only mutation
+       * and its consumer hands straight back to `asset/uploaded`, so a rename
+       * here would look exactly like a sync that simply did nothing. */
+      "library/requested",
       "footage/requested",
       "line/changed",
     ]) {

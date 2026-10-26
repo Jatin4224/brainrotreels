@@ -4,7 +4,7 @@
 
 /**
  * SOURCE OF TRUTH KEYWORDS: r2StorageAdapter, StorageAdapter, signedPutUrl,
- *   signedGetUrl, ContentLength signing, DELETE_BATCH_LIMIT
+ *   signedGetUrl, ContentLength signing, DELETE_BATCH_LIMIT, publicUrl
  *
  * WHAT:  The Cloudflare R2 implementation of StorageAdapter.
  * WHY:   `signedPutUrl` signs ContentType and ContentLength INTO the URL, so
@@ -30,7 +30,7 @@ import {
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
-import { getR2Bucket, getR2Client } from "./client";
+import { getR2Bucket, getR2Client, R2_PUBLIC_URL } from "./client";
 import {
   DEFAULT_SIGNED_GET_TTL_SECONDS,
   DEFAULT_SIGNED_PUT_TTL_SECONDS,
@@ -112,6 +112,27 @@ export const r2StorageAdapter: StorageAdapter = {
         }),
       );
     }
+  },
+
+  /**
+   * SOURCE OF TRUTH KEYWORDS: publicUrl, R2_PUBLIC_URL, CDN_IS_OPTIONAL
+   *
+   * The configured CDN origin plus the key. Null when `R2_PUBLIC_URL` is
+   * unset, which is the normal state of a development checkout — the caller
+   * signs instead (see PUBLIC_IS_NOT_SIGNED on the contract).
+   *
+   * Encoded SEGMENT BY SEGMENT rather than with one `encodeURIComponent`: the
+   * slashes in a key are real path separators and escaping them would produce
+   * a URL for an object whose name contains "%2F", which does not exist.
+   */
+  publicUrl(key) {
+    if (R2_PUBLIC_URL.length === 0) return null;
+    const origin = R2_PUBLIC_URL.replace(/\/+$/, "");
+    const path = key
+      .split("/")
+      .map((segment) => encodeURIComponent(segment))
+      .join("/");
+    return `${origin}/${path}`;
   },
 
   async head(key): Promise<StorageObjectInfo | null> {

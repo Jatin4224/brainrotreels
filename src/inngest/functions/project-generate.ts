@@ -90,6 +90,7 @@ import {
   readRequestId,
   trackFunnelEvent,
 } from "@/lib/observability";
+import { getOrganizationTier } from "@/lib/feature-gate";
 import { estimateRenderCost } from "@/lib/credits";
 import {
   GeneratorNotImplementedError,
@@ -685,10 +686,29 @@ export const projectGenerateFunction = inngestClient.createFunction(
     const built = await step.run("build-timeline", async () => {
       await beginStage(prisma, projectId, "timeline");
 
+      /**
+       * SOURCE OF TRUTH KEYWORDS: PLAN_IS_RESOLVED_FOR_THE_BACKGROUND,
+       *   RESOLVED_BEFORE_THE_GENERATOR
+       *
+       * Phase 11. The context now carries a resolved background, and choosing
+       * one means checking a row's `minPlan` — so the plan has to be read
+       * somewhere, and the workflow is the right somewhere: a generator
+       * resolves no entitlements (GENERATOR_CONTEXT_IS_FACTS) and a service
+       * resolves none either. The render pre-flight already reads a plan the
+       * same way (WATERMARK_IS_DECIDED_BEFORE_THE_RENDER), so this is the
+       * established place for it.
+       *
+       * It is read fresh rather than taken from the event: a run that waited
+       * in a queue while the workspace downgraded must use the plan it has
+       * NOW, not the one it had when it clicked.
+       */
+      const tier = await getOrganizationTier(organizationId);
+
       const assembled = await generatorContextFor(
         prisma,
         organizationId,
         projectId,
+        tier.tier,
       );
       if (assembled === null) {
         const reason = "This project is no longer available.";

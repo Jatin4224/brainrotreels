@@ -66,3 +66,31 @@ describe("storage seam", () => {
     await expect(adapter.deleteObjects([])).resolves.toBeUndefined();
   });
 });
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: publicUrl tests, CDN_IS_OPTIONAL,
+ *   PUBLIC_IS_NOT_SIGNED
+ *
+ * WHAT:  That a bucket with no CDN in front of it still works.
+ * WHY:   CDN_IS_OPTIONAL is the half of Phase 11's CDN serving that has to be
+ *        true on a fresh clone: `R2_PUBLIC_URL` is optional, and these tests
+ *        run with no R2 variables at all, so `publicUrl` must answer null
+ *        rather than throw or invent an origin. `signScopedKey` then falls back
+ *        to signing, and the only cost of an unconfigured CDN is cache misses.
+ * WHERE: Run by `npm test`. Guards publicUrl in ./r2.
+ */
+describe("publicUrl", () => {
+  it("answers null with no CDN origin configured", async () => {
+    const adapter = await getStorageAdapter();
+    expect(adapter.publicUrl("library/backgrounds/lib-waves/vertical.mp4")).toBeNull();
+  });
+
+  /* It must not need credentials either — the same laziness as the rest of the
+   * adapter (FAIL_AT_CALL_TIME), since a public URL is string concatenation and
+   * has nothing to sign. */
+  it("does not require R2 credentials", async () => {
+    const adapter = await getStorageAdapter();
+    expect(isR2Configured()).toBe(false);
+    expect(() => adapter.publicUrl("library/x/y.mp4")).not.toThrow();
+  });
+});

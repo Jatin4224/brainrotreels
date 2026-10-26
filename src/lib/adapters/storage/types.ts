@@ -59,6 +59,37 @@ export interface StorageAdapter {
 
   /** Returns null when absent, so a caller can distinguish missing from failed. */
   head(key: string): Promise<StorageObjectInfo | null>;
+
+  /**
+   * SOURCE OF TRUTH KEYWORDS: publicUrl, PUBLIC_IS_NOT_SIGNED,
+   *   CDN_IS_OPTIONAL
+   *
+   * WHAT:  The permanent CDN URL for an object, or null when there is none.
+   *
+   * WHY:   PUBLIC_IS_NOT_SIGNED. Library objects — curated backgrounds, music
+   *        beds, voice previews — are public by definition: every workspace is
+   *        served the identical bytes, so signing them per request buys no
+   *        access control and costs the whole CDN cache. A signed URL carries a
+   *        unique query string, which means every tenant (and every page load)
+   *        is a cache miss on an object that could be edge-cached forever.
+   *
+   *        SYNCHRONOUS and not a Promise, unlike every other method here, and
+   *        that is the shape of the thing rather than an inconsistency: there
+   *        is nothing to sign and nobody to ask. It is string concatenation
+   *        against a configured origin.
+   *
+   *        CDN_IS_OPTIONAL. Returns null when no public origin is configured,
+   *        which is the normal state of a development checkout — the caller
+   *        then falls back to signing, so a bucket with no CDN in front of it
+   *        still works and is merely slower. A thrown error here would make an
+   *        optional variable required.
+   *
+   *        It does NOT check whether the key is public. The adapter knows the
+   *        origin; the key convention knows what is shared (isLibraryKey), and
+   *        the one caller allowed to make that decision is `signScopedKey` in
+   *        src/services/assets.service.ts.
+   */
+  publicUrl(key: string): string | null;
 }
 
 export const STORAGE_PROVIDER_IDS = ["r2"] as const;

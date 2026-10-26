@@ -5,6 +5,7 @@
 /**
  * SOURCE OF TRUTH KEYWORDS: assetIngestFunction, asset/uploaded, asset.ingest,
  *   FFMPEG_RUNS_IN_A_CONTAINER, STEP_PER_VARIANT, RESUMABLE_INGEST,
+ *   ONE_OWNER_ONE_PREFIX, LIBRARY_IS_APPROVED_BY_REVIEW, LIBRARY_REVIEW_ENGINE,
  *   PERMANENT_VS_TRANSIENT_FAILURE, MODERATION_STUB, NonRetriableError
  *
  * WHAT:  The ingest pipeline: probe the uploaded file, refuse what cannot be
@@ -74,7 +75,12 @@ import { z } from "zod";
 import { inngestClient } from "@/lib/adapters/jobs/inngest/client";
 import { getMediaAdapter } from "@/lib/adapters/media";
 import { MediaProcessingError } from "@/lib/adapters/media/types";
-import { uploadKey } from "@/lib/adapters/storage";
+import {
+  assetObjectKey,
+  libraryKindForAssetKind,
+  LIBRARY_KINDS,
+  type AssetKeyOwner,
+} from "@/lib/adapters/storage";
 import { prisma } from "@/lib/config/prisma";
 import {
   UnsupportedMediaError,
@@ -107,6 +113,21 @@ import { moderateText, recordModeration } from "@/services/moderation.service";
  * WHERE: The `moderate` step below, and the portal's review queue.
  */
 const VISUAL_REVIEW_ENGINE = "awaiting-visual-review";
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: LIBRARY_REVIEW_ENGINE, LIBRARY_IS_APPROVED_BY_REVIEW
+ *
+ * WHAT:  The `engine` recorded when a library row was cleared by its manifest
+ *        review rather than by a classifier.
+ * WHY:   The same reason VISUAL_REVIEW_ENGINE above is a sentinel: "a model
+ *        approved this" and "a person vouched for this in a commit" are
+ *        different facts, and a moderation table that cannot tell them apart
+ *        cannot answer "what has actually been classified". Grep it to find
+ *        every asset whose clearance rests on a human review rather than on a
+ *        check that ran.
+ * WHERE: The `moderate` step below; the portal's review queue.
+ */
+const LIBRARY_REVIEW_ENGINE = "library-manifest";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: assetUploadedEventSchema, EVENT_PAYLOAD_PARSED
@@ -153,10 +174,41 @@ const failureEventSchema = z.object({
  *        makes the replayed value and the fresh value the same thing.
  * WHERE: Passed from the probe step into the variant steps.
  */
+/**
+ * SOURCE OF TRUTH KEYWORDS: assetKeyOwnerSchema, AssetKeyOwner,
+ *   STEP_RESULTS_ARE_JSON
+ *
+ * The runtime mirror of `AssetKeyOwner`. It exists because the owner crosses a
+ * step boundary and therefore arrives as JSON on a replay (see
+ * STEP_RESULTS_ARE_JSON above) — a type alone would be erased and a replayed
+ * run would hand `assetObjectKey` an unchecked object.
+ */
+const assetKeyOwnerSchema = z.discriminatedUnion("scope", [
+  z.object({
+    scope: z.literal("organization"),
+    organizationId: z.string().min(1),
+  }),
+  z.object({ scope: z.literal("library"), libraryKind: z.enum(LIBRARY_KINDS) }),
+]);
+
 const probedFactsSchema = z.object({
   family: z.enum(["video", "image", "audio"]),
   kind: assetKindSchema,
   storageKey: z.string(),
+  /**
+   * SOURCE OF TRUTH KEYWORDS: ONE_OWNER_ONE_PREFIX, LIBRARY_ASSETS_ARE_SHARED
+   *
+   * WHO the objects belong to, not which workspace asked. Phase 02 carried an
+   * organization id here and that was right while every asset had one; a
+   * library row has none (`Asset.organizationId` is null so the catalogue can
+   * be shared by every workspace), and writing ITS variants under the syncing
+   * workspace's prefix would put them somewhere `isLibraryKey` rejects —
+   * invisible to every other tenant, and failing as a signing bug rather than
+   * a key bug. The union has no default, so the library case cannot be
+   * forgotten.
+   */
+  owner: assetKeyOwnerSchema,
+  /** The workspace whose moderation record this ingest writes against. */
   organizationId: z.string(),
   durationSec: z.number().nullable(),
   width: z.number().nullable(),
@@ -254,6 +306,48 @@ export const assetIngestFunction = inngestClient.createFunction(
         );
       }
 
+      /**
+       * SOURCE OF TRUTH KEYWORDS: ONE_OWNER_ONE_PREFIX, LIBRARY_ASSETS_ARE_SHARED
+       *
+       * Resolved from the ROW, once, here — not from the event, and not again
+       * in each variant step. A null `organizationId` means a shared library
+       * row (Phase 11), and its folder comes from the asset's kind rather than
+       * from anything the sync passed, so a background and a music bed land in
+       * the right places with no caller deciding.
+       *
+       * A library kind the key convention has no folder for is a permanent
+       * failure rather than a guess: writing an avatar's loop into
+       * `library/backgrounds/` would make it unfindable, and falling back to
+       * the organization prefix would make it unreadable by every tenant.
+       */
+      const libraryKind =
+        asset.organizationId === null
+          ? libraryKindForAssetKind(kind.data)
+          : null;
+
+      if (asset.organizationId === null && libraryKind === null) {
+        await markAssetFailed(
+          prisma,
+          assetId,
+          "This library asset's type has nowhere to live in the catalogue.",
+        );
+        throw new NonRetriableError(
+          `[asset.ingest] Library asset ${assetId} has kind "${kind.data}", which maps to no library folder.`,
+        );
+      }
+
+      const owner: AssetKeyOwner =
+        libraryKind !== null
+          ? { scope: "library", libraryKind }
+          : {
+              scope: "organization",
+              /* Non-null in this branch by construction: `libraryKind` is only
+               * null here when the row HAS an organization. Checked rather than
+               * asserted — `!` is banned and a narrowing that depends on two
+               * variables agreeing is worth proving. */
+              organizationId: asset.organizationId ?? input.data.organizationId,
+            };
+
       return withStagingDir(async (dir) => {
         const localPath = dir.file("original");
         await downloadToFile(asset.storageKey, localPath);
@@ -289,6 +383,7 @@ export const assetIngestFunction = inngestClient.createFunction(
           family,
           kind: kind.data,
           storageKey: asset.storageKey,
+          owner,
           organizationId: asset.organizationId ?? input.data.organizationId,
           durationSec: probe.durationSec,
           width: probe.video?.width ?? null,
@@ -324,7 +419,7 @@ export const assetIngestFunction = inngestClient.createFunction(
       await step.run(`variant-${plan.variant}`, () =>
         buildVariant({
           assetId,
-          organizationId: probed.organizationId,
+          owner: probed.owner,
           originalKey: probed.storageKey,
           plan,
           plans,
@@ -346,6 +441,37 @@ export const assetIngestFunction = inngestClient.createFunction(
         return { moderationStatus: "rejected", checked: false };
       }
 
+      /**
+       * SOURCE OF TRUTH KEYWORDS: LIBRARY_IS_APPROVED_BY_REVIEW,
+       *   MODERATION_IS_PARTIAL, MANIFEST_IS_THE_REVIEW
+       *
+       * Phase 11. A library row is APPROVED, and this is the one exception to
+       * the rule below it — so it is worth being exact about why it is not a
+       * hole in the fail-closed posture.
+       *
+       * An upload is held `pending` because nothing has looked at its pixels
+       * and this product has no vision classifier, so the honest state is "the
+       * check that matters did not happen". That reasoning does not transfer: a
+       * library row exists only because somebody added it to
+       * src/lib/library/backgrounds.manifest.ts, which is a code change that a
+       * person reads and that carries the licence they established. The human
+       * review has already happened, in the diff
+       * (MANIFEST_IS_THE_REVIEW) — holding it `pending` afterwards would mean
+       * asking an operator to clear, in a queue, the thing they themselves just
+       * committed, and until they did, every workspace's picker would be empty
+       * and every generated video would fall back to the backdrop.
+       *
+       * It is `approved` rather than `skipped` deliberately. `skipped` means
+       * "moderation does not apply to this" and is for OUR OWN output — a
+       * render's file, a narration line we synthesised from already-classified
+       * text (SKIPPED_IS_CLEARED). A curated loop is somebody else's footage
+       * that a person vouched for, which is exactly what `approved` means.
+       *
+       * The filename is still classified first, below: the manifest's `title`
+       * is text an operator typed and the check is free.
+       */
+      const isLibraryRow = asset.organizationId === null;
+
       /* The filename is the only TEXT an upload carries. Classified under the
        * `input` standard rather than `prompt`: it is material the customer
        * supplied, not a request they made. */
@@ -361,6 +487,24 @@ export const assetIngestFunction = inngestClient.createFunction(
       if (outcome.blocked && outcome.status === "rejected") {
         await setModerationStatus(prisma, assetId, "rejected");
         return { moderationStatus: "rejected", checked: true };
+      }
+
+      /* LIBRARY_IS_APPROVED_BY_REVIEW — see the note above. The record names
+       * the manifest as the engine, so the review queue and an auditor can both
+       * see WHO cleared it and on what basis. */
+      if (isLibraryRow) {
+        await recordModeration(prisma, {
+          organizationId: probed.organizationId,
+          subjectType: "asset",
+          subjectId: assetId,
+          status: "approved",
+          categories: [],
+          reason:
+            "Curated library asset. Reviewed by an operator when it was added to the background manifest, with its licence established there.",
+          engine: LIBRARY_REVIEW_ENGINE,
+        });
+        await setModerationStatus(prisma, assetId, "approved");
+        return { moderationStatus: "approved", checked: true };
       }
 
       /* PIXELS_ARE_UNCHECKED. A clean filename says nothing about the frames,
@@ -419,20 +563,23 @@ export const assetIngestFunction = inngestClient.createFunction(
  */
 async function buildVariant(args: {
   assetId: string;
-  organizationId: string;
+  owner: AssetKeyOwner;
   originalKey: string;
   plan: VariantPlan;
   plans: readonly VariantPlan[];
   durationSec: number | null;
 }): Promise<{ variant: string; bytes: number }> {
-  const { assetId, organizationId, originalKey, plan, plans } = args;
+  const { assetId, owner, originalKey, plan, plans } = args;
 
   const sourceKey =
     plan.source === "original"
       ? originalKey
-      : keyForVariant(organizationId, assetId, plans, plan.source);
+      : keyForVariant(owner, assetId, plans, plan.source);
 
-  const outputKey = uploadKey(organizationId, assetId, plan.filename);
+  /* ONE_OWNER_ONE_PREFIX — the prefix is the owner's, resolved once in the
+   * probe step. A library row's variants therefore land under `library/…` and
+   * are readable by every workspace. */
+  const outputKey = assetObjectKey(owner, assetId, plan.filename);
 
   return withStagingDir(async (dir) => {
     const inputPath = dir.file("input");
@@ -525,7 +672,7 @@ async function buildVariant(args: {
  * WHERE: buildVariant, for any plan whose `source` is not `original`.
  */
 function keyForVariant(
-  organizationId: string,
+  owner: AssetKeyOwner,
   assetId: string,
   plans: readonly VariantPlan[],
   source: Exclude<VariantPlan["source"], "original">,
@@ -536,5 +683,5 @@ function keyForVariant(
       `[asset.ingest] Variant plan refers to "${source}", which this plan does not build.`,
     );
   }
-  return uploadKey(organizationId, assetId, sourcePlan.filename);
+  return assetObjectKey(owner, assetId, sourcePlan.filename);
 }

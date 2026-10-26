@@ -662,6 +662,78 @@ export const RESOURCES = {
     },
   },
 
+  /**
+   * SOURCE OF TRUTH KEYWORDS: RESOURCES.backgroundLibrary, BREADTH_NOT_A_COUNTER,
+   *   LOCKED_NOT_HIDDEN, PORTAL_ONLY_SYNC, backgroundLibrary.applyBackground
+   *
+   * The curated background catalogue: footage loops, music beds and sound
+   * effects shared by every workspace (`Asset.organizationId: null`).
+   *
+   * BREADTH_NOT_A_COUNTER, and this is the one field here that cannot be
+   * guessed from the rest. The `limit` gates how much of the CATALOGUE a plan
+   * may use — not how many backgrounds a workspace has, not how often it may
+   * change one. There is deliberately no `create` verb, so section 9 of
+   * src/trpc/procedures/protected.ts never fires and section 13 never bumps a
+   * counter: nothing accumulates, `UsageMetrics` stays empty for this key, and
+   * the number is applied at READ time by the picker instead. That is why the
+   * limit is absolute rather than `period: 'month'` — a breadth cap that
+   * refilled would be meaningless.
+   *
+   * It appears on the pricing page and in the upgrade modal's comparison table
+   * for free, because both are generated from this registry — which is the
+   * whole reason the cap is declared here rather than as a constant beside the
+   * picker. A plan's catalogue breadth is a thing customers buy.
+   *
+   * LOCKED_NOT_HIDDEN governs how it is applied, the same rule the voice
+   * catalogue and the caption gallery follow: rows beyond a plan's reach are
+   * returned and LOCKED, never filtered out of the response. A background a
+   * customer never sees is one they have no reason to pay for. `apply` is the
+   * boundary that actually enforces it.
+   *
+   * Three permissions where the phase file names one. `read` is the picker.
+   * `apply` is the write — a project's chosen background, reached at the path
+   * verb `applyBackground`, because tRPC reserves `apply` (it collides with
+   * `Function.prototype.apply`, which is why `captionStyles` is reached at
+   * `applyStyle`). It needs a verb
+   * of its own because a mutation with no permission would be gated by nothing
+   * (the factory's section 7 refuses an ungated mutation outright). `sync` is
+   * the operator's catalogue import, PORTAL_ONLY_SYNC, exactly as
+   * `voices.sync` is: library rows are shared by every tenant, so a tenant
+   * able to write them could withdraw or replace a background for everyone.
+   */
+  backgroundLibrary: {
+    name: "Background library",
+    description: "The curated background catalogue",
+    permissions: ["read", "apply", "sync"],
+    limit: {
+      perPlan: {
+        free: 10,
+        starter: 100,
+        pro: "unlimited",
+        enterprise: "unlimited",
+        portal: "unlimited",
+      },
+      upgradeMessage: "Upgrade to {nextPlan} for the full background library",
+      availableOnFreeTrial: true,
+      unit: "backgrounds",
+    },
+    audit: {
+      describe: {
+        applyBackground: "Changed the background on project {input.projectId}",
+        sync: "Synced the background library from the manifest",
+      },
+    },
+    /* Picking a background is a settings write with no provider call behind
+     * it, so it is as cheap as a restyle and limited at the same number. The
+     * sync fetches and transcodes every manifest row it touches, which is the
+     * most expensive operator action in the product — three in five minutes is
+     * a dry run, a real run and a correction. */
+    rateLimit: {
+      applyBackground: { count: 60, window: "1 m" },
+      sync: { count: 3, window: "5 m" },
+    },
+  },
+
   invitation: {
     name: "Invitations",
     description: "Send invites and cancel pending invitations",

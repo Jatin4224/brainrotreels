@@ -7,6 +7,7 @@
  *   findAssetWithVariants, createProcessingAsset, markAssetReady,
  *   markAssetFailed, upsertAssetVariant, getAssetVariants, signAssetUrl,
  *   signVariantUrl, deleteAssetRow, sumAssetBytes, ASSET_LIST_SELECT,
+ *   LIBRARY_IS_SERVED_FROM_THE_CDN,
  *   AssetListItem, MINE_OR_LIBRARY, TENANT_SCOPED_QUERY, SIGNING_BOUNDARY,
  *   DELETE_REMOVES_EVERY_OBJECT, DbClient
  *
@@ -507,6 +508,36 @@ export async function signScopedKey(
   organizationId: string,
   ttlSeconds?: number,
 ): Promise<string | null> {
+  /**
+   * SOURCE OF TRUTH KEYWORDS: LIBRARY_IS_SERVED_FROM_THE_CDN,
+   *   PUBLIC_IS_NOT_SIGNED
+   *
+   * Phase 11, step 3. A library object is served from the CDN origin rather
+   * than signed, and this is the ONE place that decision is made — which is
+   * why it is here and not in the background service. Every path that turns a
+   * library asset into a URL comes through this function: the picker's
+   * thumbnails, a voice preview, and `signDocumentAssets` on the way to a
+   * render. A branch in any one of those would have left the other two
+   * signing.
+   *
+   * Signing a shared object buys nothing — every workspace is served the
+   * identical bytes — and costs the entire edge cache, because a signed URL
+   * carries a unique query string and is therefore a miss per tenant and per
+   * page load. It also makes a background in a rendered video expire, which a
+   * permanent public URL does not.
+   *
+   * The ownership check below still runs FIRST for tenant keys; this branch is
+   * reached only for a key the convention itself calls public
+   * (`isLibraryKey`), so no amount of CDN configuration can make a customer's
+   * upload public. With no origin configured `publicUrl` returns null and the
+   * key falls through to signing — CDN_IS_OPTIONAL.
+   */
+  if (isLibraryKey(storageKey)) {
+    const storage = await getStorageAdapter();
+    const publicUrl = storage.publicUrl(storageKey);
+    if (publicUrl !== null) return publicUrl;
+  }
+
   if (
     !isOwnedByOrganization(storageKey, organizationId) &&
     !isLibraryKey(storageKey)
