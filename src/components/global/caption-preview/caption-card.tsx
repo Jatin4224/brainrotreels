@@ -78,6 +78,20 @@ export interface CaptionCardProps {
   safeZone: SafeZone;
   /** The caption item's own band, if it carries one. */
   y?: number | undefined;
+  /**
+   * SOURCE OF TRUTH KEYWORDS: speaker, COLOUR_IS_NEVER_THE_ONLY_SIGNAL
+   *
+   * Phase 12. Who is talking on this card, when per-speaker colouring is on.
+   * ONE optional prop carrying BOTH the tint and the name tag, because the
+   * phase requires the pairing and two props would make 'colour only' a
+   * one-line shortcut — see COLOUR_IS_NEVER_THE_ONLY_SIGNAL in
+   * src/lib/captions/speakers.ts for why that matters to about one man in
+   * twelve.
+   *
+   * Absent for every single-voice video, which is every format but one, so the
+   * card looks exactly as it did before this existed.
+   */
+  speaker?: { color: string; label: string } | undefined;
 }
 
 /** ANIMATION_IS_BOUNDED — see animationStyle. */
@@ -90,6 +104,7 @@ export function CaptionCard({
   canvas,
   safeZone,
   y,
+  speaker,
 }: CaptionCardProps) {
   if (words.length === 0) return null;
 
@@ -144,6 +159,31 @@ export function CaptionCard({
           wordBreak: "break-word",
         }}
       >
+        {/* COLOUR_IS_NEVER_THE_ONLY_SIGNAL — the name tag is drawn whenever
+            the tint is, in the same element, so one cannot ship without the
+            other. It is part of the wrapping flow rather than absolutely
+            positioned, so a long caption pushes it rather than overlapping
+            it. */}
+        {speaker === undefined ? null : (
+          <span
+            style={{
+              fontSize: fontPx * 0.46,
+              fontWeight: 700,
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              color: speaker.color,
+              textShadow: shadow,
+              /* A full-width row of its own, so the tag sits ABOVE the words
+                 rather than inline with the first one. */
+              flexBasis: "100%",
+              textAlign: "center",
+              opacity: 0.9,
+            }}
+          >
+            {speaker.label}
+          </span>
+        )}
+
         {words.map((word) => (
           <CaptionWord
             key={word.i}
@@ -152,6 +192,7 @@ export function CaptionCard({
             fontPx={fontPx}
             shadow={shadow}
             style={style}
+            tint={speaker?.color}
           />
         ))}
       </div>
@@ -176,12 +217,21 @@ function CaptionWord({
   fontPx,
   shadow,
   style,
+  tint,
 }: {
   word: WordToken;
   seconds: number;
   fontPx: number;
   shadow: string;
   style: CaptionStyle;
+  /**
+   * The speaker's colour, when per-speaker colouring is on. It replaces the
+   * style's RESTING fill only — the highlight stays the style's own, so the
+   * active word still reads as the active word. Tinting both would mean a card
+   * where nothing stands out, which loses the thing captions are for in order
+   * to show the thing the name tag already says.
+   */
+  tint?: string | undefined;
 }) {
   const active = seconds >= word.s && seconds < word.e;
   const spoken = seconds >= word.e;
@@ -196,7 +246,8 @@ function CaptionWord({
     <span
       style={{
         display: "inline-block",
-        color: active || spoken ? style.highlight : style.fill,
+        color:
+          active || spoken ? style.highlight : (tint ?? style.fill),
         textShadow: shadow,
         ...(boxed
           ? {

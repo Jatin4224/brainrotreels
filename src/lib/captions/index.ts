@@ -68,3 +68,10 @@ export {
   RENDER_FONT_FAMILY,
   captionFontFamily,
 } from "./fonts";
+
+export {
+  SPEAKER_CAPTION_COLORS,
+  dominantSpeaker,
+  speakerCaptionTint,
+  speakerLabelFor,
+} from "./speakers";

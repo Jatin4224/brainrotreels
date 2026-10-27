@@ -106,15 +106,40 @@ export const backgroundAudioKindSchema = z.enum(BACKGROUND_AUDIO_KINDS);
 export type BackgroundAudioKind = z.infer<typeof backgroundAudioKindSchema>;
 
 /**
+ * SOURCE OF TRUTH KEYWORDS: LIBRARY_ART_KINDS, libraryArtKindSchema
+ *
+ * WHAT:  The library's still artwork — avatar frames, from Phase 12.
+ * WHY:   A third tuple rather than an entry in either of the two above,
+ *        because an avatar frame is neither a background nor audio and is
+ *        never offered by the background picker. What it SHARES is everything
+ *        behind the picker: the same manifest, the same ingest, the same
+ *        `library/avatars/…` prefix (LIBRARY_KIND_BY_ASSET_KIND already maps
+ *        it) and the same `minPlan` gate — which is the whole reason Phase 12
+ *        adds a tuple here instead of a second library.
+ *
+ *        `image` is deliberately NOT the kind. An `image` is a customer's own
+ *        upload; avatar artwork is a catalogue row with a provenance
+ *        attestation behind it, and conflating them would put somebody's
+ *        holiday photo in the character picker.
+ * WHERE: libraryAssetKindSchema below; src/lib/library/avatars.manifest.ts.
+ */
+export const LIBRARY_ART_KINDS = ["avatar"] as const;
+
+export const libraryArtKindSchema = z.enum(LIBRARY_ART_KINDS);
+
+export type LibraryArtKind = z.infer<typeof libraryArtKindSchema>;
+
+/**
  * SOURCE OF TRUTH KEYWORDS: libraryAssetKindSchema, LibraryAssetKind
  *
- * Everything the library may hold: footage and audio. A union of the two
- * tuples rather than a third list, so adding a kind to either one reaches the
- * manifest with no second edit.
+ * Everything the library may hold: footage, audio and artwork. A union of the
+ * tuples rather than a fourth list, so adding a kind to any one of them
+ * reaches the manifest with no second edit.
  */
 export const libraryAssetKindSchema = z.union([
   backgroundAssetKindSchema,
   backgroundAudioKindSchema,
+  libraryArtKindSchema,
 ]);
 
 export type LibraryAssetKind = z.infer<typeof libraryAssetKindSchema>;

@@ -325,6 +325,34 @@ export const OPTIONAL_ENV: readonly OptionalEnvVar[] = [
       },
     ],
   },
+  /* Reddit (Phase 12). A row of its own because it gates ONE FORMAT rather
+   * than a capability: without it every other kind of video still generates
+   * end to end, and only the Reddit input panel refuses. It is also the one
+   * credential here that belongs to a third party's TERMS rather than just
+   * their API — hence the help text, which is the only place an operator is
+   * told that the format has a kill switch in the registry. */
+  {
+    id: "reddit",
+    label: "Reddit stories (official API)",
+    purpose:
+      "Needed before a Reddit thread can be turned into a video. Only the Reddit format depends on it — every other kind of project generates without it, and the paste-your-own-text fallback works even when it is missing. Without it the thread field refuses and tells the customer to paste the text instead.",
+    help:
+      "Create a 'script' app at reddit.com/prefs/apps and set REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET. REDDIT_USER_AGENT is an optional override; leave it blank and one is built from the app name and client id, which is the shape Reddit's guidance asks for — requests with a generic User-Agent are rate-limited far harder. The API budget is shared by EVERY workspace on this deployment, which is why the format carries its own tight rate limits. If Reddit's terms change or the app is suspended, turn the format off for everybody by flipping the `redditStories` flag in src/lib/resources.ts — see A_FLAG_NOT_A_LIMIT.",
+    icon: "MessageSquare",
+    link: {
+      label: "Create a Reddit app",
+      url: "https://www.reddit.com/prefs/apps",
+    },
+    keys: [
+      { key: "REDDIT_CLIENT_ID", label: "Client ID" },
+      { key: "REDDIT_CLIENT_SECRET", label: "Client secret" },
+      {
+        key: "REDDIT_USER_AGENT",
+        label: "User-Agent override (blank builds one from the app name)",
+        optional: true,
+      },
+    ],
+  },
   /* Cloud rendering. A third media row rather than part of the other two,
    * because it fails at a different point again and the fix is in a different
    * cloud: without R2 nothing can be uploaded, without ffmpeg nothing can be

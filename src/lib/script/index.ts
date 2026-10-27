@@ -27,6 +27,24 @@ export { extractSource, SourceExtractionError } from "./ingest";
 export type { ExtractedSource } from "./ingest";
 export { generateScript, regenerateScriptBlock } from "./generate";
 export type { GeneratedScript } from "./generate";
+export { condenseThread, estimateThreadSeconds } from "./condense";
+export {
+  SCRIPT_WRITERS,
+  ScriptWriterNotImplementedError,
+  hasScriptWriter,
+  resolveScriptWriter,
+} from "./writers";
+export type {
+  ScriptWriter,
+  WriterContext,
+  WrittenScript,
+  WrittenScriptBlock,
+} from "./writers";
+export {
+  condenseSystemPrompt,
+  condenseUserPrompt,
+  flattenThread,
+} from "./reddit-prompt";
 export {
   MAX_REDIRECTS,
   UrlGuardError,

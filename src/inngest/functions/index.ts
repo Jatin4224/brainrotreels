@@ -23,6 +23,7 @@ import { projectAlignFunction } from "./project-align";
 import { projectGenerateFunction } from "./project-generate";
 import { projectRenderFunction } from "./project-render";
 import { projectTtsFunction } from "./project-tts";
+import { redditRetentionFunction } from "./reddit-retention";
 import { scriptGenerateFunction } from "./script-generate";
 import { usageResetFunction } from "./usage-reset";
 
@@ -39,4 +40,5 @@ export const INNGEST_FUNCTIONS = [
   projectAlignFunction,
   projectGenerateFunction,
   costAlertFunction,
+  redditRetentionFunction,
 ];

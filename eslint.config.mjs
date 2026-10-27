@@ -50,6 +50,26 @@ const eslintConfig = defineConfig([
           message:
             "PROVIDER_ISOLATION: read ELEVENLABS_API_KEY only inside src/lib/adapters/tts/elevenlabs/** or src/lib/adapters/stt/elevenlabs/**. Elsewhere, use getTtsAdapter() from @/lib/adapters/tts or getSttAdapter() from @/lib/adapters/stt.",
         },
+        // Reddit seam (Phase 12). The fence is on the CREDENTIAL rather than
+        // an import, because this adapter uses `fetch` and has no SDK — the
+        // same mechanism, and the same reasoning, as ELEVENLABS_API_KEY above.
+        // It matters more than it looks: the secret is an OAuth app's, so a
+        // leak is somebody else spending OUR shared API budget and getting the
+        // app suspended for everybody. src/lib/adapters/reddit/url.ts stays
+        // pure and credential-free so the HOST ALLOWLIST — the check with
+        // security consequences — is importable and testable anywhere.
+        {
+          selector:
+            "MemberExpression[object.object.name='process'][object.property.name='env'] > Literal[value='REDDIT_CLIENT_SECRET']",
+          message:
+            "PROVIDER_ISOLATION: read REDDIT_CLIENT_SECRET only inside src/lib/adapters/reddit/official/**. Elsewhere, use getRedditAdapter() from @/lib/adapters/reddit — and validate a URL with parseRedditThreadUrl, which needs no credential.",
+        },
+        {
+          selector:
+            "MemberExpression[object.object.name='process'][object.property.name='env'] > Identifier[name='REDDIT_CLIENT_SECRET']",
+          message:
+            "PROVIDER_ISOLATION: read REDDIT_CLIENT_SECRET only inside src/lib/adapters/reddit/official/**. Elsewhere, use getRedditAdapter() from @/lib/adapters/reddit — and validate a URL with parseRedditThreadUrl, which needs no credential.",
+        },
       ],
       "no-restricted-imports": [
         "error",
@@ -196,6 +216,12 @@ const eslintConfig = defineConfig([
       // and src/lib/captions/ stay pure, so the back-match, the degrade
       // distribution and the contrast rule are testable with no key.
       "src/lib/adapters/stt/elevenlabs/**/*.ts",
+      // Reddit seam. Only this folder may read REDDIT_CLIENT_SECRET; the fence
+      // is on the credential rather than an import, because this adapter uses
+      // fetch and has no SDK. `url.ts` sits OUTSIDE it deliberately and stays
+      // pure, so the host allowlist and the post-id validation are testable
+      // with no credential and importable by a form validator.
+      "src/lib/adapters/reddit/official/**/*.ts",
     ],
     rules: {
       // These folders ARE the translation layer, so the credential fence is

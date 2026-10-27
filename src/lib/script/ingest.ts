@@ -39,11 +39,13 @@
 import "server-only";
 
 import { getStorageAdapter } from "@/lib/adapters/storage";
+import { getRedditAdapter, RedditError, type RedditThread } from "@/lib/adapters/reddit";
+import { redditErrorMessage } from "@/lib/types/reddit";
 import {
   SOURCE_FETCH_MAX_BYTES,
   SOURCE_FETCH_TIMEOUT_MS,
   SOURCE_TEXT_MAX_CHARS,
-  type ScriptSource,
+  type ExtractableSource,
   type SourceKind,
 } from "@/lib/types/script";
 import {
@@ -52,6 +54,7 @@ import {
   htmlToReadableText,
   stripPdfFurniture,
 } from "./readable";
+import { flattenThread } from "./reddit-prompt";
 import { UrlGuardError, guardedFetch } from "./url-guard";
 
 /**
@@ -92,6 +95,20 @@ export interface ExtractedSource {
   truncated: boolean;
   /** Where the text actually came from — a URL may redirect. */
   finalUrl?: string | undefined;
+  /**
+   * SOURCE OF TRUTH KEYWORDS: STRUCTURE_SURVIVES_EXTRACTION
+   *
+   * The Reddit path only. Phase 12 needs the thread's STRUCTURE as well as its
+   * prose, because the speaker split depends on knowing which sentence was the
+   * poster's and which was a reply — and that is not recoverable from the
+   * flattened text without parsing our own formatting back out, which would
+   * make the cast depend on a string template.
+   *
+   * `text` is still the authority for everything else: it is what moderation
+   * judges and what a human operator reads when asking why a script came out
+   * wrong. This is the extra, not a replacement.
+   */
+  thread?: RedditThread | undefined;
 }
 
 /**
@@ -101,7 +118,7 @@ export interface ExtractedSource {
  * WHERE: See the file header.
  */
 export async function extractSource(
-  source: ScriptSource,
+  source: ExtractableSource,
 ): Promise<ExtractedSource> {
   switch (source.kind) {
     case "text":
@@ -110,6 +127,8 @@ export async function extractSource(
       return fromUrl(source.value);
     case "pdf":
       return fromPdf(source.value);
+    case "reddit":
+      return fromReddit(source.value);
     default: {
       /* Exhaustive over the discriminated union — a new kind without a case
        * here is a compile error at the `never` branch. */
@@ -200,6 +219,81 @@ async function fromUrl(value: string): Promise<ExtractedSource> {
     kind: "url",
     truncated,
     finalUrl: fetched.finalUrl,
+  };
+}
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: fromReddit, REDDIT_IS_A_FOURTH_PATH,
+ *   FIVE_FAILURES_NOT_ONE, EVERY_FAILURE_OFFERS_THE_FALLBACK,
+ *   STRUCTURE_SURVIVES_EXTRACTION
+ *
+ * WHAT:  A thread URL becomes the prose a script is written from, plus the
+ *        structure the speaker split needs.
+ *
+ * WHY:   REDDIT_IS_A_FOURTH_PATH rather than a flavour of `fromUrl`, and the
+ *        difference is not cosmetic. `fromUrl` fetches arbitrary HTML through
+ *        the SSRF guard and guesses at an article; this calls a documented,
+ *        authenticated API with a host allowlist and gets typed fields back.
+ *        Routing a Reddit link through `fromUrl` would mean scraping — which is
+ *        against Reddit's terms, breaks without notice, and would lose the
+ *        comment structure entirely.
+ *
+ *        The SSRF question does not arise here, which is worth stating because
+ *        it looks like an omission: nothing customer-supplied becomes a URL we
+ *        fetch. The only thing taken from the input is a base-36 post id,
+ *        validated by `parseRedditThreadUrl` against a character class, and the
+ *        host is ours (`oauth.reddit.com`). Grep HOST_IS_AN_ALLOWLIST and
+ *        POST_ID_IS_BASE36 in src/lib/adapters/reddit/url.ts.
+ *
+ *        FIVE_FAILURES_NOT_ONE is preserved across this boundary rather than
+ *        flattened into "could not fetch": the adapter's reason is mapped to
+ *        its own sentence by `redditErrorMessage`, and every one of those
+ *        sentences ends by offering the paste-text fallback
+ *        (EVERY_FAILURE_OFFERS_THE_FALLBACK). That mapping is the phase's step
+ *        2, and it lives in lib/types rather than here so the input panel can
+ *        show the same words before a request is made.
+ *
+ *        TOO_LITTLE_TEXT applies here too, and the common cause is specific: a
+ *        link post with no body whose every top comment was deleted. The
+ *        transport succeeded and there is nothing to narrate.
+ * WHERE: extractSource, for `kind: 'reddit'`.
+ */
+async function fromReddit(value: string): Promise<ExtractedSource> {
+  const reddit = await getRedditAdapter();
+
+  let thread: RedditThread;
+  try {
+    thread = await reddit.fetchThread(value);
+  } catch (error) {
+    if (error instanceof RedditError) {
+      /* The reason becomes the sentence; the detail stays for the operator. */
+      throw new SourceExtractionError(
+        redditErrorMessage(error.reason),
+        `reddit ${error.reason}: ${error.detail}`,
+      );
+    }
+    throw error;
+  }
+
+  /* The SAME flattening the model is given, so the text moderation judges and
+   * the text the model reads are one string (see flattenThread). */
+  const { text, truncated } = cap(flattenThread(thread));
+
+  if (text.length < MIN_USEFUL_CHARS) {
+    throw new SourceExtractionError(
+      "That thread has almost nothing left to read — the post may be a link with no text and its comments may have been deleted. Pick another thread, or paste the text instead.",
+      `flattened thread was ${text.length} chars`,
+    );
+  }
+
+  return {
+    text,
+    title: thread.title,
+    kind: "reddit",
+    truncated,
+    finalUrl: thread.permalink,
+    /* STRUCTURE_SURVIVES_EXTRACTION — the speaker split needs this. */
+    thread,
   };
 }
 

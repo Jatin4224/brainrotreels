@@ -145,7 +145,17 @@ export async function replaceScript(
   args: {
     organizationId: string;
     projectId: string;
-    blocks: readonly ScriptBlockDraft[];
+    /**
+     * SOURCE OF TRUTH KEYWORDS: SPEAKER_TAG_IS_OPTIONAL
+     *
+     * Phase 12 widened this from `ScriptBlockDraft`. A block may now name the
+     * SPEAKER that says it, which is what makes a multi-voice format possible
+     * — and it is optional rather than required because a single-narrator
+     * script genuinely has no cast to choose from. An absent tag is defaulted
+     * to `narrator` by `splitScriptIntoLines`, so nothing downstream needs to
+     * know which kind of script it is looking at.
+     */
+    blocks: readonly (ScriptBlockDraft & { speakerTag?: string | undefined })[];
   },
 ): Promise<number> {
   await db.scriptBlock.deleteMany({
@@ -164,6 +174,12 @@ export async function replaceScript(
       /* Derived here rather than taken from the caller, so the stored duration
        * is always the one implied by the stored text — they cannot drift. */
       durationEstimate: estimateSpokenSeconds(block.narrationText),
+      /* Omitted rather than written as null when absent, so the column keeps
+       * whatever default it has and `exactOptionalPropertyTypes` is satisfied
+       * without a cast. */
+      ...(block.speakerTag !== undefined && block.speakerTag.length > 0
+        ? { speakerTag: block.speakerTag }
+        : {}),
     })),
   });
 

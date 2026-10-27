@@ -418,6 +418,35 @@ export const captionTrackSchema = z
     /* Overrides doc.style.captionStyleId for this lane only — a second caption
      * track exists so a translation can be styled differently. */
     styleId: idSchema.optional(),
+    /**
+     * SOURCE OF TRUTH KEYWORDS: speakerColors, COLOUR_IS_NEVER_THE_ONLY_SIGNAL,
+     *   ADDING_A_FIELD_IS_NOT_A_MIGRATION
+     *
+     * Phase 12. Tint each caption in its speaker's colour and show a name tag
+     * with it. A PER-LANE setting, which is what this track exists to hold —
+     * the schema's own note says a per-lane value is the alternative to
+     * repeating it on every item, and sixty caption items carrying the same
+     * boolean is exactly that.
+     *
+     * COLOUR_IS_NEVER_THE_ONLY_SIGNAL: switching this on turns on the NAME TAG
+     * too, in the one component that draws both. The phase requires the pairing
+     * and the reason is not decoration — roughly one man in twelve cannot
+     * reliably tell two tinted captions apart, and colour alone would make the
+     * speaker attribution invisible to them.
+     *
+     * ADDING_A_FIELD_IS_NOT_A_MIGRATION, the same reasoning as Phase 09's
+     * `backdrop` render kind: an OPTIONAL field leaves every stored document
+     * valid under the new schema, so there is nothing for a migration step to
+     * change and no `docVersion` bump went with it. A bump with an empty
+     * migration would be a claim that documents needed rewriting.
+     *
+     * Optional rather than defaulted, matching `styleId` above: a `.default()`
+     * makes the field REQUIRED on the inferred output type, which would mean
+     * every fixture and every caption-track builder growing a
+     * `speakerColors: false` that says nothing. Absent means off, and the one
+     * reader coalesces it.
+     */
+    speakerColors: z.boolean().optional(),
     items: z.array(captionItemSchema),
   })
   .strict();

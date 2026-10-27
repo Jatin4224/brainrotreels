@@ -56,8 +56,13 @@ import {
 import { LlmError } from "@/lib/adapters/llm";
 import { prisma } from "@/lib/config/prisma";
 import { estimate } from "@/lib/credits";
-import { generateScript } from "@/lib/script";
+import {
+  ScriptWriterNotImplementedError,
+  hasScriptWriter,
+  resolveScriptWriter,
+} from "@/lib/script";
 import { scriptToneSchema } from "@/lib/types/script";
+import { projectKindSchema } from "@/lib/types/project";
 import {
   InsufficientCreditsError,
   commit,
@@ -111,6 +116,40 @@ const failureEventSchema = z.object({
 const storedSourceSchema = z.object({
   sourceText: z.string().min(1),
   sourceTitle: z.string().nullable().optional(),
+  /**
+   * SOURCE OF TRUTH KEYWORDS: THREAD_IS_STORED_NOT_REFETCHED
+   *
+   * Phase 12. A Reddit project's structured thread, written by
+   * `redditStories.start` alongside the flattened text. The condensation needs
+   * the STRUCTURE — which sentence was the poster's and which was a reply —
+   * and re-fetching the thread here would mean a second call against a third
+   * party's API inside a run that already has the answer, against a post that
+   * may have been deleted in between.
+   *
+   * Optional, because only one format has one. A project whose thread has been
+   * removed by the retention sweep therefore fails its CONDENSATION with a
+   * named error rather than silently narrating the flattened text in one
+   * voice — which is the honest outcome: the source the video was made from is
+   * gone, and the existing script is unaffected.
+   */
+  thread: z
+    .object({
+      title: z.string(),
+      subreddit: z.string(),
+      body: z.string(),
+      author: z.string(),
+      permalink: z.string(),
+      comments: z.array(
+        z.object({
+          author: z.string(),
+          body: z.string(),
+          score: z.number(),
+        }),
+      ),
+    })
+    .optional(),
+  /** Reddit only: whether to cut the thread to the target length. */
+  condense: z.boolean().optional(),
 });
 
 export const scriptGenerateFunction = inngestClient.createFunction(
@@ -183,7 +222,9 @@ export const scriptGenerateFunction = inngestClient.createFunction(
     const source = await step.run("load-source", async () => {
       const project = await prisma.project.findFirst({
         where: { id: projectId, organizationId },
-        select: { id: true, settings: true },
+        /* `kind` is read here so the WRITER can be resolved from it —
+         * ONE_WORKFLOW_MANY_WRITERS, Phase 12. */
+        select: { id: true, kind: true, settings: true },
       });
       if (project === null) {
         /* Deleted while the event was in flight. Nothing to mark failed. */
@@ -208,14 +249,38 @@ export const scriptGenerateFunction = inngestClient.createFunction(
         );
       }
 
+      /**
+       * SOURCE OF TRUTH KEYWORDS: ONE_WORKFLOW_MANY_WRITERS,
+       *   UNWRITABLE_KIND_IS_NAMED
+       *
+       * The kind is resolved here, in the step that already reads the project,
+       * and refused HERE — before the credit hold — if no writer is built for
+       * it. Refusing after the hold would mean reserving a customer's credits
+       * for a format that cannot be written, and the refusal is permanent:
+       * a missing writer will not appear on the second attempt.
+       */
+      const kind = projectKindSchema.safeParse(project.kind);
+      if (!kind.success || !hasScriptWriter(kind.data)) {
+        const reason = `${project.kind} scripts cannot be written yet.`;
+        await failAndRelease(projectId, reason);
+        throw new NonRetriableError(
+          `[script.generate] ${projectId}: no writer for kind "${project.kind}".`,
+        );
+      }
+
       await prisma.project.updateMany({
         where: { id: projectId, organizationId },
         data: { status: "generating" },
       });
 
       return {
+        kind: kind.data,
         sourceText: parsed.data.sourceText,
         sourceTitle: parsed.data.sourceTitle ?? null,
+        /* STEP_RESULTS_ARE_JSON: this crosses a step boundary and comes back
+         * as plain data on a replay, which is why it is re-parsed below. */
+        thread: parsed.data.thread ?? null,
+        condense: parsed.data.condense ?? true,
       };
     });
 
@@ -272,13 +337,39 @@ export const scriptGenerateFunction = inngestClient.createFunction(
     // ───────────────────────────────────────────────────────────────────────
     const draft = await step.run("generate", async () => {
       try {
-        return await generateScript({
-          sourceText: source.sourceText,
-          targetSeconds,
-          tone,
-          title: source.sourceTitle ?? undefined,
-        });
+        /**
+         * ONE_WORKFLOW_MANY_WRITERS. The kind picks the writer and nothing
+         * else in this file knows which format is being written — no
+         * `if (kind === 'reddit-story')` anywhere, which is the property the
+         * registry exists to hold (see THE_OTHER_EXTENSION_POINT in
+         * src/lib/script/writers.ts).
+         *
+         * The source is re-parsed from the step result rather than trusted,
+         * because a replayed step returns JSON (STEP_RESULTS_ARE_JSON).
+         */
+        const loaded = storedSourceSchema
+          .pick({ thread: true })
+          .safeParse({ thread: source.thread ?? undefined });
+
+        return await resolveScriptWriter(projectKindSchema.parse(source.kind))
+          .write({
+            sourceText: source.sourceText,
+            targetSeconds,
+            tone,
+            sourceTitle: source.sourceTitle ?? undefined,
+            ...(loaded.success && loaded.data.thread !== undefined
+              ? { thread: loaded.data.thread }
+              : {}),
+            condense: source.condense,
+          });
       } catch (error) {
+        if (error instanceof ScriptWriterNotImplementedError) {
+          /* The kind was checked before the hold, so reaching here means a
+           * writer withdrawn between that check and this call — a deploy mid
+           * run. Permanent: it will not reappear on the second attempt. */
+          await failAndRelease(projectId, error.message);
+          throw new NonRetriableError(error.message);
+        }
         if (error instanceof LlmError) {
           console.error(`[script.generate] ${projectId}: ${error.detail}`);
           if (error.permanent) {

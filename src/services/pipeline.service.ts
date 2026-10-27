@@ -49,7 +49,7 @@ import "server-only";
 
 import type { Prisma } from "@/generated/prisma";
 import { generatorSkipsFor } from "@/lib/generators";
-import type { GeneratorContext } from "@/lib/generators";
+import type { CastMember, GeneratorContext } from "@/lib/generators";
 import { type DbClient } from "@/lib/config/prisma";
 import { hashValue, wordTokenSchema, type WordToken } from "@/lib/timeline";
 import { jsonObjectSchema } from "@/lib/types/json";
@@ -58,6 +58,8 @@ import {
   BACKGROUND_ASSET_KINDS,
   licenseCategoryForSource,
 } from "@/lib/types/background";
+import { avatarAvailableOnPlan, readAvatarAssetSet } from "@/lib/types/avatar";
+import { redditThreadSnapshotSchema } from "@/lib/types/reddit";
 import { resolveProjectBackground } from "./backgrounds.service";
 import {
   PIPELINE_STAGES,
@@ -571,7 +573,9 @@ export async function generatorContextFor(
   const [speakers, lines, alignment, background] = await Promise.all([
     db.speaker.findMany({
       where: { organizationId, projectId },
-      select: { tag: true, voiceId: true },
+      /* `avatarId` is read here so the cast can be resolved in one more query
+       * rather than one per speaker — Phase 12, CAST_IS_A_FACT. */
+      select: { tag: true, voiceId: true, avatarId: true },
       orderBy: { tag: "asc" },
     }),
     db.narrationLine.findMany({
@@ -617,6 +621,30 @@ export async function generatorContextFor(
    * product's default shape rather than failing a run that is otherwise fine. */
   const aspect = aspectRatioSchema.safeParse(project.aspect);
 
+  /**
+   * SOURCE OF TRUTH KEYWORDS: CAST_IS_A_FACT, RESOLVED_BEFORE_THE_GENERATOR
+   *
+   * Phase 12. The faces, resolved to artwork ids before the build, for the same
+   * reason the background is: it is three tables and a plan check, and a
+   * generator may do neither (GENERATOR_CONTEXT_IS_FACTS, GENERATORS_STAY_PURE).
+   *
+   * ONE query for every avatar the cast names, not one per speaker — a thread
+   * with three roles would otherwise be three round trips to answer one
+   * question. Resolved AFTER the speakers because it depends on them, which is
+   * why it is not in the `Promise.all` above.
+   */
+  const cast = await resolveCast(db, speakers, plan);
+
+  /**
+   * SOURCE OF TRUTH KEYWORDS: SNAPSHOT_IS_WHAT_THE_CARD_SHOWS
+   *
+   * The thread's facts for the title card, read from the project's own
+   * settings rather than re-fetched. Null for every non-Reddit format, and
+   * null once the retention window has passed — in which case the story still
+   * renders, without its card.
+   */
+  const thread = readThreadSnapshot(settings.success ? settings.data : {});
+
   return {
     kind: kind.data,
     ctx: {
@@ -659,6 +687,8 @@ export async function generatorContextFor(
               width: background.row.width,
               height: background.row.height,
             },
+      cast,
+      thread,
       db,
     },
   };
@@ -668,6 +698,101 @@ export async function generatorContextFor(
  * payload is jsonb written by a possibly older release, so it is parsed with
  * the document's own schema. An unparseable alignment yields no captions rather
  * than captions with NaN timings. */
+/**
+ * SOURCE OF TRUTH KEYWORDS: resolveCast, CAST_IS_A_FACT,
+ *   A_SET_IS_COMPLETE_OR_REFUSED, UNASSIGNED_IS_NOT_AN_ERROR
+ *
+ * WHAT:  Speaker tag → the artwork ids of the avatar assigned to it.
+ *
+ * WHY:   UNASSIGNED_IS_NOT_AN_ERROR. Three things make a speaker drop out of
+ *        the cast, and all three are normal rather than failures: no avatar
+ *        assigned (a narrator who is never on screen), an avatar that has since
+ *        been withdrawn (`isActive: false` — DEACTIVATE_NEVER_DELETE), and an
+ *        avatar above the workspace's plan. Each one means no overlay for that
+ *        speaker, which is a video with fewer faces and not a broken one.
+ *
+ *        A_SET_IS_COMPLETE_OR_REFUSED: an avatar whose `assetSet` does not
+ *        parse into all three states is skipped too. A character missing its
+ *        resting frame would vanish between sentences, and no overlay is better
+ *        than one that flickers to nothing.
+ *
+ *        The plan check is HERE rather than in the generator because this is
+ *        the layer that was given the plan, and it is re-checked at generate
+ *        time rather than trusted from the assignment: a workspace can
+ *        downgrade between casting a premium character and generating, and the
+ *        honest result then is a video without that face rather than a paid
+ *        feature leaking.
+ * WHERE: generatorContextFor.
+ */
+async function resolveCast(
+  db: DbClient,
+  speakers: readonly { tag: string; avatarId: string | null }[],
+  plan: PlanKey,
+): Promise<Record<string, CastMember | undefined>> {
+  const wanted = [
+    ...new Set(
+      speakers.flatMap((speaker) =>
+        speaker.avatarId === null ? [] : [speaker.avatarId],
+      ),
+    ),
+  ];
+  if (wanted.length === 0) return {};
+
+  const rows = await db.avatar.findMany({
+    where: { id: { in: wanted }, isActive: true },
+    select: { id: true, assetSet: true, minPlan: true },
+  });
+
+  const usable = new Map<string, CastMember>();
+  for (const row of rows) {
+    if (!avatarAvailableOnPlan(row.minPlan, plan)) continue;
+    const states = readAvatarAssetSet(row.assetSet);
+    if (states === null) {
+      console.warn(
+        `[pipeline.service] Avatar ${row.id} has an incomplete asset set; no overlay will be drawn for it.`,
+      );
+      continue;
+    }
+    usable.set(row.id, { avatarId: row.id, states });
+  }
+
+  const cast: Record<string, CastMember | undefined> = {};
+  for (const speaker of speakers) {
+    if (speaker.avatarId === null) continue;
+    const member = usable.get(speaker.avatarId);
+    if (member !== undefined) cast[speaker.tag] = member;
+  }
+  return cast;
+}
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: readThreadSnapshot, SNAPSHOT_IS_WHAT_THE_CARD_SHOWS,
+ *   SETTINGS_ARE_PARSED_NOT_TRUSTED
+ *
+ * WHAT:  The thread facts for a title card, out of `Project.settings.reddit`.
+ * WHY:   Null for anything that does not parse, which covers three real cases
+ *        with one answer: a non-Reddit project (no `reddit` key at all), a
+ *        Reddit project whose snapshot the retention sweep has removed, and a
+ *        row written by an older release. All three mean "draw no card", and a
+ *        thrown error would fail a run that is otherwise fine.
+ *
+ *        Only the three fields the card draws are passed on, even though the
+ *        snapshot holds more: a generator that could see the URL and the fetch
+ *        time would be a generator somebody later puts them on screen from.
+ * WHERE: generatorContextFor.
+ */
+function readThreadSnapshot(
+  bag: Record<string, unknown>,
+): { title: string; subreddit: string; author: string } | null {
+  const parsed = redditThreadSnapshotSchema.safeParse(bag["reddit"]);
+  if (!parsed.success) return null;
+  return {
+    title: parsed.data.title,
+    subreddit: parsed.data.subreddit,
+    author: parsed.data.author,
+  };
+}
+
 function readWords(projectId: string, words: unknown): WordToken[] {
   if (words === undefined || words === null) return [];
   const parsed = wordTokenSchema.array().safeParse(words);

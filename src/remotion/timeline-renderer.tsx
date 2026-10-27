@@ -197,7 +197,10 @@ function PlannedItemRenderer({
   narrationWindows: readonly { from: number; durationInFrames: number }[];
   words: readonly WordToken[];
   safeZone: TimelineDoc["style"]["safeZone"];
-  captionStyleByItem: ReadonlyMap<string, string>;
+  captionStyleByItem: ReadonlyMap<
+    string,
+    { styleId: string; speakerColors: boolean }
+  >;
 }) {
   /* `item` is a document value, which is JSON by construction — the props
    * every component receives are deliberately loose, and each one narrows what
@@ -228,7 +231,10 @@ function PlannedItemRenderer({
       <CaptionGroup
         range={{ startWord: item.startWord, endWord: item.endWord }}
         words={words}
-        styleId={captionStyleByItem.get(plan.id) ?? DEFAULT_CAPTION_STYLE_ID}
+        styleId={
+          captionStyleByItem.get(plan.id)?.styleId ?? DEFAULT_CAPTION_STYLE_ID
+        }
+        speakerColors={captionStyleByItem.get(plan.id)?.speakerColors}
         safeZone={safeZone}
         canvas={canvas}
         frames={props.frames}
@@ -298,13 +304,21 @@ function collectNarrationWindows(
  *        every other consumer of the plan carry a field only captions use.
  * WHERE: TimelineRenderer, once per render; read per caption item.
  */
-function collectCaptionStyles(doc: TimelineDoc): ReadonlyMap<string, string> {
-  const byItem = new Map<string, string>();
+function collectCaptionStyles(
+  doc: TimelineDoc,
+): ReadonlyMap<string, { styleId: string; speakerColors: boolean }> {
+  const byItem = new Map<string, { styleId: string; speakerColors: boolean }>();
 
   for (const track of doc.tracks) {
     if (track.type !== "caption") continue;
     const styleId = track.styleId ?? doc.style.captionStyleId;
-    for (const item of track.items) byItem.set(item.id, styleId);
+    /* Phase 12: a per-LANE setting, resolved here for the same reason the
+     * style is — the plan flattens tracks away, so an item cannot reach its
+     * own track once the walk starts. */
+    const speakerColors = track.speakerColors ?? false;
+    for (const item of track.items) {
+      byItem.set(item.id, { styleId, speakerColors });
+    }
   }
 
   return byItem;
