@@ -40,6 +40,7 @@ import type { RenderItemProps } from "@/lib/types";
 import { AvatarOverlay } from "./components/avatar-overlay";
 import { Backdrop } from "./components/backdrop";
 import { MediaClip } from "./components/media-clip";
+import { QuizCard } from "./components/quiz-card";
 import { RedditCard } from "./components/reddit-card";
 import { TextOverlay } from "./components/text-overlay";
 
@@ -57,9 +58,13 @@ import { TextOverlay } from "./components/text-overlay";
  *   redditCard       → RedditCard    (the title scene of a Reddit story)
  *   characterOverlay → AvatarOverlay (the active speaker, at rest/talking/reacting)
  *
- * Deliberately absent, each with the phase that adds it:
+ * Added in Phase 13:
+ *   quizCard → QuizCard (the intro, question, reveal and outro cards of a
+ *              quiz — ONE family switching on `scene.layout`, see
+ *              ONE_FAMILY_FOUR_LAYOUTS for why that is not four entries)
+ *
+ * Deliberately absent, with the phase that adds it:
  *   motion           → Phase 16 (motion graphics studio)
- *   quizCard         → Phase 13 (quiz format)
  *
  * Captions are NOT a render kind and never will be: a caption item carries a
  * word range rather than a `render` field (WORD_RANGE_NOT_TEXT in the timeline
@@ -75,6 +80,7 @@ export const RENDER_COMPONENTS: Partial<
   backdrop: Backdrop,
   redditCard: RedditCard,
   characterOverlay: AvatarOverlay,
+  quizCard: QuizCard,
 };
 
 /* One warning per unknown kind per process, not per frame. A 60-second render
@@ -98,9 +104,9 @@ export function resolveRenderComponent(
   if (render === null) return null;
 
   /* Narrowed against the document's own union, not against this file's keys —
-   * so a VALID kind that simply has no component yet (`quizCard` until
-   * Phase 13) takes the same path as a garbage value, which is correct: both
-   * draw nothing and both are worth one log line. */
+   * so a VALID kind that simply has no component yet (`motion` until Phase 16)
+   * takes the same path as a garbage value, which is correct: both draw
+   * nothing and both are worth one log line. */
   const component = isRenderKind(render)
     ? RENDER_COMPONENTS[render]
     : undefined;

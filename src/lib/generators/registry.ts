@@ -47,6 +47,7 @@
 import type { ProjectKind } from "@/lib/types/project";
 import type { PipelineStageName } from "@/lib/types/pipeline";
 import { GeneratorNotImplementedError, type Generator } from "./types";
+import { quizGenerator } from "./quiz";
 import { redditStoryGenerator } from "./reddit-story";
 import { voiceoverGenerator } from "./voiceover";
 
@@ -61,18 +62,26 @@ import { voiceoverGenerator } from "./voiceover";
  *                  over the same background and captions a voiceover uses. The
  *                  two share ./common.ts; see COMPOSED_FROM_COMMON.
  *
- * Deliberately absent, each with the phase that adds it:
- *   quiz         → Phase 13
+ * Added in Phase 13:
+ *   quiz         → an intro card, then a question card and a SEPARATE reveal
+ *                  card per question, with a silent countdown between the two
+ *                  and every card anchored to the word that introduces it. It
+ *                  shares ./common.ts with the other two, and it is the first
+ *                  format to ask that module for a measured beat between lines
+ *                  (COUNTDOWN_IS_A_LEAD_GAP).
+ *
+ * Deliberately absent, with the phase that adds it:
  *   motion       → Phase 16
  *
- * Each of those kinds can already be CREATED (the create form offers all four,
- * from PROJECT_KINDS) and each already has a fixture and a renderable document
- * shape. What they do not have is a generator, so `projects.generate` refuses
- * them by name rather than running a pipeline that would fail at its last step.
+ * That kind can already be CREATED (the create form offers all four, from
+ * PROJECT_KINDS) and already has a fixture and a renderable document shape.
+ * What it does not have is a generator, so `projects.generate` refuses it by
+ * name rather than running a pipeline that would fail at its last step.
  */
 export const GENERATORS: Partial<Record<ProjectKind, Generator>> = {
   voiceover: voiceoverGenerator,
   "reddit-story": redditStoryGenerator,
+  quiz: quizGenerator,
 };
 
 export function hasGenerator(kind: ProjectKind): boolean {

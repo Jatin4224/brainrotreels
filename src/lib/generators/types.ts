@@ -265,3 +265,49 @@ export class GeneratorNotImplementedError extends Error {
     this.kind = kind;
   }
 }
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: GeneratorInputError, UNBUILDABLE_INPUT_IS_NAMED,
+ *   FAILURE_IS_EXPLAINED_NOT_DUMPED
+ *
+ * WHAT:  Thrown when a generator's own format-specific input is missing or
+ *        unreadable, so no document can honestly be built.
+ *
+ * WHY:   UNBUILDABLE_INPUT_IS_NAMED. Phase 13 is the first format with an input
+ *        that has NO DEFAULT. Every other read of `Project.settings` falls back
+ *        — a malformed caption preference produces default captions, an absent
+ *        background produces the styled backdrop — because a worse video beats
+ *        a failed run. A quiz with no question set has no such answer: the
+ *        narration asks questions, and a document without them is a paid video
+ *        of a host talking over blank cards. Refusing is the better outcome,
+ *        and the refund path already exists.
+ *
+ *        It is a SEPARATE class from `GeneratorNotImplementedError` because the
+ *        two mean opposite things to the person reading the message. That one
+ *        says "this format is not built yet" and nothing the customer does will
+ *        change it; this one says "this project is missing something" and names
+ *        the screen that fixes it. Collapsing them would send somebody waiting
+ *        for a feature that shipped.
+ *
+ *        FAILURE_IS_EXPLAINED_NOT_DUMPED: `message` is plain language for a
+ *        customer and `detail` is for the log, so a zod error cannot reach a
+ *        screen by being the easiest thing to hand — the same split
+ *        `failStage` enforces.
+ *
+ *        Permanent by nature, and the `timeline` stage treats it so: a missing
+ *        question set will not appear on the second attempt.
+ * WHERE: Raised by src/lib/generators/quiz.ts; caught by the `timeline` stage
+ *        of src/inngest/functions/project-generate.ts beside its sibling.
+ */
+export class GeneratorInputError extends Error {
+  readonly kind: ProjectKind;
+  /** For the log, never for a customer. */
+  readonly detail: string;
+
+  constructor(kind: ProjectKind, message: string, detail = "") {
+    super(message);
+    this.name = "GeneratorInputError";
+    this.kind = kind;
+    this.detail = detail;
+  }
+}

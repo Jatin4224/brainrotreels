@@ -45,6 +45,12 @@ export {
   condenseUserPrompt,
   flattenThread,
 } from "./reddit-prompt";
+export { previewQuizQuestion, writeQuizScript } from "./quiz";
+export {
+  quizRetryPrompt,
+  quizSystemPrompt,
+  quizUserPrompt,
+} from "./quiz-prompt";
 export {
   MAX_REDIRECTS,
   UrlGuardError,

@@ -45,7 +45,13 @@ worse than an empty box.
       format renders with captions and a background but no faces — the largest gap, and not a code
       gap. 41 new tests, including the committed hostile-thread injection fixture. Retention was
       narrowed from the phase file's wording, deliberately; see the note.
-- [ ] Phase 13: Quiz format
+- [ ] Phase 13: Quiz format — built; **blocked on the same ELEVENLABS_API_KEY and R2 gaps** that
+      stop any video completing, so no quiz has ever rendered. Everything that can be verified
+      without a provider is: 73 new tests cover the four cross-field rules, the shot plan, the
+      countdown gap and the word shift it implies, the word anchors and their seconds fallback, the
+      prompt's injection properties and the paste import. **The countdown is silent** — the sfx
+      catalogue is Phase 11's and still empty. "Narration with SSML" was implemented **without**
+      SSML, deliberately; see the note.
 - [ ] Phase 14: Voiceover visuals
 - [ ] Phase 15: Timeline editor
 - [ ] Phase 16: Motion graphics studio
@@ -2014,4 +2020,109 @@ adapter has never authenticated. Specifically untested:
   `MUSIC_LICENCE_IS_NOT_RESOLVED_YET`) and **Phase 11's empty background catalogue** are both still
   open, so a Reddit story currently plays over the styled backdrop.
 - **Phase 02's R2**, **Phase 04's AWS deploy** and the **ELEVENLABS_API_KEY** remain the three
+  blockers that stop any video completing end to end.
+
+### Phase 13 — 2026-10-28
+
+Built: `src/lib/types/quiz.ts` (the contracts, the four cross-field rules, the five refusal
+sentences, the derived request schema), `src/lib/quiz/` (the shot plan, the pronunciation
+transform, the paste parser), `src/lib/script/quiz-prompt.ts` + `quiz.ts`, the `quiz` entry in
+**`SCRIPT_WRITERS`**, the `quiz` entry in **`GENERATORS`** with `src/lib/generators/quiz.ts`,
+the `QuizCard` family registered into the render registry, `src/trpc/routers/quizzes.ts`, the
+`quizzes` registry entry, and the quiz input panel on the script screen. 73 new tests; the suite is
+925 and green, `tsc --noEmit` and `eslint` are clean, and `next build` succeeds — with the two
+Turbopack NFT warnings about `next.config.ts` that this repo already emitted before the phase.
+
+**The card has been rendered and looked at**, which is the one part of this phase that a test
+cannot check: `remotion still … quiz` against the committed fixture draws the question, all four
+options and the countdown ring emptying, inside the frame. That also exercises the unfamiliar-layout
+fallback, because `quizFixture` predates this phase and uses `quiz-four-up`.
+
+**It touched shared code twice, and both are the interesting part of the phase.** Everything else
+plugged into the two extension points Phase 12 built, exactly as intended — no workflow's credit
+handling, no stage list and no renderer changed.
+
+- **`layNarration` gained an optional beat between lines, and returns the aligned words shifted by
+  it.** A countdown is a hole in the narration lane, and `NARRATION_IS_SEQUENTIAL` forbids one
+  because `layNarration` and `concatAlignedLines` have to agree about where line four starts. Three
+  places could have made the hole: the TTS seam with SSML (widens a contract that deliberately has
+  none, for one format, and puts markup in `NarrationLine.text` that the aligner then has to
+  reconcile against words nobody said), the narration and alignment stages with a stored per-line
+  gap (a column, a migration and two shared-stage edits for something one format wants), or the
+  GENERATOR. It went to the generator, because a gap is a layout decision about a document. The
+  alignment row stays gapless and stays correct for its own purpose; the DOCUMENT is internally
+  consistent, which is the only consistency that matters. Grep `COUNTDOWN_IS_A_LEAD_GAP` and
+  `BEATS_SHIFT_THE_WORDS`.
+- **`WrittenScript` gained an optional `settingsPatch`.** A quiz's questions are not words anybody
+  narrates — they have options and a correct index and the card draws them — so there is no block to
+  put them on, and the generator needs them. The workflow merges the patch into `Project.settings`
+  in the SAME transaction that saves the blocks and charges the credits, which is the point: a quiz
+  whose narration was saved and whose questions were not is a paid-for video of a host asking
+  questions no card can draw. The alternatives were a model call inside a 10-second transaction, a
+  duplicate workflow with its own hold and refund paths, or a generator that asks a model (which
+  breaks Phase 04's render reuse outright). Grep `THE_WRITER_RECORDS_WHAT_IT_DECIDED`.
+
+**Three findings about the phase file itself, because they changed what was worth doing:**
+
+- **Step 7's "narration with SSML" cannot be followed as written, and did not need to be.** The TTS
+  adapter's contract states as a decision that it has "no streaming, no SSML, no voice management".
+  The two things SSML was wanted for are both achieved otherwise: the countdown is the gap above,
+  and the phonetic overrides are a respelling of the SPOKEN copy while the card keeps the original
+  spelling. That is strictly better than SSML on both channels — "SQL" is read as "sequel" and still
+  reads as "SQL" on screen — and it needs no seam change. If a later phase wants real prosody
+  control, that is its own argument. Grep `PHONETICS_ARE_SPOKEN_NOT_SHOWN`.
+- **Step 2's "distractors that are actually plausible" needed tuning, not just writing.** The naive
+  rule is a length ratio, and it refuses "Jupiter" against "Mars" constantly — four characters
+  against seven is 1.75x and a perfectly fair question. It needs BOTH a ratio and an absolute
+  character gap, and the committed test has as many accepting cases as rejecting ones, because a
+  rule that over-refuses fails invisibly in a suite that only checks bad sets are caught. Grep
+  `LENGTH_IS_THE_LLM_TELL`.
+- **The voiceover generator's own note predicted this phase would need the `storyboard` stage. It
+  does not.** A quiz is multi-shot, but its shot order is entirely determined by the question set,
+  so the stage would be a progress row for an arithmetic step — and a stage that goes from pending
+  to complete in the same instant is noise on a list somebody is watching. `align` is NOT skipped,
+  though a quiz draws no captions, because the word timings are what the cards are anchored to.
+
+**One decision that is a narrowing rather than a finding.** `answerType: 'open'` still stores
+options. The phase's own contract makes `options` required with a minimum of two, so "open" is a
+presentation choice — the question card does not draw the list and the reveal still does, because
+the reveal has to name the right answer. Switching a finished quiz between the two is a settings
+change and a re-render rather than a re-authoring. Grep `ANSWER_TYPE_IS_PRESENTATION`.
+
+**Done-when checks:**
+
+- [x] A topic produces a complete quiz video with countdowns and reveals — the document does;
+      **the video has never rendered**, for the ELEVENLABS/R2 reasons below.
+- [x] Manually entered questions render identically to generated ones — structurally, not merely
+      tested: both arms are parsed by one schema and checked by one function, and nothing after
+      that point can tell them apart. Grep `ONE_SHAPE_TWO_INPUTS`.
+- [x] A set with two correct answers, a duplicate option or a duplicate question is rejected and
+      regenerated rather than saved. The rejection is fed back to the model by question number;
+      a second refusal is permanent and refunds.
+- [x] A very long question auto-scales and stays inside the safe zone without truncation — the
+      smallest font band is sized so the schema's 200-character cap WRAPS inside the safe box, so
+      the ellipsis is unreachable through the product's own forms.
+- [x] An acronym with a phonetic override is pronounced as specified — the narration is respelled;
+      **unverified against a real voice**, because no audio has been synthesised.
+- [x] The countdown contains no speech — satisfied by there being a hole in the narration rather
+      than by anything muting a voice, which is what the committed test measures.
+- [x] A free workspace cannot reach the quiz routes at all, server-side included — the `quizzes`
+      flag is false on `free`, and the procedure builder's flag gate refuses every verb including
+      the reads, with no check in either handler.
+
+**Also outstanding:**
+
+- **The countdown is silent.** `settings.quiz.countdownAssetId` is read and the sfx track is built
+  when it is set, but Phase 11's library ships empty and there is no sfx picker, so nothing ticks.
+  Silence is a complete video, which is why it is the working default; the unresolved music and sfx
+  licence category (grep `MUSIC_LICENCE_IS_NOT_RESOLVED_YET`) is the same open owner decision.
+- **No question editing after generation.** The questions are baked into the scene track and are
+  edited thereafter through the timeline editor, which is Phase 15 — the phase file says so. Today
+  the only way to change them is to re-run the quiz panel, which replaces the script.
+- **No model has written a quiz yet.** The prompt, the schema, the four rules and the
+  reject-and-regenerate loop are all tested without a model, deliberately — but nobody has seen what
+  Claude actually returns for ten hard questions on a niche topic, so the `length_tell` threshold is
+  reasoned rather than observed. It is the first thing to check once a generation runs.
+- **Phase 11's empty background catalogue** means a quiz plays over the styled backdrop, and
+  **Phase 02's R2**, **Phase 04's AWS deploy** and the **ELEVENLABS_API_KEY** remain the three
   blockers that stop any video completing end to end.

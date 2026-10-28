@@ -29,6 +29,7 @@ import { projectsRouter } from "./projects";
 import { assetsRouter } from "./assets";
 import { backgroundsRouter } from "./backgrounds";
 import { redditRouter } from "./reddit";
+import { quizzesRouter } from "./quizzes";
 import { avatarsRouter } from "./avatars";
 import { rendersRouter } from "./renders";
 import { creditsRouter } from "./credits";
@@ -51,6 +52,7 @@ export const appRouter = createTRPCRouter({
   assets: assetsRouter,
   backgroundLibrary: backgroundsRouter,
   redditStories: redditRouter,
+  quizzes: quizzesRouter,
   avatars: avatarsRouter,
   renders: rendersRouter,
   credits: creditsRouter,

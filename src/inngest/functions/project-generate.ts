@@ -93,6 +93,7 @@ import {
 import { getOrganizationTier } from "@/lib/feature-gate";
 import { estimateRenderCost } from "@/lib/credits";
 import {
+  GeneratorInputError,
   GeneratorNotImplementedError,
   resolveGenerator,
 } from "@/lib/generators";
@@ -725,6 +726,29 @@ export const projectGenerateFunction = inngestClient.createFunction(
           await failStage(prisma, projectId, "timeline", reason);
           throw new NonRetriableError(
             `[project.generate] ${projectId}: ${reason}`,
+          );
+        }
+        /**
+         * SOURCE OF TRUTH KEYWORDS: UNBUILDABLE_INPUT_IS_NAMED,
+         *   FAILURE_IS_EXPLAINED_NOT_DUMPED
+         *
+         * Phase 13. The format's own input is missing — a quiz with no
+         * question set is the first case. Handled beside its sibling and for
+         * the same reason it exists as a separate class: the two messages send
+         * the reader to different places, one to wait for a feature and one to
+         * a screen they can fix. Permanent, because a missing question set
+         * will not appear on the second attempt.
+         *
+         * The technical detail goes to the log; `error.message` is already the
+         * plain sentence, which is what `failStage` is allowed to take.
+         */
+        if (error instanceof GeneratorInputError) {
+          console.error(
+            `[project.generate] ${projectId}: ${error.kind} input unusable. ${error.detail}`,
+          );
+          await failStage(prisma, projectId, "timeline", error.message);
+          throw new NonRetriableError(
+            `[project.generate] ${projectId}: ${error.message}`,
           );
         }
         throw error;
