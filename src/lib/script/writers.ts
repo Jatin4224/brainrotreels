@@ -50,10 +50,14 @@
 
 import type { ProjectKind } from "@/lib/types/project";
 import type { ScriptTone } from "@/lib/types/script";
+import type { JsonValue } from "@/lib/types/json";
+import type { QuizRequest } from "@/lib/types/quiz";
 import type { RedditThread } from "@/lib/adapters/reddit/types";
+import { LlmError } from "@/lib/adapters/llm";
 import { generateScript } from "./generate";
 import { condenseThread } from "./condense";
 import { flattenThread } from "./reddit-prompt";
+import { writeQuizScript } from "./quiz";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: WrittenScript, SPEAKER_IS_OPTIONAL
@@ -86,6 +90,39 @@ export interface WrittenScript {
   estimatedSeconds: number;
   overLimit: boolean;
   warnAtSeconds: number;
+  /**
+   * SOURCE OF TRUTH KEYWORDS: settingsPatch, THE_WRITER_RECORDS_WHAT_IT_DECIDED,
+   *   PATCH_IS_MERGED_NOT_REPLACED
+   *
+   * Structured facts the writer DECIDED that a later stage needs, merged into
+   * `Project.settings` by the workflow's save step.
+   *
+   * THE_WRITER_RECORDS_WHAT_IT_DECIDED, and Phase 13 is where this became
+   * necessary. A writer is otherwise pure apart from its model call
+   * (SOURCE_IS_ALREADY_EXTRACTED) and cannot touch the database — which is
+   * exactly what makes it testable against a fixture — but a quiz writer
+   * resolves something the GENERATOR needs and the narration cannot carry: the
+   * question set, with its options and its correct index. Those are not words
+   * anybody narrates, so there is no block to put them on.
+   *
+   * The alternatives were worse in ways worth recording. Generating the
+   * questions in the request would put a model call inside a 10-second
+   * transaction (EXTRACT_SYNCHRONOUSLY_GENERATE_ASYNCHRONOUSLY). Giving the
+   * quiz its own workflow would duplicate the hold, the retry classification
+   * and the refund on every path — the four things ONE_WORKFLOW_MANY_WRITERS
+   * exists to share. Having the generator re-ask a model would make a document
+   * build non-deterministic and paid.
+   *
+   * PATCH_IS_MERGED_NOT_REPLACED: the workflow merges these keys into the
+   * existing settings object and touches nothing else, because `settings` is
+   * one shared column several phases write (SETTINGS_ARE_MERGED). The writer
+   * owns the KEYS it names and no others.
+   *
+   * Absent for every writer that decides nothing structural, which is both of
+   * the others — a script and a condensed thread are entirely expressed by
+   * their blocks.
+   */
+  settingsPatch?: Readonly<Record<string, JsonValue>> | undefined;
 }
 
 /**
@@ -116,6 +153,28 @@ export interface WriterContext {
   thread?: RedditThread | undefined;
   /** Reddit only: whether to cut the thread to the target length. */
   condense?: boolean | undefined;
+  /**
+   * SOURCE OF TRUTH KEYWORDS: QUIZ_REQUEST_IS_ON_THE_CONTEXT,
+   *   THE_REQUEST_IS_NOT_THE_RESULT
+   *
+   * Quiz only: the topic and count, or the typed question table, plus the
+   * countdown, answer type and difficulty the customer chose.
+   *
+   * It is the REQUEST and not a resolved question set, which is the whole
+   * reason it has to be here rather than being read from the settings by the
+   * generator later: for the topic arm the questions do not exist yet, and the
+   * thing that brings them into existence is this writer. The same argument as
+   * `thread` above — a writer that had to re-derive its structured input from
+   * the flattened `sourceText` would make the format depend on string
+   * formatting.
+   */
+  quiz?: QuizRequest | undefined;
+  /**
+   * The project's own name. Used as a title by a writer that has nothing better
+   * — a typed quiz table has no model-written title and no topic to borrow one
+   * from. Optional, because every other writer gets a title from its source.
+   */
+  projectTitle?: string | undefined;
 }
 
 export interface ScriptWriter {
@@ -155,8 +214,13 @@ export class ScriptWriterNotImplementedError extends Error {
  * Added in Phase 12:
  *   reddit-story → a thread becomes speaker-split narration.
  *
- * Deliberately absent, each with the phase that adds it:
- *   quiz   → Phase 13 (questions and answers are not narration blocks)
+ * Added in Phase 13:
+ *   quiz → a topic or a typed table becomes a validated question set and the
+ *          narration that reads it out. It is the first writer that DECIDES
+ *          something the blocks cannot express, which is why `WrittenScript`
+ *          grew `settingsPatch` here (THE_WRITER_RECORDS_WHAT_IT_DECIDED).
+ *
+ * Deliberately absent, with the phase that adds it:
  *   motion → Phase 16 (a motion piece may have no narration at all)
  */
 export const SCRIPT_WRITERS: Partial<Record<ProjectKind, ScriptWriter>> = {
@@ -198,6 +262,43 @@ export const SCRIPT_WRITERS: Partial<Record<ProjectKind, ScriptWriter>> = {
         targetSeconds: context.targetSeconds,
         condense: context.condense ?? true,
       }),
+  },
+
+  quiz: {
+    kind: "quiz",
+    /**
+     * SOURCE OF TRUTH KEYWORDS: THE_REQUEST_IS_REQUIRED, UNWRITABLE_WITHOUT_A_SET
+     *
+     * UNWRITABLE_WITHOUT_A_SET. A quiz is the one format whose writer cannot
+     * fall back to `sourceText`: a topic produces questions and a typed table
+     * IS the questions, and neither survives being flattened to prose. There
+     * is nothing to narrate without the request, so a missing one is refused
+     * by name rather than producing a one-block script about a string.
+     *
+     * `quizzes.start` is the only thing that writes it and it writes it in the
+     * same mutation that enqueues the run, so reaching here without one means
+     * the settings were edited or written by an older release — permanent
+     * either way, which is what `LlmError({ permanent: true })` tells the
+     * workflow (it marks the stage failed, refunds the hold and does not
+     * retry).
+     */
+    write: (context) => {
+      if (context.quiz === undefined) {
+        return Promise.reject(
+          new LlmError(
+            "This quiz has no questions or topic recorded. Set it up again from the quiz panel.",
+            {
+              detail: "quiz writer invoked with no stored request",
+              permanent: true,
+            },
+          ),
+        );
+      }
+      return writeQuizScript({
+        request: context.quiz,
+        fallbackTitle: context.projectTitle ?? context.sourceTitle ?? "Quiz",
+      });
+    },
   },
 };
 

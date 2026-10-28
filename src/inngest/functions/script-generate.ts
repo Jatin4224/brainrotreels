@@ -63,6 +63,8 @@ import {
 } from "@/lib/script";
 import { scriptToneSchema } from "@/lib/types/script";
 import { projectKindSchema } from "@/lib/types/project";
+import { jsonObjectSchema } from "@/lib/types/json";
+import { quizRequestSchema } from "@/lib/types/quiz";
 import {
   InsufficientCreditsError,
   commit,
@@ -150,6 +152,24 @@ const storedSourceSchema = z.object({
     .optional(),
   /** Reddit only: whether to cut the thread to the target length. */
   condense: z.boolean().optional(),
+  /**
+   * SOURCE OF TRUTH KEYWORDS: QUIZ_REQUEST_IS_STORED_NOT_RE_ASKED
+   *
+   * Phase 13. The quiz request `quizzes.start` wrote — a topic and a count, or
+   * the typed question table, plus the countdown, the answer type and the
+   * difficulty.
+   *
+   * Stored rather than carried on the event for the reason the source text is
+   * (EVENT_PAYLOAD_PARSED's note: "ids, never documents"): a ten-question
+   * table is the largest thing in this flow and a queue payload is the wrong
+   * place for it. Re-validated here with the same schema the mutation used,
+   * because it is a jsonb column any previous release could have written.
+   *
+   * Optional, because only one format has one — and a `quiz` project whose
+   * request is missing fails its WRITER with a named permanent error
+   * (UNWRITABLE_WITHOUT_A_SET) rather than narrating a topic string.
+   */
+  quiz: quizRequestSchema.optional(),
 });
 
 export const scriptGenerateFunction = inngestClient.createFunction(
@@ -223,8 +243,9 @@ export const scriptGenerateFunction = inngestClient.createFunction(
       const project = await prisma.project.findFirst({
         where: { id: projectId, organizationId },
         /* `kind` is read here so the WRITER can be resolved from it —
-         * ONE_WORKFLOW_MANY_WRITERS, Phase 12. */
-        select: { id: true, kind: true, settings: true },
+         * ONE_WORKFLOW_MANY_WRITERS, Phase 12. `title` is read for the one
+         * writer that has no other source for one (a typed quiz table). */
+        select: { id: true, kind: true, title: true, settings: true },
       });
       if (project === null) {
         /* Deleted while the event was in flight. Nothing to mark failed. */
@@ -275,12 +296,14 @@ export const scriptGenerateFunction = inngestClient.createFunction(
 
       return {
         kind: kind.data,
+        projectTitle: project.title,
         sourceText: parsed.data.sourceText,
         sourceTitle: parsed.data.sourceTitle ?? null,
         /* STEP_RESULTS_ARE_JSON: this crosses a step boundary and comes back
          * as plain data on a replay, which is why it is re-parsed below. */
         thread: parsed.data.thread ?? null,
         condense: parsed.data.condense ?? true,
+        quiz: parsed.data.quiz ?? null,
       };
     });
 
@@ -348,8 +371,11 @@ export const scriptGenerateFunction = inngestClient.createFunction(
          * because a replayed step returns JSON (STEP_RESULTS_ARE_JSON).
          */
         const loaded = storedSourceSchema
-          .pick({ thread: true })
-          .safeParse({ thread: source.thread ?? undefined });
+          .pick({ thread: true, quiz: true })
+          .safeParse({
+            thread: source.thread ?? undefined,
+            quiz: source.quiz ?? undefined,
+          });
 
         return await resolveScriptWriter(projectKindSchema.parse(source.kind))
           .write({
@@ -357,8 +383,12 @@ export const scriptGenerateFunction = inngestClient.createFunction(
             targetSeconds,
             tone,
             sourceTitle: source.sourceTitle ?? undefined,
+            projectTitle: source.projectTitle,
             ...(loaded.success && loaded.data.thread !== undefined
               ? { thread: loaded.data.thread }
+              : {}),
+            ...(loaded.success && loaded.data.quiz !== undefined
+              ? { quiz: loaded.data.quiz }
               : {}),
             condense: source.condense,
           });
@@ -403,6 +433,57 @@ export const scriptGenerateFunction = inngestClient.createFunction(
           projectId,
           blocks: draft.blocks,
         });
+
+        /**
+         * SOURCE OF TRUTH KEYWORDS: PATCH_IS_MERGED_NOT_REPLACED,
+         *   THE_WRITER_RECORDS_WHAT_IT_DECIDED
+         *
+         * Phase 13. A writer may return structured facts it DECIDED that a
+         * later stage needs and the narration cannot carry — the quiz's
+         * question set is the first (see `settingsPatch` in
+         * src/lib/script/writers.ts for why it arrives this way rather than
+         * through a second workflow or a model call in the request).
+         *
+         * MERGED, key by key, into whatever is already there: `settings` is
+         * one shared jsonb column several phases write, and replacing it would
+         * discard the caption preferences, the background choice and the
+         * notify flag. The writer owns the keys it names and no others.
+         *
+         * Inside the SAME transaction as the blocks and the charge, which is
+         * the point: a quiz whose narration was saved and whose questions were
+         * not is a paid-for video of a host asking questions that no card can
+         * draw. The halfway state cannot exist.
+         *
+         * Re-parsed rather than trusted, because `draft` crossed a step
+         * boundary and comes back as JSON on a replay
+         * (STEP_RESULTS_ARE_JSON). An unparseable patch is dropped and logged:
+         * the script is still correct, and the stage that needs the patch
+         * fails by name rather than this one failing with a settings error.
+         */
+        const patch = draft.settingsPatch;
+        if (patch !== undefined && patch !== null) {
+          const parsed = jsonObjectSchema.safeParse(patch);
+          if (!parsed.success) {
+            console.error(
+              `[script.generate] ${projectId}: the writer's settings patch could not be read.`,
+            );
+          } else {
+            const project = await tx.project.findFirst({
+              where: { id: projectId, organizationId },
+              select: { settings: true },
+            });
+            const existing = jsonObjectSchema.safeParse(project?.settings);
+            await tx.project.updateMany({
+              where: { id: projectId, organizationId },
+              data: {
+                settings: jsonObjectSchema.parse({
+                  ...(existing.success ? existing.data : {}),
+                  ...parsed.data,
+                }),
+              },
+            });
+          }
+        }
 
         await tx.project.updateMany({
           where: { id: projectId, organizationId },

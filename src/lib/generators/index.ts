@@ -26,7 +26,7 @@
  */
 
 export { GENERATORS, generatorSkipsFor, hasGenerator, resolveGenerator } from "./registry";
-export { GeneratorNotImplementedError } from "./types";
+export { GeneratorInputError, GeneratorNotImplementedError } from "./types";
 export type {
   Generator,
   GeneratorContext,
@@ -34,6 +34,13 @@ export type {
   NarrationLineInput,
   ResolvedBackgroundInput,
 } from "./types";
+export type { LayNarrationOptions, NarrationSpan } from "./common";
+export {
+  QUIZ_ELEMENT_KINDS,
+  QUIZ_LAYOUTS,
+  buildQuizDocument,
+  quizGenerator,
+} from "./quiz";
 export { buildVoiceoverDocument, voiceoverGenerator } from "./voiceover";
 export {
   REDDIT_CARD_ELEMENT_KIND,

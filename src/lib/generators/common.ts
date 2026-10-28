@@ -7,7 +7,8 @@
  *   buildMusicTrack, buildSpeakers, readGeneratorSettings, narrationHandle,
  *   SHARED_BY_EVERY_FORMAT, NARRATION_IS_SEQUENTIAL,
  *   FOOTAGE_OR_BACKDROP_NEVER_BOTH, LOOP_TO_THE_NARRATION, MUSIC_IS_OPTIONAL,
- *   SAFE_ZONE_BY_ASPECT
+ *   SAFE_ZONE_BY_ASPECT, LayNarrationOptions, NarrationSpan,
+ *   BEATS_SHIFT_THE_WORDS, COUNTDOWN_IS_A_LEAD_GAP
  *
  * WHAT:  The parts of a timeline document that are the same whatever format is
  *        being generated: the narration lane, the background (footage or
@@ -38,7 +39,14 @@
 
 import { DEFAULT_CAPTION_STYLE_ID } from "@/lib/captions";
 import { BACKDROP_ELEMENT_KIND, DEFAULT_PALETTE_ID } from "@/lib/palettes";
-import type { AssetRef, AudioItem, TimelineDoc, Track } from "@/lib/timeline";
+import type {
+  AssetRef,
+  AudioItem,
+  TimelineDoc,
+  Track,
+  WordToken,
+} from "@/lib/timeline";
+import { TIME_EPSILON, roundSeconds } from "@/lib/timeline";
 import { captionSettingsSchema } from "@/lib/types/caption";
 import { generateSettingsSchema } from "@/lib/types/pipeline";
 import type { AspectRatio } from "@/lib/types/project";
@@ -119,21 +127,57 @@ export function narrationHandle(lineId: string): string {
  *        It returns the SPANS as well as the track, because a format that puts
  *        a character on screen needs to know when each speaker was talking
  *        (`buildAvatarWindows`) and re-deriving that from the finished items
- *        would mean reading the document it just built.
- * WHERE: Both generators, first thing.
+ *        would mean reading the document it just built. Phase 13 added the
+ *        first WORD INDEX to each span for the same reason, so a card can be
+ *        anchored to the word that introduces it.
+ *
+ *        Phase 13 also made the "no gap" rule a DEFAULT rather than a law: a
+ *        format may ask for a measured beat before a line
+ *        (`LayNarrationOptions`), and the WORDS come back shifted by exactly
+ *        what was inserted so the document stays internally consistent
+ *        (BEATS_SHIFT_THE_WORDS). With no beats asked for — every format but
+ *        the quiz — nothing about the output changes.
+ * WHERE: All three generators, first thing.
  */
-export function layNarration(ctx: GeneratorContext): {
+export function layNarration(
+  ctx: GeneratorContext,
+  options: LayNarrationOptions = {},
+): {
   track: Track | null;
   assets: Record<string, AssetRef>;
   totalSec: number;
-  spans: { speakerTag: string; start: number; duration: number }[];
+  spans: NarrationSpan[];
+  /**
+   * The aligned words, SHIFTED by whatever beats were inserted — see
+   * BEATS_SHIFT_THE_WORDS. Identical to `ctx.words` when no beats were asked
+   * for, which is every format but the quiz.
+   */
+  words: WordToken[];
 } {
   const items: AudioItem[] = [];
   const assets: Record<string, AssetRef> = {};
-  const spans: { speakerTag: string; start: number; duration: number }[] = [];
-  let offsetSec = 0;
+  const spans: NarrationSpan[] = [];
+  /* The gapless position of each line, which is the coordinate system the
+   * ALIGNMENT used — words are placed against these, not against the shifted
+   * ones. */
+  const gaplessStarts: number[] = [];
+  /* How much has been inserted before each line, cumulative. */
+  const shiftByLine: number[] = [];
 
-  for (const line of ctx.lines) {
+  let offsetSec = 0;
+  let gaplessSec = 0;
+  let insertedSec = 0;
+
+  for (const [index, line] of ctx.lines.entries()) {
+    /* BEAT_IS_BEFORE_THE_LINE — a beat belongs to the line it precedes, so
+     * dropping the last line cannot leave a trailing silence behind. */
+    const beat = Math.max(0, options.beatBeforeLine?.(index) ?? 0);
+    offsetSec = roundSeconds(offsetSec + beat);
+    insertedSec = roundSeconds(insertedSec + beat);
+
+    gaplessStarts.push(gaplessSec);
+    shiftByLine.push(insertedSec);
+
     const handle = narrationHandle(line.id);
     items.push({
       id: `line-${line.id}`,
@@ -156,9 +200,20 @@ export function layNarration(ctx: GeneratorContext): {
       speakerTag: line.speakerTag,
       start: offsetSec,
       duration: line.durationSec,
+      lineIndex: index,
+      firstWordIndex: null,
     });
-    offsetSec += line.durationSec;
+
+    offsetSec = roundSeconds(offsetSec + line.durationSec);
+    gaplessSec = roundSeconds(gaplessSec + line.durationSec);
   }
+
+  const words = shiftWordsForBeats({
+    words: ctx.words,
+    gaplessStarts,
+    shiftByLine,
+    spans,
+  });
 
   return {
     track:
@@ -173,7 +228,151 @@ export function layNarration(ctx: GeneratorContext): {
     assets,
     totalSec: offsetSec,
     spans,
+    words,
   };
+}
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: LayNarrationOptions, beatBeforeLine,
+ *   COUNTDOWN_IS_A_LEAD_GAP, BEAT_IS_BEFORE_THE_LINE
+ *
+ * WHAT:  How a format asks for silence between two narration lines.
+ *
+ * WHY:   COUNTDOWN_IS_A_LEAD_GAP. Phase 13 needs a thinking beat between a
+ *        question and its answer — "music or ticking and no speech" — and that
+ *        means a hole in the narration lane, which NARRATION_IS_SEQUENTIAL
+ *        otherwise forbids. The full argument for putting it HERE rather than
+ *        in the TTS seam or in the narration and alignment stages is written
+ *        out under COUNTDOWN_IS_A_LEAD_GAP in src/lib/quiz/narration.ts; the
+ *        short version is that a beat is a LAYOUT decision about a document,
+ *        and laying documents out is what a generator does.
+ *
+ *        A CALLBACK rather than an array, so a format expresses the rule it
+ *        actually has ("a beat before every reveal") instead of building a
+ *        parallel array whose length has to be kept equal to `ctx.lines` by
+ *        hand. A format with no beats passes nothing and gets today's
+ *        behaviour byte for byte.
+ *
+ *        Negative values are clamped to zero rather than refused: a beat is
+ *        derived from a customer's setting, and a format that computed a
+ *        negative one would otherwise overlap two audio items — which is a
+ *        video with two voices talking over each other, a far worse outcome
+ *        than a beat that did not happen.
+ * WHERE: The second argument of `layNarration`. Passed only by
+ *        src/lib/generators/quiz.ts.
+ */
+export interface LayNarrationOptions {
+  /** Seconds of silence to leave before the line at this index. */
+  beatBeforeLine?: ((lineIndex: number) => number) | undefined;
+}
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: NarrationSpan, SPAN_KNOWS_ITS_LINE,
+ *   SPAN_KNOWS_ITS_FIRST_WORD
+ *
+ * WHAT:  Where one narration line landed, and how to address it.
+ *
+ * WHY:   SPAN_KNOWS_ITS_LINE. `buildAvatarWindows` needed only the speaker and
+ *        the times, but Phase 13 has to put a CARD over a particular line's
+ *        audio — so the span carries its own index and the index of its first
+ *        aligned WORD.
+ *
+ *        SPAN_KNOWS_ITS_FIRST_WORD, and the word index is the load-bearing one:
+ *        it is what lets a scene item be anchored with `{ wordIndex }` instead
+ *        of a hard-coded offset, so re-recording the narration moves the card
+ *        with the voice (TWO_FORMED_TIMING in the timeline schema). It is NULL
+ *        when the alignment produced no words for this line, which is a real
+ *        case — a line the aligner could not read, or a whole alignment that
+ *        failed — and a caller must fall back to seconds rather than emitting
+ *        an anchor that dangles (ANCHOR_ONLY_WHEN_THERE_ARE_WORDS).
+ * WHERE: `layNarration`'s return; consumed by the avatar windows and by the
+ *        quiz generator.
+ */
+export interface NarrationSpan {
+  speakerTag: string;
+  start: number;
+  duration: number;
+  /** Its position in `ctx.lines`. */
+  lineIndex: number;
+  /** The index into `doc.words` of this line's first word, or null. */
+  firstWordIndex: number | null;
+}
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: shiftWordsForBeats, BEATS_SHIFT_THE_WORDS,
+ *   WORDS_ARE_ASSIGNED_BY_GAPLESS_TIME
+ *
+ * WHAT:  The aligned words moved to where they now actually fall, and each
+ *        span told which word it starts on.
+ *
+ * WHY:   BEATS_SHIFT_THE_WORDS is the half of the beat decision that makes it
+ *        safe. The alignment stage builds one narration-wide word array by
+ *        offsetting each line by the SUM OF THE DURATIONS BEFORE IT
+ *        (`concatAlignedLines`) — no beats, because it knows nothing about
+ *        formats and should not. So the moment a generator inserts silence, the
+ *        stored word times and the audio items disagree by the accumulated
+ *        beat, and every caption and every anchor after the first beat would be
+ *        early.
+ *
+ *        Shifting here keeps the DOCUMENT internally consistent, which is the
+ *        only consistency that matters: the words, the audio items, the
+ *        captions and the anchors all agree, and the alignment row stays
+ *        correct for its own purpose and is not rewritten. A document is the
+ *        output; an alignment is an input that several documents can be built
+ *        from.
+ *
+ *        WORDS_ARE_ASSIGNED_BY_GAPLESS_TIME: a word is attributed to a line by
+ *        comparing its start against the line's GAPLESS window, because that is
+ *        the coordinate system the word was written in. Walking both lists once
+ *        in order rather than searching per word, since both are already
+ *        sorted — and the boundary comparison carries TIME_EPSILON, because a
+ *        word that starts exactly on a line boundary is the first word of the
+ *        new line and floating-point addition of durations does not land
+ *        exactly.
+ *
+ *        Returns a NEW array and never mutates `ctx.words`: the context is
+ *        shared with whatever else the workflow does with it, and a generator
+ *        that wrote through it would be a generator with a side effect.
+ * WHERE: `layNarration`, once.
+ */
+function shiftWordsForBeats(args: {
+  words: readonly WordToken[];
+  gaplessStarts: readonly number[];
+  shiftByLine: readonly number[];
+  spans: NarrationSpan[];
+}): WordToken[] {
+  const { words, gaplessStarts, shiftByLine, spans } = args;
+  if (words.length === 0 || gaplessStarts.length === 0) return [...words];
+
+  const shifted: WordToken[] = [];
+  let lineIndex = 0;
+
+  for (const word of words) {
+    /* Advance to the line this word falls in. Never past the last one: a word
+     * beyond the measured narration belongs to its final line, which is the
+     * honest reading of an alignment slightly longer than the audio. */
+    while (
+      lineIndex + 1 < gaplessStarts.length &&
+      word.s >= (gaplessStarts[lineIndex + 1] ?? Number.POSITIVE_INFINITY) -
+        TIME_EPSILON
+    ) {
+      lineIndex += 1;
+    }
+
+    const shift = shiftByLine[lineIndex] ?? 0;
+    const span = spans[lineIndex];
+    if (span !== undefined && span.firstWordIndex === null) {
+      span.firstWordIndex = word.i;
+    }
+
+    shifted.push({
+      ...word,
+      s: roundSeconds(word.s + shift),
+      e: roundSeconds(word.e + shift),
+    });
+  }
+
+  return shifted;
 }
 
 /**

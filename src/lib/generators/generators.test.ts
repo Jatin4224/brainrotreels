@@ -676,22 +676,24 @@ describe("buildRedditStoryDocument", () => {
 });
 
 describe("the generator registry", () => {
-  /* DOCUMENTED_GAP_NOT_A_STUB — the three unbuilt kinds are ABSENT, and that
-   * absence is what `projects.generate` turns into a named refusal. A stub
-   * returning an empty document would be a silent, black, paid-for video. */
-  it("has the two built formats and not the two unbuilt ones", () => {
+  /* DOCUMENTED_GAP_NOT_A_STUB — the unbuilt kind is ABSENT, and that absence is
+   * what `projects.generate` turns into a named refusal. A stub returning an
+   * empty document would be a silent, black, paid-for video. Phase 13 moved
+   * `quiz` out of that list; `motion` is what is left, in Phase 16. */
+  it("has the three built formats and not the one unbuilt one", () => {
     expect(Object.keys(GENERATORS).sort()).toEqual([
+      "quiz",
       "reddit-story",
       "voiceover",
     ]);
     expect(hasGenerator("voiceover")).toBe(true);
     expect(hasGenerator("reddit-story")).toBe(true);
-    expect(hasGenerator("quiz")).toBe(false);
+    expect(hasGenerator("quiz")).toBe(true);
     expect(hasGenerator("motion")).toBe(false);
   });
 
   it("names the format when a kind has no generator", () => {
-    expect(() => resolveGenerator("quiz")).toThrow(
+    expect(() => resolveGenerator("motion")).toThrow(
       GeneratorNotImplementedError,
     );
     try {

@@ -834,6 +834,64 @@ export const RESOURCES = {
     },
   },
 
+  /**
+   * SOURCE OF TRUTH KEYWORDS: RESOURCES.quizzes, A_FLAG_THAT_GATES_READS,
+   *   quizzes.start, quizzes.previewQuestion
+   *
+   * Trivia videos with countdowns and reveals.
+   *
+   * A_FLAG_THAT_GATES_READS, and this is the one place in the registry where a
+   * flag is a genuine ENTITLEMENT rather than a kill switch. `redditStories` is
+   * true on every plan because it exists to be switched off for everybody
+   * (A_FLAG_NOT_A_LIMIT); this one is false on `free` because the phase says so,
+   * and the phase also spells out what that has to mean: "a `flag` gates EVERY
+   * VERB of the resource automatically, queries included — so a free workspace
+   * cannot even list quiz templates. That is the intent here."
+   *
+   * Section 10 of src/trpc/procedures/protected.ts is what makes that true
+   * without either handler checking anything, which is also the seventh "done
+   * when" check of the phase: "a free workspace cannot reach the quiz routes at
+   * all, server-side included". A client-side hide would leave the procedure
+   * callable; a flag refuses it at the boundary.
+   *
+   * It is deliberately NOT a `limit`. A per-plan cap on quiz videos would be a
+   * second quota alongside `renders`, counting the same act twice and giving a
+   * customer two different numbers for how many videos they have left — the
+   * same argument the Reddit entry makes.
+   *
+   * The rate limits are OURS rather than a third party's, unlike
+   * `redditStories` (THEIR_RATE_LIMIT_NOT_OURS): every verb here costs a model
+   * request against our own LLM account. `start` carries the same figure a
+   * script generation does, because it is one. `previewQuestion` is looser
+   * because it asks for ONE question and is what somebody does while deciding
+   * — but it is still a paid request, so it is capped well below what a loop
+   * would do and well above what a person trying four topics would.
+   */
+  quizzes: {
+    name: "Quiz videos",
+    description: "Trivia videos with countdowns and reveals",
+    permissions: ["read", "create"],
+    flag: {
+      perPlan: {
+        free: false,
+        starter: true,
+        pro: true,
+        enterprise: true,
+        portal: true,
+      },
+      availableOnFreeTrial: true,
+    },
+    audit: {
+      describe: {
+        start: "Started a quiz for project {input.projectId}",
+      },
+    },
+    rateLimit: {
+      start: { count: 10, window: "5 m" },
+      previewQuestion: { count: 30, window: "5 m" },
+    },
+  },
+
   invitation: {
     name: "Invitations",
     description: "Send invites and cancel pending invitations",

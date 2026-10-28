@@ -82,6 +82,7 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
+import { QuizInputPanel } from "./quiz-input-panel";
 import { RedditInputPanel } from "./reddit-input-panel";
 
 /** Two seconds, matching the media table — live enough, not a request storm. */
@@ -152,6 +153,17 @@ export function ScriptEditor({ projectId }: { projectId: string }) {
             hasExistingScript={blocks.length > 0}
             generating={generating}
             retention={project.data.reddit ?? null}
+          />
+        ) : project.data?.kind === "quiz" ? (
+          /* THE_INPUT_IS_PER_FORMAT — a quiz is started from a topic or a
+             typed question table, with a countdown length and a free
+             single-question preview, and none of that belongs on the generic
+             form either. Third kind, same switch. */
+          <QuizInputPanel
+            organizationId={organizationId}
+            projectId={projectId}
+            hasExistingScript={blocks.length > 0}
+            generating={generating}
           />
         ) : (
           <GenerateScriptForm
