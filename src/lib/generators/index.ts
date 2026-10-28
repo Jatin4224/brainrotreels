@@ -30,7 +30,15 @@ export { GeneratorNotImplementedError } from "./types";
 export type {
   Generator,
   GeneratorContext,
+  CastMember,
   NarrationLineInput,
   ResolvedBackgroundInput,
 } from "./types";
 export { buildVoiceoverDocument, voiceoverGenerator } from "./voiceover";
+export {
+  REDDIT_CARD_ELEMENT_KIND,
+  buildRedditStoryDocument,
+  redditStoryGenerator,
+} from "./reddit-story";
+export { buildAvatarWindows } from "./avatar-windows";
+export type { AvatarWindow, SpeakerSpan } from "./avatar-windows";

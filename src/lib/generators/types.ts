@@ -149,6 +149,35 @@ export interface ResolvedBackgroundInput {
   height: number | null;
 }
 
+/**
+ * SOURCE OF TRUTH KEYWORDS: CastMember, CAST_IS_A_FACT,
+ *   RESOLVED_BEFORE_THE_GENERATOR
+ *
+ * WHAT:  One speaker's face, already resolved to the three artwork handles it
+ *        needs.
+ *
+ * WHY:   CAST_IS_A_FACT, the same decision as the background's and for the same
+ *        reason. Resolving an avatar means reading `Speaker.avatarId`, then the
+ *        `Avatar` row, then parsing its `assetSet` jsonb and checking the
+ *        character is still active and within the workspace's plan — three
+ *        tables and an entitlement. GENERATOR_CONTEXT_IS_FACTS says a generator
+ *        must not be able to read a plan, and GENERATORS_STAY_PURE says it must
+ *        not reach Prisma, so the answer arrives here already decided.
+ *
+ *        `states` is the COMPLETE set or the member does not exist: an avatar
+ *        missing its resting frame has no neutral state, and the honest
+ *        response is no overlay at all rather than a character that vanishes
+ *        between sentences (A_SET_IS_COMPLETE_OR_REFUSED in
+ *        src/lib/types/avatar.ts).
+ * WHERE: `GeneratorContext.cast`, keyed by speaker TAG — which is what the
+ *        narration lines carry, so no generator has to join ids.
+ */
+export interface CastMember {
+  avatarId: string;
+  /** The real Asset row id for each of the three states. */
+  states: { neutral: string; talking: string; reaction: string };
+}
+
 export interface GeneratorContext {
   organizationId: string;
   projectId: string;
@@ -169,6 +198,30 @@ export interface GeneratorContext {
    * up here.
    */
   background: ResolvedBackgroundInput | null;
+  /**
+   * Speaker TAG → the avatar assigned to it. A tag with no entry is a speaker
+   * with no face, which is a deliberate and common choice rather than a gap.
+   * Empty for every format that puts nobody on screen.
+   */
+  cast: Readonly<Record<string, CastMember | undefined>>;
+  /**
+   * SOURCE OF TRUTH KEYWORDS: SNAPSHOT_IS_WHAT_THE_CARD_SHOWS
+   *
+   * The Reddit thread's facts, for the title card. Null for every other
+   * format, and null for a Reddit project whose cached thread has passed its
+   * retention window — in which case the story still renders with no card,
+   * which is a worse video than it was and a better one than a failed render.
+   *
+   * It is a SNAPSHOT rather than a live read for the reason the type's own note
+   * gives: re-fetching a thread to draw a card would make a render depend on
+   * somebody else's uptime and on a post still existing, which is exactly the
+   * dependency a deterministic render must not have.
+   */
+  thread: {
+    title: string;
+    subreddit: string;
+    author: string;
+  } | null;
   db: DbClient;
 }
 

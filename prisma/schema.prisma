@@ -844,6 +844,57 @@ model Voice {
   @@map("voice")
 }
 
+/// Avatar — one illustrated character a speaker can be given a face.
+///
+/// NO organizationId, for exactly the reason `Voice` has none: this is a
+/// catalogue every workspace reads. The artwork is licensed or commissioned by
+/// the operator once, so a per-tenant copy would be the same licence
+/// duplicated per customer.
+///
+/// ORIGINAL ILLUSTRATED CHARACTERS ONLY. No real-person likenesses and no
+/// third-party characters, ever — Phase 12's brief states it as a legal
+/// position and the reason is that a likeness-rights claim is not a bug you
+/// can patch. The avatar manifest enforces what a machine can enforce (an
+/// explicit attestation per row, refused if absent); the rest is the review
+/// that adding a row to that file requires. Grep LIKENESS_IS_ATTESTED.
+///
+/// `assetSet` IS A JSON MAP, not three columns, and that is the one decision
+/// here worth explaining. It holds `{ neutral, talking, reaction }` → Asset
+/// id, and the states are a CLOSED union validated in TypeScript
+/// (avatarAssetSetSchema in src/lib/types/avatar.ts), matching this schema's
+/// STRING_NOT_ENUM posture everywhere else. Three nullable columns would be
+/// the same data with a worse property: a row could exist with `talking` set
+/// and `neutral` null, which is an avatar that cannot be drawn at rest. One
+/// jsonb value parsed as a whole is either a complete set or it is refused.
+/// It also means Phase 14's richer character work can add a state without a
+/// migration on a table every project's cast points at.
+///
+/// `minPlan` gates it, as `Voice.minPlan` and `Asset.minPlan` do, and for the
+/// same reason: a boolean "premium" flag cannot express one character
+/// available from Starter and another from Pro.
+///
+/// `isActive` rather than a delete. `Speaker.avatarId` points here and a
+/// project rendered last month must keep rendering the same way, so a
+/// withdrawn character is deactivated — DEACTIVATE_NEVER_DELETE, the same rule
+/// the voice catalogue follows.
+///
+/// SOURCE OF TRUTH KEYWORD: Avatar
+model Avatar {
+  id       String  @id @default(cuid())
+  name     String
+  /// { neutral: assetId, talking: assetId, reaction: assetId }
+  assetSet Json
+  minPlan  String  @default("free")
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([minPlan])
+  @@index([isActive])
+  @@map("avatar")
+}
+
 /// Speaker — a role in one project's script, and the voice assigned to it.
 ///
 /// `tag` is the label the SCRIPT uses ("A", "OP", "narrator"), which is what

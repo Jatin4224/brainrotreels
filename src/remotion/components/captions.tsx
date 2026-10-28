@@ -40,7 +40,11 @@
 import { useCurrentFrame } from "remotion";
 
 import { CaptionCard } from "@/components/global/caption-preview/caption-card";
-import { getCaptionStyle } from "@/lib/captions";
+import {
+  dominantSpeaker,
+  getCaptionStyle,
+  speakerCaptionTint,
+} from "@/lib/captions";
 import type { CanvasSpec, WordToken } from "@/lib/timeline";
 import type { SafeZone } from "@/lib/types/caption";
 
@@ -56,6 +60,15 @@ export interface CaptionGroupProps {
   frames: { from: number; durationInFrames: number };
   /** The caption item's own band, if it carries one. */
   y?: number | undefined;
+  /**
+   * SOURCE OF TRUTH KEYWORDS: speakerColors, COLOUR_IS_NEVER_THE_ONLY_SIGNAL
+   *
+   * Phase 12. Whether this LANE tints its captions per speaker and shows a
+   * name tag. It is the caption track's own setting, resolved by the renderer
+   * before the walk (the plan flattens tracks away) — the same mechanism, for
+   * the same reason, as TRACK_STYLE_OVERRIDES_DOC.
+   */
+  speakerColors?: boolean | undefined;
 }
 
 export function CaptionGroup({
@@ -66,11 +79,19 @@ export function CaptionGroup({
   canvas,
   frames,
   y,
+  speakerColors,
 }: CaptionGroupProps) {
   const frame = useCurrentFrame();
 
   const slice = words.slice(range.startWord, range.endWord + 1);
   if (slice.length === 0) return null;
+
+  /* ONE_TAG_PER_CARD — a card can straddle a speaker change, so the majority
+   * speaker is the one it is drawn as. Null when no word carries a tag, which
+   * is every pre-Phase-08 document and every degraded alignment; the card then
+   * draws exactly as it always did. */
+  const tag = speakerColors === true ? dominantSpeaker(slice) : null;
+  const speaker = tag === null ? undefined : speakerCaptionTint(tag);
 
   return (
     <CaptionCard
@@ -81,6 +102,7 @@ export function CaptionGroup({
       canvas={canvas}
       safeZone={safeZone}
       y={y}
+      speaker={speaker}
     />
   );
 }

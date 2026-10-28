@@ -39,7 +39,12 @@ worse than an empty box.
       decision and a licence string nobody has verified is the one fiction this product cannot
       afford. Also **blocked on R2**, so no library asset has ever been fetched or served. 53 new
       tests cover the pure halves. See the note.
-- [ ] Phase 12: Reddit story format
+- [ ] Phase 12: Reddit story format — **the first complete format** — built; **blocked on
+      REDDIT_CLIENT_ID/SECRET**, so no thread has ever been fetched, and on the same
+      ELEVENLABS/R2 gaps that stop any video completing. **No avatar artwork exists**, so the
+      format renders with captions and a background but no faces — the largest gap, and not a code
+      gap. 41 new tests, including the committed hostile-thread injection fixture. Retention was
+      narrowed from the phase file's wording, deliberately; see the note.
 - [ ] Phase 13: Quiz format
 - [ ] Phase 14: Voiceover visuals
 - [ ] Phase 15: Timeline editor
@@ -1780,3 +1785,233 @@ No library asset has ever existed. Specifically untested:
   projects point at these rows.
 - **Phase 02's R2** and **Phase 04's AWS deploy** remain open, and both of them block this phase's
   end-to-end checks.
+
+### Phase 12 — 2026-10-28
+
+Built: the **Reddit adapter seam** (`src/lib/adapters/reddit/` — contract, selector, a pure URL
+parser holding the host allowlist, and an official-API implementation with an OAuth app),
+`src/lib/types/reddit.ts` (the five refusal sentences, the three speaker roles, the condensation
+schema, the retention window), `src/lib/types/avatar.ts`, the `Avatar` model and its migration
+(**applied**), `avatars.service.ts`, `src/lib/script/reddit-prompt.ts` + `condense.ts`,
+**`SCRIPT_WRITERS`** (`src/lib/script/writers.ts` — the new extension point),
+`src/lib/generators/common.ts` (everything a format shares, extracted from the voiceover
+generator), `reddit-story.ts`, `avatar-windows.ts` (the flicker maths),
+`src/lib/captions/speakers.ts`, the `RedditCard` and `AvatarOverlay` component families registered
+into the render registry, `src/trpc/routers/reddit.ts` and `avatars.ts`, the `redditStories` and
+`avatars` registry entries, the `reddit-retention` cron, the Reddit input panel on the script
+screen, and the eslint credential fence plus the setup-checklist row. 41 new tests; the suite is
+852 and green, and `tsc --noEmit`, `eslint --max-warnings=0` and `next build` are all clean.
+
+**Five findings about the phase file itself, because they changed what was worth doing:**
+
+- **The phase's `RedditFetchError` union is five values; the adapter declares seven.**
+  `unavailable` was added as an honest catch-all — Reddit answering something this build does not
+  recognise is not any of the five, and folding it into one of them would hide a case worth adding
+  later. `rate_limited` was in the phase's list and is the one failure that is OURS rather than the
+  thread's, so it is reported as transient while the other five are permanent.
+- **Step 7's "switches to `talking` on that speaker's word timings" contradicts its own next
+  sentence.** Word timings are available (aligned words carry a speaker), and using them directly
+  switches the mouth shut on every comma — which is precisely the sub-200ms flip the same step
+  forbids. It is implemented at LINE granularity, which satisfies both readings: a line is the
+  measured unit of audio, so a line is a continuous stretch of talking and the gaps between lines
+  are the real pauses. Grep `TALKING_IS_PER_LINE_NOT_PER_WORD`.
+- **Step 7's `reaction` "on marked beats" has no marker and no producer.** Nothing in the document
+  marks a beat, and inventing one would be a document concept with one consumer and no author. The
+  rule chosen instead needs no new concept and is what these videos actually look like: a character
+  reacts for 450ms as it arrives, then speaks. Grep `REACTION_IS_THE_ENTRANCE`.
+- **Step 12's "outputs expire" was narrowed, deliberately, and this is the one place the phase was
+  not followed literally.** See the section below.
+- **Step 2's paste-text fallback would not have worked for this format** as the contracts are
+  written. The condenser originally required a structured thread, which meant a fetch failure
+  offered a fallback that produced single-voice narration while the fetched path produced several —
+  a different product depending on whether Reddit was up. It takes flattened TEXT instead, so both
+  paths go through the identical prompt and schema. Grep `PASTE_IS_THE_SAME_PATH`.
+
+**The retention decision, because it is the one deviation worth arguing about.**
+
+The phase says "outputs of this kind expire after the configured window". The sweep removes **our
+copy of somebody else's thread** — the flattened source text, the structured thread and the
+snapshot — and does NOT touch the script, the narration audio, the timeline or any render.
+
+Those are the customer's own derived work and they SPENT CREDITS on them. Deleting a finished video
+on a schedule is taking back something they paid for, and this app's own privacy copy promises the
+opposite ("your projects and media stay until you delete them"). Shipping a cron that quietly
+deletes paid outputs is also not a thing to do without the owner saying so. If that IS wanted, it
+is a separate decision with legal copy and a customer notification attached rather than a side
+effect of a retention job — and this note is where to start. Grep
+`WHAT_EXPIRES_IS_THE_CACHED_SOURCE` and `NEVER_DELETE_THE_CUSTOMERS_WORK`.
+
+The privacy policy's retention section now states what the sweep does, with the window read from
+`REDDIT_RETENTION_DAYS` rather than restated — a retention clause that omits a deletion the product
+performs is worse than no clause.
+
+**Decisions worth knowing about, because none of them were in the phase file:**
+
+- **There is NO Reddit workflow.** `SCRIPT_WRITERS` is a registry keyed by `ProjectKind`, mirroring
+  `GENERATORS`, and the existing script workflow resolves the writer from the project's kind — so
+  the credit hold, the retry classification, the refund on every path and the one transaction that
+  saves and charges are all Phase 06's, unchanged. The alternative was
+  `if (kind === 'reddit-story')` inside `project-generate`, which the generator registry's own
+  header explains the cost of. Phase 13 gets all of it free. Grep `ONE_WORKFLOW_MANY_WRITERS`.
+- **`reddit` is a FOURTH source kind, not a flavour of `url`.** `extractSource` stays the one
+  extraction entry point, with an exhaustive switch — but `scriptSourceSchema` (the wire input of
+  `scripts.generate`) deliberately does NOT accept it, because that endpoint writes a
+  single-narrator script and would produce a Reddit project with no card, one voice and no expiry
+  while nothing errored. Two unions sharing their three common arms as values, so they cannot drift.
+  Grep `REDDIT_IS_NOT_A_SCRIPT_SOURCE`.
+- **`ExtractedSource` grew a `thread` field.** The speaker split needs the STRUCTURE, and
+  recovering it from the flattened prose would mean parsing our own formatting back out — which
+  would make the cast depend on a string template. Grep `STRUCTURE_SURVIVES_EXTRACTION`.
+- **Five generator behaviours moved to `common.ts`.** A Reddit story and a voiceover differ in
+  exactly two ways (a card and avatars) and are identical in five. Two copies of "a background
+  shorter than the narration loops, and one with no measured duration does not" is two places for
+  it to stop being true, and the second copy is always the wrong one. The voiceover generator went
+  from ~330 lines to ~160 with no behaviour change — all 25 of its existing tests passed against
+  the refactor before anything new was added. Grep `COMPOSED_FROM_COMMON`.
+- **The avatar state timeline is baked into the document, and it HAD to be.** A render component
+  receives `item`, `assets`, `frames` and `canvas` and not the document
+  (`RENDER_COMPONENT_CONTRACT`), so the overlay cannot read `doc.words` and could not derive a
+  talking state if it wanted to. The component does one scan to find the span covering its frame.
+  Grep `WINDOWS_ARE_COMPUTED_NOT_DRAWN`.
+- **A window breaks on the SPEAKER and only on the speaker.** The first implementation also broke on
+  a long gap, which meant a character left the screen mid-thought and came back a second later — a
+  bigger switch than the flicker the rule exists to prevent. A pause inside a window is a `neutral`
+  stretch instead: the character standing there, not talking.
+- **A dropped short window has its neighbours RE-MERGED.** Dropping a two-word interjection on its
+  own left a hole where the surrounding character blinked off and back on — the same flicker wearing
+  a different hat. Two passes, because one pass cannot know that the run it is starting will turn
+  out too short to keep. Grep `DROP_THEN_REMERGE`.
+- **Every avatar overlay shares one `z`**, which is safe precisely because the windows provably do
+  not overlap. An incrementing depth would make it depend on how many speakers happened to talk,
+  which is a document that re-renders differently after an edit that changed nothing visual. Grep
+  `AVATAR_Z_IS_STABLE`.
+- **The card is a SCENE item and runs UNDER the narration.** The narrator is already reading the
+  title while it is on screen, which is how these videos work — a card that delayed the audio would
+  put a silent hold at the front of every video, which is the one place a viewer leaves. It is a
+  scene item rather than a caption because the title is not a word anybody narrated and has to be
+  legible whether or not the alignment produced anything. Grep `CARD_THEN_STORY` and
+  `CARD_IS_NOT_A_CAPTION`.
+- **The card carries NO Reddit branding** — no logo, no wordmark, no orange, no snoo, no imitation
+  of their UI. Those are trademarks, and a video that looks like it came FROM Reddit is a different
+  legal problem from one that quotes a thread. It is our card in the app's own palette, with the
+  subreddit as plain-text attribution. Grep `NO_REDDIT_BRANDING`.
+- **`condenseSystemPrompt()` takes no arguments**, which is the strongest available form of
+  `UNTRUSTED_TEXT_IS_NEVER_SYSTEM`: there is no parameter for thread text to arrive through, so no
+  future edit can interpolate one by accident. A test asserts its arity.
+- **Usernames never reach the model.** Participants are labelled by role and every handle is
+  dropped. Two reasons: a username is a real person's handle and nothing good comes of asking a
+  model to write in their name, and it is also free-text its owner chose, which makes
+  `u/ignore_all_previous` a delivery vector that costs nothing to close. Grep
+  `USERNAMES_NEVER_REACH_THE_MODEL`.
+- **`redditStories` is a flag that is TRUE on every plan — a kill switch, not an upsell.** This is
+  the one feature depending on a third party's terms, and if Reddit changes them or suspends the app
+  the operator needs to turn the format off for everybody in one edit without a deploy. Flipping
+  those booleans makes the factory's flag gate refuse every verb, reads included. It is deliberately
+  not a `limit`, which would be a second quota counting what `renders` already bills. Grep
+  `A_FLAG_NOT_A_LIMIT`.
+- **The preview is a deliberate second click**, not a debounce as you type. Every lookup is a
+  request against Reddit's API under our shared credentials, so a debounce would spend that budget
+  on half-typed links — and the resource's own rate limit would start refusing the customer who is
+  typing carefully. Grep `THEIR_RATE_LIMIT_NOT_OURS`.
+- **The link is validated locally first**, with the same pure parser the server uses, so a share
+  link gets the sentence that names the fix with no request at all. That is the whole reason the
+  parser is credential-free and lives outside the adapter's implementation folder.
+- **Per-speaker caption colour and its name tag come from ONE function**, so there is no way to
+  ship the tint without the tag. The phase requires the pairing and the reason is not decoration:
+  roughly one man in twelve cannot reliably distinguish two tinted captions, and for them colour
+  alone carries no attribution. Two functions would make "colour only" a one-line shortcut. Grep
+  `COLOUR_IS_NEVER_THE_ONLY_SIGNAL`.
+- **The colour is DERIVED from the tag, not stored**, so the same speaker is the same colour in
+  every video and re-generating cannot reshuffle them. `narrator` is pinned to plain white, because
+  it is the voice in most of every video and tinting it would colour most captions in the product
+  for no informational gain — which also means a single-voice video looks exactly as it did before
+  the feature existed. Grep `NARRATOR_IS_ALWAYS_WHITE`.
+- **`Avatar.assetSet` is one jsonb column rather than three.** Three nullable columns could hold a
+  row with `talking` set and `neutral` null, which is a character that cannot be drawn at rest and
+  the renderer would find out mid-video. One value parsed as a whole is either complete or refused.
+  Grep `A_SET_IS_COMPLETE_OR_REFUSED`.
+- **The avatar artwork goes through the Phase 11 library pipeline**, as `kind: 'avatar'` entries in
+  the background manifest — same ingest, same variants, same `library/avatars/…` prefix, same CDN
+  serving. The avatar sync runs SECOND and refuses any character whose three frames are not yet
+  `ready`, per character rather than per run. Grep `ARTWORK_MUST_EXIST_FIRST`.
+- **A cast member is resolved before the generator and re-checked at generate time.** The plan is
+  checked at assignment (so a customer gets an explanation) AND again when the document is built (so
+  a workspace that downgraded gets a video without the premium face rather than a leaked feature).
+  Grep `CAST_IS_A_FACT` and `UNASSIGNED_IS_NOT_AN_ERROR`.
+- **`speakerColors` on the caption track is OPTIONAL, not defaulted.** A `.default()` makes the
+  field required on the inferred output type, which would have meant every fixture and every
+  caption-track builder growing a `speakerColors: false` that says nothing. No `docVersion` bump
+  went with it: an optional field leaves every stored document valid, so there is nothing for a
+  migration to change. Grep `ADDING_A_FIELD_IS_NOT_A_MIGRATION`.
+- **`backgroundLibrary.applyBackground` taught us that tRPC reserves `apply`** (Phase 11). The same
+  class of trap was avoided here: `redditStories.start` rather than `create`, because the path verb
+  drives the audit key and the rate-limit key.
+
+**Verified.**
+
+- **41 new tests.** The hostile-thread fixture puts an injection in every attacker-controlled field
+  — title, body, subreddit, each comment, each username — and asserts the system prompt's arity, the
+  boundary stated before the task, exactly one surviving fence however many markers the thread
+  wrote, case-insensitive stripping, the task restated after the fence with nothing of the thread's
+  after it, every field inside the fence, every username dropped, and the schema refusing the
+  invented role, the extra field and a prompt dump. The URL parser refuses four lookalike hosts, a
+  userinfo URL, `http:`, a share link, a subreddit URL and four malformed ids, and accepts the four
+  shapes people paste while dropping the query. The avatar maths asserts one window per speaker run,
+  a short gap absorbed, a real pause kept as neutral, a short window dropped AND the hole closed,
+  the switch landing exactly on the line boundary, no state span shorter than the threshold, and
+  full coverage with no gaps or overlaps over forty lines. The reddit generator asserts a valid
+  document before and after anchor resolution, the card first and capped, the story still rendering
+  with no card, one overlay per run at one depth, three handles per avatar and one set for a
+  character used twice, no overlay for a faceless speaker, footage replacing the backdrop, and the
+  caption lane asking for colours only when the project did. The caption tints are held to Phase
+  08's own contrast threshold.
+- **The suite is 852 and green**; `tsc --noEmit`, `eslint --max-warnings=0` and `next build` are all
+  clean.
+- **The migration is applied** and `migrate status` reports the database in sync.
+- **13 workflows are registered**, the new `reddit-retention` cron among them.
+- **The voiceover refactor is behaviour-preserving**: all 25 of its existing tests passed against
+  `common.ts` before any Reddit code was added.
+
+**NOT verified, and this is why the box is unticked.**
+
+No thread has ever been fetched. `REDDIT_CLIENT_ID` and `REDDIT_CLIENT_SECRET` are unset, so the
+adapter has never authenticated. Specifically untested:
+
+- A real public thread URL producing a complete video. This also needs the ELEVENLABS and R2 gaps
+  closed — a Reddit story goes through narration, alignment and a background like any other video.
+- The five failure cases against real threads. Each is mapped and each mapping is read from a
+  documented Reddit response shape, but no deleted, removed, private, quarantined or missing thread
+  has actually been fetched — so the branch that reads `[deleted]` out of a 200 has never run.
+- A Reddit-looking URL that REDIRECTS into a private range. The host allowlist refuses the obvious
+  cases locally and the API host is ours, so the SSRF path is not reachable from this input at all —
+  which is the right answer and is not the same as having tested it.
+- **A thread containing explicit instructions to the model does not change the model's behaviour.**
+  The four structural properties and the schema's refusals are tested; what is NOT tested is a real
+  model's response to the fixture, deliberately — see the note in the test file on why that test
+  would cost money per run and prove nothing about the next model version. An end-to-end check
+  against a live model with the committed fixture is still worth doing once, by hand.
+- A two-speaker video with the correct avatar visible per line. The maths is tested exhaustively;
+  nothing has been rendered, and no avatar artwork exists.
+- The rate limiter refusing a hammered `preview`.
+- The retention sweep running against real rows.
+
+**Also outstanding:**
+
+- **No avatar artwork exists**, so the character catalogue is empty and the format renders with
+  captions and a background but no faces. This needs an illustrator, three frames per character,
+  and a provenance statement per row. It is the largest gap in the phase and it is not a code gap.
+- **No character picker in the UI.** `avatars.list` and `avatars.assign` exist, are gated and are
+  audited, but nothing on the cast screen calls them — a picker over an empty catalogue is a grid
+  with nothing in it. The pipeline already reads `Speaker.avatarId`, so the format works the moment
+  a character exists and a row points at it.
+- **No portal console for `avatars.sync`**, the same state `voices.sync` and
+  `backgroundLibrary.sync` are in.
+- **The Reddit app's API terms have not been read by a lawyer.** The implementation uses the
+  official API with an OAuth app, respects the rate limits, sends a descriptive User-Agent and holds
+  a retention window — but "we are compliant" is a legal conclusion and nobody qualified has drawn
+  it. The kill switch exists for the day that conversation goes badly.
+- **Phase 11's music picker and its unresolved licence category** (grep
+  `MUSIC_LICENCE_IS_NOT_RESOLVED_YET`) and **Phase 11's empty background catalogue** are both still
+  open, so a Reddit story currently plays over the styled backdrop.
+- **Phase 02's R2**, **Phase 04's AWS deploy** and the **ELEVENLABS_API_KEY** remain the three
+  blockers that stop any video completing end to end.

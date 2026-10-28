@@ -47,16 +47,21 @@
 import type { ProjectKind } from "@/lib/types/project";
 import type { PipelineStageName } from "@/lib/types/pipeline";
 import { GeneratorNotImplementedError, type Generator } from "./types";
+import { redditStoryGenerator } from "./reddit-story";
 import { voiceoverGenerator } from "./voiceover";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: GENERATORS
  *
  * Built in Phase 09:
- *   voiceover → narration over a styled background, captioned, optional music.
+ *   voiceover → narration over a background, captioned, optional music.
+ *
+ * Added in Phase 12:
+ *   reddit-story → a title card, speaker-split narration and avatar overlays
+ *                  over the same background and captions a voiceover uses. The
+ *                  two share ./common.ts; see COMPOSED_FROM_COMMON.
  *
  * Deliberately absent, each with the phase that adds it:
- *   reddit-story → Phase 12
  *   quiz         → Phase 13
  *   motion       → Phase 16
  *
@@ -67,6 +72,7 @@ import { voiceoverGenerator } from "./voiceover";
  */
 export const GENERATORS: Partial<Record<ProjectKind, Generator>> = {
   voiceover: voiceoverGenerator,
+  "reddit-story": redditStoryGenerator,
 };
 
 export function hasGenerator(kind: ProjectKind): boolean {

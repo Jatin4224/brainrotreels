@@ -734,6 +734,106 @@ export const RESOURCES = {
     },
   },
 
+  /**
+   * SOURCE OF TRUTH KEYWORDS: RESOURCES.redditStories, A_FLAG_NOT_A_LIMIT,
+   *   THEIR_RATE_LIMIT_NOT_OURS, redditStories.start
+   *
+   * Videos generated from Reddit threads.
+   *
+   * A_FLAG_NOT_A_LIMIT, and it is a flag that is TRUE on every plan — which
+   * looks pointless until you ask what it is for. It is not an upsell: a
+   * Reddit story costs the same credits as any other video and the format is
+   * part of the product on every tier. It is a KILL SWITCH. This is the one
+   * feature in the app that depends on a third party's API terms, and if
+   * Reddit changes them, suspends our app, or the licensing position shifts,
+   * the operator needs to turn the format off for everybody in one edit —
+   * without a deploy that also ships whatever else is on main. Flipping these
+   * booleans does that, and the factory's flag gate (section 10 of
+   * src/trpc/procedures/protected.ts) then refuses every verb on the resource,
+   * reads included.
+   *
+   * It is deliberately NOT a `limit`. A per-plan cap on Reddit videos
+   * specifically would be a second quota alongside `renders`, counting the
+   * same act twice and giving a customer two different numbers for how many
+   * videos they have left.
+   *
+   * THEIR_RATE_LIMIT_NOT_OURS is why the numbers below are tighter than
+   * anything else in this registry. Every `start` and every `preview` is a
+   * request against Reddit's API under OUR app's credentials, and that budget
+   * is shared by every workspace — so one customer pasting links in a loop
+   * degrades the format for all of them. `preview` is the looser of the two
+   * because it is free and is what a customer does while deciding; `start`
+   * carries the phase's own number.
+   */
+  redditStories: {
+    name: "Reddit stories",
+    description: "Videos generated from Reddit threads",
+    permissions: ["read", "create"],
+    flag: {
+      perPlan: {
+        free: true,
+        starter: true,
+        pro: true,
+        enterprise: true,
+        portal: true,
+      },
+      availableOnFreeTrial: true,
+    },
+    audit: {
+      describe: {
+        start: "Started a Reddit story for project {input.projectId}",
+      },
+    },
+    rateLimit: {
+      /* The phase's own figure. The Reddit API has its own limits to respect,
+       * and they are shared across every workspace. */
+      start: { count: 10, window: "5 m" },
+      /* A free read, but still a Reddit request — so it is capped well above
+       * what a person typing does and well below what a loop would. */
+      preview: { count: 30, window: "5 m" },
+    },
+  },
+
+  /**
+   * SOURCE OF TRUTH KEYWORDS: RESOURCES.avatars, LOCKED_NOT_HIDDEN,
+   *   PORTAL_ONLY_SYNC, A_CATALOGUE_NOT_A_QUOTA
+   *
+   * The illustrated characters a speaker can be given a face.
+   *
+   * A_CATALOGUE_NOT_A_QUOTA: no `limit` and no `flag`. There is nothing to
+   * count — a project has as many faces as it has speakers — and nothing to
+   * gate wholesale, because the gating that matters is PER CHARACTER
+   * (`Avatar.minPlan`), exactly as it is for voices and caption styles. A
+   * boolean here could not express one character available from Starter and
+   * another from Pro, and a counter would be a second number for something
+   * `renders` already bills.
+   *
+   * `assign` is its own verb rather than `update`, mirroring `voices.assign`:
+   * it writes a SPEAKER, not a character, and naming it after the thing it
+   * changes would suggest a tenant can edit the shared catalogue. `sync` is
+   * PORTAL_ONLY_SYNC for the same reason the voice and background syncs are —
+   * these rows are read by every tenant.
+   */
+  avatars: {
+    name: "Characters",
+    description: "The illustrated character catalogue",
+    permissions: ["read", "assign", "sync"],
+    audit: {
+      describe: {
+        assign: "Assigned a character to a speaker",
+        sync: "Synced the character catalogue from the manifest",
+      },
+    },
+    /* Assigning a face is a single-row settings write with no provider call
+     * behind it, limited at the same number as the other cheap writes. The
+     * sync resolves three artwork rows per character and is an operator
+     * action. */
+    rateLimit: {
+      assign: { count: 60, window: "1 m" },
+      sync: { count: 3, window: "5 m" },
+    },
+  },
+
   invitation: {
     name: "Invitations",
     description: "Send invites and cancel pending invitations",

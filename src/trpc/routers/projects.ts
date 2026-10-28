@@ -35,6 +35,13 @@ import { TRPCError } from "@trpc/server";
 import type { Prisma } from "@/generated/prisma";
 import { enqueue } from "@/lib/adapters/jobs";
 import { hasGenerator } from "@/lib/generators";
+import {
+  REDDIT_RETENTION_DAYS,
+  isRedditExpired,
+  redditExpiresAt,
+  redditThreadSnapshotSchema,
+} from "@/lib/types/reddit";
+import { jsonObjectSchema } from "@/lib/types/json";
 
 import { createStructuredError, createTRPCRouter } from "../init";
 import { protectedProcedure } from "../procedures";
@@ -159,17 +166,49 @@ export const projectsRouter = createTRPCRouter({
         });
 
       const { timeline, ...rest } = project;
+
+      /**
+       * SOURCE OF TRUTH KEYWORDS: reddit, RETENTION_IS_DERIVED_NOT_STORED,
+       *   NOTHING_IS_SILENT
+       *
+       * Phase 12. For a Reddit story: what thread it was made from and when
+       * our copy of that thread expires.
+       *
+       * NOTHING_IS_SILENT is the phase's own requirement — show the expiry
+       * date rather than deleting silently — so the date is returned from the
+       * moment the project exists, not once it is close. It is DERIVED from
+       * `createdAt` rather than stored, so changing the window changes every
+       * project's date at once instead of leaving old rows on the old one.
+       *
+       * `sourceExpired` is computed rather than inferred from the snapshot
+       * being absent, because the two mean different things: a project whose
+       * thread was swept is expired, and a project started from PASTED TEXT
+       * never had a snapshot at all.
+       */
+      const redditBlock = redditBlockFor(rest);
+
       if (timeline === null) {
-        return { ...rest, timeline: null, timelineErrors: [] };
+        return {
+          ...rest,
+          reddit: redditBlock,
+          timeline: null,
+          timelineErrors: [],
+        };
       }
 
       const migrated = tryMigrate(timeline.doc);
       if (!migrated.ok) {
-        return { ...rest, timeline: null, timelineErrors: migrated.errors };
+        return {
+          ...rest,
+          reddit: redditBlock,
+          timeline: null,
+          timelineErrors: migrated.errors,
+        };
       }
 
       return {
         ...rest,
+        reddit: redditBlock,
         timeline: {
           doc: migrated.doc,
           revision: timeline.revision,
@@ -815,3 +854,70 @@ function sleep(ms: number, signal?: AbortSignal): Promise<void> {
 /* Re-exported so a caller catching a failed migration from `get` does not have
  * to reach into the timeline module for the error class. */
 export { TimelineMigrationError };
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: redditBlockFor, RETENTION_IS_DERIVED_NOT_STORED,
+ *   NOTHING_IS_SILENT, SNAPSHOT_IS_WHAT_THE_CARD_SHOWS
+ *
+ * WHAT:  The Reddit facts `projects.get` returns, or null for every other
+ *        format.
+ *
+ * WHY:   NOTHING_IS_SILENT. The phase requires the expiry date to be on the
+ *        project screen rather than a thread disappearing without warning, so
+ *        the date is returned from the moment a Reddit project exists — not
+ *        once it is nearly due. It is DERIVED from `createdAt`
+ *        (RETENTION_IS_DERIVED_NOT_STORED), so an operator changing the window
+ *        changes every project's date at once instead of leaving old rows on
+ *        the old one.
+ *
+ *        `sourceExpired` is COMPUTED from the date rather than inferred from
+ *        the snapshot being absent, because the two mean genuinely different
+ *        things and the UI words them differently: a project whose thread the
+ *        sweep removed is expired, and a project started from PASTED TEXT
+ *        never had a snapshot at all.
+ *
+ *        Only the snapshot's display fields are returned. The stored thread
+ *        BODY and its comments are not — nothing on a screen shows them, and
+ *        putting somebody else's full thread in a tRPC response that a browser
+ *        caches would be a copy of it in one more place.
+ * WHERE: `projects.get`.
+ */
+function redditBlockFor(project: {
+  kind: string;
+  createdAt: Date;
+  sourceRef: string | null;
+  settings: Prisma.JsonValue;
+}): {
+  expiresAt: string;
+  retentionDays: number;
+  sourceExpired: boolean;
+  thread: {
+    url: string;
+    title: string;
+    subreddit: string;
+    author: string;
+    commentCount: number;
+  } | null;
+} | null {
+  if (project.kind !== "reddit-story") return null;
+
+  const bag = jsonObjectSchema.safeParse(project.settings);
+  const snapshot = redditThreadSnapshotSchema.safeParse(
+    bag.success ? bag.data["reddit"] : undefined,
+  );
+
+  return {
+    expiresAt: redditExpiresAt(project.createdAt).toISOString(),
+    retentionDays: REDDIT_RETENTION_DAYS,
+    sourceExpired: isRedditExpired(project.createdAt),
+    thread: snapshot.success
+      ? {
+          url: snapshot.data.url,
+          title: snapshot.data.title,
+          subreddit: snapshot.data.subreddit,
+          author: snapshot.data.author,
+          commentCount: snapshot.data.commentCount,
+        }
+      : null,
+  };
+}

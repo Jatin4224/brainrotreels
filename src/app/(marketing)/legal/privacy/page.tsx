@@ -25,6 +25,7 @@
 
 import type { Metadata } from "next";
 
+import { REDDIT_RETENTION_DAYS } from "@/lib/types/reddit";
 import { APP_NAME } from "@/lib/config/branding";
 import { LegalDocument } from "../_components/legal-document";
 
@@ -90,6 +91,19 @@ export default function PrivacyPage() {
         <li>
           Your projects and media stay until you delete them or close the
           workspace.
+        </li>
+        <li>
+          {/* Phase 12. Disclosed because the sweep in
+              src/inngest/functions/reddit-retention.ts actually does this, and
+              a retention clause that omits a deletion the product performs is
+              worse than no clause. It names the window from the code
+              (REDDIT_RETENTION_DAYS) rather than restating it, so changing the
+              policy changes this sentence. */}
+          Where you make a video from a Reddit thread, our copy of that thread —
+          its title, its text and the replies we read — is removed{" "}
+          {REDDIT_RETENTION_DAYS} days after the project is created. The script,
+          narration and video you made from it are yours and stay. The expiry
+          date is shown on the project before it happens.
         </li>
         <li>
           Audit entries and content-safety decisions are kept after the project

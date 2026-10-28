@@ -405,6 +405,25 @@ export const captionSettingsSchema = z.object({
   position: captionPositionSchema,
   wordsPerChunk: captionWordsPerChunkSchema,
   enabled: z.boolean(),
+  /**
+   * SOURCE OF TRUTH KEYWORDS: speakerColors, COLOUR_IS_NEVER_THE_ONLY_SIGNAL
+   *
+   * Phase 12. Tint each caption in its speaker's colour and show a name tag
+   * with it. OPTIONAL rather than required, so every settings object written
+   * before this existed still parses — a required field here would make every
+   * stored caption preference malformed, and `readCaptionSettings` would
+   * silently fall back to the defaults, losing the customer's chosen style.
+   *
+   * It is a per-PROJECT preference that the generator writes onto the caption
+   * TRACK, which is where the renderer reads it (the document is the run's
+   * output, so a preference steering the run cannot live in it — the same
+   * argument as CAPTION_SETTINGS_LIVE_ON_THE_PROJECT above).
+   *
+   * Only one format has several speakers today, so this does nothing visible
+   * on a single-voice video even when it is on: `narrator` is pinned to the
+   * same white the styles already use (NARRATOR_IS_ALWAYS_WHITE).
+   */
+  speakerColors: z.boolean().optional(),
 });
 
 export type CaptionSettings = z.infer<typeof captionSettingsSchema>;

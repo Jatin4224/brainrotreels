@@ -29,6 +29,7 @@ import { resolveWordAnchors, validate, type WordToken } from "@/lib/timeline";
 import type { DbClient } from "@/lib/config/prisma";
 import { GENERATORS, hasGenerator, resolveGenerator } from "./registry";
 import { GeneratorNotImplementedError, type GeneratorContext, type NarrationLineInput } from "./types";
+import { buildRedditStoryDocument } from "./reddit-story";
 import { buildVoiceoverDocument } from "./voiceover";
 
 /* The generator never touches it — BUILD_IS_THE_WHOLE_CONTRACT — so the test
@@ -80,6 +81,10 @@ function contextFor(
      * generator has to build a complete video without footage. The tests that
      * care pass one in. */
     background: null,
+    /* Phase 12: no faces and no thread by default — a voiceover has neither,
+     * and the Reddit tests pass both in. */
+    cast: {},
+    thread: null,
     db: NO_DB,
     ...overrides,
   };
@@ -401,18 +406,292 @@ describe("buildVoiceoverDocument with a background", () => {
   });
 });
 
+/**
+ * SOURCE OF TRUTH KEYWORDS: reddit-story tests, CARD_THEN_STORY,
+ *   ONE_OVERLAY_PER_SPEAKER_RUN, CAST_IS_A_FACT, FOOTAGE_OR_BACKDROP_NEVER_BOTH
+ *
+ * Phase 12. The cast and the thread arrive as FACTS on the context
+ * (RESOLVED_BEFORE_THE_GENERATOR), so the whole format is provable with no
+ * database — which is the property that matters here: a Reddit video is the
+ * most assembled thing this product makes, and every piece of it is checked
+ * without a key, a row or a provider.
+ */
+describe("buildRedditStoryDocument", () => {
+  const CAST = {
+    op: {
+      avatarId: "avt-sam",
+      states: { neutral: "a1", talking: "a2", reaction: "a3" },
+    },
+    commenter: {
+      avatarId: "avt-rae",
+      states: { neutral: "b1", talking: "b2", reaction: "b3" },
+    },
+  };
+
+  const THREAD = {
+    title: "My roommate ate my leftovers",
+    subreddit: "tifu",
+    author: "someone",
+  };
+
+  function redditContext(
+    overrides: Partial<GeneratorContext> = {},
+  ): GeneratorContext {
+    return contextFor({
+      /* The aligned words have to COVER the narration and no more — Phase 08
+       * produces exactly that, and a fixture where they disagree would fail
+       *  for a reason that has nothing to do with this format. */
+      words: words(12, 7),
+      lines: [
+        {
+          id: "l0",
+          position: 0,
+          speakerTag: "op",
+          text: "First.",
+          audioAssetId: "ast_0",
+          durationSec: 4,
+        },
+        {
+          id: "l1",
+          position: 1,
+          speakerTag: "commenter",
+          text: "Second.",
+          audioAssetId: "ast_1",
+          durationSec: 3,
+        },
+      ],
+      speakers: { op: "voice_a", commenter: "voice_b" },
+      cast: CAST,
+      thread: THREAD,
+      ...overrides,
+    });
+  }
+
+  it("produces a document the timeline module accepts", () => {
+    const doc = buildRedditStoryDocument(redditContext());
+    const verdict = validate(doc);
+    expect(verdict.ok, JSON.stringify(verdict.ok ? [] : verdict.errors)).toBe(
+      true,
+    );
+  });
+
+  it("is still valid once its anchors are resolved", () => {
+    const verdict = validate(
+      resolveWordAnchors(buildRedditStoryDocument(redditContext())),
+    );
+    expect(verdict.ok, JSON.stringify(verdict.ok ? [] : verdict.errors)).toBe(
+      true,
+    );
+  });
+
+  it("declares itself a reddit-story", () => {
+    expect(buildRedditStoryDocument(redditContext()).kind).toBe("reddit-story");
+  });
+
+  /* CARD_THEN_STORY — the card is at the FRONT and the narration starts under
+   * it, because a silent hold at the front of a video is where a viewer
+   * leaves. */
+  it("puts the title card first and lets the narration run under it", () => {
+    const doc = buildRedditStoryDocument(redditContext());
+    const card = doc.tracks.find((track) => track.id === "reddit-card");
+    const item = card?.type === "scene" ? card.items[0] : undefined;
+
+    expect(item?.render).toBe("redditCard");
+    expect(item?.start).toBe(0);
+    /* Capped by CARD_SECONDS, not by the video's length (7s here). */
+    expect(item?.duration).toBe(4);
+
+    const narration = doc.tracks.find((track) => track.id === "narration");
+    const firstLine =
+      narration?.type === "audio" ? narration.items[0] : undefined;
+    expect(firstLine?.start).toBe(0);
+  });
+
+  it("shows the thread title, subreddit and author on the card", () => {
+    const doc = buildRedditStoryDocument(redditContext());
+    const card = doc.tracks.find((track) => track.id === "reddit-card");
+    const element =
+      card?.type === "scene" ? card.items[0]?.scene.elements[0] : undefined;
+
+    expect(element?.text).toBe(THREAD.title);
+    expect(element?.props?.["subreddit"]).toBe("tifu");
+    expect(element?.props?.["author"]).toBe("someone");
+  });
+
+  /* A card never longer than the video — an overhanging item is one
+   * `validate()` refuses. */
+  it("caps the card at the length of the video", () => {
+    const doc = buildRedditStoryDocument(
+      redditContext({
+        words: words(4, 1.5),
+        lines: [
+          {
+            id: "l0",
+            position: 0,
+            speakerTag: "op",
+            text: "Short.",
+            audioAssetId: "ast_0",
+            durationSec: 1.5,
+          },
+        ],
+      }),
+    );
+    const card = doc.tracks.find((track) => track.id === "reddit-card");
+    const item = card?.type === "scene" ? card.items[0] : undefined;
+    expect(item?.duration).toBe(1.5);
+  });
+
+  it("emits no card when the thread snapshot is gone", () => {
+    const doc = buildRedditStoryDocument(redditContext({ thread: null }));
+    expect(doc.tracks.some((track) => track.id === "reddit-card")).toBe(false);
+    /* And the story still renders, which is what makes the retention sweep
+     * survivable rather than destructive. */
+    expect(validate(doc).ok).toBe(true);
+  });
+
+  /* ONE_OVERLAY_PER_SPEAKER_RUN, and AVATAR_Z_IS_STABLE with it. */
+  it("gives each speaker run one overlay at one shared depth", () => {
+    const doc = buildRedditStoryDocument(redditContext());
+    const overlays = doc.tracks.find((track) => track.id === "avatars");
+    const items = overlays?.type === "overlay" ? overlays.items : [];
+
+    expect(items).toHaveLength(2);
+    expect(items[0]?.render).toBe("characterOverlay");
+    expect(new Set(items.map((item) => item.z)).size).toBe(1);
+
+    /* Non-overlapping, which is what makes one shared depth safe — the schema
+     * refuses two overlays sharing a depth while both are on screen. */
+    const first = items[0];
+    const second = items[1];
+    expect(first).toBeDefined();
+    expect(second).toBeDefined();
+    if (first === undefined || second === undefined) return;
+    expect(Number(first.start) + Number(first.duration)).toBeCloseTo(
+      Number(second.start),
+      6,
+    );
+  });
+
+  it("declares three artwork handles per avatar and no more", () => {
+    const doc = buildRedditStoryDocument(redditContext());
+    const avatarHandles = Object.keys(doc.assets).filter((key) =>
+      key.startsWith("avatar_"),
+    );
+    expect(avatarHandles.sort()).toEqual([
+      "avatar_avt-rae_neutral",
+      "avatar_avt-rae_reaction",
+      "avatar_avt-rae_talking",
+      "avatar_avt-sam_neutral",
+      "avatar_avt-sam_reaction",
+      "avatar_avt-sam_talking",
+    ]);
+    /* URL_NEVER_IN_THE_DOCUMENT. */
+    expect(Object.values(doc.assets).every((asset) => !("url" in asset))).toBe(
+      true,
+    );
+  });
+
+  /* The same character used by two speakers declares ONE set of handles —
+   * which is what deriving the handle from the AVATAR rather than the speaker
+   * buys. */
+  it("declares one set of handles for a character used twice", () => {
+    const doc = buildRedditStoryDocument(
+      redditContext({ cast: { op: CAST.op, commenter: CAST.op } }),
+    );
+    expect(
+      Object.keys(doc.assets).filter((key) => key.startsWith("avatar_")),
+    ).toHaveLength(3);
+  });
+
+  /* UNASSIGNED_IS_NOT_AN_ERROR — a narrator who is never on screen. */
+  it("emits no overlay for a speaker with no face", () => {
+    const doc = buildRedditStoryDocument(redditContext({ cast: {} }));
+    expect(doc.tracks.some((track) => track.id === "avatars")).toBe(false);
+    expect(validate(doc).ok).toBe(true);
+  });
+
+  it("carries the already-settled state timeline onto each overlay", () => {
+    const doc = buildRedditStoryDocument(redditContext());
+    const overlays = doc.tracks.find((track) => track.id === "avatars");
+    const first = overlays?.type === "overlay" ? overlays.items[0] : undefined;
+
+    /* WINDOWS_ARE_COMPUTED_NOT_DRAWN — the component looks these up rather
+     * than deriving them, because it never sees the document. */
+    expect(Array.isArray(first?.props?.["states"])).toBe(true);
+    expect(first?.props?.["handles"]).toBeDefined();
+  });
+
+  /* FOOTAGE_OR_BACKDROP_NEVER_BOTH — shared with the voiceover format through
+   * ./common.ts, and asserted here too because this format stacks four tracks
+   * over it and a gradient drawn above the footage is the kind of thing that
+   * survives review. */
+  it("uses footage instead of the backdrop when one is chosen", () => {
+    const doc = buildRedditStoryDocument(
+      redditContext({
+        background: {
+          assetId: "ast_loop",
+          durationSec: 4,
+          license: "licensed",
+          width: 1080,
+          height: 1920,
+        },
+      }),
+    );
+    expect(doc.tracks.some((track) => track.id === "footage")).toBe(true);
+    expect(doc.tracks.some((track) => track.id === "background")).toBe(false);
+  });
+
+  it("asks for per-speaker caption colours only when the project did", () => {
+    const off = buildRedditStoryDocument(redditContext());
+    const offTrack = off.tracks.find((track) => track.type === "caption");
+    expect(
+      offTrack?.type === "caption" ? offTrack.speakerColors : true,
+    ).toBeFalsy();
+
+    const on = buildRedditStoryDocument(
+      redditContext({
+        settings: {
+          captions: {
+            styleId: "clean",
+            position: "bottom",
+            wordsPerChunk: 3,
+            enabled: true,
+            speakerColors: true,
+          },
+        },
+      }),
+    );
+    const onTrack = on.tracks.find((track) => track.type === "caption");
+    expect(onTrack?.type === "caption" ? onTrack.speakerColors : false).toBe(
+      true,
+    );
+  });
+
+  it("produces an empty document when there are no lines", () => {
+    const doc = buildRedditStoryDocument(
+      redditContext({ lines: [], words: [] }),
+    );
+    expect(doc.tracks).toHaveLength(0);
+  });
+});
+
 describe("the generator registry", () => {
   /* DOCUMENTED_GAP_NOT_A_STUB — the three unbuilt kinds are ABSENT, and that
    * absence is what `projects.generate` turns into a named refusal. A stub
    * returning an empty document would be a silent, black, paid-for video. */
-  it("has voiceover and nothing else yet", () => {
-    expect(Object.keys(GENERATORS)).toEqual(["voiceover"]);
+  it("has the two built formats and not the two unbuilt ones", () => {
+    expect(Object.keys(GENERATORS).sort()).toEqual([
+      "reddit-story",
+      "voiceover",
+    ]);
     expect(hasGenerator("voiceover")).toBe(true);
+    expect(hasGenerator("reddit-story")).toBe(true);
     expect(hasGenerator("quiz")).toBe(false);
+    expect(hasGenerator("motion")).toBe(false);
   });
 
   it("names the format when a kind has no generator", () => {
-    expect(() => resolveGenerator("reddit-story")).toThrow(
+    expect(() => resolveGenerator("quiz")).toThrow(
       GeneratorNotImplementedError,
     );
     try {

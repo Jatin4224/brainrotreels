@@ -83,7 +83,13 @@ export type ScriptTone = z.infer<typeof scriptToneSchema>
  *        they pasted. The phase asks for this explicitly.
  * WHERE: `Project.sourceRef` carries the value; this records the path.
  */
-export const SOURCE_KINDS = ['url', 'pdf', 'text'] as const
+/* Phase 12 added 'reddit'. It is a FOURTH PATH rather than a flavour of
+ * 'url', because it fails differently in five named ways (FIVE_FAILURES_NOT_ONE
+ * in src/lib/adapters/reddit/types.ts) and because it yields a STRUCTURED
+ * thread rather than prose — which is what the speaker split needs. Recording
+ * it is what lets 'why is my script wrong' be answered with 'the thread's top
+ * comments were all deleted'. */
+export const SOURCE_KINDS = ['url', 'pdf', 'text', 'reddit'] as const
 
 export const sourceKindSchema = z.enum(SOURCE_KINDS)
 
@@ -262,27 +268,71 @@ export const SOURCE_FETCH_TIMEOUT_MS = 15_000
 export const SCRIPT_TARGET_SECONDS_MIN = 10
 export const SCRIPT_TARGET_SECONDS_MAX = 180
 
+const urlSourceArm = z.object({
+  kind: z.literal('url'),
+  /* Checked properly by the SSRF guard server-side; this only catches the
+   * obvious before a request is made. */
+  value: z.string().trim().url().max(2_000),
+})
+
+const textSourceArm = z.object({
+  kind: z.literal('text'),
+  value: z.string().trim().min(1).max(SOURCE_TEXT_MAX_CHARS),
+})
+
+const pdfSourceArm = z.object({
+  kind: z.literal('pdf'),
+  /* A storage key for an already-uploaded PDF, not the bytes. The file goes
+   * through the normal upload path so it is size-capped and owned by the
+   * workspace before anything reads it. */
+  value: z.string().trim().min(1).max(500),
+})
+
+const redditSourceArm = z.object({
+  kind: z.literal('reddit'),
+  /* A thread URL. Checked properly by parseRedditThreadUrl server-side — host
+   * allowlist and base-36 post id — which this cannot express. */
+  value: z.string().trim().url().max(2_000),
+})
+
 export const scriptSourceSchema = z.discriminatedUnion('kind', [
-  z.object({
-    kind: z.literal('url'),
-    /* Checked properly by the SSRF guard server-side; this only catches the
-     * obvious before a request is made. */
-    value: z.string().trim().url().max(2_000),
-  }),
-  z.object({
-    kind: z.literal('text'),
-    value: z.string().trim().min(1).max(SOURCE_TEXT_MAX_CHARS),
-  }),
-  z.object({
-    kind: z.literal('pdf'),
-    /* A storage key for an already-uploaded PDF, not the bytes. The file goes
-     * through the normal upload path so it is size-capped and owned by the
-     * workspace before anything reads it. */
-    value: z.string().trim().min(1).max(500),
-  }),
+  urlSourceArm,
+  textSourceArm,
+  pdfSourceArm,
 ])
 
 export type ScriptSource = z.infer<typeof scriptSourceSchema>
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: extractableSourceSchema, ExtractableSource,
+ *   REDDIT_IS_NOT_A_SCRIPT_SOURCE
+ *
+ * WHAT:  Every source `extractSource` knows how to read.
+ *
+ * WHY:   REDDIT_IS_NOT_A_SCRIPT_SOURCE, and the two unions are different ON
+ *        PURPOSE rather than by omission. `scriptSourceSchema` is the wire
+ *        input of `scripts.generate`, and a Reddit thread must not be
+ *        acceptable there: that endpoint writes a single-narrator script, while
+ *        a thread needs a speaker split, a condensation toggle, a thread
+ *        snapshot for the title card and a retention clock — none of which
+ *        `scripts.generate` would set. Accepting `kind: 'reddit'` there would
+ *        produce a Reddit project with no card, one voice and no expiry, and
+ *        nothing would error.
+ *
+ *        So the EXTRACTOR accepts four kinds and the script ENDPOINT accepts
+ *        three, and `redditStories.start` is the only producer of the fourth.
+ *        The arms are shared values rather than duplicated literals, so the
+ *        two unions cannot drift on the three they have in common.
+ * WHERE: The parameter type of `extractSource` in src/lib/script/ingest.ts.
+ */
+export const extractableSourceSchema = z.discriminatedUnion('kind', [
+  urlSourceArm,
+  textSourceArm,
+  pdfSourceArm,
+  redditSourceArm,
+])
+
+export type ExtractableSource = z.infer<typeof extractableSourceSchema>
 
 export const generateScriptSchema = z.object({
   organizationId: z.string().min(1),

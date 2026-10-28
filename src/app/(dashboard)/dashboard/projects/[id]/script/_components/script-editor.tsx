@@ -82,6 +82,7 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
+import { RedditInputPanel } from "./reddit-input-panel";
 
 /** Two seconds, matching the media table — live enough, not a request storm. */
 const GENERATING_POLL_MS = 2000;
@@ -137,13 +138,29 @@ export function ScriptEditor({ projectId }: { projectId: string }) {
 
   return (
     <div className="flex flex-col gap-6">
+      {/* THE_INPUT_IS_PER_FORMAT. A Reddit story is started from a THREAD,
+          not from an article and a tone — it has its own validation, its own
+          five named failures, a condense toggle and a retention notice, and
+          none of that belongs on the generic form. The kind decides which
+          panel renders, which is the same thing the writer registry and the
+          generator registry do server-side. */}
       {canGenerate ? (
-        <GenerateScriptForm
-          organizationId={organizationId}
-          projectId={projectId}
-          hasExistingScript={blocks.length > 0}
-          generating={generating}
-        />
+        project.data?.kind === "reddit-story" ? (
+          <RedditInputPanel
+            organizationId={organizationId}
+            projectId={projectId}
+            hasExistingScript={blocks.length > 0}
+            generating={generating}
+            retention={project.data.reddit ?? null}
+          />
+        ) : (
+          <GenerateScriptForm
+            organizationId={organizationId}
+            projectId={projectId}
+            hasExistingScript={blocks.length > 0}
+            generating={generating}
+          />
+        )
       ) : null}
 
       {project.data?.status === "failed" ? (
