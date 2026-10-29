@@ -463,6 +463,7 @@ model Project {
   narrationLines NarrationLine[]
   alignment      Alignment?
   pipelineStages PipelineStage[]
+  revisions      TimelineRevision[]
 
   @@index([organizationId])
   @@index([organizationId, createdAt])
@@ -490,6 +491,36 @@ model Timeline {
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@map("timeline")
+}
+
+/// TimelineRevision — a SNAPSHOT of a timeline document, written once per
+/// accepted editor save.
+///
+/// SNAPSHOTS_NOT_AN_EVENT_LOG (Phase 15). The alternative — storing the ops and
+/// replaying them — makes recovery depend on every op in the chain still
+/// applying cleanly against a document whose schema has since migrated, which
+/// is precisely the situation somebody recovering from a bad autosave is in. A
+/// snapshot is readable on its own, costs one row per save, and is pruned to
+/// TIMELINE_REVISION_KEEP by the service that writes it.
+///
+/// `revision` is the number Timeline.revision carried AFTER the save that
+/// produced this document, so restoring one writes its `doc` back under a NEW
+/// higher revision — history is appended to, never rewound, which is what lets
+/// an undo of a restore exist at all.
+///
+/// SOURCE OF TRUTH KEYWORD: TimelineRevision
+model TimelineRevision {
+  id        String   @id @default(cuid())
+  projectId String
+  revision  Int
+  doc       Json
+  createdAt DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, revision])
+  @@index([projectId, createdAt])
+  @@map("timeline_revision")
 }
 
 // ============================================================================

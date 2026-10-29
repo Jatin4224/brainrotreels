@@ -19,7 +19,9 @@
  *   listAssetsSchema, renameAssetSchema, CONTENT_TYPE_ALLOWLIST,
  *   UPLOAD_BYTES_PER_PLAN, VARIANT_NAMES, ASSET_TABS,
  *   PIPELINE_STAGES, stageUpdateSchema, generateProjectSchema,
- *   cancelProjectSchema, projectStagesSchema
+ *   cancelProjectSchema, projectStagesSchema,
+ *   applyOpsSchema, openTimelineSchema, restoreRevisionSchema,
+ *   resynthLineSchema, ApplyOpsResult, TIMELINE_AUTOSAVE_MS
  *
  * WHAT:  Barrel re-export for `src/lib/types/*` — the single import surface
  *        for custom (non-Prisma) types and their backing zod schemas.
@@ -390,3 +392,35 @@ export type {
   QuizSource,
   StartQuizValues,
 } from "./quiz";
+export {
+  CAPTION_ORPHAN_POLICIES,
+  EDITOR_MIN_WIDTH_PX,
+  TIMELINE_AUTOSAVE_MS,
+  TIMELINE_REVISION_KEEP,
+  applyOpsSchema,
+  audioMixFormSchema,
+  captionOrphanPolicySchema,
+  captionTextFormSchema,
+  clipLabelFormSchema,
+  lineTextFormSchema,
+  overlayPlacementFormSchema,
+  listRevisionsSchema,
+  openTimelineSchema,
+  restoreRevisionSchema,
+  resynthLineSchema,
+} from "./timeline";
+export type {
+  ApplyOpsResult,
+  ApplyOpsStatus,
+  ApplyOpsValues,
+  AudioMixValues,
+  CaptionTextValues,
+  ClipLabelValues,
+  LineTextValues,
+  OverlayPlacementValues,
+  TimelineWireError,
+  CaptionOrphanPolicy,
+  OpenTimelineValues,
+  RestoreRevisionValues,
+  ResynthLineValues,
+} from "./timeline";

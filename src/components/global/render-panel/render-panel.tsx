@@ -42,7 +42,8 @@
  *        so the panel simply shows a finished render where it would have shown
  *        a progress bar. The toast says so, because a button that produces a
  *        completed render in no time otherwise reads as a bug.
- * WHERE: Rendered beside the player on /dashboard/projects/[id]/preview.
+ * WHERE: Rendered beside the player on /dashboard/projects/[id]/preview and in
+ *        the timeline editor's export tab.
  */
 
 import * as React from "react";

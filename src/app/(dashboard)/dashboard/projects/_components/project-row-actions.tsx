@@ -33,6 +33,7 @@ import {
   Loader2Icon,
   MoreHorizontal,
   Pencil,
+  ScissorsIcon,
   PlayIcon,
   SparklesIcon,
   Trash2,
@@ -200,6 +201,21 @@ export function ProjectRowActions({
             <CaptionsIcon className="size-4" />
             Captions
           </DropdownMenuItem>
+          {/* Phase 15. After captions because it edits what the four screens
+              above produced, and gated with `<FeatureGate>` rather than hidden:
+              LOCKED_NOT_HIDDEN — a plan without the editor sees the item, gets
+              the upgrade modal, and learns the feature exists. The route is
+              refused server-side regardless (GATE_IS_THE_WHOLE_ROUTER). */}
+          <FeatureGate resource="timelineEditor">
+            <DropdownMenuItem
+              onClick={() =>
+                router.push(`/dashboard/projects/${project.id}/edit`)
+              }
+            >
+              <ScissorsIcon className="size-4" />
+              Edit timeline
+            </DropdownMenuItem>
+          </FeatureGate>
           {/* Last in the list and first in the workflow, which is the right way
               round: the four items above are the pieces a customer inspects or
               adjusts, and this is the one button that does all of it. Gated on

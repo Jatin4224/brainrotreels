@@ -54,6 +54,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import { trpc } from "@/trpc/react-provider";
@@ -92,6 +93,7 @@ export function GeneratePanel({ projectId }: { projectId: string }) {
   const [streamed, setStreamed] = React.useState<StageUpdate[] | null>(null);
 
   const utils = trpc.useUtils();
+  const router = useRouter();
   const input = { organizationId: organizationId ?? "", projectId };
 
   const project = trpc.projects.get.useQuery(
@@ -149,6 +151,26 @@ export function GeneratePanel({ projectId }: { projectId: string }) {
        * the old snapshot would show the previous run's ticks for a second. */
       setStreamed(null);
       invalidateEverything();
+
+      /**
+       * SOURCE OF TRUTH KEYWORDS: REGENERATE_AS_A_NEW_VERSION, BRANCH_POLICY
+       *
+       * The server BRANCHED rather than overwrote, because this project has
+       * been edited by hand. The run belongs to the new project, so the screen
+       * follows it — staying here would watch a project that is not
+       * generating and conclude the button did nothing. The toast names what
+       * happened, because a silent navigation to a differently-titled project
+       * reads as a bug.
+       */
+      if (result.branchedFrom !== null) {
+        void utils.projects.list.invalidate();
+        toast.success(
+          "Your edited version is untouched — generating a new version of it.",
+        );
+        router.push(`/dashboard/projects/${result.projectId}/generate`);
+        return;
+      }
+
       toast.success(
         result.alreadyRunning
           ? "This project is already generating."
