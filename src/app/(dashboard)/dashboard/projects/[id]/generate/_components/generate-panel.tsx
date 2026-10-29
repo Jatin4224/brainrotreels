@@ -62,6 +62,7 @@ import {
   useActiveOrganizationId,
 } from "@/hooks/use-active-organization";
 import { BackgroundPicker } from "@/components/global/background-picker";
+import { VisualPicker } from "@/components/global/visual-picker";
 import { StageProgress } from "@/components/global/stage-progress";
 import { permissions } from "@/lib/permissions";
 import {
@@ -235,6 +236,27 @@ export function GeneratePanel({ projectId }: { projectId: string }) {
         disabled={run.active || busy}
         className="lg:col-start-1"
       />
+
+      {/* VISUALS_ARE_CHOSEN_BEFORE_THE_RUN, for the same reason the background
+          is — and BELOW it deliberately, because the two are read together: the
+          background is what plays wherever a paragraph has no picture of its
+          own, so a customer reads the general choice first and then the
+          exceptions. Disabled mid-run alongside it.
+
+          Only for `voiceover`, which is the one format that chooses a picture
+          per paragraph; a quiz draws cards and a Reddit story draws a thread,
+          both over the single background above (their generators skip the
+          `visuals` stage). Gated on the KIND rather than on whether any visual
+          happens to exist, so the panel is visible — and usable — before the
+          first generation has chosen anything. */}
+      {project.data?.kind === "voiceover" && (
+        <VisualPicker
+          organizationId={organizationId}
+          projectId={projectId}
+          disabled={run.active || busy}
+          className="lg:col-start-1"
+        />
+      )}
 
       <div className="flex flex-col gap-4">
         <Card>

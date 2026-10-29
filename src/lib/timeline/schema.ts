@@ -243,11 +243,28 @@ export type SceneSpec = z.infer<typeof sceneSpecSchema>;
  * SOURCE OF TRUTH KEYWORDS: VideoItem, videoItemSchema
  *
  * WHAT:  A clip on a video track — the gameplay loop, a stock shot, a recorded
- *        take.
+ *        take, a generated still.
  * WHY:   `muted` defaults true and `loop` defaults false. Backgrounds carry
  *        their own audio that nobody wants under a narration, and a loop that
  *        turned itself on would quietly hide a document whose background is
  *        shorter than its script.
+ *
+ *        PROPS_ARE_THE_COMPONENTS_OWN (Phase 14). `props` is the same open JSON
+ *        bag `OverlayItem` and `SceneElement` carry, and it is here because
+ *        `MediaClip` already reads one: KEN_BURNS has lived in that component
+ *        since Phase 03 with a note saying "a generator can set it today", and
+ *        it could not — a `.strict()` video item had nowhere to put it, so the
+ *        only way to reach the drift was to draw a still as an OVERLAY, which
+ *        would also have made it composite above the captions.
+ *
+ *        An optional field in an existing object, so every stored document is
+ *        still valid under the new schema and there is nothing for a migration
+ *        step to change — the same argument ADDING_A_KIND_IS_NOT_A_MIGRATION
+ *        makes above about `backdrop`, and the reason no `docVersion` bump goes
+ *        with this. It IS hashed, because it changes the picture: `hashDoc`
+ *        walks the whole document and only `CACHE_IRRELEVANT_FIELDS` is
+ *        dropped, so turning Ken Burns on correctly invalidates a cached
+ *        render.
  * WHERE: tracks[type='video'].items.
  */
 export const videoItemSchema = z
@@ -259,6 +276,9 @@ export const videoItemSchema = z
     muted: z.boolean().default(true),
     gain: z.number().min(0).max(4).optional(),
     render: z.literal("media").default("media"),
+    /* Presentation knobs belonging to the component family that draws this —
+     * see PROPS_ARE_THE_COMPONENTS_OWN above. */
+    props: z.record(z.string(), jsonValueSchema).optional(),
   })
   .strict();
 

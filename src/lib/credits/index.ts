@@ -18,7 +18,12 @@
  *        UI.
  */
 
-export { CREDIT_RATES, estimate, estimateRenderCost } from "./estimate";
+export {
+  CREDIT_RATES,
+  estimate,
+  estimateRenderCost,
+  estimateVisualsCost,
+} from "./estimate";
 export type { EstimateInput } from "./estimate";
 export { settlementNet, settlementRows } from "./settlement";
 export type { SettlementRow } from "./settlement";

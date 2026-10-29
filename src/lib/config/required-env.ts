@@ -353,6 +353,61 @@ export const OPTIONAL_ENV: readonly OptionalEnvVar[] = [
       },
     ],
   },
+  /* Stock footage (Phase 14). A row of its own because, like Reddit, it gates
+   * a CAPABILITY rather than the product: without it a voiceover still
+   * generates end to end and plays over the styled background, just plainer.
+   * It is also the row whose absence is least visible — nothing refuses and no
+   * error appears, the videos are simply duller — which is exactly why it is
+   * worth a line on a checklist an operator reads. */
+  {
+    id: "stock",
+    label: "Stock footage (Pexels)",
+    purpose:
+      "Needed before a voiceover's paragraphs can be matched to real footage. Nothing refuses without it: the generate pipeline's 'Choosing visuals' step completes with a warning and every paragraph plays over the styled background instead. The warning is the only sign, so a deployment that forgot this key produces perfectly working but noticeably plain videos.",
+    help:
+      "Create a free key at pexels.com/api and set STOCK_API_KEY. The hourly request quota is SHARED by every workspace on this deployment, which is why the stock search carries its own rate limit — see THEIR_RATE_LIMIT_NOT_OURS on the `aiImages` entry in src/lib/resources.ts. " +
+      "Every clip ingested records the provider, that provider's own id and the licence string on its asset row, so the question 'where did this footage come from' is answerable later from the row alone (PROVENANCE_IS_NOT_OPTIONAL). " +
+      "STOCK_PROVIDER selects the implementation and only `pexels` is registered; a second library means a new folder under src/lib/adapters/stock/, not a wider key. " +
+      "IMPORTANT: a fetched clip is held for review and withheld from every render unless STOCK_LIBRARY_PRE_CLEARED is set to \"true\" — this product has no vision classifier, so the default is to assume nothing has looked at the frames. Setting it is YOU stating, for this deployment, that the provider's library is moderated before publication; each cleared clip's moderation record names the setting as the basis. Without it, stock footage is fetched and transcoded and then never used, which is the one configuration that spends effort for nothing.",
+    icon: "Film",
+    link: { label: "Get a Pexels API key", url: "https://www.pexels.com/api/" },
+    keys: [
+      { key: "STOCK_API_KEY", label: "API key" },
+      {
+        key: "STOCK_LIBRARY_PRE_CLEARED",
+        label: 'Set to "true" to clear fetched clips for rendering',
+        optional: true,
+      },
+    ],
+  },
+  /* Image generation (Phase 14). Separate from the stock row although they sit
+   * next to each other in the same fallback chain, because they fail at
+   * different points and cost differently: a missing stock key costs nothing
+   * and loses footage, while this one SPENDS CREDITS per image and is capped
+   * per plan. An operator deciding whether to configure one of the two needs
+   * them as separate decisions. */
+  {
+    id: "image",
+    label: "Image generation",
+    purpose:
+      "Needed before a paragraph with no matching stock clip can get a generated still instead. Optional, and the chain is designed around its absence: stock first, then an image, then the styled background. Each generated image SPENDS CREDITS on the customer's ledger and counts against the plan's monthly `aiImages` allowance, which is zero on the free plan — so a free workspace is refused with the upgrade modal rather than quietly getting them.",
+    help:
+      "Set IMAGE_API_KEY to a key for the selected provider (IMAGE_PROVIDER, `openai` by default; IMAGE_MODEL is an optional model override). The variable is named for the CAPABILITY rather than the vendor on purpose — the seam exists because the commercial-rights position on generated media is still an open owner decision, and switching providers should be one env change rather than a rename of your deployment's secrets. " +
+      "Every prompt is classified before the model is called, under the stricter `prompt` standard, and a refused prompt falls back to the background rather than failing the video. Each generated image records its prompt and the model version that served it on the asset row, and an identical prompt in the same workspace reuses the existing image instead of paying twice.",
+    icon: "Sparkles",
+    link: {
+      label: "OpenAI API keys",
+      url: "https://platform.openai.com/api-keys",
+    },
+    keys: [
+      { key: "IMAGE_API_KEY", label: "API key" },
+      {
+        key: "IMAGE_MODEL",
+        label: "Model override (blank uses the default)",
+        optional: true,
+      },
+    ],
+  },
   /* Cloud rendering. A third media row rather than part of the other two,
    * because it fails at a different point again and the fix is in a different
    * cloud: without R2 nothing can be uploaded, without ffmpeg nothing can be

@@ -214,6 +214,10 @@ export const projectTtsFunction = inngestClient.createFunction(
           voiceId,
           text: draft.text,
           textHash: narrationTextHash(draft.text, voiceId),
+          /* LINE_REMEMBERS_ITS_BLOCK — Phase 14 times a block's visual to the
+           * words of that block, and the splitter already knows which block
+           * each line came from. */
+          blockId: draft.blockId,
         };
       });
 

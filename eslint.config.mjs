@@ -70,6 +70,43 @@ const eslintConfig = defineConfig([
           message:
             "PROVIDER_ISOLATION: read REDDIT_CLIENT_SECRET only inside src/lib/adapters/reddit/official/**. Elsewhere, use getRedditAdapter() from @/lib/adapters/reddit — and validate a URL with parseRedditThreadUrl, which needs no credential.",
         },
+        // Stock footage seam (Phase 14). The fence is on the CREDENTIAL, as
+        // above, because this adapter uses `fetch` and has no SDK. The key's
+        // hourly quota is SHARED by every workspace on the deployment, so a
+        // leak is somebody else spending the whole product's search budget.
+        // src/lib/adapters/stock/hosts.ts sits OUTSIDE the fenced folder
+        // deliberately and stays pure, so the DOWNLOAD HOST ALLOWLIST — the
+        // check that stops a stored URL becoming a request-forgery primitive
+        // (NO_SSRF_THROUGH_A_STORED_URL) — is importable by a router, by the
+        // ingest workflow and by a test.
+        {
+          selector:
+            "MemberExpression[object.object.name='process'][object.property.name='env'] > Literal[value='STOCK_API_KEY']",
+          message:
+            "PROVIDER_ISOLATION: read STOCK_API_KEY only inside src/lib/adapters/stock/pexels/**. Elsewhere, use getStockAdapter() from @/lib/adapters/stock — and check a download URL with assertStockDownloadUrl, which needs no credential.",
+        },
+        {
+          selector:
+            "MemberExpression[object.object.name='process'][object.property.name='env'] > Identifier[name='STOCK_API_KEY']",
+          message:
+            "PROVIDER_ISOLATION: read STOCK_API_KEY only inside src/lib/adapters/stock/pexels/**. Elsewhere, use getStockAdapter() from @/lib/adapters/stock — and check a download URL with assertStockDownloadUrl, which needs no credential.",
+        },
+        // Image model seam (Phase 14). Same mechanism again, and the one here
+        // where a careless read costs money PER CALL rather than per deploy:
+        // an image is billed on every request, and there is no cache in front
+        // of a key that has escaped its folder.
+        {
+          selector:
+            "MemberExpression[object.object.name='process'][object.property.name='env'] > Literal[value='IMAGE_API_KEY']",
+          message:
+            "PROVIDER_ISOLATION: read IMAGE_API_KEY only inside src/lib/adapters/image/openai/**. Elsewhere, use getImageAdapter() from @/lib/adapters/image — and moderate the prompt first, with moderateImagePrompt from @/services/visuals.service.",
+        },
+        {
+          selector:
+            "MemberExpression[object.object.name='process'][object.property.name='env'] > Identifier[name='IMAGE_API_KEY']",
+          message:
+            "PROVIDER_ISOLATION: read IMAGE_API_KEY only inside src/lib/adapters/image/openai/**. Elsewhere, use getImageAdapter() from @/lib/adapters/image — and moderate the prompt first, with moderateImagePrompt from @/services/visuals.service.",
+        },
       ],
       "no-restricted-imports": [
         "error",
@@ -222,6 +259,15 @@ const eslintConfig = defineConfig([
       // pure, so the host allowlist and the post-id validation are testable
       // with no credential and importable by a form validator.
       "src/lib/adapters/reddit/official/**/*.ts",
+      // Stock seam (Phase 14). Only this folder may read STOCK_API_KEY. Note
+      // that `hosts.ts` is NOT listed and must not be: it is the pure half,
+      // and keeping it under the fence is what proves it never reads the key.
+      "src/lib/adapters/stock/pexels/**/*.ts",
+      // Image seam (Phase 14). Only this folder may read IMAGE_API_KEY.
+      // src/lib/visuals/ stays pure and credential-free so the clip scoring and
+      // the tie-break — the decisions that can actually be wrong — are testable
+      // with no key and no spend.
+      "src/lib/adapters/image/openai/**/*.ts",
     ],
     rules: {
       // These folders ARE the translation layer, so the credential fence is

@@ -62,6 +62,10 @@ import { avatarAvailableOnPlan, readAvatarAssetSet } from "@/lib/types/avatar";
 import { redditThreadSnapshotSchema } from "@/lib/types/reddit";
 import { resolveProjectBackground } from "./backgrounds.service";
 import {
+  readVisualsFromSettings,
+  resolveBlockVisuals,
+} from "./visuals.service";
+import {
   PIPELINE_STAGES,
   generateSettingsSchema,
   type ClearableGenerateSettingKey,
@@ -159,7 +163,12 @@ export async function seedStages(
 function skipReasonFor(stage: PipelineStageName): string {
   switch (stage) {
     case "visuals":
-      return "Backgrounds beyond a styled gradient are not available yet.";
+      /* Phase 14 made this stage real for `voiceover`, which chooses a picture
+       * per block. The formats that still skip it are the ones that draw their
+       * own thing over ONE background — a quiz's cards, a Reddit story's thread
+       * — so the honest reason is now about the format rather than about a
+       * feature that has not shipped. */
+      return "This format plays over a single background rather than a picture per paragraph.";
     case "storyboard":
       return "This format has a single scene, so there is nothing to sequence.";
     case "design":
@@ -417,7 +426,16 @@ export async function setProjectStatus(
  *        reconciler is the backstop that catches what this misses.
  * WHERE: The workflow's onFailure, and `projects.cancel`.
  */
-export const PROJECT_HOLD_REFS = ["script", "tts", "align"] as const;
+export const PROJECT_HOLD_REFS = [
+  "script",
+  "tts",
+  "align",
+  /* Phase 14. The `visuals` stage holds against the images it plans to
+   * generate and settles on the ones it actually produced; a cancel between
+   * those two points would otherwise strand the reservation until the Phase 05
+   * reconciler noticed. Adding the namespace here is the whole wiring. */
+  "visuals",
+] as const;
 
 export async function releaseProjectHolds(
   db: DbClient,
@@ -588,6 +606,9 @@ export async function generatorContextFor(
         text: true,
         audioAssetId: true,
         durationSec: true,
+        /* LINE_REMEMBERS_ITS_BLOCK — Phase 14 times a per-block visual to the
+         * words of its block, and a block becomes one or more lines. */
+        blockId: true,
       },
     }),
     db.alignment.findFirst({
@@ -645,6 +666,27 @@ export async function generatorContextFor(
    */
   const thread = readThreadSnapshot(settings.success ? settings.data : {});
 
+  /**
+   * SOURCE OF TRUTH KEYWORDS: VISUALS_ARE_FACTS, RESOLVED_BEFORE_THE_GENERATOR,
+   *   READY_AND_CLEARED
+   *
+   * Phase 14. The per-block pictures, resolved to asset facts before the build
+   * for the same reason the background and the cast are: it is an asset read
+   * plus a readiness and moderation check, and a generator may do neither
+   * (GENERATORS_STAY_PURE, GENERATOR_CONTEXT_IS_FACTS).
+   *
+   * Resolved AFTER the project read because it depends on the project's stored
+   * choices, which is why it is not in the `Promise.all` above — the same
+   * reason `resolveCast` is not.
+   *
+   * Empty is the normal answer on a deployment with neither visual provider
+   * configured, and it means the styled backdrop, which is a complete video.
+   */
+  const visuals = await resolveBlockVisuals(db, {
+    organizationId,
+    visuals: readVisualsFromSettings(project.settings),
+  });
+
   return {
     kind: kind.data,
     ctx: {
@@ -664,6 +706,7 @@ export async function generatorContextFor(
                 text: line.text,
                 audioAssetId: line.audioAssetId,
                 durationSec: line.durationSec,
+                blockId: line.blockId,
               },
             ],
       ),
@@ -688,6 +731,7 @@ export async function generatorContextFor(
               height: background.row.height,
             },
       cast,
+      visuals,
       thread,
       db,
     },

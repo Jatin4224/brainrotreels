@@ -31,6 +31,7 @@ import { backgroundsRouter } from "./backgrounds";
 import { redditRouter } from "./reddit";
 import { quizzesRouter } from "./quizzes";
 import { avatarsRouter } from "./avatars";
+import { visualsRouter } from "./visuals";
 import { rendersRouter } from "./renders";
 import { creditsRouter } from "./credits";
 import { scriptsRouter } from "./scripts";
@@ -54,6 +55,9 @@ export const appRouter = createTRPCRouter({
   redditStories: redditRouter,
   quizzes: quizzesRouter,
   avatars: avatarsRouter,
+  /* Mounted under the REGISTRY KEY, which is what wires its permissions and
+   * rate limits — the factory derives both from the procedure path. */
+  aiImages: visualsRouter,
   renders: rendersRouter,
   credits: creditsRouter,
   scripts: scriptsRouter,

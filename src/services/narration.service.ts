@@ -132,6 +132,17 @@ export async function replaceNarrationLines(
       voiceId: string | null;
       text: string;
       textHash: string;
+      /**
+       * SOURCE OF TRUTH KEYWORDS: LINE_REMEMBERS_ITS_BLOCK
+       *
+       * Which `ScriptBlock` this line was split out of. Carried on
+       * `LineDraft` since Phase 06 and dropped here until Phase 14, which
+       * needs it: a per-block visual is timed to the words of its block, and a
+       * block becomes one or more lines. Optional rather than required so a
+       * caller with no block behind a line — there is none today, and
+       * Phase 15's editor will have one — is not forced to invent an id.
+       */
+      blockId?: string | null;
     }[];
   },
 ): Promise<number> {
@@ -150,6 +161,7 @@ export async function replaceNarrationLines(
       voiceId: line.voiceId,
       text: line.text,
       textHash: line.textHash,
+      blockId: line.blockId ?? null,
     })),
   });
 

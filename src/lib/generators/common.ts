@@ -44,6 +44,7 @@ import type {
   AudioItem,
   TimelineDoc,
   Track,
+  VideoItem,
   WordToken,
 } from "@/lib/timeline";
 import { TIME_EPSILON, roundSeconds } from "@/lib/timeline";
@@ -51,7 +52,12 @@ import { captionSettingsSchema } from "@/lib/types/caption";
 import { generateSettingsSchema } from "@/lib/types/pipeline";
 import type { AspectRatio } from "@/lib/types/project";
 import { jsonObjectSchema } from "@/lib/types/json";
-import type { GeneratorContext, ResolvedBackgroundInput } from "./types";
+import type {
+  GeneratorContext,
+  NarrationLineInput,
+  ResolvedBackgroundInput,
+  ResolvedBlockVisual,
+} from "./types";
 
 /* Document-local handles, not database ids — see ASSET_HANDLE_INDIRECTION. */
 export const BACKDROP_ITEM_ID = "backdrop";
@@ -487,6 +493,310 @@ export function buildBackgroundTrack(args: {
           },
         },
       ],
+    },
+    assets: {},
+  };
+}
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: buildBlockVisualTracks, BLOCK_SPANS_ARE_CONTIGUOUS,
+ *   ONE_FUNCTION_OWNS_WHAT_IS_BEHIND_THE_WORDS, STILLS_GET_KEN_BURNS,
+ *   GAPS_FALL_BACK_IN_TIME, KEN_BURNS_SCALE
+ *
+ * WHAT:  Everything behind the words for a format that chooses a picture PER
+ *        BLOCK: one clip or still per block that has one, and the project's
+ *        background or the styled backdrop over every second that no block
+ *        visual covers.
+ *
+ * WHY:   ONE_FUNCTION_OWNS_WHAT_IS_BEHIND_THE_WORDS, and it is the same
+ *        exclusivity argument FOOTAGE_OR_BACKDROP_NEVER_BOTH makes, extended
+ *        from "the whole video" to "a stretch of it". A backdrop sits on the
+ *        SCENE track, which composites ABOVE video (LAYER_ORDER in
+ *        src/lib/render/frame-plan.ts), so a document carrying both a full-
+ *        length backdrop and per-block clips would draw a gradient over every
+ *        picture — and the bug would look like "my visuals did not apply". The
+ *        only way to make that structurally impossible is for ONE function to
+ *        decide both, which is why this returns a LIST of tracks rather than
+ *        being composed from two calls at the callsite.
+ *
+ *        GAPS_FALL_BACK_IN_TIME. A block with no usable visual is the normal
+ *        case — both providers may be unconfigured, a search may match nothing,
+ *        a prompt may be refused — so the fallback is applied per STRETCH, not
+ *        per video. Each uncovered run of seconds gets the project's chosen
+ *        background if it has one, or a backdrop if it does not. That is what
+ *        makes "with both providers disabled, the video still completes on the
+ *        styled background" and "five blocks produce five matching visuals" the
+ *        same code path with different inputs, rather than two.
+ *
+ *        BLOCK_SPANS_ARE_CONTIGUOUS. A block becomes one or more narration
+ *        lines (`splitBlockIntoLines`), and because `layNarration` lays lines
+ *        in script order those lines are adjacent — so a block's span is its
+ *        first line's start to its last line's end, and a run is detected by
+ *        walking the spans once. It is computed from the SPANS rather than from
+ *        a sum of durations so that a beat inserted between lines
+ *        (BEATS_SHIFT_THE_WORDS) is inside the block that follows it, exactly
+ *        as the audio is.
+ *
+ *        STILLS_GET_KEN_BURNS and clips do not. A generated image held for six
+ *        seconds reads as a frozen frame, which the phase names as the reason
+ *        for the drift; the same drift applied to moving footage reads as a
+ *        camera wobble. `isStill` arrives as a FACT on the resolved visual
+ *        because a generator cannot read an asset row.
+ *
+ *        The drift goes in the item's `props` bag, which is where `MediaClip`
+ *        has read it since Phase 03 (KEN_BURNS) — not a new field on the
+ *        schema, and not a new render kind.
+ * WHERE: src/lib/generators/voiceover.ts, when the project has any resolved
+ *        block visual. With none, that generator calls `buildBackgroundTrack`
+ *        exactly as before, so an existing project's document — and therefore
+ *        its render cache entry — is unchanged by this phase.
+ */
+export const VISUAL_TRACK_ID = "visuals";
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: KEN_BURNS_SCALE, DRIFT_IS_SMALL_ON_PURPOSE
+ *
+ * How much a still drifts over its own span. The component's own default is the
+ * same figure; it is named here as well because this is the layer that DECIDES
+ * to ask for it, and a generator silently relying on a component's default
+ * would make the amount of motion in a video a fact about a React file.
+ *
+ * Eight percent is enough to read as motion on a phone and small enough that a
+ * two-second block does not feel like a zoom.
+ */
+export const KEN_BURNS_SCALE = 1.08;
+
+export function buildBlockVisualTracks(args: {
+  lines: readonly NarrationLineInput[];
+  spans: readonly NarrationSpan[];
+  visuals: Readonly<Record<string, ResolvedBlockVisual | undefined>>;
+  background: ResolvedBackgroundInput | null;
+  totalSec: number;
+  paletteId: string;
+}): { tracks: Track[]; assets: Record<string, AssetRef>; covered: number } {
+  if (args.totalSec <= 0) return { tracks: [], assets: {}, covered: 0 };
+
+  const runs = blockRuns(args.lines, args.spans);
+
+  const visualItems: VideoItem[] = [];
+  const assets: Record<string, AssetRef> = {};
+  /* The stretches no block visual covers, in order. */
+  const gaps: { start: number; end: number }[] = [];
+  let cursor = 0;
+
+  for (const run of runs) {
+    const visual = args.visuals[run.blockId];
+    if (visual === undefined) continue;
+
+    /* A run that starts after the cursor leaves a hole; the backdrop or the
+     * project background fills it (GAPS_FALL_BACK_IN_TIME). */
+    if (run.start > cursor + TIME_EPSILON) {
+      gaps.push({ start: cursor, end: run.start });
+    }
+
+    const duration = roundSeconds(run.end - run.start);
+    if (duration <= 0) continue;
+
+    const handle = visualHandle(run.blockId);
+    const loopable =
+      !visual.isStill && visual.durationSec !== null && visual.durationSec > 0;
+
+    visualItems.push({
+      id: `visual-${run.blockId}`,
+      start: run.start,
+      duration,
+      assetId: handle,
+      fit: "cover",
+      loop: loopable,
+      /* A stock clip carries its own soundtrack, and nobody asked for it under
+       * the narration — the same reasoning as the background's `muted`. */
+      muted: true,
+      render: "media",
+      /* STILLS_GET_KEN_BURNS — see the file header. */
+      ...(visual.isStill
+        ? { props: { kenBurns: true, kenBurnsScale: KEN_BURNS_SCALE } }
+        : {}),
+    });
+
+    assets[handle] = {
+      assetId: visual.assetId,
+      kind: visual.isStill ? "image" : "video",
+      /* The licence travels WITH the document, so a render can be refused
+       * months later without re-reading a provider's terms. */
+      license: visual.license,
+      ...(loopable && visual.durationSec !== null
+        ? { durationInSeconds: visual.durationSec }
+        : {}),
+      ...(visual.width !== null ? { width: visual.width } : {}),
+      ...(visual.height !== null ? { height: visual.height } : {}),
+    };
+
+    cursor = roundSeconds(run.end);
+  }
+
+  if (cursor < args.totalSec - TIME_EPSILON) {
+    gaps.push({ start: cursor, end: args.totalSec });
+  }
+
+  const tracks: Track[] = [];
+
+  /* Bottom-most first within the video lane, and the fallback is laid BEFORE
+   * the block visuals so that a rounding overlap of a frame shows the picture
+   * rather than the gradient. */
+  const fallback = buildFallbackTrack({
+    gaps,
+    background: args.background,
+    paletteId: args.paletteId,
+  });
+  if (fallback.track !== null) tracks.push(fallback.track);
+  Object.assign(assets, fallback.assets);
+
+  if (visualItems.length > 0) {
+    tracks.push({
+      id: VISUAL_TRACK_ID,
+      type: "video",
+      label: "Visuals",
+      items: visualItems,
+    });
+  }
+
+  return { tracks, assets, covered: visualItems.length };
+}
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: visualHandle, ASSET_HANDLE_INDIRECTION
+ *
+ * The document-local handle for one block's visual. Derived from the BLOCK id,
+ * not the asset id, so swapping a block's picture keeps the same handle and the
+ * editor's references to it survive — exactly as `narrationHandle` is derived
+ * from the line id and for the same reason.
+ */
+export function visualHandle(blockId: string): string {
+  return `visual_${blockId}`;
+}
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: blockRuns, BLOCK_SPANS_ARE_CONTIGUOUS
+ *
+ * WHAT:  Each block's span: first line's start to last line's end, in order.
+ * WHY:   See BLOCK_SPANS_ARE_CONTIGUOUS in `buildBlockVisualTracks`. Walked
+ *        once rather than grouped into a map, because the ORDER is the script's
+ *        and a map would lose it — and because a block id appearing twice
+ *        non-adjacently would mean the narration was reordered, in which case
+ *        two separate runs is the honest reading rather than one span with a
+ *        hole in it.
+ * WHERE: `buildBlockVisualTracks`.
+ */
+function blockRuns(
+  lines: readonly NarrationLineInput[],
+  spans: readonly NarrationSpan[],
+): { blockId: string; start: number; end: number }[] {
+  const runs: { blockId: string; start: number; end: number }[] = [];
+
+  for (const span of spans) {
+    const line = lines[span.lineIndex];
+    /* A line with no block — pre-Phase-14 audio, or a planned narration like a
+     * quiz's — cannot carry a per-block visual, so it extends nothing and
+     * breaks the current run. */
+    const blockId = line?.blockId ?? null;
+    const end = roundSeconds(span.start + span.duration);
+
+    if (blockId === null) continue;
+
+    const previous = runs[runs.length - 1];
+    if (previous !== undefined && previous.blockId === blockId) {
+      previous.end = end;
+      continue;
+    }
+    runs.push({ blockId, start: span.start, end });
+  }
+
+  return runs;
+}
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: buildFallbackTrack, GAPS_FALL_BACK_IN_TIME
+ *
+ * WHAT:  The project's background, or the styled backdrop, over exactly the
+ *        stretches no block visual covers.
+ *
+ * WHY:   The per-stretch version of `buildBackgroundTrack`'s decision, and it
+ *        keeps that function's two rules intact rather than reimplementing
+ *        them: footage is `muted`, `cover` and looped only when a source length
+ *        is known (LOOP_TO_THE_NARRATION), and with no footage the fill is a
+ *        backdrop element with the palette baked on
+ *        (PALETTE_IS_BAKED_ONTO_THE_ITEM).
+ *
+ *        One track, many items, rather than one track per gap: a lane is a
+ *        lane, and a document with six background tracks would be unreadable in
+ *        Phase 15's editor for no gain.
+ * WHERE: `buildBlockVisualTracks` only.
+ */
+function buildFallbackTrack(args: {
+  gaps: readonly { start: number; end: number }[];
+  background: ResolvedBackgroundInput | null;
+  paletteId: string;
+}): { track: Track | null; assets: Record<string, AssetRef> } {
+  if (args.gaps.length === 0) return { track: null, assets: {} };
+
+  const background = args.background;
+
+  if (background !== null) {
+    const loopable =
+      background.durationSec !== null && background.durationSec > 0;
+
+    return {
+      track: {
+        id: FOOTAGE_TRACK_ID,
+        type: "video",
+        label: "Background",
+        items: args.gaps.map((gap, index) => ({
+          id: `${BACKGROUND_ITEM_ID}-${index}`,
+          start: gap.start,
+          duration: roundSeconds(gap.end - gap.start),
+          assetId: BACKGROUND_HANDLE,
+          fit: "cover" as const,
+          loop: loopable,
+          muted: true,
+          render: "media" as const,
+        })),
+      },
+      assets: {
+        [BACKGROUND_HANDLE]: {
+          assetId: background.assetId,
+          kind: "video",
+          license: background.license,
+          ...(loopable && background.durationSec !== null
+            ? { durationInSeconds: background.durationSec }
+            : {}),
+          ...(background.width !== null ? { width: background.width } : {}),
+          ...(background.height !== null ? { height: background.height } : {}),
+        },
+      },
+    };
+  }
+
+  return {
+    track: {
+      id: BACKGROUND_TRACK_ID,
+      type: "scene",
+      label: "Background",
+      items: args.gaps.map((gap, index) => ({
+        id: `${BACKDROP_ITEM_ID}-${index}`,
+        start: gap.start,
+        duration: roundSeconds(gap.end - gap.start),
+        render: "backdrop" as const,
+        scene: {
+          layout: "fill",
+          elements: [
+            {
+              id: "fill",
+              kind: BACKDROP_ELEMENT_KIND,
+              props: { paletteId: args.paletteId },
+            },
+          ],
+        },
+      })),
     },
     assets: {},
   };

@@ -102,6 +102,10 @@ function linesForPlan(quiz: QuizSettings): NarrationLineInput[] {
         text,
         audioAssetId: `ast_${lines.length}`,
         durationSec: LINE_SECONDS,
+        /* A quiz's narration is PLANNED rather than split from script blocks,
+         * so its lines carry no block id — which is exactly the case a
+         * per-block visual must not cover (LINE_REMEMBERS_ITS_BLOCK). */
+        blockId: null,
       });
     }
   }
@@ -147,6 +151,9 @@ function contextFor(
     settings: { quiz: JSON.parse(JSON.stringify(quiz)) as unknown },
     background: null,
     cast: {},
+    /* A quiz chooses no per-block pictures — it draws cards over one
+     * background, which is why its generator still skips the `visuals` stage. */
+    visuals: {},
     thread: null,
     db: NO_DB,
     ...overrides,
