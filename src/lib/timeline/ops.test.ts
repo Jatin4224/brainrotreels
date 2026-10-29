@@ -5,7 +5,8 @@
 /**
  * SOURCE OF TRUTH KEYWORDS: ops tests, PURE_OPS, ATOMIC_PER_OP, RIPPLE,
  *   split edges, setCaptionText, WORD_SHIFT, PROPORTIONAL_REDISTRIBUTION,
- *   CAPTIONS_FOLLOW_WORDS, reorder, setItemProps, addItem, addOverlay
+ *   CAPTIONS_FOLLOW_WORDS, reorder, setItemProps, addItem, addOverlay,
+ *   setWordTiming, restoreDoc
  *
  * WHAT:  Every operation, including the ripple variants, the split edge cases,
  *        and the refusals.
@@ -726,5 +727,280 @@ describe("atomicity and sequencing", () => {
       { type: "move", itemId: "o2", start: 0.4, ripple: false },
     ]);
     expect(result.errors.map((error) => error.code)).toContain("Z_COLLISION");
+  });
+});
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: setWordTiming tests, WORD_LEVEL_NUDGE,
+ *   NEIGHBOURS_ARE_THE_BOUNDS, CACHE_IS_DROPPED_NOT_RECOMPUTED
+ *
+ * The finest edit the editor makes. The refusals matter more than the happy
+ * path: a nudge that crossed a neighbour would leave a token order that
+ * disagrees with the audio, and nothing downstream would report it.
+ */
+describe("setWordTiming", () => {
+  it("moves one word's edges and leaves its neighbours alone", () => {
+    const doc = redditStoryFixture();
+    const before = doc.words[2];
+    const next = doc.words[3];
+    if (before === undefined || next === undefined) throw new Error("fixture");
+
+    const target = (before.s + before.e) / 2;
+    const result = run(doc, [
+      { type: "setWordTiming", wordIndex: 2, end: target },
+    ]);
+
+    expect(result.errors).toEqual([]);
+    expect(result.doc.words[2]?.e).toBeCloseTo(target, 3);
+    expect(result.doc.words[2]?.s).toBe(before.s);
+    expect(result.doc.words[3]?.s).toBe(next.s);
+  });
+
+  it("refuses to start a word before the previous one has finished", () => {
+    const doc = redditStoryFixture();
+    const previous = doc.words[1];
+    if (previous === undefined) throw new Error("fixture");
+
+    const result = run(doc, [
+      { type: "setWordTiming", wordIndex: 2, start: previous.s },
+    ]);
+
+    expect(result.errors[0]?.code).toBe("BAD_OPERATION");
+    expect(result.doc.words[2]?.s).toBe(doc.words[2]?.s);
+  });
+
+  it("refuses to run a word past the start of the next one", () => {
+    const doc = redditStoryFixture();
+    const next = doc.words[3];
+    if (next === undefined) throw new Error("fixture");
+
+    const result = run(doc, [
+      { type: "setWordTiming", wordIndex: 2, end: next.e },
+    ]);
+
+    expect(result.errors[0]?.code).toBe("BAD_OPERATION");
+  });
+
+  it("refuses a word that would end before it starts", () => {
+    const doc = redditStoryFixture();
+    const word = doc.words[2];
+    if (word === undefined) throw new Error("fixture");
+
+    const result = run(doc, [
+      { type: "setWordTiming", wordIndex: 2, start: word.e, end: word.s },
+    ]);
+
+    expect(result.errors[0]?.code).toBe("BAD_DURATION");
+  });
+
+  it("names a word the document does not have", () => {
+    const result = run(redditStoryFixture(), [
+      { type: "setWordTiming", wordIndex: 9_999, start: 1 },
+    ]);
+    expect(result.errors[0]?.code).toBe("NOT_FOUND");
+  });
+
+  /* CACHE_IS_DROPPED_NOT_RECOMPUTED — and the document must still validate,
+   * which is the whole reason the cache is dropped rather than left stale. */
+  it("drops the cached timing of every caption over the word", () => {
+    const doc = redditStoryFixture();
+    const word = doc.words[2];
+    if (word === undefined) throw new Error("fixture");
+
+    const result = run(doc, [
+      { type: "setWordTiming", wordIndex: 2, end: (word.s + word.e) / 2 },
+    ]);
+
+    expect(result.errors).toEqual([]);
+    const covering = trackOf(result.doc, "captions").items.filter(
+      (item) => "startWord" in item && item.startWord <= 2 && item.endWord >= 2,
+    );
+    expect(covering.length).toBeGreaterThan(0);
+    for (const caption of covering) {
+      expect(caption.start).toBeUndefined();
+      expect(caption.duration).toBeUndefined();
+    }
+    expect(validate(result.doc).ok).toBe(true);
+  });
+});
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: restoreDoc tests, WHOLE_DOCUMENT_IS_STILL_AN_OP,
+ *   IN_PLACE_REPLACEMENT
+ *
+ * The op undo-past-the-save and the snapshot restore both use. What has to
+ * hold is that it replaces EVERYTHING and is still subject to the same
+ * validation as any other op — a restore is not a back door.
+ */
+describe("restoreDoc", () => {
+  it("replaces the whole document", () => {
+    const original = redditStoryFixture();
+    const edited = run(original, [
+      { type: "trim", itemId: "i1", duration: 2, ripple: false },
+    ]).doc;
+
+    const result = run(edited, [{ type: "restoreDoc", doc: original }]);
+
+    expect(result.errors).toEqual([]);
+    expect(JSON.stringify(result.doc)).toBe(JSON.stringify(original));
+  });
+
+  it("does not alias the document carried by the op", () => {
+    /* An op is replayable, so a later edit must not reach back through it. */
+    const original = redditStoryFixture();
+    const op: Op = { type: "restoreDoc", doc: original };
+
+    const result = run(quizFixture(), [
+      op,
+      { type: "trim", itemId: "i1", duration: 1.5, ripple: false },
+    ]);
+
+    expect(result.errors).toEqual([]);
+    expect(seconds(videoItem(original, "i1").duration)).not.toBe(1.5);
+  });
+
+  it("is validated like every other op", () => {
+    const broken = redditStoryFixture();
+    const overlays = trackOf(broken, "overlays").items;
+    const [first, second] = overlays;
+    if (first === undefined || second === undefined || !("z" in second))
+      throw new Error("fixture");
+    /* Two overlays made to collide at a depth, then restored wholesale. */
+    second.z = 10;
+    second.start = seconds(first.start);
+    second.duration = seconds(first.duration);
+
+    const result = run(quizFixture(), [{ type: "restoreDoc", doc: broken }]);
+    expect(result.errors.map((error) => error.code)).toContain("Z_COLLISION");
+  });
+});
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: ADD_REGISTERS_ITS_ASSET tests, UNKNOWN_ASSET,
+ *   ASSET_HANDLE_INDIRECTION
+ *
+ * Inserting media the document has never carried. Without the registration
+ * half, every such insert would fail validate()'s UNKNOWN_ASSET rule — which
+ * is what makes the two halves one op rather than two.
+ */
+describe("addItem with a new asset handle", () => {
+  const NEW_ASSET = {
+    assetId: "ast_library_clip_42",
+    kind: "video",
+    license: "licensed",
+  } as const;
+
+  it("registers the handle and inserts the clip", () => {
+    const result = run(redditStoryFixture(), [
+      {
+        type: "addItem",
+        trackId: "bg",
+        ripple: false,
+        asset: NEW_ASSET,
+        item: {
+          id: "inserted",
+          start: 0,
+          duration: 1.5,
+          assetId: "library_clip_42",
+        },
+      },
+    ]);
+
+    expect(result.errors).toEqual([]);
+    expect(result.doc.assets["library_clip_42"]).toEqual(NEW_ASSET);
+    expect(seconds(videoItem(result.doc, "inserted").duration)).toBe(1.5);
+  });
+
+  it("refuses to re-point a handle the document already uses", () => {
+    const result = run(redditStoryFixture(), [
+      {
+        type: "addItem",
+        trackId: "bg",
+        ripple: false,
+        asset: NEW_ASSET,
+        /* `bg_loop_07` is the fixture's existing background handle. */
+        item: {
+          id: "inserted",
+          start: 0,
+          duration: 1.5,
+          assetId: "bg_loop_07",
+        },
+      },
+    ]);
+
+    expect(result.errors[0]?.code).toBe("BAD_OPERATION");
+    expect(result.doc.assets["bg_loop_07"]?.assetId).toBe("ast_bg_loop_07");
+  });
+
+  it("still refuses an item whose handle was never registered", () => {
+    const result = run(redditStoryFixture(), [
+      {
+        type: "addItem",
+        trackId: "bg",
+        ripple: false,
+        item: {
+          id: "inserted",
+          start: 0,
+          duration: 1.5,
+          assetId: "never_heard_of_it",
+        },
+      },
+    ]);
+
+    expect(result.errors.map((error) => error.code)).toContain("UNKNOWN_ASSET");
+  });
+});
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: REGROUP_BY_RANGE tests, startWord, endWord,
+ *   CACHE_IS_DROPPED_NOT_RECOMPUTED
+ *
+ * The phase's "regroup words", done by moving a caption's boundary. What has
+ * to hold is that the cached timing does not survive the move — a caption
+ * covering different words with the old seconds on it is the definition of
+ * out of sync.
+ */
+describe("setItemProps on a caption's word range", () => {
+  it("moves the boundary and drops the cached timing", () => {
+    const doc = redditStoryFixture();
+    const caption = trackOf(doc, "captions").items[0];
+    if (caption === undefined || !("endWord" in caption))
+      throw new Error("fixture");
+    const widened = caption.endWord + 1;
+
+    const result = run(doc, [
+      {
+        type: "setItemProps",
+        itemId: caption.id,
+        props: { endWord: widened },
+      },
+    ]);
+
+    expect(result.errors).toEqual([]);
+    const after = trackOf(result.doc, "captions").items[0];
+    if (after === undefined || !("endWord" in after)) throw new Error("gone");
+    expect(after.endWord).toBe(widened);
+    expect(after.start).toBeUndefined();
+    expect(after.duration).toBeUndefined();
+    expect(validate(result.doc).ok).toBe(true);
+  });
+
+  it("refuses a range that ends before it starts", () => {
+    const doc = redditStoryFixture();
+    const caption = trackOf(doc, "captions").items[1];
+    if (caption === undefined || !("startWord" in caption))
+      throw new Error("fixture");
+
+    const result = run(doc, [
+      {
+        type: "setItemProps",
+        itemId: caption.id,
+        props: { endWord: caption.startWord - 1 },
+      },
+    ]);
+
+    expect(result.errors.map((error) => error.code)).toContain(
+      "BAD_WORD_RANGE",
+    );
   });
 });

@@ -6,7 +6,8 @@
  * SOURCE OF TRUTH KEYWORDS: projectsRouter, projects.create, projects.list,
  *   projects.get, projects.rename, projects.delete, projects.duplicate,
  *   projects.generate, projects.cancel, projects.getStages, projects.progress,
- *   BRANCH_POLICY, EXPLICIT_GATE_ON_DUPLICATE, AUTO_DERIVED_FROM_RESOURCES,
+ *   BRANCH_POLICY, REGENERATE_AS_A_NEW_VERSION, EXPLICIT_GATE_ON_DUPLICATE,
+ *   EXPLICIT_GATE_ON_A_BRANCH, AUTO_DERIVED_FROM_RESOURCES,
  *   FIRST_SUBSCRIPTION, STREAM_AND_POLL_ARE_ONE_READ
  *
  * WHAT:  The CRUD surface for projects: create, paginated list, single read
@@ -580,18 +581,123 @@ export const projectsRouter = createTRPCRouter({
         });
       }
 
+      /**
+       * SOURCE OF TRUTH KEYWORDS: BRANCH_POLICY, REGENERATE_AS_A_NEW_VERSION,
+       *   manualEdited, parentId, EXPLICIT_GATE_ON_A_BRANCH
+       *
+       * Phase 15, and `architecture.md` lists it as decide-early-or-suffer.
+       * Regenerating a project somebody has EDITED BY HAND never overwrites
+       * their work: it creates a new Project row with `parentId` pointing at
+       * the edited one and runs the pipeline against THAT. The edited version
+       * is left exactly as it was, down to its revision.
+       *
+       * The alternative — merging a regenerated script into a hand-edited
+       * document — cannot be made correct. The generator rewrites the words,
+       * and every manual caption regroup, overlay position and trim is
+       * expressed against the words it replaced. A merge would silently keep
+       * some of them and silently drop others, which is the worst of the three
+       * possible behaviours. So the UI says "Regenerate as a new version"
+       * rather than offering one.
+       *
+       * EXPLICIT_GATE_ON_A_BRANCH, the same exception `duplicate` makes and
+       * for the same reason: this path produces a PROJECT, and the factory's
+       * automatic cap fires on the path segment `create` only. Without the
+       * check here a workspace at its project limit would branch past it and
+       * leave the counter one short of reality.
+       *
+       * It runs AFTER the daily cap and the verification check because those
+       * refuse the generation itself — a refused run should leave no new
+       * project behind — and BEFORE the settings write and the enqueue, both of
+       * which must name the branch rather than the original.
+       */
+      let targetProjectId = project.id;
+      let branchedFrom: string | null = null;
+
+      if (project.manualEdited) {
+        const gate = await checkFeatureGate(input.organizationId, "projects", 1);
+        if (!gate.allowed) {
+          throw createStructuredError(
+            "FORBIDDEN",
+            gate.reason || "Plan limit reached",
+            {
+              errorCode: ERROR_CODES.USAGE_LIMIT_REACHED,
+              resource: "projects",
+              limit: gate.limit ?? 0,
+              current: gate.currentUsage ?? 0,
+              currentPlan: gate.plan,
+              upgradeRequired: true,
+              message:
+                gate.reason ||
+                "You have reached your plan limit for projects, so this edit cannot be branched",
+              upgradeMessage: gate.upgradeMessage,
+            },
+          );
+        }
+
+        const source = await findProjectWithTimeline(
+          ctx.db,
+          input.organizationId,
+          input.id,
+        );
+        if (!source)
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Project not found",
+          });
+
+        const branch = await ctx.db.project.create({
+          data: {
+            organizationId: source.organizationId,
+            title: `${source.title} (new version)`,
+            kind: source.kind,
+            aspect: source.aspect,
+            parentId: source.id,
+            ...(source.sourceRef !== null
+              ? { sourceRef: source.sourceRef }
+              : {}),
+            ...(source.settings !== null ? { settings: source.settings } : {}),
+          },
+        });
+
+        /* The document is copied so the branch starts from what the customer
+         * actually has rather than from nothing — a regeneration replaces it
+         * stage by stage, and a failed run partway through should leave a
+         * playable video rather than an empty project. `manualEdited` is NOT
+         * copied: the branch has had no manual work done to it, and inheriting
+         * the flag would make its own first regeneration branch again. */
+        if (source.timeline !== null) {
+          await ctx.db.timeline.create({
+            data: {
+              projectId: branch.id,
+              docVersion: source.timeline.docVersion,
+              doc: source.timeline.doc as Prisma.InputJsonValue,
+              revision: 0,
+            },
+          });
+        }
+
+        await incrementUsage(input.organizationId, "projects", 1, ctx.db);
+        targetProjectId = branch.id;
+        branchedFrom = source.id;
+      }
+
       if (project.status === "generating" && input.force !== true) {
         /* Not an error: the customer pressed a button that is already doing
          * what they asked for, and the screen they are on is the progress
          * screen. An error toast here would be noise on a working run. */
-        return { queued: false, alreadyRunning: true };
+        return {
+          queued: false,
+          alreadyRunning: true,
+          projectId: project.id,
+          branchedFrom: null,
+        };
       }
 
       /* Recorded BEFORE the enqueue, so the run cannot reach its `notify` step
        * before the preference it reads has been written. SETTINGS_ARE_MERGED —
        * only the `generate` key is touched. */
       if (input.notifyWhenDone !== undefined) {
-        await writeGenerateSettings(ctx.db, input.organizationId, input.id, {
+        await writeGenerateSettings(ctx.db, input.organizationId, targetProjectId, {
           notifyWhenDone: input.notifyWhenDone,
           /* ADDRESS_IS_RESOLVED_NOT_STORED — the id, never the address. */
           ...(input.notifyWhenDone ? { notifyUserId: ctx.user.id } : {}),
@@ -601,18 +707,29 @@ export const projectsRouter = createTRPCRouter({
       const idempotencyKey = await pipelineIdempotencyKey(
         ctx.db,
         input.organizationId,
-        input.id,
+        targetProjectId,
         { force: input.force === true },
       );
 
       await enqueue({
         requestId: ctx.requestId,
         name: "project/requested",
-        data: { projectId: input.id, organizationId: input.organizationId },
+        data: {
+          projectId: targetProjectId,
+          organizationId: input.organizationId,
+        },
         id: idempotencyKey,
       });
 
-      return { queued: true, alreadyRunning: false };
+      /* `projectId` is the project the RUN belongs to, which is the branch when
+       * one was made — the screen has to follow the work rather than stay on a
+       * project that is no longer generating. */
+      return {
+        queued: true,
+        alreadyRunning: false,
+        projectId: targetProjectId,
+        branchedFrom,
+      };
     }),
 
   /**

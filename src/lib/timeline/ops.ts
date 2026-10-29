@@ -4,7 +4,9 @@
 
 /**
  * SOURCE OF TRUTH KEYWORDS: apply, Op, opSchema, trim, split, move, deleteItem,
- *   reorder, setCaptionText, setItemProps, addItem, addOverlay, RIPPLE,
+ *   reorder, setCaptionText, setItemProps, addItem, addOverlay, setWordTiming,
+ *   restoreDoc,
+ *   RIPPLE,
  *   PURE_OPS, ATOMIC_PER_OP, ITEM_SCHEMA_BY_TRACK, itemPatchSchema,
  *   CAPTIONS_FOLLOW_WORDS, findItem
  *
@@ -41,6 +43,7 @@ import { z } from "zod";
 import { jsonValueSchema } from "@/lib/types/json";
 import { timelineError, type ValidationError } from "./errors";
 import {
+  assetRefSchema,
   audioItemSchema,
   captionItemSchema,
   normalizedBoxSchema,
@@ -48,6 +51,7 @@ import {
   renderKindSchema,
   sceneItemSchema,
   sceneSpecSchema,
+  timelineDocSchema,
   videoItemSchema,
   type TimelineDoc,
   type Track,
@@ -89,6 +93,24 @@ export const itemPatchSchema = z
       .optional(),
     z: z.number().int().optional(),
     text: z.string().optional(),
+    /**
+     * SOURCE OF TRUTH KEYWORDS: REGROUP_BY_RANGE, startWord, endWord,
+     *   CACHE_IS_DROPPED_NOT_RECOMPUTED
+     *
+     * Phase 15. Which words a caption covers — the phase's "regroup words".
+     *
+     * These are here while `start` and `duration` are deliberately absent,
+     * and the distinction is the point: a caption's range IS its position
+     * (WORD_RANGE_NOT_TEXT), so moving the boundary is the only honest way to
+     * say "this word belongs to the next caption". Moving `start` instead
+     * would set a time that contradicts the range, which is what validate()
+     * calls STALE_RESOLUTION.
+     *
+     * Changing either makes the cached pair stale, and opSetItemProps drops
+     * it for exactly that reason.
+     */
+    startWord: z.number().int().min(0).optional(),
+    endWord: z.number().int().min(0).optional(),
     props: z.record(z.string(), jsonValueSchema).optional(),
   })
   .strict();
@@ -101,7 +123,7 @@ const rippleShape = { ripple: z.boolean().default(false) };
 /**
  * SOURCE OF TRUTH KEYWORDS: opSchema, Op
  *
- * WHAT:  The nine edits, discriminated by `type`.
+ * WHAT:  The eleven edits, discriminated by `type`.
  * WHY:   Validated with zod rather than typed only in TypeScript because these
  *        arrive from a browser in Phase 15. The editor is not a trusted caller.
  * WHERE: apply(); the Phase 15 mutation input.
@@ -169,6 +191,25 @@ export const opSchema = z.discriminatedUnion("type", [
       /* Parsed against the target track's own item schema inside the op, which
        * is the only place that knows which variant is legal here. */
       item: z.record(z.string(), jsonValueSchema),
+      /**
+       * SOURCE OF TRUTH KEYWORDS: ADD_REGISTERS_ITS_ASSET,
+       *   ASSET_HANDLE_INDIRECTION, UNKNOWN_ASSET
+       *
+       * Phase 15. The doc.assets entry for the media this item points at,
+       * when the document does not already carry one.
+       *
+       * It is part of THIS op rather than an op of its own because the two
+       * halves are one intent and neither is valid alone: an item naming a
+       * handle the document has never heard of fails validate()'s
+       * UNKNOWN_ASSET rule, and a handle with nothing pointing at it is
+       * dead weight in every later render plan. Two ops would also be two
+       * undo steps for one gesture, and ATOMIC_PER_OP would let the first
+       * land while the second was refused.
+       *
+       * Optional because inserting a SECOND clip of media the document
+       * already uses — the same background twice — needs no new entry.
+       */
+      asset: assetRefSchema.optional(),
       ...rippleShape,
     })
     .strict(),
@@ -177,6 +218,69 @@ export const opSchema = z.discriminatedUnion("type", [
       type: z.literal("addOverlay"),
       trackId: z.string().min(1),
       item: z.record(z.string(), jsonValueSchema),
+      asset: assetRefSchema.optional(),
+    })
+    .strict(),
+  /**
+   * SOURCE OF TRUTH KEYWORDS: restoreDoc, WHOLE_DOCUMENT_IS_STILL_AN_OP,
+   *   UNDO_PAST_THE_SAVE, revisions.restore
+   *
+   * Phase 15. Replaces the whole document with the one carried here.
+   *
+   * WHOLE_DOCUMENT_IS_STILL_AN_OP, and it has to be, because two features
+   * cannot be expressed as a forward edit:
+   *
+   *   UNDO_PAST_THE_SAVE — the editor's undo stack holds the documents
+   *   themselves, so an undo is exact by construction (the phase requires the
+   *   restored document to hash identically). Once the autosave has already
+   *   sent the ops being undone, telling the server to go BACK would need an
+   *   inverse of every op, and `split` and `delete` have no faithful inverse —
+   *   an inverted delete has to invent the item's array position.
+   *
+   *   Restoring a TimelineRevision snapshot, which is the same act against an
+   *   older document.
+   *
+   * It does NOT weaken the thing ops exist for. apply() is still the single
+   * implementation, the server still runs it on the same input, and the result
+   * is still re-validated as a whole — a restore of a document that does not
+   * parse is refused rather than stored. Collision detection is unaffected
+   * too: the revision compare in timelineEditor.applyOps happens before any op
+   * runs, so a restore cannot silently overwrite another tab's work any more
+   * than a trim can.
+   */
+  /**
+   * SOURCE OF TRUTH KEYWORDS: setWordTiming, WORD_LEVEL_NUDGE,
+   *   NEIGHBOURS_ARE_THE_BOUNDS
+   *
+   * Phase 15. Moves one word's start or end, which is the finest correction
+   * the phase asks for ("word-level timing nudges").
+   *
+   * It is a separate op from `trim` rather than trim on a caption, because a
+   * word is not an item: it has no id, it lives in `doc.words`, and the
+   * captions over it derive their timing FROM it rather than the other way
+   * round (WORD_RANGE_NOT_TEXT). `trim` on a caption is refused for exactly
+   * that reason, and this is the thing a person actually wanted when they
+   * tried it.
+   */
+  z
+    .object({
+      type: z.literal("setWordTiming"),
+      /* The index into doc.words, which is also the token's own `i`. */
+      wordIndex: z.number().int().min(0),
+      start: z.number().finite().optional(),
+      end: z.number().finite().optional(),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("restoreDoc"),
+      /* The real document schema rather than an open record, unlike addItem.
+       * addItem cannot name its schema here because which one is legal depends
+       * on the target track; this op has exactly one. Parsing at the boundary
+       * means a malformed restore is refused with a field path before any op
+       * runs, and it is what lets the op carry a TimelineDoc the editor can
+       * build without a cast. */
+      doc: timelineDocSchema,
     })
     .strict(),
 ]);
@@ -271,8 +375,138 @@ function runOp(doc: TimelineDoc, op: Op, path: string): ValidationError[] {
         path,
         "overlay",
       );
+    case "setWordTiming":
+      return opSetWordTiming(doc, op, path);
+    case "restoreDoc":
+      return opRestoreDoc(doc, op);
   }
 }
+/**
+ * SOURCE OF TRUTH KEYWORDS: opSetWordTiming, WORD_LEVEL_NUDGE,
+ *   NEIGHBOURS_ARE_THE_BOUNDS, CACHE_IS_DROPPED_NOT_RECOMPUTED
+ *
+ * WHAT:  Moves one word's start and/or end within the gap its neighbours leave.
+ *
+ * WHY:   NEIGHBOURS_ARE_THE_BOUNDS. A nudge is refused rather than clamped when
+ *        it would cross the word before or after it, because the alternative is
+ *        a token order that disagrees with the audio — and nothing downstream
+ *        would report it: the captions would still render, in the wrong order,
+ *        confidently. A refusal names which side it hit, which is something the
+ *        customer can act on.
+ *
+ *        CACHE_IS_DROPPED_NOT_RECOMPUTED. Every caption covering this word has
+ *        a cached start and duration derived from it, and they are now stale —
+ *        validate() reports exactly that (STALE_RESOLUTION). They are DELETED
+ *        rather than recomputed here, the same way setCaptionText handles it,
+ *        so the one piece of code that turns a word range into seconds stays
+ *        `resolveWordAnchors` instead of becoming two that can disagree.
+ *
+ *        It does not touch the AUDIO. Nudging a caption's timing is free and
+ *        instant; making the voice say it at a different moment is a
+ *        re-recording, which is `timelineEditor.resynthLine`.
+ * WHERE: apply(); the editor's word timing controls.
+ */
+function opSetWordTiming(
+  doc: TimelineDoc,
+  op: Extract<Op, { type: "setWordTiming" }>,
+  path: string,
+): ValidationError[] {
+  const word = doc.words[op.wordIndex];
+  if (word === undefined) {
+    return [
+      timelineError(
+        `${path}.wordIndex`,
+        "NOT_FOUND",
+        `This timeline has no word ${op.wordIndex}.`,
+      ),
+    ];
+  }
+
+  const start = roundSeconds(op.start ?? word.s);
+  const end = roundSeconds(op.end ?? word.e);
+
+  if (end - start <= TIME_EPSILON) {
+    return [
+      timelineError(
+        `${path}.end`,
+        "BAD_DURATION",
+        "A word has to end after it starts.",
+      ),
+    ];
+  }
+
+  const previous = doc.words[op.wordIndex - 1];
+  if (previous !== undefined && start < previous.e - TIME_EPSILON) {
+    return [
+      timelineError(
+        `${path}.start`,
+        "BAD_OPERATION",
+        `"${word.w}" cannot start before "${previous.w}" has finished.`,
+      ),
+    ];
+  }
+
+  const next = doc.words[op.wordIndex + 1];
+  if (next !== undefined && end > next.s + TIME_EPSILON) {
+    return [
+      timelineError(
+        `${path}.end`,
+        "BAD_OPERATION",
+        `"${word.w}" cannot run past the start of "${next.w}".`,
+      ),
+    ];
+  }
+
+  if (start < -TIME_EPSILON) {
+    return [
+      timelineError(
+        `${path}.start`,
+        "BAD_DURATION",
+        "A word cannot start before zero.",
+      ),
+    ];
+  }
+
+  word.s = start;
+  word.e = end;
+
+  /* Every caption whose range includes this word now has a stale cache. */
+  for (const caption of allCaptions(doc)) {
+    if (op.wordIndex < caption.startWord || op.wordIndex > caption.endWord)
+      continue;
+    const item = findItem(doc, caption.id);
+    if (item === null) continue;
+    delete item.item.start;
+    delete item.item.duration;
+  }
+
+  return [];
+}
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: opRestoreDoc, restoreDoc, IN_PLACE_REPLACEMENT
+ *
+ * WHAT:  Overwrites every field of the document with the replacement.
+ * WHY:   IN_PLACE_REPLACEMENT. apply() owns the object it handed in — it is the
+ *        clone a failed op is discarded with — so this cannot reassign the
+ *        reference and must write through it. Object.assign is sufficient and
+ *        leaves nothing stale: timelineDocSchema has no optional top-level
+ *        field, so a parsed document always carries all nine keys and every
+ *        one of them is overwritten.
+ *        No re-parse and no error return: opSchema validated the document at
+ *        the boundary, and apply() re-validates the RESULT as a whole like it
+ *        does after every op — a restore of a document that parses but breaks
+ *        an invariant is reported there, with the invariant named.
+ * WHERE: apply(); the editor's undo-past-the-save and revision restore.
+ */
+function opRestoreDoc(
+  doc: TimelineDoc,
+  op: Extract<Op, { type: "restoreDoc" }>,
+): ValidationError[] {
+  Object.assign(doc, cloneDoc(op.doc));
+  return [];
+}
+
 
 /**
  * SOURCE OF TRUTH KEYWORDS: findItem, ItemLocation, GLOBAL_ITEM_IDS
@@ -851,7 +1085,9 @@ function redistribute(
  * WHY:   The patched result is re-parsed against the item schema for its own
  *        track, so a field that is legal on some item but not this one is
  *        rejected with the schema's own message rather than stored and
- *        discovered at render time. See itemPatchSchema for what is off limits.
+ *        discovered at render time. See itemPatchSchema for what is off limits
+ *        — and for why a caption's word range is patchable here while its
+ *        start and duration are not.
  * WHERE: apply(); the editor's properties panel.
  */
 function opSetItemProps(
@@ -866,6 +1102,16 @@ function opSetItemProps(
   for (const [key, value] of Object.entries(op.props)) {
     if (value === undefined) continue;
     merged[key] = value;
+  }
+
+  /* CACHE_IS_DROPPED_NOT_RECOMPUTED. A regrouped caption covers different
+   * words, so its cached start and duration no longer describe them —
+   * validate() would report STALE_RESOLUTION. Dropped rather than recomputed
+   * so resolveWordAnchors stays the only code that turns a range into
+   * seconds; the same choice setCaptionText and setWordTiming make. */
+  if (op.props.startWord !== undefined || op.props.endWord !== undefined) {
+    delete merged["start"];
+    delete merged["duration"];
   }
 
   const schema = ITEM_SCHEMA_BY_TRACK[location.track.type];
@@ -939,6 +1185,35 @@ function opAddItem(
         `Something in this timeline is already called "${parsed.data.id}".`,
       ),
     ];
+  }
+
+  /* ADD_REGISTERS_ITS_ASSET. Written BEFORE the item, so a refused handle
+   * leaves no item pointing at nothing. Re-pointing an EXISTING handle is
+   * refused rather than allowed: the handle is shared, and silently moving it
+   * would change which media every other item using it plays. */
+  if (op.asset !== undefined) {
+    const handle =
+      "assetId" in parsed.data ? parsed.data.assetId : undefined;
+    if (handle === undefined) {
+      return [
+        timelineError(
+          `${path}.asset`,
+          "BAD_OPERATION",
+          "This kind of item does not play an asset, so it has no handle to register one under.",
+        ),
+      ];
+    }
+    const existing = doc.assets[handle];
+    if (existing !== undefined && existing.assetId !== op.asset.assetId) {
+      return [
+        timelineError(
+          `${path}.asset`,
+          "BAD_OPERATION",
+          `"${handle}" already points at different media in this timeline.`,
+        ),
+      ];
+    }
+    doc.assets[handle] = op.asset;
   }
 
   return insertItem(track, parsed.data, track.items.length, path);

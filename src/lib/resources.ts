@@ -970,6 +970,63 @@ export const RESOURCES = {
     },
   },
 
+  /**
+   * SOURCE OF TRUTH KEYWORDS: RESOURCES.timelineEditor, timelineEditor.applyOps,
+   *   A_FLAG_NOT_A_LIMIT, EDITING_IS_FREE, AUTOSAVE_SETS_THE_RATE,
+   *   GATE_IS_THE_WHOLE_ROUTER
+   *
+   * Phase 15. The multi-track editor: the screen that lets somebody fix what
+   * the generator got wrong instead of regenerating and hoping.
+   *
+   * A_FLAG_NOT_A_LIMIT, for the same reason `redditStories` and `quizzes` are
+   * flags. A per-plan cap on edits would be a quota on fixing our own output,
+   * which is the one thing a customer should never be rationed; the money is
+   * in `renders`, and an edited project pays there like any other.
+   *
+   * GATE_IS_THE_WHOLE_ROUTER is what satisfies the phase's "a free workspace
+   * cannot reach the editor, server-side included". The flag gate in the
+   * procedure factory fires on EVERY verb of the resource the path names, so
+   * mounting the router under this key refuses the reads as well as the
+   * writes — there is no per-procedure check to forget, and `free: false` is
+   * the whole of the server-side enforcement.
+   *
+   * EDITING_IS_FREE: no credits and no usage counter. `resynthLine` is the one
+   * verb that spends anything, and it is refused by the narration workflow's
+   * own balance check with that line's exact figure — the same
+   * CREDITS_ARE_REFUSED_BY_THE_CHILDREN split `projects.generate` makes.
+   *
+   * AUTOSAVE_SETS_THE_RATE. `applyOps` is called by a DEBOUNCED autosave
+   * rather than by a button, so its cap is sized for somebody editing
+   * continuously: about one save every two seconds for five solid minutes.
+   * Tighter and a productive session throttles mid-edit; looser and a stuck
+   * retry loop writes a snapshot row per request. `restore` and `resynthLine`
+   * are deliberate single acts and are capped like them.
+   *
+   * No `audit` templates, deliberately: an autosave firing every few seconds
+   * would bury every other row in the activity log. TimelineRevision IS this
+   * feature's history and it stores the document, not a sentence about it.
+   */
+  timelineEditor: {
+    name: "Timeline editor",
+    description: "Edit scenes, captions, overlays and audio by hand",
+    flag: {
+      perPlan: {
+        free: false,
+        starter: true,
+        pro: true,
+        enterprise: true,
+        portal: true,
+      },
+      upgradeMessage: "Upgrade to {nextPlan} to edit your videos by hand",
+      availableOnFreeTrial: true,
+    },
+    rateLimit: {
+      applyOps: { count: 150, window: "5 m" },
+      restore: { count: 20, window: "5 m" },
+      resynthLine: { count: 20, window: "5 m" },
+    },
+  },
+
   invitation: {
     name: "Invitations",
     description: "Send invites and cancel pending invitations",

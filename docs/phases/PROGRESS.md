@@ -62,7 +62,13 @@ worse than an empty box.
       block, and the per-block timeline arithmetic including the guard that an existing project's
       document is byte-identical. **Whether a fetched stock clip may render at all is now an
       operator switch** (`STOCK_LIBRARY_PRE_CLEARED`, default off) — see the note.
-- [ ] Phase 15: Timeline editor
+- [ ] Phase 15: Timeline editor — built; the pure halves are **verified** (the browser-equals-server
+      claim and the undo hash are asserted over one fixture by 38 new tests), while the conflict
+      path, the snapshot trail and the branch-on-regenerate are **built but never exercised against
+      a live database** — Neon has been unreachable since Phase 05, so no revision row has ever been
+      written. Scrubbing on proxies is untested (R2), and no narration line has ever been re-recorded
+      from the editor (ELEVENLABS_API_KEY). Two new ops were needed and are argued in the note, and
+      `ApplyOpsResult` carries a third status the phase's contract does not list. See the note.
 - [ ] Phase 16: Motion graphics studio
 - [ ] Phase 17: Platform surface
 
@@ -2278,3 +2284,122 @@ Each cleared clip's record names the setting as the basis, and it can only promo
   blockers that stop any video completing end to end, and the **music and sfx licence category**
   (grep `MUSIC_LICENCE_IS_NOT_RESOLVED_YET`) and the **commercial-rights position on generated
   media** remain open owner decisions.
+
+### Phase 15 — 2026-10-30
+
+Built: `src/lib/timeline/session.ts` (the editor's whole state machine as pure functions — the undo
+and redo stacks, the unsaved queue, the rebase onto a confirmed save), two new ops in
+`src/lib/timeline/ops.ts`, `src/lib/types/timeline.ts` (the inputs, the save-result union and the
+inspector's forms), `src/services/timeline.service.ts` (the compare-and-set save and the snapshot
+trail), `src/trpc/routers/timeline.ts` mounted as `timelineEditor`, the `timelineEditor` registry
+entry, the branch in `projects.generate`, one migration adding `timeline_revision`, the editor
+itself under `dashboard/projects/[id]/edit/_components/` (the shell, the hook, the five-lane tracks
+panel, the inspector, the word-timing panel, the overlay drag layer, the delete dialog, the
+add-media control), and two components promoted to global — `components/global/render-panel/`
+(moved out of the preview route, because the editor ends in the same "export this") and
+`components/global/asset-picker/` (the picker the assets router's own notes have called "the
+editor's asset picker in Phase 15" since Phase 02). 38 new tests; the suite is 1025 and green,
+`tsc --noEmit` and `eslint` are clean, and `next build` succeeds with only the Turbopack NFT
+warning about `next.config.ts` that this repo already emitted before the phase.
+
+**One migration, and it adds one table.** `timeline_revision` exactly as the phase file specifies
+it, with the unique on `(projectId, revision)` — which is not decoration but the second half of the
+concurrency check. Grep `SNAPSHOTS_NOT_AN_EVENT_LOG`.
+
+**What is verified, and what is only built.** The browser-equals-server claim, the undo hash and the
+op refusals are asserted directly: `session.test.ts` runs the editor's path and the server's path
+over one fixture and compares the hashes, and the undo check is the phase's own wording — `hashDoc`
+before and after, which is the same function Phase 04 uses to decide a render can be reused, so a
+document that hashes equal is one that renders identically. The conflict path, the branch on
+regenerate and the snapshot prune are **built but never exercised against a live database**: Neon
+has been unreachable since Phase 05, so no revision row has ever been written. Scrubbing a
+three-minute project on proxies is **untested** for the same R2 reason every other phase cites — no
+proxy variant has ever been produced. Editing a narration line enqueues `line/changed`, which is
+Phase 07's workflow and still **blocked on an ELEVENLABS_API_KEY**, so no line has ever been
+re-recorded from the editor.
+
+**Four additions to shared code, and the first two are the phase's real design question.**
+
+- **`restoreDoc` — a whole-document op.** The phase says operations only, and two features cannot be
+  expressed as a forward edit: undoing past an autosave, and restoring a snapshot. The undo stack
+  holds DOCUMENTS rather than inverse ops because `split` and `delete` have no faithful inverse — an
+  inverted delete has to invent the item's array position, and array position is what decides which
+  of two clips draws on top. So once the autosave has already sent the ops being undone, there is
+  nothing left to send but the document. It does not weaken what ops exist for: `apply()` is still
+  the single implementation, the server still runs it on the same input, the result is still
+  re-validated as a whole, and the revision compare still happens before any op runs — so a restore
+  cannot overwrite another tab's work any more than a trim can. Grep
+  `WHOLE_DOCUMENT_IS_STILL_AN_OP` and `UNDO_PAST_THE_SAVE`.
+- **`setWordTiming` — the word-level nudge.** A word is not an item: no id, it lives in `doc.words`,
+  and the captions over it derive their timing from it. `trim` on a caption is refused for exactly
+  that reason (`CAPTIONS_FOLLOW_WORDS`), and this is the thing somebody actually wanted when they
+  tried it. It refuses rather than clamps when a nudge would cross a neighbouring word, because the
+  alternative is a token order that disagrees with the audio and nothing downstream would report it.
+  Grep `NEIGHBOURS_ARE_THE_BOUNDS`.
+- **`addItem` registers its own asset handle.** An item naming a `doc.assets` handle the document has
+  never heard of fails validate()'s `UNKNOWN_ASSET` rule — so inserting from the media library was
+  impossible without it. Part of the same op rather than an op of its own because the two halves are
+  one intent, neither is valid alone, and `ATOMIC_PER_OP` would otherwise let the item land while
+  the handle was refused. Re-pointing an existing handle is refused: the handle is shared, and
+  moving it would silently change which media every other item using it plays. Grep
+  `ADD_REGISTERS_ITS_ASSET`.
+- **`itemPatchSchema` gained `startWord` and `endWord`.** This is the phase's "regroup words", and
+  the contrast with the fields that are still absent is the point: `start` and `duration` remain off
+  the patch, because a caption's RANGE is its position and setting a time that contradicts the range
+  is precisely what validate() calls `STALE_RESOLUTION`. Every op that moves a word or a boundary now
+  DROPS the cached pair rather than recomputing it, so `resolveWordAnchors` stays the only code that
+  turns a word range into seconds. Grep `REGROUP_BY_RANGE` and `CACHE_IS_DROPPED_NOT_RECOMPUTED`.
+
+**The save result has three statuses, not the contract's two** — `applied | conflict | rejected`.
+`apply()` returns a document even when the result breaks an invariant, because the editor needs
+something to render; the SERVER must not store that, or the customer ends up with a project the
+render pre-flight refuses and no obvious way back. A rejected save leaves the stored document
+untouched, returns the reasons, and the editor keeps the broken state on screen so it can be fixed
+or undone. Silently reverting the screen instead would read as a gesture that never registered. Grep
+`AN_INVALID_DOCUMENT_IS_NOT_STORED`.
+
+**The editor reads through its own procedure rather than `projects.preview`.** The phase requires
+that a free workspace cannot reach the editor "server-side included", and preview is a read every
+plan is entitled to — routing the editor through it would leave the screen's data ungated. Mounting
+the router under the registry key `timelineEditor` means the procedure factory's flag gate refuses
+every verb including the read, so `free: false` in one registry entry is the whole of the
+enforcement and there is no per-procedure check to forget. Grep `GATE_IS_THE_WHOLE_ROUTER`.
+
+**Two procedures beyond the phase's contract, both earned by its own sentences.**
+`timelineEditor.revisions` and `timelineEditor.restore` exist because the phase asks snapshots to be
+"enough to recover from a bad autosave", and a table nothing can read is not a recovery point. The
+restore goes through `apply()` carrying one `restoreDoc` rather than writing the jsonb back, so it is
+validated and revision-checked like any other edit, and it writes a NEW revision — history is
+appended to, never rewound, which is what lets a restore itself be undone. Grep
+`HISTORY_IS_APPENDED_NOT_REWOUND`.
+
+**The regeneration policy is now enforced where it is reachable.** `projects.generate` branches when
+`manualEdited` is true: a new `Project` with `parentId`, the document copied, the run pointed at the
+branch, and the edited version untouched down to its revision. It takes the same explicit plan-cap
+check `duplicate` does, for the same reason — the factory's automatic cap fires on the path segment
+`create` and nothing else, so without it a workspace at its limit would branch past the cap and
+leave the counter one short of reality. The screen follows the run to the new project and says why,
+because a silent navigation to a differently-titled project reads as a bug. Grep
+`EXPLICIT_GATE_ON_A_BRANCH`.
+
+**One thing the phase lists that is deliberately narrower.** "Drag to reorder" within a lane is two
+buttons — send back, bring forward — rather than a draggable list. Both produce the same `reorder`
+op, moving one step is the whole of what the gesture is for, and a drag-to-reorder list would be a
+second way to express an op that already has one. Said plainly rather than ticked silently.
+
+**Three findings about the phase file itself.**
+
+- **The contract contradicts itself on conflicts.** It specifies a status union and then says the
+  mutation "returns `{ doc, revision }` or throws CONFLICT". The union is right and the throw is
+  wrong: a thrown CONFLICT is indistinguishable from a network failure at the call site, and losing
+  an edit silently is the one thing the phase forbids.
+- **The undo requirement and the ops-only requirement are in tension, and the phase does not say
+  so.** "Undo/redo in memory, 50 operations" plus "saving posts operations, not documents" plus a
+  debounced autosave means undo reaches back past the last save almost immediately. That is what
+  `restoreDoc` is for; a reading that forbade it would cap undo at the debounce interval, which is
+  not an editor anybody would use.
+- **The registry snippet omits the rate limit.** `applyOps` is driven by a debounced autosave rather
+  than a button, which is a completely different shape from every other mutation in the app — sized
+  here at roughly one save every two seconds for five solid minutes, because tighter throttles a
+  productive session mid-edit and looser lets a stuck retry loop write a snapshot row per request.
+  Grep `AUTOSAVE_SETS_THE_RATE`.

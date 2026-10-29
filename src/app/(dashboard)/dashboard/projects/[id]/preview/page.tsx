@@ -31,7 +31,7 @@ import type { Metadata } from "next";
 
 import { ContentLayout } from "@/components/global/page-header";
 import { ProjectPreview } from "./_components/project-preview";
-import { RenderPanel } from "./_components/render-panel";
+import { RenderPanel } from "@/components/global/render-panel";
 
 export const metadata: Metadata = {
   title: "Preview",

@@ -5,6 +5,7 @@
 /**
  * SOURCE OF TRUTH KEYWORDS: timeline barrel, validate, migrate, apply,
  *   resolveWordAnchors, hashDoc, TimelineDoc, Op, ValidationError,
+ *   EditorSession, openSession, editSession, undoSession, confirmSession,
  *   ISOMORPHIC_PURE_MODULE
  *
  * WHAT:  The public surface of the timeline module — the six functions in the
@@ -83,6 +84,22 @@ export {
   stableStringify,
   CACHE_IRRELEVANT_FIELDS,
 } from "./hash";
+
+export {
+  TIMELINE_UNDO_DEPTH,
+  TIMELINE_MAX_OPS_PER_SAVE,
+  openSession,
+  editSession,
+  undoSession,
+  redoSession,
+  confirmSession,
+  restoreDocOp,
+  pendingOps,
+  isDirty,
+  canUndo,
+  canRedo,
+} from "./session";
+export type { EditorSession } from "./session";
 
 export { TIMELINE_ERROR_CODES, timelineError } from "./errors";
 export type {
