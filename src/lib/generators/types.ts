@@ -79,6 +79,22 @@ export interface NarrationLineInput {
   audioAssetId: string;
   /** Measured from the normalised file, not claimed by the provider. */
   durationSec: number;
+  /**
+   * SOURCE OF TRUTH KEYWORDS: LINE_REMEMBERS_ITS_BLOCK,
+   *   A_BLOCK_IS_ONE_OR_MORE_LINES
+   *
+   * The `ScriptBlock` this line was split out of, or null for a line recorded
+   * before Phase 14 added the column — and for a quiz, whose narration is
+   * planned rather than split from blocks.
+   *
+   * A_BLOCK_IS_ONE_OR_MORE_LINES is why a generator needs it at all:
+   * `splitBlockIntoLines` breaks a long paragraph into several takes, so "the
+   * span of block X" is the union of several lines' spans, and only this field
+   * says which. Null means a line with no block, which a per-block visual
+   * simply does not cover — it plays over whatever the previous block's visual
+   * was, which is the same thing that happens on a block with no match.
+   */
+  blockId: string | null;
 }
 
 /**
@@ -178,6 +194,66 @@ export interface CastMember {
   states: { neutral: string; talking: string; reaction: string };
 }
 
+/**
+ * SOURCE OF TRUTH KEYWORDS: ResolvedBlockVisual, VISUALS_ARE_FACTS,
+ *   RESOLVED_BEFORE_THE_GENERATOR, NO_PROVIDER_URL_IN_A_DOCUMENT,
+ *   STILLS_GET_KEN_BURNS
+ *
+ * WHAT:  The picture one script block should show, already chosen, already
+ *        ingested and already proven usable.
+ *
+ * WHY:   VISUALS_ARE_FACTS, the same decision as the background's and the
+ *        cast's and for the same reasons. Choosing a block's visual means a
+ *        stock search, an image-model call, a moderation decision, a credit
+ *        hold and an ingest — none of which a generator may do
+ *        (GENERATORS_STAY_PURE), and the last two are entitlement and money
+ *        decisions a generator must not be able to make at all
+ *        (GENERATOR_CONTEXT_IS_FACTS). So the whole chain runs in the `visuals`
+ *        stage before the build, and the generator receives the ANSWER.
+ *
+ *        NO_PROVIDER_URL_IN_A_DOCUMENT, and this type is where that promise is
+ *        kept structurally rather than by discipline. The phase's last
+ *        "done when" check is "no timeline item references a provider URL
+ *        directly", and the way to guarantee it is to give the generator no URL
+ *        to reach for: this carries an `assetId` and nothing that could be
+ *        hotlinked. The provider's URL stops at the ingest.
+ *
+ *        STILLS_GET_KEN_BURNS, which is why `isStill` is here as a FACT rather
+ *        than inferred by the generator from the content type. A generator
+ *        cannot read an asset row, so "is this a video or a picture" has to
+ *        arrive with the rest of it — and the phase requires the drift
+ *        specifically "so a static image does not read as a frozen frame",
+ *        which means a clip must NOT get it (a pan applied to moving footage
+ *        reads as a camera wobble).
+ *
+ *        `durationSec` is here and nullable for exactly the reason
+ *        `ResolvedBackgroundInput.durationSec` is: it is what decides whether a
+ *        clip can be LOOPED to the block's length (LOOP_IS_A_MODULO), and a
+ *        generator must be able to see that it is missing rather than
+ *        discovering it at render time. It is always null for a still, which
+ *        has no source length to loop against.
+ *
+ *        A block that fell back to the backdrop has NO entry here at all,
+ *        rather than an entry with a null asset. The styled backdrop is already
+ *        the behaviour of a document with no per-block visuals
+ *        (FOOTAGE_OR_BACKDROP_NEVER_BOTH), so "absent" and "fell back" are the
+ *        same fact and modelling them separately would be two ways to say one
+ *        thing.
+ * WHERE: `GeneratorContext.visuals`, keyed by SCRIPT BLOCK id and assembled by
+ *        `generatorContextFor` from `Project.settings.visuals`.
+ */
+export interface ResolvedBlockVisual {
+  /** The real `Asset` row id the document's handle will point at. */
+  assetId: string;
+  /** Null for a still, and for a clip the ingest could not measure. */
+  durationSec: number | null;
+  license: AssetRef["license"];
+  width: number | null;
+  height: number | null;
+  /** A picture rather than footage — see STILLS_GET_KEN_BURNS. */
+  isStill: boolean;
+}
+
 export interface GeneratorContext {
   organizationId: string;
   projectId: string;
@@ -204,6 +280,19 @@ export interface GeneratorContext {
    * Empty for every format that puts nobody on screen.
    */
   cast: Readonly<Record<string, CastMember | undefined>>;
+  /**
+   * SOURCE OF TRUTH KEYWORDS: VISUALS_ARE_FACTS, NO_PROVIDER_URL_IN_A_DOCUMENT
+   *
+   * SCRIPT BLOCK id → the picture that block should show. A block with no entry
+   * is a block that fell back to the styled backdrop, which is a complete
+   * video and the normal case on a deployment with neither provider configured
+   * (FALLBACK_CHAIN_IS_THE_POINT in src/lib/types/visual.ts).
+   *
+   * Empty for every format that does not choose visuals per block — a quiz
+   * draws cards and a Reddit story draws a thread, both over one background.
+   * See `ResolvedBlockVisual` above for why these arrive resolved.
+   */
+  visuals: Readonly<Record<string, ResolvedBlockVisual | undefined>>;
   /**
    * SOURCE OF TRUTH KEYWORDS: SNAPSHOT_IS_WHAT_THE_CARD_SHOWS
    *

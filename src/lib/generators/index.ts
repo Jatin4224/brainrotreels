@@ -33,8 +33,15 @@ export type {
   CastMember,
   NarrationLineInput,
   ResolvedBackgroundInput,
+  ResolvedBlockVisual,
 } from "./types";
 export type { LayNarrationOptions, NarrationSpan } from "./common";
+export {
+  KEN_BURNS_SCALE,
+  VISUAL_TRACK_ID,
+  buildBlockVisualTracks,
+  visualHandle,
+} from "./common";
 export {
   QUIZ_ELEMENT_KINDS,
   QUIZ_LAYOUTS,

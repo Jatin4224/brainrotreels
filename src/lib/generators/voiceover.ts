@@ -49,6 +49,7 @@ import { CANVAS_BY_ASPECT } from "@/lib/types/project";
 import {
   SAFE_ZONE_BY_ASPECT,
   buildBackgroundTrack,
+  buildBlockVisualTracks,
   buildMusicTrack,
   buildSpeakers,
   layNarration,
@@ -77,12 +78,51 @@ export function buildVoiceoverDocument(ctx: GeneratorContext): TimelineDoc {
   const narration = layNarration(ctx);
   const totalSec = narration.totalSec;
 
-  /* FOOTAGE_OR_BACKDROP_NEVER_BOTH — one call, one track. */
-  const background = buildBackgroundTrack({
-    background: ctx.background,
-    totalSec,
-    paletteId,
-  });
+  /**
+   * SOURCE OF TRUTH KEYWORDS: VISUALS_PER_BLOCK_OR_ONE_BACKGROUND,
+   *   FOOTAGE_OR_BACKDROP_NEVER_BOTH, NO_DOCUMENT_CHANGES_WITHOUT_VISUALS
+   *
+   * Phase 14. Two shapes of "what is behind the words", and which one applies
+   * is decided by whether this project has ANY resolved block visual.
+   *
+   * NO_DOCUMENT_CHANGES_WITHOUT_VISUALS is why this is a branch rather than
+   * one generalised call. With no block visuals — every project that existed
+   * before this phase, and every deployment with neither provider configured —
+   * `buildBackgroundTrack` runs exactly as it did, producing byte-identical
+   * items and therefore the same `docHash`. A single unified builder would
+   * have changed item ids for every existing project, which Phase 04 reads as
+   * a different document and charges a second paid render for
+   * (RENDER_REUSE). A phase that quietly re-bills every customer's next
+   * export is not a phase that shipped.
+   *
+   * With block visuals, ONE function owns both the clips and the fallback over
+   * the stretches they do not cover, because a backdrop composites ABOVE video
+   * and emitting both for the same seconds would draw a gradient over the
+   * pictures — see ONE_FUNCTION_OWNS_WHAT_IS_BEHIND_THE_WORDS in ./common.ts.
+   */
+  const hasBlockVisuals = Object.keys(ctx.visuals).length > 0;
+
+  const behindTheWords = hasBlockVisuals
+    ? buildBlockVisualTracks({
+        lines: ctx.lines,
+        spans: narration.spans,
+        visuals: ctx.visuals,
+        background: ctx.background,
+        totalSec,
+        paletteId,
+      })
+    : (() => {
+        /* FOOTAGE_OR_BACKDROP_NEVER_BOTH — one call, one track. */
+        const built = buildBackgroundTrack({
+          background: ctx.background,
+          totalSec,
+          paletteId,
+        });
+        return {
+          tracks: built.track === null ? [] : [built.track],
+          assets: built.assets,
+        };
+      })();
 
   /* MUSIC_IS_OPTIONAL — absent unless the project names a bed. */
   const music = buildMusicTrack({
@@ -92,14 +132,13 @@ export function buildVoiceoverDocument(ctx: GeneratorContext): TimelineDoc {
 
   const assets: Record<string, AssetRef> = {
     ...narration.assets,
-    ...background.assets,
+    ...behindTheWords.assets,
     ...music.assets,
   };
 
   /* Bottom-most first: the renderer walks tracks in array order (LAYER_ORDER),
    * so the background has to be laid before anything that sits over it. */
-  const tracks: Track[] = [];
-  if (background.track !== null) tracks.push(background.track);
+  const tracks: Track[] = [...behindTheWords.tracks];
   if (narration.track !== null) tracks.push(narration.track);
   if (music.track !== null) tracks.push(music.track);
 
@@ -135,22 +174,15 @@ export function buildVoiceoverDocument(ctx: GeneratorContext): TimelineDoc {
  * SOURCE OF TRUTH KEYWORDS: voiceoverGenerator, VOICEOVER_SKIPS
  *
  * WHAT:  The registry entry for `voiceover`.
- * WHY:   VOICEOVER_SKIPS names the four stages this kind does not run, and each
+ * WHY:   VOICEOVER_SKIPS names the three stages this kind does not run, and each
  *        is a deferral rather than an omission:
- *          `visuals`    — still skipped, and now deliberately rather than
- *                         pending. Phase 11 built the footage library, and
- *                         choosing from it is ONE read and one decision taken
- *                         before the build (RESOLVED_BEFORE_THE_GENERATOR in
- *                         ./types.ts), not a stage's worth of work. A stage
+ *          `storyboard` — there is nothing to sequence. A `voiceover` is a
+ *                         narration with a picture per block, and the block
+ *                         order IS the script's — so a storyboard stage would
+ *                         be a progress row for an arithmetic step, and a stage
  *                         that goes from pending to complete in the same
- *                         instant is noise on a progress list somebody is
- *                         watching, and a `skipped` row with a reason is the
- *                         honest one. The stage fills in for a format that
- *                         genuinely chooses visuals per BLOCK — Phase 14's
- *                         stock search.
- *          `storyboard` — there is nothing to sequence: one background, one
- *                         narration. A storyboard is what a multi-shot format
- *                         needs (Phases 13 and 14).
+ *                         instant is noise on a list somebody is watching. The
+ *                         same argument Phase 13 made for the quiz.
  *          `design`     — the caption style is already chosen on the captions
  *                         screen, and there are no other on-screen elements to
  *                         lay out.
@@ -160,10 +192,22 @@ export function buildVoiceoverDocument(ctx: GeneratorContext): TimelineDoc {
  *                         resolution choice. Rendering inside the pipeline
  *                         would charge for an output nobody has asked for yet,
  *                         and the phase's goal is a PREVIEWABLE video.
+ *
+ *        `visuals` is NO LONGER SKIPPED, and that is the one line of this entry
+ *        Phase 14 changed. It was skipped with a note predicting exactly this
+ *        ("the stage fills in for a format that genuinely chooses visuals per
+ *        BLOCK — Phase 14's stock search"), and it now runs for every voiceover
+ *        — including on a deployment with neither provider configured, where it
+ *        completes with a warning saying the footage is plain. That is better
+ *        than skipping it conditionally: `skips` is STATIC (it is read before a
+ *        run starts, by `seedStages`) and could not see a provider's
+ *        configuration anyway, and a customer whose video came out plainer
+ *        should be told which step decided that rather than watching a greyed
+ *        row claim the feature does not exist.
  * WHERE: GENERATORS in ./registry.ts.
  */
 export const voiceoverGenerator: Generator = {
   kind: "voiceover",
-  skips: ["visuals", "storyboard", "design", "render"],
+  skips: ["storyboard", "design", "render"],
   build: (ctx) => Promise.resolve(buildVoiceoverDocument(ctx)),
 };

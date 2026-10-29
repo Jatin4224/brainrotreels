@@ -90,8 +90,12 @@ import {
   readRequestId,
   trackFunnelEvent,
 } from "@/lib/observability";
-import { getOrganizationTier } from "@/lib/feature-gate";
-import { estimateRenderCost } from "@/lib/credits";
+import { checkFeatureGate, getOrganizationTier } from "@/lib/feature-gate";
+import {
+  CREDIT_RATES,
+  estimateRenderCost,
+  estimateVisualsCost,
+} from "@/lib/credits";
 import {
   GeneratorInputError,
   GeneratorNotImplementedError,
@@ -118,10 +122,24 @@ import {
 } from "@/services/pipeline.service";
 import { saveTimelineDocument } from "@/services/projects.service";
 import { upsertSpeakers, validateAssignments } from "@/services/voices.service";
+import {
+  commit,
+  findOpenHoldForRef,
+  getBalance,
+  hold,
+  InsufficientCreditsError,
+} from "@/services/credits.service";
+import { incrementUsage } from "@/services/usage.service";
+import {
+  planProjectVisuals,
+  readBlockVisuals,
+  writeBlockVisuals,
+} from "@/services/visuals.service";
 import { projectKindSchema } from "@/lib/types/project";
 import { projectAlignFunction } from "./project-align";
 import { projectTtsFunction } from "./project-tts";
 import { scriptGenerateFunction } from "./script-generate";
+import { visualIngestFunction } from "./visual-ingest";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: projectRequestedEventSchema, EVENT_PAYLOAD_PARSED
@@ -240,6 +258,51 @@ const ttsResultSchema = z
   .object({ synthesised: z.number().optional(), failed: z.number().optional() })
   .partial()
   .passthrough();
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: visualsBudgetSchema, visualsPlanSchema,
+ *   STEP_RESULTS_ARE_JSON, visualsRef, ONE_REF_PER_PROJECT
+ *
+ * WHAT:  The two values Phase 14's `visuals` stage carries between its own
+ *        steps, and the ledger reference its hold is keyed on.
+ *
+ * WHY:   STEP_RESULTS_ARE_JSON, the same rule as the schemas above: a step's
+ *        return value is serialised, stored and replayed on a retry, so what
+ *        comes back on a resumed run is JSON rather than the object the step
+ *        returned. Re-parsing at the boundary is what makes the replayed value
+ *        and the fresh value the same thing — and it matters more here than
+ *        usual, because the budget is arithmetic that later steps SPEND
+ *        against.
+ *
+ *        ONE_REF_PER_PROJECT: `visuals:<projectId>`, matching `script:`,
+ *        `tts:` and `align:`. The namespace is what lets `releaseProjectHolds`
+ *        find and reverse an abandoned hold without knowing which stage took
+ *        it, which is why this phase also adds the namespace to
+ *        `PROJECT_HOLD_REFS` — a hold whose namespace is not in that tuple is
+ *        a hold a cancelled run strands.
+ * WHERE: The `visuals` stage below.
+ */
+const visualsBudgetSchema = z.object({
+  blocks: z.array(
+    z.object({
+      blockId: z.string().min(1),
+      narrationText: z.string(),
+      seconds: z.number().min(0),
+    }),
+  ),
+  imageBudget: z.number().int().min(0),
+});
+
+const visualsPlanSchema = z.object({
+  blockIds: z.array(z.string().min(1)),
+  imagesPlanned: z.number().int().min(0),
+  fromStock: z.number().int().min(0),
+  onBackdrop: z.number().int().min(0),
+});
+
+function visualsRef(projectId: string): string {
+  return `visuals:${projectId}`;
+}
 
 /**
  * SOURCE OF TRUTH KEYWORDS: GENERATE_CONCURRENCY, GENERATE_RETRIES
@@ -640,6 +703,292 @@ export const projectGenerateFunction = inngestClient.createFunction(
       );
       return { degraded };
     });
+
+    // ───────────────────────────────────────────────────────────────────────
+    // [6b] VISUALS — a picture per script block. Phase 14.
+    //      Runs only for the kinds whose generator does not skip it, which
+    //      today is `voiceover` alone; the others draw their own thing over
+    //      one background (see skipReasonFor in pipeline.service.ts).
+    //
+    //      EVERY PART OF THIS STAGE IS ALLOWED TO COME UP EMPTY. With neither
+    //      provider configured it completes with a warning and the video plays
+    //      on the styled backdrop, which is the phase's own promise: "with both
+    //      providers disabled, the video still completes on the styled
+    //      background". It never fails the run.
+    // ───────────────────────────────────────────────────────────────────────
+    const visualsSkipped = new Set(
+      resolveGenerator(parsedKind).skips as readonly string[],
+    ).has("visuals");
+
+    if (!visualsSkipped) {
+      /**
+       * SOURCE OF TRUTH KEYWORDS: VISUAL_BUDGET_IS_THE_LOWER_OF_TWO,
+       *   A_QUOTA_AND_A_PRICE, PLAN_IS_READ_FRESH
+       *
+       * How many images this run may generate, which is the SMALLER of two
+       * independent limits — A_QUOTA_AND_A_PRICE on the registry entry. The
+       * plan's monthly allowance says how many a customer is entitled to; the
+       * balance says how many they can pay for. Taking the lower of the two
+       * means a customer can never be charged for an image their plan does not
+       * allow, nor given one free because the quota had room and the wallet did
+       * not.
+       *
+       * Read FRESH rather than from the event, exactly as the background's plan
+       * read is (PLAN_IS_RESOLVED_FOR_THE_BACKGROUND): a run that waited in a
+       * queue while the workspace downgraded must use the plan it has NOW.
+       */
+      const rawBudget = await step.run("visuals-budget", async () => {
+        await beginStage(prisma, projectId, "visuals");
+
+        const blocks = await listScriptBlocks(prisma, organizationId, projectId);
+        if (blocks.length === 0) {
+          return { blocks: [], imageBudget: 0 };
+        }
+
+        /* The per-block length, from the MEASURED narration rather than from an
+         * estimate: it is what decides whether a clip covers the block or has
+         * to loop (COVERAGE_BEATS_RESOLUTION), and an estimate here would pick
+         * clips against a length the video does not have. */
+        const lines = await prisma.narrationLine.findMany({
+          where: { organizationId, projectId, status: "ready" },
+          select: { blockId: true, durationSec: true },
+        });
+        const secondsByBlock = new Map<string, number>();
+        for (const line of lines) {
+          if (line.blockId === null || line.durationSec === null) continue;
+          secondsByBlock.set(
+            line.blockId,
+            (secondsByBlock.get(line.blockId) ?? 0) + line.durationSec,
+          );
+        }
+
+        const gate = await checkFeatureGate(organizationId, "aiImages", 0);
+        const quotaLeft =
+          gate.limit === undefined
+            ? /* No numeric limit means unlimited — capped at the block count,
+               * because there is nothing to spend a further image on. */
+              blocks.length
+            : Math.max(0, gate.limit - (gate.currentUsage ?? 0));
+        /* A refusal with no numbers is the free-trial case, which is zero. */
+        const quota = gate.allowed ? quotaLeft : 0;
+
+        const balance = await getBalance(organizationId, prisma);
+        const perImage = Math.max(1, CREDIT_RATES.perAiImage);
+        const affordable = Math.max(0, Math.floor(balance / perImage));
+
+        return {
+          blocks: blocks.map((block) => ({
+            blockId: block.id,
+            narrationText: block.narrationText,
+            seconds: secondsByBlock.get(block.id) ?? 0,
+          })),
+          imageBudget: Math.min(blocks.length, quota, affordable),
+        };
+      });
+
+      const budget = visualsBudgetSchema.parse(rawBudget);
+
+      if (budget.blocks.length === 0) {
+        await step.run("visuals-nothing-to-do", async () => {
+          await completeStage(
+            prisma,
+            projectId,
+            "visuals",
+            "There was no script to choose pictures for.",
+          );
+          return { planned: 0 };
+        });
+      } else {
+        /**
+         * SOURCE OF TRUTH KEYWORDS: visuals-plan, PLAN_THEN_HOLD_THEN_FETCH,
+         *   ONE_REF_PER_PROJECT
+         *
+         * The chain decides every block's source, and the decisions are written
+         * to the project BEFORE anything is fetched — which is what makes the
+         * ingest runs resumable and re-readable
+         * (CHOICE_IS_RE_READ_NOT_REPLAYED). The credits are held against the
+         * number of images the plan actually asked for, not against the budget:
+         * a script whose every block matched a stock clip holds nothing.
+         */
+        const rawPlanned = await step.run("visuals-plan", async () => {
+          const planned = await planProjectVisuals(prisma, {
+            organizationId,
+            projectId,
+            blocks: budget.blocks,
+            imageBudget: budget.imageBudget,
+            kindLabel: parsedKind,
+          });
+
+          const written = await writeBlockVisuals(
+            prisma,
+            organizationId,
+            projectId,
+            { blocks: planned.blocks, imagesGenerated: 0 },
+          );
+          if (!written) {
+            throw new NonRetriableError(
+              `[project.generate] ${projectId} is no longer available.`,
+            );
+          }
+
+          return {
+            blockIds: planned.blocks
+              .filter((block) => block.status === "pending")
+              .map((block) => block.blockId),
+            imagesPlanned: planned.imagesPlanned,
+            fromStock: planned.blocks.filter(
+              (block) => block.choice.source === "stock",
+            ).length,
+            onBackdrop: planned.blocks.filter(
+              (block) => block.choice.source === "background",
+            ).length,
+          };
+        });
+
+        const planned = visualsPlanSchema.parse(rawPlanned);
+
+        if (planned.imagesPlanned > 0) {
+          await step.run("visuals-hold", async () => {
+            /* ONE_REF_PER_PROJECT, as every other sub-pipeline does: an
+             * existing open hold means this step already ran and the run is
+             * replaying, so it must not reserve twice. */
+            const existing = await findOpenHoldForRef(
+              prisma,
+              visualsRef(projectId),
+            );
+            if (existing !== null) return { held: Math.abs(existing.delta) };
+
+            const cost = estimateVisualsCost({
+              aiImages: planned.imagesPlanned,
+            });
+            try {
+              await hold(
+                prisma,
+                organizationId,
+                cost.total,
+                visualsRef(projectId),
+                {
+                  kind: "footage",
+                  projectId,
+                  images: planned.imagesPlanned,
+                },
+              );
+              return { held: cost.total };
+            } catch (error) {
+              if (error instanceof InsufficientCreditsError) {
+                /* The balance moved between the budget read and here. Not a
+                 * failure: the images are abandoned and the blocks fall back,
+                 * which is a plainer video rather than no video. */
+                console.warn(
+                  `[project.generate] ${projectId}: not enough credits for ${planned.imagesPlanned} image(s); falling back.`,
+                );
+                return { held: 0 };
+              }
+              throw error;
+            }
+          });
+        }
+
+        /* One run per block, each invoked so this stage WAITS for the asset to
+         * be ingested — the generator may only use a `ready` asset
+         * (INGEST_IS_INVOKED_NOT_ENQUEUED in ./visual-ingest.ts). Sequential
+         * rather than parallel: the ingests are serialised at one per workspace
+         * anyway, and a `Promise.all` of step.invokes would make a single
+         * block's permanent failure unwind the others' results. */
+        for (const blockId of planned.blockIds) {
+          try {
+            await step.invoke(`visual-${blockId}`, {
+              function: visualIngestFunction,
+              data: { organizationId, projectId, blockId },
+            });
+          } catch (error) {
+            /* A_FAILED_BLOCK_IS_NOT_A_FAILED_VIDEO. The child already marked
+             * its own block `failed` with a readable reason; the generator will
+             * read it as a block with no visual. */
+            console.warn(
+              `[project.generate] ${projectId}: block ${blockId} has no visual — ${
+                error instanceof Error ? error.message : String(error)
+              }`,
+            );
+          }
+        }
+
+        await step.run("visuals-settle", async () => {
+          const stored = await readBlockVisuals(
+            prisma,
+            organizationId,
+            projectId,
+          );
+          const ready =
+            stored?.blocks.filter((block) => block.status === "ready").length ??
+            0;
+          const withPicture =
+            stored?.blocks.filter(
+              (block) =>
+                block.status === "ready" && block.choice.source !== "background",
+            ).length ?? 0;
+          /* IMAGES_GENERATED_IS_CUMULATIVE — what was actually SPENT, counted
+           * by the ingest runs, not what the plan hoped for. */
+          const imagesGenerated = stored?.imagesGenerated ?? 0;
+
+          /**
+           * SOURCE OF TRUTH KEYWORDS: SETTLE_ON_WHAT_WAS_PRODUCED,
+           *   PARTIAL_RELEASE
+           *
+           * The hold is settled at the number of images that were actually
+           * generated, which is routinely FEWER than planned: a prompt may have
+           * been refused, a model may have been down, a cache may have hit. The
+           * difference comes back (PARTIAL_RELEASE in credits.service.ts), so
+           * nobody is charged for a picture that was not drawn — the phase's
+           * own "nobody is ever charged for a video that was not made", applied
+           * per image.
+           */
+          const openHold = await findOpenHoldForRef(
+            prisma,
+            visualsRef(projectId),
+          );
+          if (openHold !== null) {
+            const actual = estimateVisualsCost({ aiImages: imagesGenerated });
+            await commit(prisma, openHold.id, actual.total, {
+              kind: "footage",
+              projectId,
+              images: imagesGenerated,
+            });
+          }
+
+          /* AN IMAGE IS COUNTED WHEN IT IS MADE. The usage counter moves here
+           * rather than in the procedure layer, because the procedure that
+           * started this run is `projects.generate` — the factory's automatic
+           * bump fires on `<resource>.create` and there is no `aiImages.create`
+           * path. Counting the actual number rather than the planned one keeps
+           * the meter and the ledger telling the same story. */
+          if (imagesGenerated > 0) {
+            await incrementUsage(
+              organizationId,
+              "aiImages",
+              imagesGenerated,
+              prisma,
+            );
+          }
+
+          /* A warning rather than a failure when nothing was found — the video
+           * is complete and plainer, and the customer should be told which step
+           * decided that. */
+          await completeStage(
+            prisma,
+            projectId,
+            "visuals",
+            withPicture === 0
+              ? "No stock footage or generated images were available, so every paragraph plays on the styled background."
+              : withPicture < budget.blocks.length
+                ? `${budget.blocks.length - withPicture} of ${budget.blocks.length} paragraphs had no matching picture and play on the styled background.`
+                : undefined,
+          );
+
+          return { ready, withPicture, imagesGenerated };
+        });
+      }
+    }
 
     // ───────────────────────────────────────────────────────────────────────
     // [7] QA — are the pieces all there? Before the build, not after it.

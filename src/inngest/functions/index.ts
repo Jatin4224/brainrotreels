@@ -26,6 +26,7 @@ import { projectTtsFunction } from "./project-tts";
 import { redditRetentionFunction } from "./reddit-retention";
 import { scriptGenerateFunction } from "./script-generate";
 import { usageResetFunction } from "./usage-reset";
+import { visualIngestFunction } from "./visual-ingest";
 
 export const INNGEST_FUNCTIONS = [
   helloFunction,
@@ -41,4 +42,5 @@ export const INNGEST_FUNCTIONS = [
   projectGenerateFunction,
   costAlertFunction,
   redditRetentionFunction,
+  visualIngestFunction,
 ];

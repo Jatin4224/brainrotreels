@@ -52,6 +52,9 @@ function lines(durations: readonly number[]): NarrationLineInput[] {
     text: `Line number ${index}.`,
     audioAssetId: `ast_${index}`,
     durationSec,
+    /* LINE_REMEMBERS_ITS_BLOCK — one block per line, which is the simple case;
+     * the several-lines-per-block case gets its own fixture below. */
+    blockId: `blk${index}`,
   }));
 }
 
@@ -84,6 +87,11 @@ function contextFor(
     /* Phase 12: no faces and no thread by default — a voiceover has neither,
      * and the Reddit tests pass both in. */
     cast: {},
+    /* Phase 14: no per-block pictures by default, because that is what a
+     * deployment with neither visual provider configured produces — and the
+     * phase requires a complete video from exactly that input. The tests that
+     * care pass them in. */
+    visuals: {},
     thread: null,
     db: NO_DB,
     ...overrides,
@@ -450,6 +458,7 @@ describe("buildRedditStoryDocument", () => {
           text: "First.",
           audioAssetId: "ast_0",
           durationSec: 4,
+          blockId: "blk0",
         },
         {
           id: "l1",
@@ -458,6 +467,7 @@ describe("buildRedditStoryDocument", () => {
           text: "Second.",
           audioAssetId: "ast_1",
           durationSec: 3,
+          blockId: "blk1",
         },
       ],
       speakers: { op: "voice_a", commenter: "voice_b" },
@@ -532,6 +542,7 @@ describe("buildRedditStoryDocument", () => {
             text: "Short.",
             audioAssetId: "ast_0",
             durationSec: 1.5,
+            blockId: "blk0",
           },
         ],
       }),
@@ -709,10 +720,22 @@ describe("the generator registry", () => {
    * every progress screen — and `PipelineStageName` is what stops that. */
   it("declares the stages voiceover does not run", () => {
     expect(resolveGenerator("voiceover").skips).toEqual([
-      "visuals",
       "storyboard",
       "design",
       "render",
     ]);
+  });
+
+  /**
+   * Phase 14's one change to this list, asserted in BOTH directions because the
+   * interesting part is the asymmetry: `voiceover` chooses a picture per block
+   * so it runs the stage, and the two formats that draw their own thing over
+   * one background still skip it. A single-direction assertion would pass if
+   * somebody removed the skip from all three.
+   */
+  it("runs the visuals stage only for the format that chooses pictures per block", () => {
+    expect(resolveGenerator("voiceover").skips).not.toContain("visuals");
+    expect(resolveGenerator("quiz").skips).toContain("visuals");
+    expect(resolveGenerator("reddit-story").skips).toContain("visuals");
   });
 });

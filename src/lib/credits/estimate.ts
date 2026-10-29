@@ -219,6 +219,36 @@ export function estimateRenderCost(args: {
   });
 }
 
+/**
+ * SOURCE OF TRUTH KEYWORDS: estimateVisualsCost, ONE_CALLER_ONE_SHAPE,
+ *   IMAGES_ARE_THE_WHOLE_COST
+ *
+ * WHAT:  What a project's visuals will cost, from the number of images that
+ *        will be generated.
+ *
+ * WHY:   A named wrapper rather than every caller assembling an EstimateInput
+ *        by hand, for the reason `estimateRenderCost` exists: THREE places need
+ *        this number and they must agree exactly — the itemised line on the
+ *        generate screen's review step (the phase's step 9), the hold the
+ *        `visuals` stage takes before it calls a model, and the commit that
+ *        settles it against the images actually produced. One function means
+ *        they cannot disagree, and a customer cannot be shown one price and
+ *        charged another.
+ *
+ *        IMAGES_ARE_THE_WHOLE_COST. `footage` has a base of 0 and a per-second
+ *        rate of 0 in CREDIT_RATES, so a project whose every block matched a
+ *        stock clip costs nothing and produces NO LINE at all — which is the
+ *        honest breakdown rather than a zero-credit row a customer has to
+ *        wonder about. Searching a stock library costs us a request against a
+ *        shared quota and costs the customer nothing, and pricing it would be
+ *        charging for the cheap path to make the expensive one look better.
+ * WHERE: src/trpc/routers/visuals.ts, the `visuals` stage of
+ *        src/inngest/functions/project-generate.ts, and the generate screen.
+ */
+export function estimateVisualsCost(args: { aiImages: number }): CostBreakdown {
+  return estimate({ kind: "footage", aiImages: args.aiImages });
+}
+
 /* The customer-facing name of each kind. Separate from the union so renaming
  * what a customer sees is not a schema change. */
 const LABELS: Readonly<Record<CreditableKind, string>> = {

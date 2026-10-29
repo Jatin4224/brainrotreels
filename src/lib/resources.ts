@@ -892,6 +892,84 @@ export const RESOURCES = {
     },
   },
 
+  /**
+   * SOURCE OF TRUTH KEYWORDS: RESOURCES.aiImages, ZERO_IS_A_REAL_CAP,
+   *   PERIODIC_AI_IMAGES, aiImages.generate, A_QUOTA_AND_A_PRICE
+   *
+   * Images generated per month for a video's visuals.
+   *
+   * ZERO_IS_A_REAL_CAP, and it is the decision this entry exists to record. A
+   * `free` cap of `0` is a VALUE, not a disabled feature: the gate refuses with
+   * the upgrade modal and the usage meter shows `0/0`, which is a better upsell
+   * than the feature vanishing — a customer who cannot see that generated
+   * images exist has no reason to pay for them (the same reasoning as
+   * LOCKED_NOT_HIDDEN, applied to a counter instead of a tile). It is
+   * deliberately NOT a `flag`, which is what "off on free" would otherwise be
+   * modelled as: a flag cannot express fifty a month on Starter and five
+   * hundred on Pro, and those numbers are the whole shape of this feature.
+   *
+   * PERIODIC_AI_IMAGES — `period: 'month'`, which is the one field here that
+   * cannot be guessed from the rest. An image is CONSUMED rather than held, so
+   * the cap has to refill, and `periodicResourceKeys()` in
+   * src/lib/usage-period.ts picks this entry up with no cron wiring: the Phase
+   * 00 `usage.reset` workflow already iterates whatever declares it. Declaring
+   * it absolute (the default) would hand a Starter workspace fifty images for
+   * the lifetime of the account.
+   *
+   * A_QUOTA_AND_A_PRICE, and the two are not redundant. This cap is how many
+   * images a PLAN includes; `CREDIT_RATES.perAiImage` is what each one costs on
+   * the ledger. Both fire: the gate refuses past the plan's number, and the
+   * credits are held and committed inside it. A customer therefore cannot be
+   * surprised in either direction — they cannot spend credits on an image their
+   * plan does not allow, and they cannot get a free image by having quota left
+   * and no balance.
+   *
+   * There is no `delete` verb, for the reason `renders` has none
+   * (RENDERS_HAVE_NO_DELETE): the factory auto-DECREMENTS a limit resource's
+   * counter on `<resource>.delete`, so a delete verb would refund the monthly
+   * quota every time somebody tidied up a picture they did not like. The image
+   * is an Asset and is deleted through `assets.delete` like any other media.
+   *
+   * `generate` is rate-limited well below the monthly cap because the cap is a
+   * BUDGET and this is the blast radius: fifty images a month says nothing
+   * about twenty in one minute from a stuck client, which on an unlimited plan
+   * is unbounded spend against a per-image bill. It is the same split the
+   * `renders` entry draws.
+   */
+  aiImages: {
+    name: "AI images",
+    description: "Generated images per month",
+    permissions: ["read", "generate"],
+    limit: {
+      perPlan: {
+        free: 0,
+        starter: 50,
+        pro: 500,
+        enterprise: "unlimited",
+        portal: "unlimited",
+      },
+      upgradeMessage: "Upgrade to {nextPlan} to generate images",
+      availableOnFreeTrial: false,
+      unit: "images",
+      period: "month",
+    },
+    audit: {
+      describe: {
+        generate: "Generated a visual for a block of project {input.projectId}",
+        setBlockVisual: "Changed a block's visual on project {input.projectId}",
+      },
+    },
+    rateLimit: {
+      generate: { count: 10, window: "1 m" },
+      /* A stock search is a free read for the customer and a request against a
+       * shared third-party quota for us — THEIR_RATE_LIMIT_NOT_OURS, exactly as
+       * `redditStories.preview` is. Capped well above what a person browsing
+       * does and well below what a loop would. */
+      searchStock: { count: 30, window: "1 m" },
+      setBlockVisual: { count: 60, window: "1 m" },
+    },
+  },
+
   invitation: {
     name: "Invitations",
     description: "Send invites and cancel pending invitations",

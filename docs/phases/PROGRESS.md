@@ -52,7 +52,16 @@ worse than an empty box.
       prompt's injection properties and the paste import. **The countdown is silent** — the sfx
       catalogue is Phase 11's and still empty. "Narration with SSML" was implemented **without**
       SSML, deliberately; see the note.
-- [ ] Phase 14: Voiceover visuals
+- [ ] Phase 14: Voiceover visuals — built; **blocked on the same ELEVENLABS_API_KEY and R2 gaps**
+      that stop any video completing, and additionally on **STOCK_API_KEY and an image-model key**,
+      so no clip has ever been searched and no image has ever been generated. The fallback chain's
+      own promise — that a video completes with both providers unset — is the path that IS exercised,
+      and it is the only one that can be today. 62 new tests cover the clip scoring and its
+      deterministic tie-break, the stored choice union's provenance requirements, the prompt cache
+      key in both directions, the SSRF allowlist, the prompt fencing against a committed hostile
+      block, and the per-block timeline arithmetic including the guard that an existing project's
+      document is byte-identical. **Whether a fetched stock clip may render at all is now an
+      operator switch** (`STOCK_LIBRARY_PRE_CLEARED`, default off) — see the note.
 - [ ] Phase 15: Timeline editor
 - [ ] Phase 16: Motion graphics studio
 - [ ] Phase 17: Platform surface
@@ -2126,3 +2135,146 @@ change and a re-render rather than a re-authoring. Grep `ANSWER_TYPE_IS_PRESENTA
 - **Phase 11's empty background catalogue** means a quiz plays over the styled backdrop, and
   **Phase 02's R2**, **Phase 04's AWS deploy** and the **ELEVENLABS_API_KEY** remain the three
   blockers that stop any video completing end to end.
+
+### Phase 14 — 2026-10-30
+
+Built: `src/lib/types/visual.ts` (the choice union, the stored shape, the prompt cache key),
+`src/lib/visuals/select.ts` (which clip wins for a block), two new provider seams —
+`src/lib/adapters/stock/` with a Pexels client and `src/lib/adapters/image/` with an image client,
+both fenced on their credential by eslint like the ElevenLabs and Reddit seams —
+`src/lib/script/visual-prompt.ts` + `visuals.ts` (the one shot-plan call),
+`buildBlockVisualTracks` in `src/lib/generators/common.ts`, the branch in
+`src/lib/generators/voiceover.ts`, `src/services/visuals.service.ts` (the chain, both caches, the
+ingest), `src/inngest/functions/visual-ingest.ts`, the `visuals` stage in `project-generate.ts`, the
+`aiImages` registry entry, `src/trpc/routers/visuals.ts`, and the global
+`components/global/visual-picker/`. 62 new tests; the suite is 987 and green, `tsc --noEmit` and
+`eslint` are clean, and `next build` succeeds — with the one Turbopack NFT warning about
+`next.config.ts` that this repo already emitted before the phase.
+
+**One migration, and it adds columns rather than tables.** `asset` gained `sourceProvider`,
+`sourceId`, `attribution` and `promptHash`; `narration_line` gained `blockId`. All nullable, no
+backfill. Grep `PROVENANCE_IS_NOT_OPTIONAL` and `LINE_REMEMBERS_ITS_BLOCK`.
+
+**It touched shared code four times, and all four are the interesting part.**
+
+- **`NarrationLine` remembers its block.** A per-block visual is timed to the words of its block,
+  and `splitBlockIntoLines` turns one paragraph into several takes — so a block's span is the union
+  of several lines' spans and nothing recorded which lines were whose. `splitScriptIntoLines` had
+  carried a `blockId` on its drafts since Phase 06 and the persistence layer dropped it. The
+  alternative was re-splitting the script in the context assembly and pairing by position: the same
+  mapping computed twice from the same inputs, wrong the moment the split rule is tuned, with the
+  symptom being pictures one paragraph out. Nullable with no foreign key, because a block may be
+  deleted while its recorded audio is still good and a cascade would delete narration somebody paid
+  to synthesise.
+- **A video item may carry `props`.** `MediaClip` has read a `kenBurns` prop since Phase 03 with a
+  note saying "a generator can set it today" — and it could not, because `videoItemSchema` is
+  `.strict()`. An optional field in an existing object, so every stored document stays valid and no
+  `docVersion` bump goes with it. It IS hashed, and there is a test in each direction: two builds of
+  the same visuals hash alike, and turning a clip into a drifting still does not.
+- **One function owns what is behind the words.** A backdrop sits on the scene track, which
+  composites ABOVE video (`LAYER_ORDER`) — so a document carrying both a full-length backdrop and
+  per-block clips draws a gradient over every picture, and the bug reads as "my visuals did not
+  apply". `buildBlockVisualTracks` returns the clips AND the fallback over exactly the stretches
+  they do not cover, which makes the overlap structurally impossible. The test asserts the invariant
+  rather than the shape. Grep `ONE_FUNCTION_OWNS_WHAT_IS_BEHIND_THE_WORDS`.
+- **`PROJECT_HOLD_REFS` gained `visuals`.** The stage holds against the images it plans and settles
+  on the ones it produced; a cancel between those two points is precisely the window that tuple
+  exists to cover.
+
+**Two tests changed what the code does, which is the point of writing them.**
+
+- **An unreported clip duration scored ZERO, which is not neutral — it is the worst possible
+  score.** The rule claimed `UNKNOWN_IS_NOT_PENALISED` and did the opposite: a clip of unknown
+  length lost to one measured as covering an eighth of the block, i.e. known to stutter seven times.
+  It now scores half the weight of each term it cannot measure, which beats everything measured as
+  worse and loses to everything measured as better. Grep `NEUTRAL_IS_THE_MIDDLE_NOT_ZERO`.
+- **The shot plan was being paid for on deployments that could not use it.** With no stock search
+  and no image budget every block falls through to the backdrop whatever a model proposes — and
+  that is the state of every deployment that has configured neither key, which is also the state
+  the phase requires to produce a complete video. The model is no longer asked. Grep
+  `NO_PLAN_WITH_NOWHERE_TO_SPEND_IT`.
+
+**The hardest decision in the phase: whether a fetched stock clip may render.** Both obvious
+answers are wrong and the resolution is an operator switch, so it is written out in full on
+`STOCK_REVIEW_ENGINE` in `src/inngest/functions/asset-ingest.ts`. The default posture
+(`PIXELS_ARE_UNCHECKED`) holds a third party's file `pending` because nothing has looked at its
+frames — applied to stock footage that makes the feature **dead**, since every clip is searched,
+downloaded and transcoded and then withheld from the render anyway. Writing `approved`
+unconditionally is the claim this codebase refuses everywhere else, and
+`LIBRARY_IS_APPROVED_BY_REVIEW` is no precedent: that approval is earned by a person reading a
+specific asset into a manifest, in a diff, and nobody reads a stock search result. So the claim
+moved to the party who can make it: `STOCK_LIBRARY_PRE_CLEARED` defaults to **false**, and setting
+it is the operator stating that their chosen provider's library is moderated before publication.
+Each cleared clip's record names the setting as the basis, and it can only promote a `pending` to an
+`approved` — a filename the classifier rejects is still rejected.
+
+**Three findings about the phase file itself.**
+
+- **`Asset.source` needed no new value.** The phase says it "gains two values already allowed by the
+  Phase 02 union: `stock` and `ai_image`". `stock` was indeed already there; `ai_image` was not, and
+  `generated` was — meaning the same thing and already carrying the open owner decision about
+  commercial rights for generated media. A second value for one concept would make every "ours or
+  somebody else's" query check two strings forever. The distinction lives on the CHOICE, which is
+  where it is read.
+- **The contract's three sources are four.** `resolveBlockVisual` is specified as returning
+  `'stock' | 'ai_image' | 'background'`, and step 8 requires a customer to be able to upload their
+  own for a block — which is none of the three. Folding it into `stock` would record a Pexels
+  licence against a customer's own file, exactly the unverifiable provenance the rest of the phase
+  exists to prevent. The automatic chain still only ever produces the phase's three. Grep
+  `UPLOAD_IS_A_FOURTH_SOURCE`.
+- **The `storyboard` stage still does not fill in.** The voiceover generator's Phase 09 note
+  predicted this phase would need it, and the quiz's note already disagreed for the same reason: a
+  voiceover is now multi-shot, but its shot order is entirely determined by the block order, so the
+  stage would be a progress row for an arithmetic step. `visuals` is the stage that filled in, as
+  that same note predicted.
+
+**Done-when checks:**
+
+- [x] A five-block script produces five matching visuals, each timed to its own block — the
+      DOCUMENT does, and the test asserts the times rather than the count, because five clips at
+      zero would pass a count. **No real clip has ever been fetched**, for the STOCK_API_KEY reason
+      below.
+- [x] With both providers disabled, the video still completes on the styled background — this is
+      the only arm that has actually run, and it is tested as the same code path with different
+      inputs rather than as a special case.
+- [x] Every stock and generated asset carries its provider, source id and licence — structurally:
+      the choice union cannot be constructed without them, which is tested as three separate
+      refusals.
+- [x] A generated image records its prompt and `modelVersion` — and the version is the one the
+      provider SERVED rather than the one we asked for, which is what "which model drew this"
+      means. **Unverified against a real model.**
+- [x] Re-running with an identical prompt makes no second model call — the cache is checked before
+      the generation inside `ingestBlockVisual`, and the key's normalisation is tested in both
+      directions (a constant-returning hash would pass only one).
+- [x] A free workspace is refused image generation with the upgrade modal, and the server refuses
+      it too — the `free` cap is a real `0` rather than a missing feature, the stage's budget is the
+      lower of the quota and the balance, and `setBlockVisual` re-checks both.
+- [x] Swapping one block's visual leaves the other blocks untouched — enforced in three places by
+      construction: the input names one `blockId`, `upsertBlockVisual` replaces one entry, and the
+      ingest is one run per block with its own failure handler.
+- [x] No timeline item references a provider URL directly — structural: `ResolvedBlockVisual`
+      carries an `assetId` and nothing hotlinkable, so a generator has no URL to reach for.
+
+**Also outstanding:**
+
+- **No clip has been fetched and no image generated.** `STOCK_API_KEY` and `IMAGE_API_KEY` are both
+  unset, so the stock client, the image client and the whole ingest half are unexercised against a
+  real provider. The chain's unconfigured arm is what runs today. The Pexels response mapping and
+  the rendition choice are the first things to check once a key exists — the response shape is
+  parsed with zod rather than indexed, so a changed API is a readable refusal, but nobody has seen
+  the real shape.
+- **No model has written a shot plan yet.** The two kinds of writing the prompt asks for — keywords
+  for a search, prose for an image — are the thing most likely to come back wrong, and the failure
+  is SILENT: a model that writes beautiful queries returns no results, which looks exactly like a
+  library with nothing in it. The prompt's worked example is reasoned rather than observed.
+- **A Ken Burns drift has never been looked at.** The arithmetic is Phase 03's and is a pure
+  function of the frame; whether 8% over a four-second block reads as motion or as a creep is a
+  judgement nobody has checked on a phone.
+- **No visual moderation of the pixels, for stock or for uploads.** Unchanged from Phase 10 and
+  still a launch blocker; this phase adds the operator switch described above rather than solving
+  it. A generated image is `skipped` because its PROMPT was classified under the stricter standard
+  before the model ran — that is a defensible floor, not a vision classifier.
+- **Phase 02's R2**, **Phase 04's AWS deploy** and the **ELEVENLABS_API_KEY** remain the three
+  blockers that stop any video completing end to end, and the **music and sfx licence category**
+  (grep `MUSIC_LICENCE_IS_NOT_RESOLVED_YET`) and the **commercial-rights position on generated
+  media** remain open owner decisions.

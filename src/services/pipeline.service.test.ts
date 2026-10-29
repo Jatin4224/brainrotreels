@@ -176,10 +176,17 @@ describe("toStageUpdates", () => {
 describe("the pipeline's money and message boundaries", () => {
   /* PROJECT_HOLD_REFS has to name every namespace a generate run can hold
    * credits under, or a cancelled run leaves money reserved until the Phase 05
-   * reconciler notices. The three are the children's own `ONE_REF_PER_PROJECT`
-   * prefixes. */
+   * reconciler notices. These are the `ONE_REF_PER_PROJECT` prefixes of the
+   * three child workflows plus the `visuals` stage, which Phase 14 added: it
+   * holds against the images it plans and settles on the ones it produced, so a
+   * cancel between those two points is exactly the window this tuple covers. */
   it("names every ledger namespace a generate run can hold", () => {
-    expect([...PROJECT_HOLD_REFS]).toEqual(["script", "tts", "align"]);
+    expect([...PROJECT_HOLD_REFS]).toEqual([
+      "script",
+      "tts",
+      "align",
+      "visuals",
+    ]);
   });
 
   /* FAILURE_IS_EXPLAINED_NOT_DUMPED's blunt half: a provider that returns a

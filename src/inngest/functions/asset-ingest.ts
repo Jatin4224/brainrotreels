@@ -130,6 +130,56 @@ const VISUAL_REVIEW_ENGINE = "awaiting-visual-review";
 const LIBRARY_REVIEW_ENGINE = "library-manifest";
 
 /**
+ * SOURCE OF TRUTH KEYWORDS: STOCK_REVIEW_ENGINE, isStockPreCleared,
+ *   STOCK_LIBRARY_PRE_CLEARED, THE_OPERATOR_MAKES_THE_CLAIM,
+ *   PIXELS_ARE_UNCHECKED
+ *
+ * WHAT:  Whether this deployment's operator has asserted that their stock
+ *        provider's library is already moderated, and the engine string that
+ *        records it when they have.
+ *
+ * WHY:   THE_OPERATOR_MAKES_THE_CLAIM, and this is the one genuinely difficult
+ *        decision in Phase 14 — worth the length, because the obvious answers
+ *        are both wrong.
+ *
+ *        The default posture (PIXELS_ARE_UNCHECKED) holds a third party's file
+ *        `pending`, which withholds it from every render, because nothing has
+ *        looked at its frames and this product has no vision classifier. Applied
+ *        to stock footage that makes the feature DEAD: every clip the chain
+ *        picks is fetched, transcoded, and then withheld — so every video falls
+ *        back to the backdrop anyway, having spent a search, a download and a
+ *        transcode to get there. Worse than useless.
+ *
+ *        Writing `approved` unconditionally is the other wrong answer, and it is
+ *        the one this codebase refuses everywhere else: it would be a claim that
+ *        something reviewed the clip, which every later phase would be entitled
+ *        to believe. `LIBRARY_IS_APPROVED_BY_REVIEW` is not a precedent for it —
+ *        that approval is earned by a person reading a specific asset into a
+ *        manifest, in a diff. Nobody reads a stock search result.
+ *
+ *        So the claim is moved to the only party who can actually make it. An
+ *        operator who configures `STOCK_API_KEY` has chosen a specific provider
+ *        whose terms and submission review they can read; setting
+ *        `STOCK_LIBRARY_PRE_CLEARED` is them stating, for their deployment, that
+ *        that library is pre-moderated. It defaults to FALSE, so the fail-closed
+ *        posture is what ships and nothing changes for anybody who does not
+ *        think about it — and when it is set, the moderation record names this
+ *        engine, so an auditor can see both that the clip was cleared and on
+ *        whose authority.
+ *
+ *        The filename is still classified either way, and a `rejected` verdict
+ *        still rejects: this moves a `pending` to an `approved`, never a
+ *        `rejected`.
+ * WHERE: The moderate step below, for rows with `source: 'stock'`.
+ */
+const STOCK_REVIEW_ENGINE = "stock-provider-pre-cleared";
+
+function isStockPreCleared(): boolean {
+  const raw = process.env["STOCK_LIBRARY_PRE_CLEARED"]?.trim().toLowerCase();
+  return raw === "true" || raw === "1";
+}
+
+/**
  * SOURCE OF TRUTH KEYWORDS: assetUploadedEventSchema, EVENT_PAYLOAD_PARSED
  *
  * WHAT:  The shape of an `asset/uploaded` event's data.
@@ -502,6 +552,37 @@ export const assetIngestFunction = inngestClient.createFunction(
           reason:
             "Curated library asset. Reviewed by an operator when it was added to the background manifest, with its licence established there.",
           engine: LIBRARY_REVIEW_ENGINE,
+        });
+        await setModerationStatus(prisma, assetId, "approved");
+        return { moderationStatus: "approved", checked: true };
+      }
+
+      /**
+       * SOURCE OF TRUTH KEYWORDS: THE_OPERATOR_MAKES_THE_CLAIM,
+       *   STOCK_REVIEW_ENGINE
+       *
+       * Phase 14. A stock clip, on a deployment whose operator has stated that
+       * their stock library is pre-moderated. The full argument for why this is
+       * an operator switch rather than a default either way is on
+       * `STOCK_REVIEW_ENGINE` above.
+       *
+       * Checked AFTER the filename classification, so a `rejected` verdict
+       * still rejects: this promotes a `pending` to an `approved` and can never
+       * overrule a refusal.
+       */
+      if (asset.source === "stock" && isStockPreCleared()) {
+        await recordModeration(prisma, {
+          organizationId: asset.organizationId ?? probed.organizationId,
+          subjectType: "asset",
+          subjectId: assetId,
+          status: "approved",
+          categories: [],
+          reason:
+            `Stock clip from "${asset.sourceProvider ?? "an unnamed provider"}" ` +
+            `(id ${asset.sourceId ?? "unknown"}), cleared because this deployment is configured ` +
+            "with STOCK_LIBRARY_PRE_CLEARED — the operator has asserted that the provider's " +
+            "library is moderated before publication. The frames have not been classified here.",
+          engine: STOCK_REVIEW_ENGINE,
         });
         await setModerationStatus(prisma, assetId, "approved");
         return { moderationStatus: "approved", checked: true };
