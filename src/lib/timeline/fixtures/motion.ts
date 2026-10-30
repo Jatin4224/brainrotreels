@@ -4,7 +4,7 @@
 
 /**
  * SOURCE OF TRUTH KEYWORDS: motionFixture, NO_SPINE_DOCUMENT, VIDEO_LENGTH_RULE,
- *   silent document
+ *   silent document, FIXTURE_SPEAKS_THE_SCENE_LANGUAGE, PROPS_CARRY_THE_STRICT_ELEMENT
  *
  * WHAT:  A silent motion-graphics piece: three scene beats, no audio, no video,
  *        no words.
@@ -16,7 +16,23 @@
  *        It also proves the document survives an EMPTY word list: a motion
  *        piece has no script, and a caption rule that assumed words exist would
  *        fail here rather than in production.
- * WHERE: validate.test.ts, ops.test.ts; the Phase 16 motion studio.
+ *
+ *        FIXTURE_SPEAKS_THE_SCENE_LANGUAGE — Phase 16a. The layouts and kinds
+ *        here were invented in Phase 01, before the scene language existed,
+ *        and three of them (`figure-left`, `bigStat`, `headline`) were names
+ *        nothing ever implemented. They are now the real vocabulary from
+ *        src/lib/types/scene.ts, so this fixture is a document the motion
+ *        engine can actually lay out, check and render rather than a
+ *        plausible-looking shape. `scene.test.ts` asserts exactly that, which
+ *        is what stops the two drifting again.
+ *
+ *        PROPS_CARRY_THE_STRICT_ELEMENT: an element's knobs live in `props`,
+ *        not in the document's own optional `text` field — see
+ *        src/lib/scene/document.ts for why nothing is mirrored. Timing and
+ *        animation defaults are omitted here and filled in by the schema, so
+ *        the fixture reads as the design rather than as the serialisation.
+ * WHERE: validate.test.ts, ops.test.ts, scene.test.ts; the Phase 16 motion
+ *        studio and its gallery.
  */
 
 import type { TimelineDoc } from "../schema";
@@ -43,11 +59,14 @@ export function motionFixture(): TimelineDoc {
             scene: {
               layout: "stack-center",
               elements: [
-                { id: "s1-head", kind: "headline", text: "Three numbers" },
                 {
-                  id: "s1-sub",
-                  kind: "subhead",
-                  text: "that explain the quarter",
+                  id: "s1-head",
+                  kind: "title",
+                  props: {
+                    text: "Three numbers",
+                    subhead: "that explain the quarter",
+                    entrance: "rise",
+                  },
                 },
               ],
             },
@@ -58,18 +77,25 @@ export function motionFixture(): TimelineDoc {
             duration: 3,
             render: "motion",
             scene: {
-              layout: "figure-left",
+              layout: "hero-plus-caption",
               elements: [
                 {
                   id: "s2-stat",
-                  kind: "bigStat",
-                  text: "41%",
-                  props: { countFrom: 0 },
+                  kind: "counter",
+                  props: {
+                    from: 0,
+                    to: 41,
+                    suffix: "%",
+                    entrance: "pop",
+                  },
                 },
                 {
                   id: "s2-caption",
-                  kind: "caption",
-                  text: "of signups never finish setup",
+                  kind: "callout",
+                  props: {
+                    text: "of signups never finish setup",
+                    tone: "warning",
+                  },
                 },
               ],
             },
@@ -84,8 +110,8 @@ export function motionFixture(): TimelineDoc {
               elements: [
                 {
                   id: "s3-cta",
-                  kind: "headline",
-                  text: "Fix the first five minutes",
+                  kind: "title",
+                  props: { text: "Fix the first five minutes" },
                 },
               ],
             },

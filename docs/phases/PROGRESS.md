@@ -69,7 +69,14 @@ worse than an empty box.
       written. Scrubbing on proxies is untested (R2), and no narration line has ever been re-recorded
       from the editor (ELEVENLABS_API_KEY). Two new ops were needed and are argued in the note, and
       `ApplyOpsResult` carries a third status the phase's contract does not list. See the note.
-- [ ] Phase 16: Motion graphics studio
+- [ ] Phase 16: Motion graphics studio — **16a of four is built**; 16b (primitives and the gallery),
+      16c (style tokens) and 16d (the AI designer) are not started, so no motion video exists and
+      nothing is metered yet. What 16a ships is the scene language, the layout engine and the
+      deterministic checks, and it is **verified without a provider**: text measurement runs against
+      the real `hmtx` advances of the bundled faces, and 82 new tests include the phase's own two
+      "catch an overflowing text element and an overlap". **Two gaps carried into 16c are not code
+      gaps** — only one font family is bundled, and the `flow-graph` dependency decision is now
+      settled on Dagre. See the note.
 - [ ] Phase 17: Platform surface
 
 ## Blocked on an owner decision
@@ -2403,3 +2410,106 @@ second way to express an op that already has one. Said plainly rather than ticke
   here at roughly one save every two seconds for five solid minutes, because tighter throttles a
   productive session mid-edit and looser lets a stuck retry loop write a snapshot row per request.
   Grep `AUTOSAVE_SETS_THE_RATE`.
+
+### Phase 16a — 2026-10-31
+
+Built: `src/lib/types/scene.ts` (the whole scene vocabulary — five layouts, ten primitives, the
+animation set, the text-role size table, the slot rules, the error codes, `Beat` and `BeatIntent`),
+`src/lib/scene/metrics-data.ts` (generated glyph advances), `src/lib/scene/measure.ts`,
+`src/lib/scene/runs.ts`, `src/lib/scene/layouts.ts`, `src/lib/scene/flow.ts`,
+`src/lib/scene/check.ts`, `src/lib/scene/document.ts` and the barrel. One new dependency,
+`@dagrejs/dagre`, approved before adding as the phase file requires. 82 new tests; the suite is
+1107 and green, `tsc --noEmit` and `eslint` are clean. **No migration and no registry entry** — 16a
+touches no database and no gate, and `motionStudio`/`motionVideos` belong with 16d, which is the
+first commit that can spend a credit.
+
+**The scene language is strict and the document stays loose.** `sceneSpecSchema` in
+`timeline/schema.ts` goes on carrying `layout: string` and open `props`, because it also carries
+quiz and Reddit cards; `src/lib/scene/document.ts` is the seam where a stored scene becomes a known
+one. The same relationship `src/lib/quiz/import.ts` has with a quiz card, and the same
+`ONE_SHAPE_TWO_INPUTS` consequence: a hand-written gallery scene and a model's output are
+indistinguishable after `parseScene`. Grep `THE_DOCUMENT_IS_THE_LOOSE_FORM` and
+`PROPS_CARRY_THE_STRICT_ELEMENT`.
+
+**The measurement is real, and the provenance is checkable rather than asserted.** The advances were
+extracted from `@fontsource/geist-sans`'s `.woff` files at the pinned version; those are the same
+release whose `.woff2` siblings are the files in `public/fonts`, **byte-identical by md5**, so the
+table describes the face that actually renders. A committed table rather than a runtime measurement
+because the same check has to run in the browser editor, in Vitest with no DOM, and on the Inngest
+worker — `canvas.measureText` exists in one of those three, and an answer that differs between them
+is an editor warning that disagrees with a server refusal. Grep `REAL_ADVANCES_NOT_AN_ESTIMATE` and
+`METRICS_ARE_GENERATED_DATA`.
+
+**One honest gap in that measurement, stated with its direction.** Geist carries GPOS kerning and
+the table does not, so a measured width is at or above the true width and never below. A false
+overflow costs one repair attempt; a missed one costs a video with text off the frame. Grep
+`ADVANCE_SUM_IS_AN_UPPER_BOUND` — the same asymmetry argument decides the overlap check's treatment
+of unresolved anchors (`UNRESOLVED_IS_TREATED_AS_OVERLAPPING`).
+
+**Four decisions beyond the phase file's wording, each earned by its own sentences.**
+
+- **Word anchors here are INDICES only**, not the document's `{ word: 'revenue' }` form. A word
+  string is ambiguous in any transcript where the word repeats, and it is not checkable from a pure
+  module that holds a word COUNT rather than the transcript — so it would fail at render time
+  instead of design time, which is the trade the whole phase is arranged to avoid. Nothing is lost:
+  the designer is handed `Beat.startWord` as an index already. The narrowing is proved to be a
+  narrowing by a compile-time function, not a comment. Grep `ANCHORS_ARE_INDICES_HERE`.
+- **Overlap is checked on INK, not on slots.** Named layouts place slots that do not touch, so
+  comparing slots would be theatre that always passes. The check compares the rectangle each wrapped
+  text block actually occupies, which is why an overflow and an overlap usually fire together — the
+  second is the consequence of the first. Grep `OVERLAP_IS_CHECKED_ON_INK`.
+- **Two elements that are never on screen together are not an overlap.** Sequencing elements through
+  one region is normal design for a six-second beat, and refusing it would make the engine reject
+  good work. Grep `DISJOINT_IN_TIME_IS_NOT_AN_OVERLAP`.
+- **Auto-fit has a floor, and below it the element still renders.** Long copy is shrunk toward the
+  role's `minSizeVh` because that is what a designer does; past it the run keeps the floor size,
+  draws, and reports `TEXT_OVERFLOW`. Both halves are deliberate — the pipeline always finishes AND
+  the defect is reported, rather than a beat that is technically in bounds and unreadable. Grep
+  `AUTO_FIT_HAS_A_FLOOR`.
+
+**Dagre, not elkjs, and the reason is the call signature.** `dagre.layout()` is synchronous, and the
+geometry has to be computed inside `checkScene` (a pure function the editor calls while typing),
+inside a Remotion component's render pass (synchronous by construction) and on the worker. elkjs is
+Promise-based, which would have put an async seam through all three and made the component render a
+frame before it knew where anything goes — in Remotion that is a frame of the wrong picture
+composited into a paid video. Grep `DAGRE_IS_SYNCHRONOUS`.
+
+**Two shared things changed rather than copied.**
+
+- **`purity.test.ts` moved up to `src/lib/`** and now guards both `timeline/` and `scene/` from one
+  table. The scene engine makes the same isomorphism claim the timeline module does, and copying the
+  file would have left two lists of forbidden imports that did not stay in step. Its textual import
+  scanner also had to be tightened: it could not tell the `from` keyword from the word `from` in a
+  string literal, which `check.ts` contains. Grep `ONE_PURITY_CONTRACT`.
+- **The safe zone is Phase 08's**, called through `captionBox` rather than read a second time from
+  `SAFE_ZONE_INSETS`. The phase file asks for this and the reason is concrete: two implementations
+  of "where TikTok's button rail is" means a caption and a motion element that disagree about the
+  bottom of the frame in the same video. Grep `SAFE_ZONE_IS_SHARED`.
+
+**The committed motion fixture was rewritten, deliberately.** It has carried `figure-left`,
+`bigStat` and `headline` since Phase 01 — names nothing ever implemented — and it now speaks the
+real vocabulary, with a test asserting every beat parses and checks clean. It is used only by tests,
+so no stored document changes. Grep `FIXTURE_SPEAKS_THE_SCENE_LANGUAGE`.
+
+**Two things 16c cannot do as written, and neither is a code gap.**
+
+- **A style needs two fonts and only one family is bundled.** `public/fonts` holds Geist at 400 and
+  700 — one family, two weights — so 16c's "code validates that both fonts are actually bundled" has
+  a single candidate to validate against, and "palette, two fonts" cannot be honoured without
+  somebody choosing and licensing a second family. The validation itself will be written; the
+  library of 6–10 styles cannot be visually distinct on typography until that choice is made. This
+  is the same shape of gap as Phase 11's empty catalogue: the mechanism is buildable, the content is
+  an owner decision.
+- **`SPLIT_ALONG_THE_LONG_AXIS` is a design decision worth re-reading before 16b.** `split-2` and
+  `grid-3` divide the LONGER side of the safe rectangle, so they are columns on 16:9 and rows on
+  9:16. Two 500px columns of a 1080-wide frame are unusable, and a project's canvas is chosen per
+  video while the designer is not re-run per aspect — but it does mean a scene reads differently at
+  the two aspects, which the gallery should be looked at for.
+
+**What is NOT verified.** Nothing has been rendered. No primitive component exists, so no scene has
+ever been drawn — the geometry is asserted numerically and by the safe-zone matrix across every
+layout, both aspects and all four platform zones, and that is the strongest claim available before
+16b. The phase's "every primitive and layout renders in the gallery, reviewed by a human", "renders
+to MP4", "across 20 test videos" and every metering line remain untouched. `GAP_VH`, the 62/38
+hero split and the role size table are **unreviewed design numbers**: they are data in one table
+precisely so the gallery can change them without touching code.
