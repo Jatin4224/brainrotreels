@@ -1047,11 +1047,11 @@ export const RESOURCES = {
    * twenty times while they decide is twenty charges for nothing stored. Ten
    * in five minutes is generous for a human and useless for a loop.
    *
-   * METERING_COMES_WITH_THE_DESIGNER. The `motionVideos` limit the phase file
-   * specifies is deliberately NOT here yet: 16c ships the style library and
-   * the designer for a STYLE, neither of which produces a video, and a limit
-   * that nothing decrements would read as a feature somebody forgot to wire.
-   * It arrives with 16d, which is the first commit that can render one.
+   * METERING_IS_THE_SIBLING_ENTRY. The per-video cost lives in
+   * `motionVideos` below, added in 16d once there was something to count — a
+   * limit that nothing decrements would read as a feature somebody forgot to
+   * wire. This entry stays a pure FLAG: it gates access to the studio, and the
+   * videos are counted next door.
    *
    * A_FLAG_NOT_A_LIMIT for the studio itself, for the reason the phase file
    * gives: motion is priced separately because cost per video is several times
@@ -1076,6 +1076,52 @@ export const RESOURCES = {
     },
     rateLimit: {
       designStyle: { count: 10, window: "5 m" },
+      designBeats: { count: 20, window: "1 h" },
+    },
+  },
+
+  /**
+   * SOURCE OF TRUTH KEYWORDS: RESOURCES.motionVideos, MOTION_IS_METERED_SEPARATELY,
+   *   A_LIMIT_NOT_A_FLAG, COUNTED_WHEN_THE_DESIGN_SUCCEEDS
+   *
+   * Phase 16d. How many motion videos a workspace may DESIGN per month.
+   *
+   * MOTION_IS_METERED_SEPARATELY, in the phase file's own words: motion is
+   * "priced and metered separately because cost per video is several times the
+   * rest of the pipeline — per-beat LLM calls, still renders, and a vision
+   * pass". A sixty-second explainer is dozens of model requests before a single
+   * frame is rendered, which is a different shape of cost from every other
+   * format in this product, and it cannot be collected by the per-render
+   * charge that covers the others.
+   *
+   * A_LIMIT_NOT_A_FLAG, and it sits BESIDE `motionStudio` rather than
+   * replacing it. The flag answers "may this workspace use the studio at all",
+   * which gates the style picker and the designer; the limit answers "how many
+   * videos this month", which is where the money is. Collapsing them would
+   * mean either rationing access to a style picker that costs nothing, or
+   * leaving the expensive step uncounted.
+   *
+   * COUNTED_WHEN_THE_DESIGN_SUCCEEDS — the usage is recorded by the design
+   * stage after the beats are stored, not when a generation is requested. A
+   * run that fails before designing anything has spent nothing worth counting,
+   * and counting it would charge a customer for our outage. Credits for the
+   * individual model calls are a separate matter and are handled by the
+   * pipeline's own estimate, as they are for every other format.
+   */
+  motionVideos: {
+    name: "Motion videos",
+    description: "Motion graphics videos per month",
+    limit: {
+      perPlan: {
+        free: 0,
+        starter: 0,
+        pro: 50,
+        enterprise: "unlimited",
+        portal: "unlimited",
+      },
+      upgradeMessage: "Upgrade to {nextPlan} for motion graphics videos",
+      availableOnFreeTrial: false,
+      unit: "videos",
     },
   },
 

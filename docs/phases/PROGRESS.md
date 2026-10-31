@@ -69,18 +69,22 @@ worse than an empty box.
       written. Scrubbing on proxies is untested (R2), and no narration line has ever been re-recorded
       from the editor (ELEVENLABS_API_KEY). Two new ops were needed and are argued in the note, and
       `ApplyOpsResult` carries a third status the phase's contract does not list. See the note.
-- [ ] Phase 16: Motion graphics studio — **16a, 16b and 16c of four are built**; 16d (the AI
-      designer) is not started, so no motion video exists and nothing is metered yet. 16a is the
-      scene language, the layout engine and the deterministic checks; 16b the ten primitives, the
-      `motion → MotionScene` registry entry and the review gallery; 16c the seven style tokens,
-      eight library styles, the "design one for me" model call and its code validation. All three
-      are **verified without a provider** by 245 new tests — the measurement against the real
-      `hmtx` advances, the phase's "catch an overflowing text element and an overlap", the rule
-      that no animation can move the measured ink, and the whole style library passing its own
-      validator. **Three things have never run**: the gallery's human review, any composite to
-      MP4, and `designMotionStyle` against Claude. Two gaps are not code gaps — only one font
-      family is bundled, and `stack-center` holds three list items plus a heading in a vertical
-      frame, not four. See the three notes.
+- [ ] Phase 16: Motion graphics studio — **16a, 16b and 16c are built; 16d is partly built.**
+      16a is the scene language, the layout engine and the deterministic checks; 16b the ten
+      primitives, the `motion → MotionScene` registry entry and the review gallery; 16c the
+      seven style tokens, eight library styles and the "design one for me" model call with its
+      code validation. 16d has the storyboard, the per-beat designer with its bounded repair, the
+      pure generator (so `motion` now has one), the `motionVideos` metering and the pipeline's
+      `storyboard` + `design` stages — but **not** the beat strip, the `redesignBeat` procedure
+      or the vision pass, and `assignIntents` has no caller so every beat is designed as
+      `emphasis`. 291 new tests cover the pure halves: the measurement against real `hmtx`
+      advances, the phase's "catch an overflowing text element and an overlap", the rule that no
+      animation can move the measured ink, the storyboard's coverage over generated transcripts,
+      and the fallback's validity at both aspects in all four safe zones. **Four things have
+      never run**: the gallery's human review, any composite to MP4, `designMotionStyle` against
+      Claude, and the whole motion pipeline (Neon has been unreachable since Phase 05). Two gaps
+      are not code gaps — only one font family is bundled, and `stack-center` holds three list
+      items plus a heading in a vertical frame, not four. See the four notes.
 - [ ] Phase 17: Platform surface
 
 ## Blocked on an owner decision
@@ -2756,3 +2760,98 @@ currently has a single candidate to validate against, and no two styles in the l
 typographically. Licensing a second face is a woff2, a `FACES` entry, a key in `CAPTION_FONT_KEYS`
 and its family mapping — in that order, so a weight can never be measurable but unrenderable. Grep
 `TWO_FONTS_ONE_FAMILY`.
+
+### Phase 16d (in progress) — 2026-10-31
+
+**Not finished.** The storyboard, the beat designer, the generator, the metering and the pipeline
+stage are built; the **beat strip UI, the "redesign this beat" procedure and the vision pass are
+not started**. This note exists so the next reader knows which half is which.
+
+Built: `src/lib/scene/storyboard.ts` (the split, the coverage check, the short-tail merge),
+`src/lib/scene/fallback.ts`, `src/lib/script/motion-beat.ts` and `motion-beat-prompt.ts` (the
+per-beat design call and its bounded repair), `src/lib/generators/motion.ts` (the pure document
+builder) registered in `GENERATORS`, `src/services/motion.service.ts`, the `motionVideos` registry
+limit, and the `storyboard` + `design` stages in `src/inngest/functions/project-generate.ts`. 46 new
+tests; the suite is 1316 and green, `tsc --noEmit` and `eslint` are clean on everything touched.
+**No migration** — the storyboard lives in `Project.settings`, exactly as the phase file specifies.
+
+**The split is code and the intent is the model's.** Deciding WHERE a beat ends is arithmetic over
+word timings: it has an obviously correct answer and a test can verify it exactly, so asking a model
+would cost a request per video to get something worse. What a beat is ABOUT is judgement, so
+`assignIntents` is the seam a model plugs into — and every beat defaults to `emphasis`, the one
+intent that always has a designable scene, so the whole storyboard works with no model attached.
+Grep `THE_SPLIT_IS_DETERMINISTIC` and `INTENT_HAS_A_FREE_DEFAULT`.
+
+**Coverage is checked before anything is designed**, which is the phase's own ordering and the
+reason it matters: designing is a model request per beat, so a storyboard that drops three words in
+the middle must be caught while it costs nothing. A gap is not cosmetic — it is narration playing
+over whatever the previous beat left on screen. Grep `COVERAGE_IS_CHECKED_BEFORE_DESIGNING`.
+
+**One `step.run` per beat IS the fan-out.** Each beat is durable on its own, retried on its own and
+memoised across a replay, so a run that dies on beat thirty does not pay for the first twenty-nine
+twice. Sequential rather than parallel, and that is the throttle the phase asks for: a `Promise.all`
+over forty steps would issue forty concurrent requests and be rate-limited on a long video — the
+one failure mode that gets worse the more a customer paid. Grep `ONE_STEP_PER_BEAT`.
+
+**The designer cannot throw for a design failure, and must throw for a transport one.** Two bounded
+attempts, then a fallback — `THE_PIPELINE_ALWAYS_FINISHES`. But a rate limit or a 5xx is rethrown,
+because swallowing it into a fallback would quietly turn a retryable blip into a video full of plain
+beats. That distinction is `LlmError.permanent` and it is the one line in the loop worth reading
+twice.
+
+**Two bugs the tests caught, both mine.**
+
+- **The sentence-break preference never fired.** "Longest beat that fits" and "best sentence break"
+  shared one variable, so each iteration clobbered the sentence choice. Every beat was silently
+  breaking at the six-second ceiling instead of at punctuation — a video whose graphics change
+  mid-sentence, with nothing in the output to say why. The two candidates are now tracked
+  separately.
+- **The fallback overflowed.** Its validity rested on a word count I guessed, and twelve short words
+  do not fit the kinetic role inside TikTok's insets at 9:16. A guessed constant cannot carry
+  `FALLBACK_IS_ALWAYS_VALID`: the thing it must be true for is every transcript, at every aspect, in
+  every safe zone. **The fallback now measures itself** and drops words until `checkScene` passes,
+  with a bullet as the terminal case. That is the whole point of it — a fallback that fails turns a
+  recoverable design failure into a broken video, on exactly the beats where something had already
+  gone wrong. Grep `FALLBACK_IS_MEASURED_NOT_GUESSED`.
+
+**The generator is pure, so the design happens before it.** A generator may not call a model
+(`GENERATORS_STAY_PURE`), so the scenes are designed in the pipeline's `design` stage and stored in
+`Project.settings`; the generator reads them. The same split Phase 13's quiz writer makes, and it is
+also what makes "redesign one beat" cheap — the stored scenes are the artifact, and rebuilding the
+document from them costs nothing. Grep `MOTION_SCENES_ARE_ALREADY_DESIGNED`.
+
+**A beat with no scene gets a measured fallback rather than a gap.** The generator is the last place
+that could turn an interrupted design into a video with holes in it, and it does not. Grep
+`A_MISSING_SCENE_IS_A_FALLBACK`.
+
+**`motionVideos` is counted when the design succeeds**, in the same transaction that stores the
+beats. Counting on REQUEST would charge a customer for our outage; counting outside the transaction
+would let a crash between the two leave a video designed and unmetered. Grep
+`COUNTED_WHEN_THE_DESIGN_SUCCEEDS`.
+
+**One existing test had to change, and it is worth knowing why.** `generators.test.ts` asserted
+`hasGenerator("motion") === false` — the registry's last documented gap. Every declared kind now has
+a generator, so the assertion was rewritten against `PROJECT_KINDS` rather than a hand-listed four:
+declaring a fifth format now fails there until it is built or deliberately left out. The
+`UNBUILT_KIND_IS_NAMED` mechanism is exercised directly rather than deleted, since there is no
+unbuilt kind left to demonstrate it on.
+
+**What is NOT built, and must not be assumed.**
+
+- **The beat strip** — the phase's step 14, "each beat as a still, with redesign this beat re-running
+  exactly one beat". Neither the UI nor the `redesignBeat` procedure exists. `saveMotionDesign`
+  already takes `countVideo: false` for exactly that caller, and `readMotionDesign` returns the raw
+  blob so one beat can be replaced without re-parsing its siblings — but nothing calls either yet.
+- **The vision pass** — step 12's second half. The deterministic checks run; no still is rendered
+  and no vision model is asked.
+- **`assignIntents` has no caller.** Every beat is designed as `emphasis` today, which means the
+  intent-to-primitive guidance in the prompt is live but never varies. The storyboard-level model
+  call that would set intents is the smallest remaining piece of 16d.
+
+**What has never run.** No motion video has been generated. The pipeline stage is wired and
+type-checks, but Neon has been unreachable since Phase 05 and `designBeat` has never called Claude —
+so no storyboard has been stored, no beat designed, and `motionVideos` has never been incremented.
+The pure halves are what the 46 tests cover: the split's coverage over generated transcripts, the
+fallback's validity at both aspects in all four safe zones, the prompt's cacheability and injection
+fencing, and the generator building a valid document from hand-written settings with no model
+involved.

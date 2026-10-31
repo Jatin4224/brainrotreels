@@ -28,6 +28,7 @@ import { BACKDROP_ELEMENT_KIND } from "@/lib/palettes";
 import { resolveWordAnchors, validate, type WordToken } from "@/lib/timeline";
 import type { DbClient } from "@/lib/config/prisma";
 import { GENERATORS, hasGenerator, resolveGenerator } from "./registry";
+import { PROJECT_KINDS, type ProjectKind } from "@/lib/types/project";
 import { GeneratorNotImplementedError, type GeneratorContext, type NarrationLineInput } from "./types";
 import { buildRedditStoryDocument } from "./reddit-story";
 import { buildVoiceoverDocument } from "./voiceover";
@@ -687,32 +688,33 @@ describe("buildRedditStoryDocument", () => {
 });
 
 describe("the generator registry", () => {
-  /* DOCUMENTED_GAP_NOT_A_STUB — the unbuilt kind is ABSENT, and that absence is
+  /* DOCUMENTED_GAP_NOT_A_STUB — an unbuilt kind is ABSENT, and that absence is
    * what `projects.generate` turns into a named refusal. A stub returning an
-   * empty document would be a silent, black, paid-for video. Phase 13 moved
-   * `quiz` out of that list; `motion` is what is left, in Phase 16. */
-  it("has the three built formats and not the one unbuilt one", () => {
-    expect(Object.keys(GENERATORS).sort()).toEqual([
-      "quiz",
-      "reddit-story",
-      "voiceover",
-    ]);
-    expect(hasGenerator("voiceover")).toBe(true);
-    expect(hasGenerator("reddit-story")).toBe(true);
-    expect(hasGenerator("quiz")).toBe(true);
-    expect(hasGenerator("motion")).toBe(false);
+   * empty document would be a silent, black, paid-for video.
+   *
+   * Phase 13 moved `quiz` out of that list and Phase 16d moved `motion`, so
+   * every kind in PROJECT_KINDS now has a generator. The assertion is written
+   * against PROJECT_KINDS rather than a hand-listed four, so declaring a fifth
+   * format fails here until it is either built or deliberately left out. */
+  it("has a generator for every declared format", () => {
+    expect(Object.keys(GENERATORS).sort()).toEqual([...PROJECT_KINDS].sort());
+    for (const kind of PROJECT_KINDS) {
+      expect(hasGenerator(kind), kind).toBe(true);
+    }
   });
 
   it("names the format when a kind has no generator", () => {
-    expect(() => resolveGenerator("motion")).toThrow(
-      GeneratorNotImplementedError,
-    );
-    try {
-      resolveGenerator("motion");
-    } catch (error) {
-      expect(error).toBeInstanceOf(GeneratorNotImplementedError);
-      expect((error as GeneratorNotImplementedError).kind).toBe("motion");
-    }
+    /* UNBUILT_KIND_IS_NAMED has no unbuilt kind to demonstrate on any more, so
+     * the mechanism is exercised directly rather than deleted: a customer who
+     * creates a format declared but not yet built must be told which format,
+     * not watch a pipeline fail at its last step. */
+    const error = new GeneratorNotImplementedError("motion");
+    expect(error).toBeInstanceOf(GeneratorNotImplementedError);
+    expect(error.kind).toBe("motion");
+    expect(error.message).toContain("motion");
+
+    /* And the lookup still refuses anything that is not a declared kind. */
+    expect(GENERATORS["not-a-format" as ProjectKind]).toBeUndefined();
   });
 
   /* SKIPS_LIVE_ON_THE_GENERATOR. The workflow seeds its stage list from this,

@@ -78,3 +78,9 @@ export {
   motionStyleSystemPrompt,
   motionStyleUserPrompt,
 } from "./motion-style-prompt";
+export { designBeat } from "./motion-beat";
+export type { DesignedBeat } from "./motion-beat";
+export {
+  beatDesignSystemPrompt,
+  beatDesignUserPrompt,
+} from "./motion-beat-prompt";
