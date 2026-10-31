@@ -44,6 +44,7 @@ import { z } from "zod";
 
 import type { PlanKey } from "@/lib/config/plans";
 import { variantNameSchema, type VariantName } from "./asset";
+import type { SafeZone } from "./caption";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: RenderQuality, renderQualitySchema, VARIANT_BY_QUALITY
@@ -253,6 +254,33 @@ export interface RenderItemProps {
   frames: { from: number; durationInFrames: number };
   /** The canvas, so a component can convert a normalized box to pixels. */
   canvas: { width: number; height: number; fps: number };
+  /**
+   * SOURCE OF TRUTH KEYWORDS: STYLE_IS_PART_OF_THE_CONTRACT
+   *
+   * The document's own `style` spec — which palette, which caption style,
+   * which platform's safe zone.
+   *
+   * WHY: added in Phase 16. Before it, a scene family that needed the palette
+   * had no way to reach it: the walker hands a component its ITEM, and
+   * `sceneItemSchema` is `.strict()` with nowhere to put a document-level
+   * value. Phase 13's quiz card worked around that by having its GENERATOR
+   * copy `paletteId` and `safeZone` down into an element's `props`, which
+   * means the same two values exist in as many copies as there are scenes and
+   * a restyle has to rewrite every one of them. Phase 16's motion scenes need
+   * both on every beat, so copying that workaround ten times was the moment to
+   * fix it instead.
+   *
+   * It belongs in the shared contract rather than in one family's props for
+   * the reason RENDER_COMPONENT_CONTRACT already gives: these props are the
+   * UNION of what any family could need, and "what does this document look
+   * like" is not specific to one family. Purely additive — every existing
+   * component ignores it, and the quiz card's own `props` path still works.
+   */
+  style: {
+    paletteId: string;
+    captionStyleId: string;
+    safeZone: SafeZone;
+  };
 }
 
 /**

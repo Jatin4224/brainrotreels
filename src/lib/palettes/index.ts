@@ -215,3 +215,12 @@ export function backdropGradient(palette: Palette): string {
  *        src/remotion/components/backdrop.tsx reads it.
  */
 export const BACKDROP_ELEMENT_KIND = "gradient";
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: SCENE_TONE_COLOURS, toneColor, TONE_IS_MEANING_NOT_COLOUR
+ *
+ * Re-exported so every render colour in the app is reachable through
+ * `@/lib/palettes` — the motion scene tones live in ./tones.ts because they
+ * depend on the scene vocabulary and this file must stay the palette library.
+ */
+export { SCENE_TONE_COLOURS, toneColor } from "./tones";

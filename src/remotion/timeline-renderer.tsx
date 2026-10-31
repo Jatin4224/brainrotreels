@@ -148,7 +148,7 @@ export function TimelineRenderer({
             canvas={timeline.canvas}
             narrationWindows={narrationWindows}
             words={timeline.words}
-            safeZone={timeline.style.safeZone}
+            style={timeline.style}
             captionStyleByItem={captionStyleByItem}
           />
         </Sequence>
@@ -188,7 +188,7 @@ function PlannedItemRenderer({
   canvas,
   narrationWindows,
   words,
-  safeZone,
+  style,
   captionStyleByItem,
 }: {
   plan: PlannedItem;
@@ -196,7 +196,9 @@ function PlannedItemRenderer({
   canvas: TimelineDoc["canvas"];
   narrationWindows: readonly { from: number; durationInFrames: number }[];
   words: readonly WordToken[];
-  safeZone: TimelineDoc["style"]["safeZone"];
+  /* The whole style spec, not just the safe zone — see
+   * STYLE_IS_PART_OF_THE_CONTRACT in src/lib/types/render.ts. */
+  style: TimelineDoc["style"];
   captionStyleByItem: ReadonlyMap<
     string,
     { styleId: string; speakerColors: boolean }
@@ -210,6 +212,7 @@ function PlannedItemRenderer({
     assets,
     frames: { from: plan.from, durationInFrames: plan.durationInFrames },
     canvas,
+    style,
   };
 
   if (plan.trackType === "audio") {
@@ -235,7 +238,7 @@ function PlannedItemRenderer({
           captionStyleByItem.get(plan.id)?.styleId ?? DEFAULT_CAPTION_STYLE_ID
         }
         speakerColors={captionStyleByItem.get(plan.id)?.speakerColors}
-        safeZone={safeZone}
+        safeZone={style.safeZone}
         canvas={canvas}
         frames={props.frames}
         y={item.position?.y}

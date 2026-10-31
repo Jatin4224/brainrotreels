@@ -36,10 +36,13 @@
  *        library (16c), and Phase 16d's designer, storyboard and repair loop.
  */
 
+export { elementWindowSeconds, resolveSceneAnchors } from "./anchors";
+export type { ElementWindow } from "./anchors";
 export { checkScene } from "./check";
 export { parseScene, toSceneSpec, fromSceneSpec } from "./document";
 export type { ParsedScene } from "./document";
 export { layoutGraph } from "./flow";
+export { GALLERY_SCENES } from "./gallery";
 export { layoutScene, safeRectFor, layoutSlotRule } from "./layouts";
 export {
   fitTextRun,

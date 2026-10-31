@@ -34,27 +34,33 @@
 import { describe, expect, it } from "vitest";
 
 import { motionFixture } from "@/lib/timeline/fixtures/motion";
+import { SAFE_ZONES } from "@/lib/types/caption";
 import {
+  SCENE_ANIMATIONS,
+  SCENE_BEAT_SECONDS,
   SCENE_LAYOUTS,
+  SCENE_PRIMITIVES,
   SCENE_TEXT_ROLE_SPECS,
-  type LayoutContext,
   type Scene,
+  type SceneCheckContext,
   type SceneErrorCode,
 } from "@/lib/types/scene";
 
+import { elementWindowSeconds, resolveSceneAnchors } from "./anchors";
 import { checkScene } from "./check";
 import { fromSceneSpec, parseScene, toSceneSpec } from "./document";
+import { GALLERY_SCENES } from "./gallery";
 import { fitTextRun, measureLineWidth, wrapText } from "./measure";
 import { formatCounterValue, elementTextRuns } from "./runs";
 
-const PORTRAIT: LayoutContext = {
+const PORTRAIT: SceneCheckContext = {
   canvas: { width: 1080, height: 1920, fps: 30 },
   safeZone: "none",
   wordCount: 40,
   durationSeconds: 4,
 };
 
-const LANDSCAPE: LayoutContext = {
+const LANDSCAPE: SceneCheckContext = {
   ...PORTRAIT,
   canvas: { width: 1920, height: 1080, fps: 30 },
 };
@@ -695,5 +701,258 @@ describe("the document seam", () => {
     expect(element?.in).toBe(0);
     expect(element?.entrance).toBe("fade");
     expect(element?.out).toBeUndefined();
+  });
+});
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: EVERY_PRIMITIVE_EVERY_LAYOUT, GALLERY_SCENES,
+ *   GALLERY_IS_THE_REVIEW_SURFACE
+ *
+ * WHAT:  That the review gallery actually covers the library, and that every
+ *        card in it is clean in every palette, aspect and safe zone.
+ * WHY:   The human review the phase requires is only as good as the set it is
+ *        run over. A primitive with no card would be approved by a reviewer
+ *        who never saw it — so the coverage is a test, not a promise, and
+ *        adding an eleventh primitive in a later phase cannot quietly skip
+ *        review.
+ *
+ *        The clean-in-every-combination assertion is the one that earns its
+ *        keep: a card can look right at 9:16 with no safe zone and sit under
+ *        TikTok's button rail at 16:9, and nobody reviews all twenty-four
+ *        combinations by eye.
+ * WHERE: `npm test`.
+ */
+describe("the review gallery", () => {
+  it("covers every primitive", () => {
+    const used = new Set(
+      GALLERY_SCENES.flatMap((entry) =>
+        entry.scene.elements.map((element) => element.kind),
+      ),
+    );
+
+    expect([...SCENE_PRIMITIVES].filter((kind) => !used.has(kind))).toEqual([]);
+  });
+
+  it("covers every layout", () => {
+    const used = new Set(GALLERY_SCENES.map((entry) => entry.scene.layout));
+
+    expect([...SCENE_LAYOUTS].filter((layout) => !used.has(layout))).toEqual(
+      [],
+    );
+  });
+
+  it("covers every named animation, so none ships unwatched", () => {
+    const used = new Set(
+      GALLERY_SCENES.flatMap((entry) =>
+        entry.scene.elements.flatMap((element) => [
+          element.entrance,
+          element.exit,
+        ]),
+      ),
+    );
+
+    /* `none` is excluded: it is the absence of a movement, and a card showing
+     * nothing happening is not a review of anything. */
+    expect(
+      [...SCENE_ANIMATIONS].filter(
+        (animation) => animation !== "none" && !used.has(animation),
+      ),
+    ).toEqual([]);
+  });
+
+  it("gives every card a note saying what it is for", () => {
+    for (const entry of GALLERY_SCENES) {
+      expect(entry.note.length, entry.id).toBeGreaterThan(20);
+    }
+  });
+
+  it("keeps every beat inside the phase's 1.5-6 second range", () => {
+    for (const entry of GALLERY_SCENES) {
+      expect(entry.durationSeconds, entry.id).toBeGreaterThanOrEqual(
+        SCENE_BEAT_SECONDS.min,
+      );
+      expect(entry.durationSeconds, entry.id).toBeLessThanOrEqual(
+        SCENE_BEAT_SECONDS.max,
+      );
+    }
+  });
+
+  for (const entry of GALLERY_SCENES) {
+    for (const [label, ctx] of [
+      ["portrait", PORTRAIT],
+      ["landscape", LANDSCAPE],
+    ] as const) {
+      for (const safeZone of SAFE_ZONES) {
+        it(`${entry.id} is clean at ${label} in the ${safeZone} safe zone`, () => {
+          const result = checkScene(entry.scene, {
+            ...ctx,
+            safeZone,
+            /* Hand-written fixtures have no transcript, so they are timed in
+               seconds and never anchored — asserted below. */
+            wordCount: 0,
+            durationSeconds: entry.durationSeconds,
+          });
+
+          expect(result.errors).toEqual([]);
+        });
+      }
+    }
+  }
+
+  it("times every gallery element in seconds rather than by anchor", () => {
+    /* A word anchor in a fixture would be unresolvable by construction and
+       would fail the UNKNOWN_WORD_ANCHOR check at `wordCount: 0` above — this
+       says so directly, so the reason is obvious rather than inferred from a
+       failing combination. */
+    for (const entry of GALLERY_SCENES) {
+      for (const element of entry.scene.elements) {
+        expect(typeof element.in, `${entry.id}.${element.id}`).toBe("number");
+        if (element.out !== undefined) {
+          expect(typeof element.out, `${entry.id}.${element.id}`).toBe(
+            "number",
+          );
+        }
+      }
+    }
+  });
+});
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: resolveSceneAnchors, elementWindowSeconds,
+ *   RESOLVE_BEFORE_STORING, AN_UNRESOLVED_ANCHOR_SHOWS_THE_WHOLE_BEAT
+ *
+ * WHAT:  That an anchor becomes the right scene-relative second, and that one
+ *        which somehow survives to render time shows its element rather than
+ *        hiding it.
+ * WHY:   This is the phase's "every number or diagram appears on the word that
+ *        introduces it", reduced to the one arithmetic step it depends on. The
+ *        subtraction of the beat's own start is the part that would be wrong
+ *        silently: an absolute second looks correct on the first beat of a
+ *        video and is wrong on every one after it.
+ * WHERE: `npm test`.
+ */
+describe("scene anchors", () => {
+  const words = [
+    { i: 0, w: "we", s: 10, e: 10.2 },
+    { i: 1, w: "lose", s: 10.2, e: 10.5 },
+    { i: 2, w: "forty", s: 10.5, e: 11 },
+    { i: 3, w: "percent", s: 11, e: 11.6 },
+  ];
+
+  const anchored: Scene = {
+    layout: "stack-center",
+    elements: [
+      {
+        kind: "callout",
+        id: "a",
+        text: "40%",
+        tone: "negative",
+        in: { wordIndex: 2 },
+        entrance: "pop",
+        exit: "fade",
+      },
+    ],
+  };
+
+  it("resolves an anchor to seconds from the start of the beat", () => {
+    const resolved = resolveSceneAnchors({
+      scene: anchored,
+      words,
+      beatStart: 10,
+      beatDuration: 4,
+    });
+
+    /* Word 2 starts at 10.5s absolute and the beat starts at 10s, so the
+     * element enters half a second in — not at 10.5. */
+    expect(resolved.elements[0]?.in).toBeCloseTo(0.5, 6);
+  });
+
+  it("clamps an anchor that lands outside the beat", () => {
+    const resolved = resolveSceneAnchors({
+      scene: anchored,
+      words,
+      beatStart: 11,
+      beatDuration: 2,
+    });
+
+    expect(resolved.elements[0]?.in).toBe(0);
+  });
+
+  it("falls back to the beat's bounds for an anchor past the transcript", () => {
+    const resolved = resolveSceneAnchors({
+      scene: {
+        layout: "stack-center",
+        elements: [
+          {
+            kind: "callout",
+            id: "a",
+            text: "later",
+            tone: "neutral",
+            in: { wordIndex: 99 },
+            entrance: "fade",
+            exit: "fade",
+          },
+        ],
+      },
+      words,
+      beatStart: 0,
+      beatDuration: 3,
+    });
+
+    expect(resolved.elements[0]?.in).toBe(0);
+  });
+
+  it("leaves a scene timed in seconds untouched", () => {
+    /* ROUND_TRIP_IS_LOSSLESS applies here too: resolving an already-resolved
+     * scene must not move anything, or re-saving a beat would rewrite it. */
+    const seconds: Scene = {
+      layout: "stack-center",
+      elements: [
+        {
+          kind: "callout",
+          id: "a",
+          text: "steady",
+          tone: "neutral",
+          in: 1.25,
+          out: 2.5,
+          entrance: "fade",
+          exit: "fade",
+        },
+      ],
+    };
+
+    expect(
+      resolveSceneAnchors({
+        scene: seconds,
+        words,
+        beatStart: 0,
+        beatDuration: 4,
+      }),
+    ).toEqual(seconds);
+  });
+
+  it("shows an element for the whole beat when its anchor survived", () => {
+    /* AN_UNRESOLVED_ANCHOR_SHOWS_THE_WHOLE_BEAT — the content is right and
+     * only its timing is wrong, which beats a hole in a paid frame. */
+    const element = anchored.elements[0];
+    expect(element).toBeDefined();
+    if (element === undefined) return;
+
+    expect(elementWindowSeconds(element, 3)).toEqual({ from: 0, to: 3 });
+  });
+
+  it("collapses an inverted window to the beat rather than returning nothing", () => {
+    const element = {
+      kind: "callout" as const,
+      id: "a",
+      text: "backwards",
+      tone: "neutral" as const,
+      in: 2,
+      out: 1,
+      entrance: "fade" as const,
+      exit: "fade" as const,
+    };
+
+    expect(elementWindowSeconds(element, 3)).toEqual({ from: 0, to: 3 });
   });
 });

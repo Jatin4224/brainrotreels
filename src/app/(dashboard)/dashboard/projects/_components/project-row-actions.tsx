@@ -29,6 +29,7 @@ import {
   Copy,
   FileTextIcon,
   CaptionsIcon,
+  ShapesIcon,
   MicIcon,
   Loader2Icon,
   MoreHorizontal,
@@ -200,6 +201,20 @@ export function ProjectRowActions({
           >
             <CaptionsIcon className="size-4" />
             Captions
+          </DropdownMenuItem>
+          {/* Phase 16a/16b. The motion PRIMITIVE GALLERY — a review surface
+              over hand-written fixtures, gated on `read` like the screens
+              above it because it displays nothing about the project. Designing
+              a motion video is a different thing and arrives with 16d behind
+              the `motionStudio` flag; this item is deliberately not that, and
+              is named for what it shows. */}
+          <DropdownMenuItem
+            onClick={() =>
+              router.push(`/dashboard/projects/${project.id}/motion`)
+            }
+          >
+            <ShapesIcon className="size-4" />
+            Motion primitives
           </DropdownMenuItem>
           {/* Phase 15. After captions because it edits what the four screens
               above produced, and gated with `<FeatureGate>` rather than hidden:

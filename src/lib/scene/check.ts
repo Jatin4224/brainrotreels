@@ -55,7 +55,7 @@ import {
   LAYOUT_SLOTS,
   SCENE_TEXT_ROLE_SPECS,
   sceneError,
-  type LayoutContext,
+  type SceneCheckContext,
   type PlacedElement,
   type PlacedRect,
   type Scene,
@@ -85,7 +85,7 @@ const TOLERANCE_PX = 1;
  */
 export function checkScene(
   scene: Scene,
-  ctx: LayoutContext,
+  ctx: SceneCheckContext,
 ): SceneCheckResult {
   const errors: SceneError[] = [];
   const placed = layoutScene(scene, ctx);
@@ -199,7 +199,7 @@ function checkGraphs(scene: Scene, errors: SceneError[]): void {
  */
 function checkTiming(
   scene: Scene,
-  ctx: LayoutContext,
+  ctx: SceneCheckContext,
   errors: SceneError[],
 ): void {
   scene.elements.forEach((element, index) => {

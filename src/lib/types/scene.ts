@@ -63,6 +63,7 @@
 
 import { z } from "zod";
 
+import type { Palette } from "@/lib/palettes";
 import type { CanvasSpec, TimeValue } from "@/lib/timeline";
 import {
   CAPTION_WEIGHTS,
@@ -627,6 +628,27 @@ export interface LayoutContext {
    * SAFE_ZONE_IS_SHARED. */
   canvas: CanvasSpec;
   safeZone: SafeZone;
+}
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: SceneCheckContext, CHECKING_NEEDS_MORE_THAN_LAYOUT
+ *
+ * WHAT:  What the deterministic checks need on top of the geometry.
+ *
+ * WHY:   CHECKING_NEEDS_MORE_THAN_LAYOUT, and the split is not tidiness. The
+ *        Remotion component lays a scene out on every frame and genuinely does
+ *        NOT know the word count — the walker hands a component its item, the
+ *        canvas and the document's style, not the transcript. With one
+ *        combined context it would have had to invent a `wordCount: 0`, which
+ *        is a false statement in a type, and the next reader would not know
+ *        whether the layout depended on it.
+ *
+ *        So the layout takes only what the layout uses. `wordCount` and
+ *        `durationSeconds` exist for the anchor and timing checks, which run
+ *        where the document IS in hand — the designer, the editor, the tests.
+ * WHERE: checkScene; never the renderer.
+ */
+export interface SceneCheckContext extends LayoutContext {
   /** How many word tokens the document has; 0 for a silent motion piece. */
   wordCount: number;
   /** The beat's own length in seconds, for the timing checks. */
@@ -722,6 +744,63 @@ export interface PlacedScene {
   /** The safe rectangle every slot was placed inside. */
   safeRect: PlacedRect;
   elements: PlacedElement[];
+}
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: MotionPrimitiveProps, DRAWN_IS_MEASURED,
+ *   MOTION_PRIMITIVE_CONTRACT
+ *
+ * WHAT:  What every motion primitive component receives.
+ *
+ * WHY:   MOTION_PRIMITIVE_CONTRACT — one shape for all ten, so the
+ *         `MotionScene` family dispatches on `element.kind` through a map and
+ *         nobody edits the family to add a primitive. The same argument
+ *         RENDER_COMPONENT_CONTRACT makes one level up, which is why `element`
+ *         is the whole union and each component narrows it: a component knows
+ *         its own kind, a generic dispatcher cannot know which narrowing to
+ *         apply.
+ *
+ *         DRAWN_IS_MEASURED is the reason `placed` is here at all. A primitive
+ *         does NOT lay itself out: it is handed the rectangles and the fitted
+ *         font sizes the layout engine already computed and measured, and it
+ *         draws exactly those. Any primitive that computed its own size would
+ *         make the overflow check a statement about a picture that does not
+ *         exist — which is the single failure this phase's checks are built to
+ *         make impossible.
+ *
+ *         `palette` is the resolved palette rather than its id, so one lookup
+ *         happens in the family and not ten times in its children.
+ * WHERE: Implemented by every component under
+ *        src/remotion/components/motion-scene/.
+ */
+export interface MotionPrimitiveProps {
+  /** The element as designed. Narrow it on `kind`. */
+  element: StrictSceneElement;
+  /** Its slot, its graph and its fitted text runs — see DRAWN_IS_MEASURED. */
+  placed: PlacedElement;
+  palette: Palette;
+  canvas: CanvasSpec;
+  /** When this element is on screen, in seconds from the start of the beat. */
+  window: { from: number; to: number };
+  /**
+   * SOURCE OF TRUTH KEYWORDS: TIME_IS_A_PROP, PREVIEW_IS_THE_RENDER
+   *
+   * The moment being drawn, in seconds from the start of the beat.
+   *
+   * WHY: a PROP rather than `useCurrentFrame()`, which is the pattern
+   * src/components/global/caption-preview already established — and the reason
+   * is that the gallery has to mount these components, not approximations of
+   * them. A primitive that read the frame itself would only work inside a
+   * Remotion context, so a gallery of forty cards would need forty Players;
+   * with time as a prop the gallery drives the SAME components from one
+   * `requestAnimationFrame` loop. One component, two drivers, no second
+   * implementation to drift (PREVIEW_IS_THE_RENDER).
+   *
+   * It also keeps every drawing component free of the `remotion` package,
+   * which matters for the same reason CAPTIONS_STAY_PURE does: that package's
+   * module body expects a Remotion bundle.
+   */
+  seconds: number;
 }
 
 /**
@@ -848,6 +927,35 @@ export const beatSchema = z
   .strict();
 
 export type Beat = z.infer<typeof beatSchema>;
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: GalleryScene, GALLERY_IS_THE_REVIEW_SURFACE
+ *
+ * WHAT:  One hand-written scene in the review gallery, with what it is there
+ *        to show.
+ *
+ * WHY:   GALLERY_IS_THE_REVIEW_SURFACE. architecture.md names the weak point
+ *        of this phase — motion quality depends on the PRIMITIVE LIBRARY, not
+ *        on the model — so the primitives are reviewed on their own merits,
+ *        by a human, while there is still nothing else to blame. `note` is
+ *        part of the type because a gallery card without a statement of what
+ *        it is testing is a picture somebody nods at.
+ *
+ *        `durationSeconds` is per scene rather than a constant: a kinetic line
+ *        needs longer than a title to be judged, and reviewing every primitive
+ *        at the same length would hide the ones that are too slow for a short
+ *        beat.
+ * WHERE: src/lib/scene/gallery.ts holds the set; the motion gallery route
+ *        renders it; scene.test.ts asserts all of it checks clean.
+ */
+export interface GalleryScene {
+  id: string;
+  title: string;
+  /** What this card exists to show a reviewer. */
+  note: string;
+  durationSeconds: number;
+  scene: Scene;
+}
 
 /**
  * SOURCE OF TRUTH KEYWORDS: SCENE_BEAT_SECONDS, BEAT_LENGTH_IS_A_RANGE

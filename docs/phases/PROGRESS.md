@@ -69,14 +69,17 @@ worse than an empty box.
       written. Scrubbing on proxies is untested (R2), and no narration line has ever been re-recorded
       from the editor (ELEVENLABS_API_KEY). Two new ops were needed and are argued in the note, and
       `ApplyOpsResult` carries a third status the phase's contract does not list. See the note.
-- [ ] Phase 16: Motion graphics studio — **16a of four is built**; 16b (primitives and the gallery),
-      16c (style tokens) and 16d (the AI designer) are not started, so no motion video exists and
-      nothing is metered yet. What 16a ships is the scene language, the layout engine and the
-      deterministic checks, and it is **verified without a provider**: text measurement runs against
-      the real `hmtx` advances of the bundled faces, and 82 new tests include the phase's own two
-      "catch an overflowing text element and an overlap". **Two gaps carried into 16c are not code
-      gaps** — only one font family is bundled, and the `flow-graph` dependency decision is now
-      settled on Dagre. See the note.
+- [ ] Phase 16: Motion graphics studio — **16a and 16b of four are built**; 16c (style tokens) and
+      16d (the AI designer) are not started, so no motion video exists and nothing is metered yet.
+      16a is the scene language, the layout engine and the deterministic checks; 16b is the ten
+      primitives, the `motion → MotionScene` registry entry and the review gallery. Both are
+      **verified without a provider** — text measurement runs against the real `hmtx` advances of
+      the bundled faces, and 200 new tests include the phase's own "catch an overflowing text
+      element and an overlap" plus the assertion that no animation can move the measured ink.
+      **The gallery's human review has not happened yet**, which is the one Done-when line a test
+      cannot cover, and **nothing has been composited to MP4**. Two gaps carried into 16c are not
+      code gaps: only one font family is bundled, and `stack-center` turns out to hold three list
+      items plus a heading in a vertical frame, not four. See the two notes.
 - [ ] Phase 17: Platform surface
 
 ## Blocked on an owner decision
@@ -2513,3 +2516,122 @@ layout, both aspects and all four platform zones, and that is the strongest clai
 to MP4", "across 20 test videos" and every metering line remain untouched. `GAP_VH`, the 62/38
 hero split and the role size table are **unreviewed design numbers**: they are data in one table
 precisely so the gallery can change them without touching code.
+
+### Phase 16b — 2026-10-31
+
+Built: ten primitive components under `src/remotion/components/motion-scene/`
+(`text.tsx` — Title, KineticText, Callout; `numbers.tsx` — Counter, Meter, BarChart;
+`structure.tsx` — Compare, List, Icon; `flow-graph.tsx` — FlowGraph), the shared
+`text-block.tsx`, `animation.tsx`, `icons.tsx`, `util.ts`, the `canvas.tsx` family and the
+`index.tsx` Remotion driver; `src/lib/palettes/tones.ts`; `src/lib/scene/anchors.ts` and
+`src/lib/scene/gallery.ts`; `src/components/global/motion-preview/`; the gallery route at
+`/dashboard/projects/[id]/motion` with its row-menu entry. `motion → MotionScene` is registered in
+`src/remotion/registry.ts`, which now has a component for every `RenderKind`. 118 new tests; the
+suite is 1225 and green, `tsc --noEmit` and `eslint` are clean. **No migration, no registry entry,
+nothing metered** — 16b touches no database and no gate, and `motionStudio`/`motionVideos` belong
+with 16d, the first commit that can spend a credit.
+
+**One registry entry, ten primitives.** `motion` is one `RenderKind`, so it is one key in
+`RENDER_COMPONENTS`; the primitives are the family's own dispatch through `MOTION_PRIMITIVES`. That
+map is a FULL `Record` rather than the `Partial` the render registry uses, and the asymmetry is
+deliberate: an unimplemented render kind is a documented gap because a document written by a newer
+release must degrade, while a primitive comes from this app's own closed `SCENE_PRIMITIVES` and a
+missing one is a bug nobody should be able to ship. Grep `ONE_FAMILY_TEN_PRIMITIVES`.
+
+**Time is a prop, which is the decision the whole commit turns on.** No primitive calls
+`useCurrentFrame`. `MotionSceneCanvas` takes `seconds` and `MotionScene` — the only file in the
+folder that imports `remotion` — is a nine-line driver that reads the frame and divides by fps. The
+reason is the gallery: the captions gallery already established that a review surface must mount
+the REAL component (`PREVIEW_IS_THE_RENDER`), and a primitive that read the frame itself would only
+work inside a Remotion context, so a dozen cards would mean a dozen Players. With time as a prop the
+gallery drives the same components from one `requestAnimationFrame` loop. It also keeps every
+drawing component free of the `remotion` package, which is the gap `CAPTIONS_STAY_PURE` describes.
+The price is eight lines of cubic easing written here instead of `interpolate` — the one deliberate
+duplication in the folder, and a cubic ease is not a thing that can be got subtly wrong. Grep
+`TIME_IS_A_PROP`.
+
+**`RenderItemProps` gained `style`, and that fixed an existing workaround rather than adding one.**
+A scene family that needs the palette had no way to reach it: the walker hands a component its
+ITEM, and `sceneItemSchema` is `.strict()` with nowhere to put a document-level value. Phase 13's
+quiz card worked around that by having its GENERATOR copy `paletteId` and `safeZone` down into an
+element's `props`, so the two values exist in as many copies as there are scenes and a restyle has
+to rewrite every one. Motion needs both on every beat, so copying that ten more times was the moment
+to put the document's `style` in the shared contract instead. Purely additive — every existing
+component ignores it and the quiz card's own path still works. Grep
+`STYLE_IS_PART_OF_THE_CONTRACT`.
+
+**`LayoutContext` was split in two, because the component proved it was carrying two concerns.** The
+renderer lays a scene out every frame and genuinely does not know the word count — the walker passes
+no transcript. With one combined context it would have had to invent `wordCount: 0`, which is a
+false statement in a type. `LayoutContext` is now what the LAYOUT uses and `SceneCheckContext`
+extends it with what the CHECKS need. Grep `CHECKING_NEEDS_MORE_THAN_LAYOUT`.
+
+**Every text run is drawn by one component, and that is what keeps 16a's measurement honest.**
+`TextBlock` emits the PRE-WRAPPED lines with `white-space: nowrap`, so the browser is never asked
+where to break. Handed the whole string with `overflow-wrap` on, Chrome would wrap by its own rules
+— which agree with the measurement almost always, and "almost" is the failure, because the beats
+where they disagree are exactly the long ones the check exists for. Overflow is deliberately NOT
+clipped: in the gallery the defect has to be visible. Grep `EVERY_TEXT_GOES_THROUGH_HERE` and
+`NO_BROWSER_WRAPPING`.
+
+**Animations may only touch opacity, transform and clip-path, and a test enforces it.** If an
+entrance could change a layout rectangle, the overflow and overlap checks would describe the element
+at rest while the video showed it elsewhere — the exact gap this phase closes. The test reads every
+one of the eight movements at three progress points and fails on any other CSS property. Grep
+`ANIMATION_NEVER_MOVES_THE_INK`.
+
+**Tone colours are data with a contrast test, and the test immediately earned itself.** A scene says
+`tone: 'negative'` and never a hex, because a model cannot run a contrast check. `toneColor` resolves
+meaning against the palette — `neutral` is the palette's own `text`, so there is no sixth near-white.
+The first `negative` value failed at 3.39 against `warm`, whose background is itself a deep red; one
+step lighter measures 4.94 and passes. That margin is thin enough that a sixth palette could push it
+under, which is what the test is for. Grep `TONE_IS_MEANING_NOT_COLOUR` and
+`TONE_CONTRAST_IS_TESTED`.
+
+**Icons are twelve inline SVG paths, not the icon package the app chrome uses.** A React icon
+component is one more module that has to resolve inside the Remotion bundle and one more thing that
+can render as an empty box without failing the render — and a beat whose only element is a missing
+icon is a blank frame in a paid video. Twelve `d` attributes have no resolution step and no version
+to drift. Grep `INLINE_SVG_NOT_AN_ICON_PACKAGE`.
+
+**The gallery found two real defects in its own fixtures, which is the point of having it.**
+
+- A list item reading "Replaced the welcome tour with a single working example they could copy"
+  measured **31px past its row**. Shortening it twice still missed, by 7px and then 2px, and only
+  inside TikTok's, Reels' and Shorts' insets — it fit a 9:16 frame with no safe zone throughout. The
+  honest answer was not a shorter string but a smaller list: **`stack-center` holds three list items
+  plus a heading in a vertical frame, not four.** That is a fact about this engine's role sizes worth
+  knowing before the designer starts writing lists in 16d, and it is the kind of thing a reviewer
+  would have nodded past. Grep `THREE_ITEMS_IS_WHAT_FITS`.
+- The short-window animation scaling was off by nothing visible and wrong in principle: an element
+  on screen for 0.4s reaches full presence at exactly ONE instant, where the scaled entrance ends
+  and the scaled exit begins. The test now samples finely enough to find it. Unscaled, the two would
+  cross at roughly 0.55 and the element would read as a flicker.
+
+**Anchor resolution exists but nothing calls it yet, and that is a deliberate seam.**
+`resolveSceneAnchors` converts a scene's word anchors to beat-relative seconds, and it is the
+generator's job to call it — which is 16d. Until then a stored scene could in principle still carry
+an anchor at render time, and `elementWindowSeconds` handles that by showing the element for the
+WHOLE BEAT with one warning per process. Drawing it beats drawing nothing: the content is right and
+only its timing is wrong, where the alternative is a hole in a frame the customer paid for. The
+fallback is tested, and the gallery's fixtures are all timed in seconds — asserted, not assumed.
+Grep `RESOLVE_BEFORE_STORING` and `AN_UNRESOLVED_ANCHOR_SHOWS_THE_WHOLE_BEAT`.
+
+**`MotionPreview` is global, not route-local.** In `components/global/motion-preview/` because Phase
+15's editor inspects scene items and will want exactly this card — the same promotion
+`caption-preview` and `render-panel` already went through. It takes a scene, a canvas and a palette
+id and knows nothing about the gallery.
+
+**What is NOT verified, and the one check only a human can make.** The phase's first Done-when line
+is "every primitive and layout renders in the gallery, in every palette, reviewed by a human" — the
+gallery exists, covers every primitive, every layout and all eight named animations (each asserted
+by a test, so an eleventh primitive cannot skip review), and runs `checkScene` live for the chosen
+aspect, palette and safe zone with the errors printed on the card. **Nobody has looked at it yet.**
+That review is the remaining half of 16b and it cannot be delegated to a test.
+
+Also still untouched: nothing has been rendered to MP4 — the Remotion path is wired and
+`next build` succeeds, but a motion document has never been composited, which needs Phase 02's R2
+and Phase 04's AWS deploy like everything else. "Across 20 test videos", the 60-second timing
+budget, the metering lines and the vision pass all belong to 16c/16d. `GAP_VH`, the 62/38 hero
+split, the role size table and the new animation durations remain **unreviewed design numbers**,
+which is exactly what the gallery is for.
