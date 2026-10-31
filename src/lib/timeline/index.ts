@@ -60,6 +60,10 @@ export {
   speakerSchema,
   canvasSpecSchema,
   styleSpecSchema,
+  /* Exported in Phase 16: the motion scene component parses a stored item
+   * with it (PARSE_AT_THE_COMPONENT), and reaching into ./schema directly
+   * would bypass the barrel every other consumer uses. */
+  sceneSpecSchema,
 } from "./schema";
 
 export { validate } from "./validate";

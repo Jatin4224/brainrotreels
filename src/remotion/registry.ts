@@ -40,6 +40,7 @@ import type { RenderItemProps } from "@/lib/types";
 import { AvatarOverlay } from "./components/avatar-overlay";
 import { Backdrop } from "./components/backdrop";
 import { MediaClip } from "./components/media-clip";
+import { MotionScene } from "./components/motion-scene";
 import { QuizCard } from "./components/quiz-card";
 import { RedditCard } from "./components/reddit-card";
 import { TextOverlay } from "./components/text-overlay";
@@ -63,8 +64,15 @@ import { TextOverlay } from "./components/text-overlay";
  *              quiz — ONE family switching on `scene.layout`, see
  *              ONE_FAMILY_FOUR_LAYOUTS for why that is not four entries)
  *
- * Deliberately absent, with the phase that adds it:
- *   motion           → Phase 16 (motion graphics studio)
+ * Added in Phase 16:
+ *   motion → MotionScene (an AI-designed motion graphics beat — ONE family
+ *            dispatching to ten primitives on `element.kind`, see
+ *            ONE_FAMILY_TEN_PRIMITIVES; the geometry comes from src/lib/scene,
+ *            which the editor and the deterministic checks share)
+ *
+ * Every RenderKind now has a component, so the `Partial` below is currently
+ * total. It stays `Partial` deliberately — see the paragraph above: the next
+ * format added must be a documented gap rather than a compile error.
  *
  * Captions are NOT a render kind and never will be: a caption item carries a
  * word range rather than a `render` field (WORD_RANGE_NOT_TEXT in the timeline
@@ -81,6 +89,7 @@ export const RENDER_COMPONENTS: Partial<
   redditCard: RedditCard,
   characterOverlay: AvatarOverlay,
   quizCard: QuizCard,
+  motion: MotionScene,
 };
 
 /* One warning per unknown kind per process, not per frame. A 60-second render

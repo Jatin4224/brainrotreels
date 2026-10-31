@@ -28,6 +28,7 @@ import { describe, expect, it } from "vitest";
 
 import { contrastRatio, CONTRAST_TEXT_MIN } from "@/lib/captions";
 import { FIXTURES_BY_KIND } from "@/lib/timeline/fixtures";
+import { SCENE_TONE_COLOURS, toneColor } from "./tones";
 import {
   BACKDROP_ELEMENT_KIND,
   DEFAULT_PALETTE_ID,
@@ -101,5 +102,48 @@ describe("the palette library", () => {
    * BACKDROP_ELEMENT_KIND. */
   it("pins the backdrop element kind", () => {
     expect(BACKDROP_ELEMENT_KIND).toBe("gradient");
+  });
+});
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: TONE_CONTRAST_IS_TESTED, SCENE_TONE_COLOURS, toneColor
+ *
+ * WHAT:  That every motion scene tone is legible on every palette.
+ * WHY:   The tones are literal colours, so they owe the same debt every other
+ *        literal in this codebase owes (RENDER_COLOURS_ARE_LITERAL): a contrast
+ *        test rather than a reviewer's eye. They are the 400-weight tints
+ *        BECAUSE every palette in the library is dark, which is an assumption
+ *        about the library and not a general truth — so adding a light palette
+ *        must fail here rather than ship a callout nobody can read.
+ * WHERE: `npm test`.
+ */
+describe("motion scene tones", () => {
+  const TONES = ["neutral", "positive", "warning", "negative"] as const;
+
+  it("is legible on every palette's gradient", () => {
+    for (const palette of listPalettes()) {
+      for (const tone of TONES) {
+        const colour = toneColor(tone, palette);
+        const worst = Math.min(
+          contrastRatio(colour, palette.from),
+          contrastRatio(colour, palette.to),
+        );
+        expect(
+          worst,
+          `${palette.id}: ${tone} (${colour}) on its gradient`,
+        ).toBeGreaterThanOrEqual(CONTRAST_TEXT_MIN);
+      }
+    }
+  });
+
+  it("gives a neutral tone the palette's own voice rather than a sixth near-white", () => {
+    for (const palette of listPalettes()) {
+      expect(toneColor("neutral", palette)).toBe(palette.text);
+    }
+  });
+
+  it("gives the three judgement tones distinct colours", () => {
+    const values = Object.values(SCENE_TONE_COLOURS);
+    expect(new Set(values).size).toBe(values.length);
   });
 });
