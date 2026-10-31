@@ -8,23 +8,26 @@
   or distribution is prohibited.
 -->
 
-# Phase 16 — the motion graphics studio (16a and 16b)
+# Phase 16 — the motion graphics studio
 
 The phase file asks for this in four reviewable commits — 16a the scene language
 and layout engine, 16b the primitives, 16c the style tokens, 16d the AI
-designer. **This document covers 16a and 16b.** 16c and 16d are not started, so
-nothing here is metered, no `motionStudio` registry entry exists, and no model
-has ever designed a beat.
+designer.
 
-Read it anyway before touching 16c or 16d, because the two commits already
-landed decide what those can be.
+**16a, 16b and 16c are complete. 16d is partly built.** The storyboard, the
+per-beat designer, the pure generator, the metering and the pipeline stages are
+in; the **beat strip, the `redesignBeat` procedure and the vision pass are
+not**, and `assignIntents` has no caller, so every beat is currently designed
+as `emphasis`. Each section below says which commit it belongs to, and
+**"What has never run"** at the end is the honest inventory — read it before
+trusting a green test suite.
 
 The one decision to read if you read nothing else: **the model is not allowed to
 emit a coordinate.** Not discouraged from it — unable to. There is no field
 anywhere in the scene language that accepts an `x`, a `y`, a width or a font
 size. A model picks a named layout and fills slots; `src/lib/scene/layouts.ts`
-does every bit of the geometry, in code, under test. Everything else in these
-two commits is scaffolding around keeping that true, and around being able to
+does every bit of the geometry, in code, under test. Everything else across
+the four commits is scaffolding around keeping that true, and around being able to
 prove that what got drawn is what got measured.
 
 ## The one-sentence version
@@ -33,9 +36,12 @@ A scene is a named layout plus up to six typed elements with no positions;
 `layoutScene()` turns that into real pixel rectangles with every string wrapped
 and fitted against the **actual glyph advances of the bundled font**;
 `checkScene()` proves nothing overflows, overlaps or leaves the platform's safe
-zone; and ten primitive components draw exactly the rectangles and font sizes
-that were measured, with time as a prop so the same components run in Remotion
-and in a review gallery.
+zone; ten primitive components draw exactly the rectangles and font sizes that
+were measured, with time as a prop so the same components run in Remotion and in
+a review gallery; a motion STYLE is seven tokens that are each read by something
+that draws; and the pipeline splits the narration into beats deterministically,
+asks a model for one scene per beat, checks each with code, repairs once, and
+falls back to a plain beat rather than ever failing.
 
 ## Where the code lives
 
@@ -61,10 +67,36 @@ and in a review gallery.
 | `src/components/global/motion-preview/` | the scaled live preview card | **no** |
 | `.../projects/[id]/motion/_components/motion-gallery.tsx` | the review surface | **no** |
 
-**No migration, no service, no router, no registry entry.** That is not an
-oversight: 16a and 16b add no stored data and gate nothing. `motionStudio` and
-`motionVideos` arrive with 16d, which is the first commit that can spend a
-credit.
+And what 16c and 16d added:
+
+| Path | Contains | Touches the database? |
+| --- | --- | --- |
+| `src/lib/types/motion-style.ts` | the seven style tokens, the scale tables, the proposal shape, the rejection codes | **no** |
+| `src/lib/motion-styles/` | the base, the eight library styles, the validator, the barrel | **no** |
+| `src/lib/palettes/tones.ts` | what `tone: 'negative'` draws in, per palette | **no** |
+| `src/lib/script/motion-style.ts` | "design one for me" — the model call and its one repair | **no** (server-only) |
+| `src/lib/script/motion-beat.ts` | one beat designed, checked, repaired once, else fallback | **no** (server-only) |
+| `src/lib/script/motion-{style,beat}-prompt.ts` | the prompts, with catalogues generated from the constants | **no** |
+| `src/lib/scene/storyboard.ts` | the deterministic split, the coverage check, the short-tail merge | **no** |
+| `src/lib/scene/fallback.ts` | the plain beat a failed design gets — measured, not guessed | **no** |
+| `src/lib/generators/motion.ts` | the pure document builder, registered in `GENERATORS` | **no** |
+| `src/services/motion.service.ts` | stores the storyboard whole; meters the video | **yes** — the only layer that does |
+| `src/trpc/routers/motion.ts` | `motionStudio.styles`, `motionStudio.designStyle` | no |
+| `src/inngest/functions/project-generate.ts` | the `storyboard` and `design` stages | via the service |
+| `.../projects/[id]/motion/_components/design-style-panel.tsx` | the three questions and the live preview | via tRPC |
+
+**No migration, in any of the four.** 16a and 16b add no stored data at all;
+16c adds one OPTIONAL field to the timeline document (`style.motionStyleId`)
+which falls back when absent; and 16d stores its storyboard in
+`Project.settings`, exactly as the phase file specifies. Every document written
+before this phase is still valid, so there is nothing for a migration step to
+change.
+
+The registry gained **two** entries, and the split between them matters:
+`motionStudio` is a FLAG that gates the whole router including its reads, and
+`motionVideos` is a LIMIT counted when a design succeeds. Collapsing them would
+mean either rationing a style picker that costs nothing, or leaving the
+expensive step uncounted.
 
 ## The rule the whole phase rests on
 
@@ -324,7 +356,7 @@ Two details that are wrong in the obvious implementation:
   its entrance finished and would never reach full opacity — which reads as a
   flicker rather than as a bug. Grep `SHORT_ELEMENTS_SCALE_THEIR_MOTION`.
 
-## It touched shared code four times
+## It touched shared code four times (16a and 16b)
 
 - **`RenderItemProps` gained `style`.** A scene family that needs the palette
   had no way to reach it: the walker hands a component its ITEM, and
@@ -353,7 +385,7 @@ Two details that are wrong in the obvious implementation:
   component parses a stored item with it and reaching into `./schema` directly
   would bypass the barrel every other consumer uses.
 
-## Decided differently from the phase file
+## Decided differently from the phase file (16a and 16b)
 
 - **Zod schemas live in `src/lib/types/scene.ts`, not `src/lib/scene/schema.ts`.**
   The phase file names the second path; CLAUDE.md rule 4 says types live in
@@ -406,7 +438,7 @@ Two details that are wrong in the obvious implementation:
   point is `.`, for every customer, until the app has a locale story. Grep
   `GROUPING_IS_HAND_ROLLED` and `NO_LOCALE_STORY_YET`.
 
-## The gallery found two defects in its own fixtures
+## The gallery found two defects in its own fixtures, before anyone looked at it
 
 Which is the argument for building it before connecting any AI.
 
@@ -430,63 +462,295 @@ Tones are data for the same reason caption styles are: a scene says
 near-white, since a neutral callout IS the palette's voice. Grep
 `TONE_IS_MEANING_NOT_COLOUR`.
 
-## What 16c and 16d inherit
+## 16c — a token is a choice, not a number
 
-- **A style needs two fonts and only one family is bundled.** `public/fonts`
-  holds Geist at 400 and 700 — one family, two weights — so 16c's "code
-  validates that both fonts are actually bundled" has a single candidate to
-  validate against, and "palette, two fonts" cannot be honoured until somebody
-  chooses and licenses a second family. The validation is buildable; a library
-  of 6–10 styles cannot be typographically distinct without it. Same shape as
-  Phase 11's empty catalogue: the mechanism is code, the content is an owner
-  decision.
-- **`resolveSceneAnchors` exists and nothing calls it.** It converts a scene's
-  anchors to beat-relative seconds and it is the generator's job to call it,
-  which is 16d. Until then a stored scene could still carry an anchor at render
-  time, and `elementWindowSeconds` handles that by showing the element for the
-  **whole beat** with one warning per process — the content is right and only
-  its timing is wrong, where the alternative is a hole in a paid frame. Grep
-  `RESOLVE_BEFORE_STORING` and `AN_UNRESOLVED_ANCHOR_SHOWS_THE_WHOLE_BEAT`.
-- **The designer prompt should be generated from `SCENE_PRIMITIVES` and
-  `LAYOUT_SLOTS`**, not written by hand, so the catalogue the model is shown
-  cannot drift from the one the checks enforce.
-- **`GAP_VH`, the 62/38 hero split, the role size table and the animation
-  durations are unreviewed design numbers.** They are data in one table
-  precisely so the gallery can change them without touching code.
+The phase file lists seven tokens: palette, two fonts, radius, stroke weight,
+motion personality, caption treatment, music mood. The easy version of 16c is
+seven fields nothing reads, so the rule that shaped it is
+**TOKENS_MUST_CHANGE_THE_PICTURE** — every one has a consumer that draws:
+`paletteId` on every primitive, `fonts` through each text role's new
+`fontSlot`, `radius` on graph nodes and the meter and bar tracks,
+`strokeWeight` on edges and borders and the callout rule, `motionPersonality` on
+the animation shell's durations **and** its easing curve, `captionTreatment` as
+an id from Phase 08's library, `musicMood` as the durable half of a choice
+Phase 11 cannot yet honour.
+
+`radius` is `square | soft | round`, not a pixel value; `strokeWeight` is
+`hairline | regular | bold`, not a float. A raw number is unbounded, so a model
+proposing `radius: 400` type-checks and draws a flow-graph node as a circle with
+its label outside it — a closed union cannot be out of range. The pixel value
+also depends on the canvas and on what it is applied to, so it belongs in the
+scale tables with the arithmetic stated once in
+`src/remotion/components/motion-scene/util.ts`. Grep
+`A_TOKEN_IS_A_CHOICE_NOT_A_NUMBER`.
+
+### The style belongs in the document
+
+It would have been natural to keep the chosen style in `Project.settings` with
+the storyboard. That would have been a **cache bug**: Phase 04 decides a paid
+render can be reused by hashing the document, so a style stored outside it means
+switching from `Boardroom` to `Launch` produces an identical hash, the cache
+serves the old video, and the customer's restyle silently does nothing. Anything
+that changes the picture has to be inside the thing that gets hashed, so
+`style.motionStyleId` is a document field. It is optional and unknown ids fall
+back, so nothing stored before 16c changed. Grep
+`STYLE_BELONGS_IN_THE_DOCUMENT`.
+
+Applying a style also **copies its palette into `style.paletteId`**, which every
+format and the backdrop already read. Two sources of colour would be one too
+many: `paletteId` stays the single answer to "what colour is this video" and
+`motionStyleId` answers the narrower "which motion style", which is what the
+renderer needs for radius, stroke, fonts and personality. Grep
+`APPLYING_A_STYLE_WRITES_THE_PALETTE`.
+
+### "Code validates" is five checks, and one of them is the silent one
+
+The model proposes, `motionStyleProposalSchema` proves the SHAPE, and
+`checkMotionStyle` proves what a schema cannot: the palette exists, the caption
+treatment is real, `minPlan` is a real plan, the palette's text is legible on
+its own gradient, and **both fonts resolve to a bundled family**.
+
+That last one is the only check whose absence produces no signal at all. The
+phase file's own words: a model-proposed font that is not bundled "renders as a
+fallback and silently ruins the video". No error, no failed render, no
+complaint — a finished video in the wrong typeface that somebody paid for. Grep
+`FONT_NOT_BUNDLED_IS_THE_SILENT_ONE`.
+
+The measurement is `contrastRatio` against `CONTRAST_TEXT_MIN`, the same
+function and threshold the caption library measures its thirty-eight styles
+with. A second luminance calculation here would be a second answer to a question
+this codebase answered once. Grep `ONE_CONTRAST_RULE`.
+
+### One contrast check is new to this phase, and it found a real pairing
+
+A caption style is measured against `REFERENCE_BACKGROUNDS` in its own library —
+never against the palette a motion style happens to pair it with, because that
+pairing did not exist before 16c. `bold-ink` is the one style of thirty-eight
+with a dark fill (`#101010`), and on `noir` it measures **1.04:1**. "An inky look
+on a black background" is a plausible thing to ask a model for, and this is the
+refusal that stops it shipping.
+
+A second test records that `bold-ink` is pairable with **no** palette today,
+because all five are dark. That is a fact about the palette set rather than a
+bug in the style, and the test is what will notice when a light palette makes
+the pairing legal.
+
+### The catalogue in the prompt is generated
+
+Every list the model is shown — palettes, caption treatments, radii, strokes,
+personalities, moods — is built at call time from the constants the validator
+reads. A hand-written list is how a model ends up offered a palette that was
+renamed last month, proposes it, and is refused by a validator reading the real
+list: a failure the customer sees, that nobody can explain, with the prompt and
+the validator both looking correct in isolation. Grep
+`THE_CATALOGUE_IS_GENERATED`.
+
+### Three decisions beyond the phase file
+
+- **The id is minted by code.** A model-chosen id could collide with a library
+  style and silently replace it on a screen listing both. Every designed id
+  carries a `designed-` prefix, and a name of only punctuation falls back to a
+  fixed suffix rather than producing a bare prefix — which would itself collide
+  with the next such style. Grep `ID_IS_MINTED_BY_CODE`.
+- **`minPlan` is set by us.** What a style costs is a commercial decision; a
+  model choosing `free` would be inventing pricing.
+- **`MotionPreview` takes a resolved style, not an id.** This was a bug written
+  and then caught: a designed style is not in the library, so `getMotionStyle`
+  would fall back to the default for it, and the preview would show the
+  DEFAULT's radius, stroke and personality under the designed style's name.
+  Every token would have been wrong and nothing would have said so. Grep
+  `A_RESOLVED_STYLE_NOT_AN_ID`.
+
+## 16d — the split is code, the intent is the model's
+
+Deciding WHERE a beat ends is arithmetic over word timings: it has an obviously
+correct answer and a test can verify it exactly, so asking a model would cost a
+request per video to get something worse. What a beat is ABOUT is judgement, so
+`assignIntents` is the seam a model plugs into — and every beat defaults to
+`emphasis`, the one intent that always has a designable scene, so the whole
+storyboard works with no model attached. Grep `THE_SPLIT_IS_DETERMINISTIC` and
+`INTENT_HAS_A_FREE_DEFAULT`.
+
+Within the allowed 1.5–6 seconds the split prefers a word that ends a sentence,
+then one that ends a clause, then the longest beat that fits. A beat that cuts
+mid-sentence makes the graphic change while the speaker is still finishing a
+thought, which reads as a mistake even when every number on screen is right.
+
+**Coverage is checked before anything is designed**, which is the phase's own
+ordering. Designing is a model request per beat, so a storyboard that drops
+three words in the middle has to be caught while it costs nothing — and a gap is
+not cosmetic, it is narration playing over whatever the previous beat left on
+screen. Grep `COVERAGE_IS_CHECKED_BEFORE_DESIGNING`.
+
+### One `step.run` per beat is the fan-out
+
+Each beat is durable on its own, retried on its own, and memoised across a
+replay, so a run that dies on beat thirty does not pay for the first
+twenty-nine twice. **Sequential, not parallel**, and that is the throttle the
+phase asks for: a `Promise.all` over forty steps would issue forty concurrent
+requests and be rate-limited on a long video — the one failure mode that gets
+worse the more a customer paid. Grep `ONE_STEP_PER_BEAT`.
+
+### The designer cannot throw for a design failure, and must throw for a transport one
+
+Two bounded attempts, then a fallback: `THE_PIPELINE_ALWAYS_FINISHES`, which the
+phase argues as a business rule before a technical one — "a user seeing one plain
+beat is a minor disappointment; a stuck job is a support ticket and a refund".
+
+But a rate limit or a 5xx is **rethrown**, because swallowing it into a fallback
+would quietly turn a retryable blip into a video full of plain beats. That
+distinction is `LlmError.permanent` and it is the one line in the loop worth
+reading twice.
+
+Note the two retries sit at different levels and both are needed: the adapter
+retries output that fails the SCHEMA, and this retries output that passes the
+schema and fails the GEOMETRY. Neither can do the other's job.
+
+### The generator is pure, so the design happens before it
+
+A generator may not call a model (`GENERATORS_STAY_PURE`), so the scenes are
+designed in the pipeline's `design` stage and stored in `Project.settings`; the
+generator reads them. The same split Phase 13's quiz writer makes, and it is
+also what will make "redesign one beat" cheap — the stored scenes are the
+artifact, and rebuilding the document from them costs nothing. Grep
+`MOTION_SCENES_ARE_ALREADY_DESIGNED`.
+
+### Anchors are resolved before storing, not at render time
+
+The model may anchor an element to a WORD, which is how the phase's "every
+number or diagram appears on the word that introduces it" is expressed. A
+renderer cannot resolve one — it is handed an item, a canvas and a style, never
+the transcript — so `resolveSceneAnchors` runs in the design step, once,
+against the alignment that produced the beat.
+
+This was very nearly a silent gap: `elementWindowSeconds` handles an
+unresolved anchor by showing the element for the whole beat with a warning, so
+a scene stored still-anchored would have rendered with the right content and
+the wrong timing — the safety net doing load-bearing work and no test failing.
+Grep `RESOLVE_BEFORE_STORING` and `AN_UNRESOLVED_ANCHOR_SHOWS_THE_WHOLE_BEAT`.
+
+A beat with **no** stored scene gets a measured fallback rather than a gap. The
+generator is the last place that could turn an interrupted design into a video
+with holes in it, and it does not. Grep `A_MISSING_SCENE_IS_A_FALLBACK`.
+
+### Metering
+
+`motionVideos` is incremented after the beats are stored, **in the same
+transaction**. Counting on request would charge a customer for our outage;
+counting outside the transaction would let a crash between the two leave a video
+designed and unmetered. Grep `COUNTED_WHEN_THE_DESIGN_SUCCEEDS`.
+
+### Two bugs the tests caught
+
+Both were mine, and both are the kind that would have shipped quietly:
+
+- **The sentence-break preference never fired.** "Longest beat that fits" and
+  "best sentence break" shared one variable, so each iteration clobbered the
+  sentence choice. Every beat was silently breaking at the six-second ceiling
+  instead of at punctuation — a video whose graphics change mid-sentence, with
+  nothing in the output to say why.
+- **The fallback overflowed.** Its validity rested on a word count somebody
+  guessed, and twelve short words do not fit the kinetic role inside TikTok's
+  insets at 9:16. A guessed constant cannot carry `FALLBACK_IS_ALWAYS_VALID`,
+  because the thing it must be true for is every transcript at every aspect in
+  every safe zone. The fallback now **measures itself** and drops words until
+  `checkScene` passes, with a bullet as the terminal case. Grep
+  `FALLBACK_IS_MEASURED_NOT_GUESSED`.
+
+### One existing test had to change
+
+`generators.test.ts` asserted `hasGenerator("motion") === false` — the
+registry's last documented gap. Every declared kind now has a generator, so the
+assertion was rewritten against `PROJECT_KINDS` rather than a hand-listed four:
+declaring a fifth format now fails there until it is built or deliberately left
+out. `UNBUILT_KIND_IS_NAMED` is exercised directly rather than deleted, since
+there is no unbuilt kind left to demonstrate it on.
+
+## And two more when somebody did
+
+The review surface earned itself twice before a human had finished looking at
+it.
+
+- **Every preview in the app was drawing in the browser's default serif.**
+  `RENDER_FONT_FAMILY` is a local name declared by a `FontFace`, and the only
+  thing that declared it was `src/remotion/fonts.ts`, which runs inside a
+  Remotion bundle. So every app-side preview asked for a family nothing had
+  registered — the caption gallery **since Phase 08**, and the motion gallery
+  since 16b. For captions that was cosmetic; for motion it voided the premise,
+  because the overflow checks measure Geist's advances and the preview was
+  drawing something else. `DRAWN_IS_MEASURED` and `PREVIEW_IS_THE_RENDER` are
+  both false the moment the face is wrong. Fixed with one shared face list
+  (`RENDER_FONT_FACES`) and a second loader for the browser. Grep
+  `ONE_FACE_LIST_TWO_LOADERS` and `THE_PREVIEW_MUST_LOAD_THE_FACE`.
+
+  Worth noting: Phase 08's deliberate decision to give `RENDER_FONT_FAMILY` **no
+  fallback stack** is exactly what made this visible rather than "close enough".
+  That trade paid off.
+- **A title's subhead sat a third of a frame below its headline.** Each run
+  centres in its own band, and `stack-center` gives a lone element the entire
+  safe rectangle, so a 66/34 split put them that far apart — two pieces of text
+  that distant read as two elements, not as a title with a line under it. Now
+  placed inside a centred block at 72% of the slot. It is a tunable fraction,
+  not fitted to the measured text, because fitting it would need measuring
+  before placing and placing before measuring. Grep `A_TITLE_IS_ONE_BLOCK`.
 
 ## What is NOT in this phase
 
 Generated animation code, 3D and presenter characters, all of which the phase
-file excludes. Style tokens are 16c. The storyboard, the per-beat model call,
-the vision pass, the bounded repair loop and the beat strip are 16d, as are both
-registry entries and all metering.
+file excludes.
+
+Still missing from 16d itself:
+
+- **The beat strip** — the phase's step 14, "each beat as a still, with redesign
+  this beat re-running exactly one beat". Neither the UI nor the `redesignBeat`
+  procedure exists. `saveMotionDesign` already takes `countVideo: false` for
+  exactly that caller, and `readMotionDesign` returns the raw blob so one beat
+  can be replaced without re-parsing its siblings — but nothing calls either.
+- **The vision pass** — step 12's second half. The deterministic checks run; no
+  still is rendered and no vision model is asked.
+- **`assignIntents` has no caller.** Every beat is designed as `emphasis`, so
+  the intent-to-primitive guidance in the prompt is live but never varies. The
+  storyboard-level model call that would set intents is the smallest remaining
+  piece.
 
 ## What has never run
 
 Be precise about this, because the tests are green and the green is narrower
-than it looks.
+than it looks. Four things:
 
 **Nothing has been composited to MP4.** `motion → MotionScene` is registered and
 `next build` succeeds, but no motion document has ever been rendered — that
 needs Phase 02's R2 and Phase 04's AWS deploy like every other format. So the
 phase's "a hand-written three-scene document renders to MP4 with no model
-involved" is **not met**; its parsing and checking half is, and its rendering
-half has never been attempted.
+involved" is **half met**: a hand-written settings blob does build a valid,
+checked document, and the rendering half has never been attempted.
 
-**Nobody has looked at the gallery.** The phase's first Done-when line is "every
-primitive and layout renders in the gallery, in every palette, reviewed by a
-human". The gallery exists, covers every primitive, every layout and all eight
-named animations — each asserted by a test, so an eleventh primitive cannot skip
-review — and runs `checkScene` live for the chosen aspect, palette and safe zone
-with the errors printed on each card. The review itself has not happened and
-cannot be delegated to a test.
+**The whole motion pipeline.** Neon has been unreachable since Phase 05, so no
+storyboard has been stored, no beat designed, and `motionVideos` has never been
+incremented. The `storyboard` and `design` stages type-check and are wired into
+the workflow; they have never executed.
 
-What **is** genuinely verified is the pure half, by 200 tests: the measurement
-against real advances, auto-fit and its floor, the overflow and overlap checks in
-the phase's own wording, the document round trip, graph layout determinism and
-non-overlap, the safe-zone matrix across every layout at both aspects in all four
-platform zones, and the constraint that no animation can move the measured ink.
+**`designMotionStyle` and `designBeat` against Claude.** The adapter seam is
+proven — Phase 06 generates real scripts through it — so the risk is not the
+transport, it is the prompts. Nobody has seen what the model actually returns
+for either.
 
-"Across 20 test videos, no rendered beat has overlapping or cut-off content", the
-60-second-in-under-10-minutes budget, the repair loop, and every metering line
-belong to 16d and are untouched.
+**Nobody has finished looking at the gallery.** The first Done-when line is
+"every primitive and layout renders in the gallery, in every palette, reviewed
+by a human". The gallery exists, covers every primitive, layout and animation
+(each asserted by a test, so an eleventh primitive cannot skip review), runs
+`checkScene` live for the chosen aspect, palette and safe zone, and now has a
+style switcher and a designed-style preview. One pass over it produced the two
+findings above. The review itself is not finished and cannot be delegated to a
+test.
+
+What **is** genuinely verified, by 291 tests: the measurement against real
+`hmtx` advances, auto-fit and its floor, the overflow and overlap checks in the
+phase's own wording, the document round trip, graph layout determinism and
+non-overlap, the safe-zone matrix across every layout at both aspects in all
+four platform zones, the constraint that no animation can move the measured ink,
+the whole style library passing its own validator, the prompts' generated
+catalogues and injection fencing, the storyboard's coverage over generated
+transcripts, the fallback's validity against hostile narration, and the
+generator building a valid document from hand-written settings with no model
+involved.

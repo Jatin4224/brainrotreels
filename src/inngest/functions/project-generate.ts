@@ -135,6 +135,7 @@ import {
   beatSeconds,
   checkStoryboard,
   mergeShortTail,
+  resolveSceneAnchors,
 } from "@/lib/scene";
 import { getMotionStyle } from "@/lib/motion-styles";
 import { designBeat } from "@/lib/script";
@@ -823,6 +824,9 @@ export const projectGenerateFunction = inngestClient.createFunction(
               startWord: beat.startWord,
               endWord: beat.endWord,
               intent: beat.intent,
+              /* The beat's absolute start, which is what turns a word anchor
+               * into a BEAT-RELATIVE second — see RESOLVE_BEFORE_STORING. */
+              startSeconds: span.start,
               durationSeconds: span.end - span.start,
             };
           }),
@@ -897,7 +901,29 @@ export const projectGenerateFunction = inngestClient.createFunction(
             durationSeconds: beat.durationSeconds,
           });
 
-          return { scene: outcome.scene, source: outcome.source };
+          /**
+           * SOURCE OF TRUTH KEYWORDS: RESOLVE_BEFORE_STORING
+           *
+           * The model may anchor an element to a WORD, which is how the
+           * phase's "every number or diagram appears on the word that
+           * introduces it" is expressed. A renderer cannot resolve one — it is
+           * handed an item, a canvas and a style, never the transcript — so
+           * the conversion happens HERE, once, against the alignment that
+           * produced the beat.
+           *
+           * Without this the scene reaches the renderer still anchored, and
+           * `elementWindowSeconds` shows the element for the whole beat with a
+           * warning: the content right and the timing wrong, which is the
+           * fallback being load-bearing instead of being a safety net.
+           */
+          const resolved = resolveSceneAnchors({
+            scene: outcome.scene,
+            words: assembled.ctx.words,
+            beatStart: beat.startSeconds,
+            beatDuration: beat.durationSeconds,
+          });
+
+          return { scene: resolved, source: outcome.source };
         });
 
         designedBeats.push({

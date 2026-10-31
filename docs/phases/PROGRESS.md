@@ -2844,6 +2844,12 @@ unbuilt kind left to demonstrate it on.
   blob so one beat can be replaced without re-parsing its siblings — but nothing calls either yet.
 - **The vision pass** — step 12's second half. The deterministic checks run; no still is rendered
   and no vision model is asked.
+- **Anchor resolution is wired, and nearly was not.** `resolveSceneAnchors` had
+  no caller outside its tests: the design step stored whatever `in`/`out` the
+  model returned, and a word anchor reaching the renderer makes
+  `elementWindowSeconds` show the element for the WHOLE BEAT with a warning —
+  right content, wrong timing, no failing test. It now runs in the design step,
+  against the alignment that produced the beat. Grep `RESOLVE_BEFORE_STORING`.
 - **`assignIntents` has no caller.** Every beat is designed as `emphasis` today, which means the
   intent-to-primitive guidance in the prompt is live but never varies. The storyboard-level model
   call that would set intents is the smallest remaining piece of 16d.
