@@ -55,6 +55,12 @@ export {
 export type { StoryboardResult } from "./storyboard";
 export { layoutScene, safeRectFor, layoutSlotRule } from "./layouts";
 export {
+  STILL_ITEM_ID,
+  STILL_TRACK_ID,
+  buildStillDocument,
+  stillFrameFor,
+} from "./still";
+export {
   fitTextRun,
   lineHeightPx,
   measureBlock,

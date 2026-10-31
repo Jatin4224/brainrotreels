@@ -55,7 +55,12 @@ import {
 } from "@/lib/timeline";
 import { CANVAS_BY_ASPECT } from "@/lib/types/project";
 import { jsonObjectSchema } from "@/lib/types/json";
-import { sceneSchema, type Beat, type Scene } from "@/lib/types/scene";
+import {
+  sceneSchema,
+  toBeatIntent,
+  type Beat,
+  type Scene,
+} from "@/lib/types/scene";
 import { z } from "zod";
 
 import {
@@ -87,15 +92,32 @@ export const SCENE_TRACK_ID = "scenes";
  *        component — the same gate `fromSceneSpec` is on the render side.
  * WHERE: Written by the design step; read by `readMotionSettings` below.
  */
-const designedBeatSchema = z
-  .object({
-    index: z.number().int().min(0),
-    startWord: z.number().int().min(0),
-    endWord: z.number().int().min(0),
-    intent: z.string().min(1),
-    scene: sceneSchema.optional(),
-  })
-  .strict();
+/**
+ * SOURCE OF TRUTH KEYWORDS: designedBeatSchema, A_STORED_SHAPE_IS_NOT_STRICT,
+ *   STRICT_IS_FOR_MODEL_OUTPUT
+ *
+ * NOT `.strict()`, and the distinction is the whole reason this note exists.
+ * `sceneSchema` IS strict, because it parses MODEL OUTPUT, where an unexpected
+ * field means the model invented one and the right answer is to refuse. This
+ * schema parses OUR OWN jsonb, where an unexpected field means a different
+ * release of this code wrote it — and refusing then is catastrophic rather
+ * than safe: `motionSettingsSchema` fails, `readMotionSettings` returns no
+ * beats, and the generator silently builds a motion video with NO SCENE TRACK.
+ * Narration and captions over a background, reported as a success.
+ *
+ * That is not hypothetical: it is the bug this schema shipped with. The design
+ * stage stores `source` on every beat (A_FALLBACK_IS_RECORDED) and a strict
+ * schema rejected all of them, so every designed video would have come out
+ * blank. Unknown keys are stripped instead, which is what a reader of stored
+ * data should do with a field it was not built to understand.
+ */
+const designedBeatSchema = z.object({
+  index: z.number().int().min(0),
+  startWord: z.number().int().min(0),
+  endWord: z.number().int().min(0),
+  intent: z.string().min(1),
+  scene: sceneSchema.optional(),
+});
 
 const motionSettingsSchema = z
   .object({
@@ -128,11 +150,11 @@ export function readMotionSettings(
     index: beat.index,
     startWord: beat.startWord,
     endWord: beat.endWord,
-    /* The intent is stored as a string and narrowed on read: a settings blob
-     * written by a newer release could carry an intent this build has never
-     * heard of, and that must not drop the beat — only its intent, which the
-     * generator does not use. */
-    intent: "emphasis" as const,
+    /* Narrowed on read, never cast: a settings blob written by a NEWER
+     * release can carry an intent this build has never heard of, and that must
+     * not drop the beat — only its label. See
+     * A_STORED_INTENT_IS_NARROWED_NOT_CAST. */
+    intent: toBeatIntent(beat.intent),
     ...(beat.scene !== undefined ? { scene: beat.scene } : {}),
   }));
 

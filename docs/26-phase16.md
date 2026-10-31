@@ -14,13 +14,14 @@ The phase file asks for this in four reviewable commits — 16a the scene langua
 and layout engine, 16b the primitives, 16c the style tokens, 16d the AI
 designer.
 
-**16a, 16b and 16c are complete. 16d is partly built.** The storyboard, the
-per-beat designer, the pure generator, the metering and the pipeline stages are
-in; the **beat strip, the `redesignBeat` procedure and the vision pass are
-not**, and `assignIntents` has no caller, so every beat is currently designed
-as `emphasis`. Each section below says which commit it belongs to, and
-**"What has never run"** at the end is the honest inventory — read it before
-trusting a green test suite.
+**All four commits are complete.** The scene language and layout engine, the
+ten primitives, the style tokens, and the designer — storyboard, intent
+labelling, per-beat design, the pure generator, the beat strip, one-beat
+redesign, the vision pass and the metering. Each section below says which
+commit it belongs to, and **"What has never run"** at the end is the honest
+inventory: the code is complete and no part of the model half has ever been
+executed against a live provider, which are two different statements and both
+are true.
 
 The one decision to read if you read nothing else: **the model is not allowed to
 emit a coordinate.** Not discouraged from it — unable to. There is no field
@@ -84,6 +85,12 @@ And what 16c and 16d added:
 | `src/trpc/routers/motion.ts` | `motionStudio.styles`, `motionStudio.designStyle` | no |
 | `src/inngest/functions/project-generate.ts` | the `storyboard` and `design` stages | via the service |
 | `.../projects/[id]/motion/_components/design-style-panel.tsx` | the three questions and the live preview | via tRPC |
+| `src/lib/script/motion-intents{,-prompt}.ts` | one call that says what every beat is FOR | **no** (server-only) |
+| `src/lib/script/motion-review{,-prompt}.ts` | the stills, the vision request, the sample selector | **no** (server-only) |
+| `src/lib/scene/still.ts` | the one-beat document a QA still is rendered from | **no** |
+| `src/lib/adapters/render/types.ts` + `lambda/` | `renderStill` — one frame, synchronously | no |
+| `src/lib/adapters/llm/types.ts` + `anthropic/` | `images` on a generate call | no |
+| `.../projects/[id]/motion/_components/beat-strip.tsx` | every beat as a still, and the redesign button | via tRPC |
 
 **No migration, in any of the four.** 16a and 16b add no stored data at all;
 16c adds one OPTIONAL field to the timeline document (`style.motionStyleId`)
@@ -694,29 +701,307 @@ it.
   not fitted to the measured text, because fitting it would need measuring
   before placing and placing before measuring. Grep `A_TITLE_IS_ONE_BLOCK`.
 
+## 16d — the intent pass, and why nine primitives were unreachable
+
+`assignIntents` had no caller. The storyboard gave every beat the free
+default `emphasis`, the design step passed a hardcoded `"emphasis"` to
+`designBeat` regardless, and a designer told *"this beat is emphasis"*
+writes a text block. So the counters, meters, bar charts, comparisons, lists
+and flow graphs were built, measured, checked, drawable, covered by tests —
+**and would never have been chosen.** Every video would have come out as one
+kind of beat, with nothing failing anywhere.
+
+That is the shape of bug this phase is most exposed to, and it is worth
+naming: a seam built for a caller that never arrives. Nothing catches it. The
+types are satisfied, the function is tested, the primitives are tested, and
+the pipeline runs green.
+
+### One call for the whole video, not one per beat
+
+The labelling is a single request over the entire storyboard — one numbered
+line per beat — rather than a question attached to each per-beat design.
+Both the cheap shape and the accurate one, for the same reason: **the
+neighbours are the evidence.** The third of three numbers is a `stat` because
+of the other two; *"so here is all of it together"* is a `list` only because
+of what preceded it. A per-beat call decides blind and costs a request a beat.
+For a forty-beat video this adds one request to forty — about 2.5% on the
+most expensive step in the product.
+
+### The intent must be supported by the beat's own words
+
+The rule that earns the step. The per-beat designer sees **only its own
+slice** (`DESIGN_ONE_BEAT_ONLY`), so an intent chosen from a neighbour's
+content is a promise the designer cannot keep: a `stat` beat with no number
+in it produces a counter showing nothing, which is a worse picture than the
+plain beat the default would have given. The prompt says so outright, and
+says where the label belongs instead.
+
+The prompt also insists `emphasis` is a real answer and that a beat may be
+left out entirely. A labeller that believes it was hired to find something
+interesting finds something interesting in every beat, and the result is
+meters showing invented percentages.
+
+### It cannot fail the video
+
+`labelBeatIntents` returns an **empty map** on a refusal, on nonsense, or on
+output that failed the schema twice. Every beat keeps its default and the
+video is designed exactly as the previous release would have designed it.
+That is the whole argument for making intent a separate call from design: the
+degraded mode is the old behaviour rather than a broken video. A transport
+failure still throws, because a rate limit swallowed into an empty map would
+turn a retryable blip into a video of plain beats.
+
+## 16d — redesigning one beat, and what "byte-identical" costs
+
+The phase's done-when is *"redesigning one beat leaves the others
+byte-identical"*, and it is not a tidiness requirement. The document hash is
+what decides whether a cached render is still valid, so a write that
+re-serialises forty beats to change one **invalidates the whole video's
+render** — a one-beat retry billed as a full re-render.
+
+So `replaceMotionBeat` does not go through `saveMotionDesign`. That function
+rebuilds the beats array from typed values, which would rewrite every sibling
+and drop any field this build does not know about. Instead the stored array
+is read **raw**, one entry's `scene` and `source` keys are overwritten, and
+siblings, unknown keys and key order are written back untouched.
+
+### What the customer is allowed to name is the beat, and nothing else
+
+`redesignBeatSchema` takes a project and a `beatIndex`. The word range, the
+intent and the style all come from what is already stored. A field for
+`startWord` would let a caller point a beat at words it never covered — a
+storyboard with a gap in it, which is narration playing over a stale graphic.
+There is no field for a scene either: a client that could post one would
+bypass `checkScene` entirely.
+
+### Rate-limited, not metered
+
+A redesign spends up to two model requests and increments **nothing**:
+`motionVideos` counts videos, and a customer fixing one ugly beat has not
+made another one. The registry's `redesignBeat` limit (20/hour) is the whole
+of what stands between a frustrated customer and an unbounded bill — more
+beats than a human reviews in an hour, far fewer than a script would ask for.
+
+Aligning that key was a fix, not a decision: the factory resolves rate limits
+from the tRPC **path**, and the registry said `designBeats` while no procedure
+has ever been called that. A key that matches no procedure is a limit that
+silently never applies.
+
+### A stale range is refused, not guessed
+
+A beat whose word range no longer fits the alignment — a re-recorded line, a
+regenerated script — returns `PRECONDITION_FAILED` naming the fix, because
+the fix (regenerate) is the customer's to make. Designing it against whatever
+words are there now would store a scene about a sentence the video no longer
+says.
+
+## 16d — the beat strip
+
+Step 14. Every beat as a still, the selected one playing, with a redesign
+button. It is the first screen in this phase that shows a customer's own
+video rather than a fixture, and it answers the question the deterministic
+checks cannot: **is the right thing on screen.**
+
+### Frozen stills, one player
+
+The strip draws each beat frozen at its **midpoint** and animates only the
+selected one. Twelve live previews is twelve animation loops recomputing
+twelve layouts sixty times a second, which makes a review screen stutter on
+the machine of the person doing the reviewing.
+
+The midpoint is the honest frozen frame because **`ANIMATION_NEVER_MOVES_THE
+_INK`** — an entrance changes opacity and transform, never the measured
+rectangle — so a still at the middle of a beat shows exactly where every
+element lands. It is also the frame the vision pass photographs, which
+matters: the picture a reviewer judges and the picture the model judged are
+the same picture.
+
+### The strip reads a view, not the blob
+
+`motionStudio.design` computes each beat's **text** and **seconds**
+server-side, because neither is stored: the words live in the alignment and
+the beat holds indices into them. Sending the client the settings blob plus
+the whole transcript to do the same join would ship a transcript to label a
+dozen cards — and a re-alignment now moves the strip with the audio for free.
+
+The view carries the **resolved style**, not its id, for the reason
+`MotionPreview` already records (`A_RESOLVED_STYLE_NOT_AN_ID`): a lookup that
+falls back silently draws the default's tokens under another style's name.
+
+### An empty storyboard is not an error
+
+A motion project whose design stage has not run returns an empty beat list
+and a resolved style, not a `NOT_FOUND`. The same response covers a stage
+half way through, because the storyboard is stored **before** any scene is
+designed — so the strip shows every beat, its intent and its words, with the
+pictures filling in. That is the only state a customer can watch while the
+slow part runs, so it had to be representable.
+
+## 16d — the vision pass
+
+Step 12's second half, and the part of this phase with the clearest cost
+ceiling. It needed two new seams.
+
+### Two adapters grew a method each
+
+**`LlmGenerateArgs.images`.** Still one request-shaped question with a known
+answer shape, so it needed no second method — *"look at this frame and tell
+me what is wrong with it"* is the same seam as *"write this script"*, with an
+attachment. Images are **bytes, not a URL**: a provider that fetches a URL
+for us is a provider we have asked to reach a bucket on our behalf. They go
+in the user message by construction, which is the same boundary the
+untrusted-text rule draws and for a stronger reason — a rendered frame can
+contain whatever text a customer's script put on screen.
+
+The user message stays a plain **string** when there are no images. Wrapping
+every existing caller's text in a one-element block array would change the
+request bytes of every generation in the product, and therefore every
+prompt-cache key.
+
+**`RenderAdapter.renderStill`.** A third method on a seam whose own header
+argued for exactly two, so it carries its own argument. Every sentence that
+file wrote about `start` is false of a still: one frame, so nothing to chunk;
+seconds, so no webhook and no step timeout; no `Render` row, no credit hold,
+no copy into R2, and a fraction of a cent. Modelling it as a render with
+`durationInFrames: 1` would drag a video's whole lifecycle around a picture
+whose only reader is a model that looks at it once and forgets it.
+
+It is the one method there that returns something usable straight away, and
+it sets `deleteAfter: "1-day"` where the video path does not — a QA frame
+that outlived its check would be a growing pile of customer video frames in a
+bucket nothing ever reads. It renders **PNG** rather than the video path's
+jpeg: the one question asked of this image is whether text is legible and
+inside the frame, and jpeg ringing around white type is exactly the artifact
+that makes a model report illegible text a viewer would never notice.
+
+### The still is the graphic alone
+
+`buildStillDocument` makes a one-beat document holding **one scene, no
+assets, no words, no captions**. Rendering frame N of the project's real
+document instead would need every narration asset resolved to a signed URL,
+so a QA check would depend on storage; and the frame would be a composite
+when the thing under review is the scene.
+
+Nothing is lost by leaving the captions out, and this is the part worth
+checking: the layout engine already keeps every element clear of the caption
+box, because `safeRectFor` subtracts it. **A caption can never be the thing
+overlapping a graphic** — proved by code, not by looking. So there is nothing
+for a vision model to find there.
+
+### Do not ask what code already knows
+
+The rule that makes the pass worth its price. By the time a still exists,
+`checkScene` has proved the text fits its measured box, that nothing
+overlaps, that everything is inside the platform's safe zone and that the
+element count is in range. The prompt therefore lists those and says **do not
+report them** — otherwise a vision model dutifully reports that text is near
+an edge, which is provably false, and the response fills with findings nobody
+can act on, attached to beats that are fine, at a cost per video.
+
+What is left is the three things only a picture shows, and they are the three
+verdicts: `clutter`, `cutoff`, `offtopic` — plus `ok`, which the prompt says
+is the expected answer. A closed union rather than free text, because a
+reviewer handed *"describe any problems"* writes a paragraph about a frame
+that is fine, and a pile of those is indistinguishable from no review.
+
+### Sampled, and the sample is the busiest frames
+
+Two or three stills per video, which is what the phase file asks for and the
+only affordable shape — a still per beat would multiply the design stage's
+cost and make the review slower than the thing it reviews.
+
+A sample cannot promise every bad frame is caught, and it is not trying to.
+It is a **smoke test on the designer**: if the busiest three frames of a
+video are clean, the style, the layout engine and the prompt are working. So
+the beats are ranked by element count, because clutter and cut-off text both
+get likelier with every element on screen, with ties broken on the index so a
+finding can be reproduced.
+
+**Fallbacks are excluded outright.** A fallback is one measured line of
+narration: it cannot be cluttered or cut off, it is on-topic by construction,
+and the strip already badges it. Paying to be told a plain beat is plain is
+the one certain waste available here.
+
+### It never throws, and never fails the run
+
+A deliberate departure from `designBeat` and `labelBeatIntents`, which
+rethrow a transport failure so the caller can retry. This function's output
+is **advice**, and by the time the model is called the stills have already
+been rendered and paid for — so a retry re-renders them to recover a badge.
+Returning what it has is cheaper than being right.
+
+It runs **after** the design stage completes, for the same reason: the beats
+are stored, the video is metered, the stage that could fail has already
+succeeded. A vision pass is the one part of this pipeline whose answer
+nothing downstream depends on, and an opinion about three frames must not
+hold up a finished storyboard. A deployment with no renderer configured says
+`no-renderer` and stores nothing, which is what every video had before this
+step existed.
+
+### A finding dies with its scene
+
+`replaceMotionBeat` deletes the stored `review` when it writes a new scene,
+and deletes only that. A finding says something about a **picture** —
+"three numbers competing for the same corner" — and a redesign replaces the
+picture, so keeping the note would badge a beat for a problem that may well
+be gone. The honest state after a redesign is "not reviewed".
+
+## The strict-schema bug, which would have shipped blank videos
+
+Worth its own section because of how quietly it failed and how green
+everything was.
+
+The motion generator parsed stored beats with a `.strict()` Zod object. The
+design stage stores `source` on every beat (`A_FALLBACK_IS_RECORDED`). So
+**every beat the pipeline ever wrote failed the parse**, the whole `motion`
+blob failed with it, `readMotionSettings` returned no beats, and
+`buildMotionDocument` produced a motion video with **no scene track** —
+narration and captions over a background, reported as a success.
+
+Every test passed, because every fixture wrote the fields the generator
+declares rather than the fields the pipeline stores.
+
+The fix is one word, and the reasoning is the part worth keeping: **strict is
+for model output, not for your own storage.** `sceneSchema` is strict and
+should be — an unexpected field there means a model invented one and refusing
+is correct. A schema reading our own jsonb is in the opposite position: an
+unexpected field means a different release of this code wrote it, and
+refusing then loses data a rollback should have survived. Unknown keys are
+stripped instead.
+
+The regression test asserts against the shape the **pipeline** writes,
+including `source` and `review`, rather than the shape the module describes.
+That is the only version of the assertion that could have caught it.
+
+## Two more functions that had no callers
+
+Found while wiring the above, and deleted rather than left exported:
+`readMotionDesign` and `findMotionProject`. Both were written in 16c for
+callers that turned out not to need them — the atomic writes do their own raw
+read, because a read in one function and a write in another is the race they
+exist to avoid, and the design stage gets its project from
+`generatorContextFor`.
+
+An unused function in a service is not neutral. It is the obvious door for
+the next person to walk through, and `readMotionDesign` led directly to a
+read-then-write that loses a concurrent redesign. Together with
+`assignIntents` and `isLambdaRenderConfigured` — the latter now the
+availability check the review pass needed — that is **four** functions this
+phase wrote before their callers existed, three of which were still waiting.
+Worth remembering as a review question rather than a one-off.
 ## What is NOT in this phase
 
 Generated animation code, 3D and presenter characters, all of which the phase
 file excludes.
 
-Still missing from 16d itself:
-
-- **The beat strip** — the phase's step 14, "each beat as a still, with redesign
-  this beat re-running exactly one beat". Neither the UI nor the `redesignBeat`
-  procedure exists. `saveMotionDesign` already takes `countVideo: false` for
-  exactly that caller, and `readMotionDesign` returns the raw blob so one beat
-  can be replaced without re-parsing its siblings — but nothing calls either.
-- **The vision pass** — step 12's second half. The deterministic checks run; no
-  still is rendered and no vision model is asked.
-- **`assignIntents` has no caller.** Every beat is designed as `emphasis`, so
-  the intent-to-primitive guidance in the prompt is live but never varies. The
-  storyboard-level model call that would set intents is the smallest remaining
-  piece.
+Nothing from 16d is outstanding. What was missing when this document was
+first written — the beat strip, `redesignBeat`, the vision pass, and a caller
+for `assignIntents` — is covered by the four sections above.
 
 ## What has never run
 
 Be precise about this, because the tests are green and the green is narrower
-than it looks. Four things:
+than it looks. Five things:
 
 **Nothing has been composited to MP4.** `motion → MotionScene` is registered and
 `next build` succeeds, but no motion document has ever been rendered — that
@@ -730,10 +1015,21 @@ storyboard has been stored, no beat designed, and `motionVideos` has never been
 incremented. The `storyboard` and `design` stages type-check and are wired into
 the workflow; they have never executed.
 
-**`designMotionStyle` and `designBeat` against Claude.** The adapter seam is
-proven — Phase 06 generates real scripts through it — so the risk is not the
-transport, it is the prompts. Nobody has seen what the model actually returns
-for either.
+**No model call in this phase has ever run.** `designMotionStyle`,
+`labelBeatIntents`, `designBeat` and `reviewBeats` — four prompts, none of
+them executed. The adapter seam is proven (Phase 06 generates real scripts
+through it) so the risk is not the transport, it is the prompts: nobody has
+seen what the model actually returns for any of the four. The review pass
+additionally uses an adapter path that is new in this phase — images on a
+generate call — which is the one piece of transport here that has never carried
+a request.
+
+**No still has ever been rendered.** `renderStill` type-checks, sets its own
+lifecycle and is called from a step that is wired in, but it needs the same
+Phase 04 AWS deploy the video path does. So the vision pass has never produced
+an image, let alone a verdict, and `isRenderConfigured` currently returns
+false on every machine this code has run on — which means the review step's
+only exercised path is the one that skips.
 
 **Nobody has finished looking at the gallery.** The first Done-when line is
 "every primitive and layout renders in the gallery, in every palette, reviewed
@@ -744,7 +1040,7 @@ style switcher and a designed-style preview. One pass over it produced the two
 findings above. The review itself is not finished and cannot be delegated to a
 test.
 
-What **is** genuinely verified, by 291 tests: the measurement against real
+What **is** genuinely verified, by 319 tests: the measurement against real
 `hmtx` advances, auto-fit and its floor, the overflow and overlap checks in the
 phase's own wording, the document round trip, graph layout determinism and
 non-overlap, the safe-zone matrix across every layout at both aspects in all
@@ -753,4 +1049,6 @@ the whole style library passing its own validator, the prompts' generated
 catalogues and injection fencing, the storyboard's coverage over generated
 transcripts, the fallback's validity against hostile narration, and the
 generator building a valid document from hand-written settings with no model
-involved.
+involved — and now the still document's validity, the frame chosen from it, the
+review prompt's refusal to re-ask what code measured, and the sample selector's
+cost model.

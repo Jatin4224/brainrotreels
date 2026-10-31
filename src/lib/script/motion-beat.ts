@@ -59,6 +59,7 @@ import {
   type Beat,
   type LayoutContext,
   type Scene,
+  type SceneDesignSource,
   type SceneError,
 } from "@/lib/types/scene";
 
@@ -85,7 +86,7 @@ import {
 export interface DesignedBeat {
   beat: Beat;
   scene: Scene;
-  source: "designed" | "repaired" | "fallback";
+  source: SceneDesignSource;
   attempts: number;
   /** The errors from the last refused attempt, empty when none was refused. */
   errors: SceneError[];

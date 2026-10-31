@@ -78,6 +78,17 @@ export {
   motionStyleSystemPrompt,
   motionStyleUserPrompt,
 } from "./motion-style-prompt";
+export { labelBeatIntents } from "./motion-intents";
+export { reviewBeats } from "./motion-review";
+export type { BeatReviewOutcome, ReviewableBeat } from "./motion-review";
+export {
+  beatReviewSystemPrompt,
+  beatReviewUserPrompt,
+} from "./motion-review-prompt";
+export {
+  beatIntentsSystemPrompt,
+  beatIntentsUserPrompt,
+} from "./motion-intents-prompt";
 export { designBeat } from "./motion-beat";
 export type { DesignedBeat } from "./motion-beat";
 export {

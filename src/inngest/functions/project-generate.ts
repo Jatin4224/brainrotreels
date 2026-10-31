@@ -131,6 +131,7 @@ import {
 } from "@/services/credits.service";
 import { incrementUsage } from "@/services/usage.service";
 import {
+  assignIntents,
   buildStoryboard,
   beatSeconds,
   checkStoryboard,
@@ -138,8 +139,13 @@ import {
   resolveSceneAnchors,
 } from "@/lib/scene";
 import { getMotionStyle } from "@/lib/motion-styles";
-import { designBeat } from "@/lib/script";
-import { saveMotionDesign } from "@/services/motion.service";
+import { designBeat, labelBeatIntents, reviewBeats } from "@/lib/script";
+import {
+  saveMotionDesign,
+  saveMotionReviews,
+  type StoredMotionBeat,
+} from "@/services/motion.service";
+import { sceneSchema, toBeatIntent, type Beat } from "@/lib/types/scene";
 import { SAFE_ZONE_BY_ASPECT } from "@/lib/generators/common";
 import { CANVAS_BY_ASPECT } from "@/lib/types/project";
 import {
@@ -862,14 +868,99 @@ export const projectGenerateFunction = inngestClient.createFunction(
       const canvas = CANVAS_BY_ASPECT[storyboard.aspect];
       const safeZone = SAFE_ZONE_BY_ASPECT[storyboard.aspect];
 
-      const designedBeats: {
-        index: number;
-        startWord: number;
-        endWord: number;
-        intent: string;
-        scene?: unknown;
-        source?: string;
-      }[] = [];
+      /**
+       * SOURCE OF TRUTH KEYWORDS: ONE_CALL_FOR_THE_WHOLE_VIDEO,
+       *   INTENT_PICKS_THE_PRIMITIVE, THE_SPLIT_IS_DETERMINISTIC
+       *
+       * WHAT the beats are about, in one request, before any of them is
+       * designed.
+       *
+       * This is the seam `assignIntents` exists for and the reason the split
+       * above is pure arithmetic: WHERE a beat ends is a fact about word
+       * timings, and WHAT it is for is a judgement. Without this step every
+       * beat reaches the designer as `emphasis` — the free default — and a
+       * designer told "emphasis" writes a text block, so the counters, meters,
+       * flow graphs and comparisons are all built, drawable, and never chosen.
+       *
+       * ONE request for the whole video rather than one per beat, because the
+       * neighbours are the evidence: the third of three numbers is a `stat`
+       * only in the company of the other two. It adds one request to the
+       * forty a long video already spends here.
+       *
+       * It cannot fail the run — `labelBeatIntents` returns an empty map on a
+       * refusal and every beat keeps its default, which is exactly the
+       * behaviour of the release before this step existed.
+       */
+      const labelled = await step.run("beat-intents", async () => {
+        const tier = await getOrganizationTier(organizationId);
+        const assembled = await generatorContextFor(
+          prisma,
+          organizationId,
+          projectId,
+          tier.tier,
+        );
+
+        if (assembled === null) {
+          const reason = "This project is no longer available.";
+          await failStage(prisma, projectId, "design", reason);
+          throw new NonRetriableError(`[project.generate] ${projectId}: ${reason}`);
+        }
+
+        /* Narrowed rather than cast: a step's return value is JSON by the time
+         * this line reads it (A_STORED_INTENT_IS_NARROWED_NOT_CAST). */
+        const beats: Beat[] = storyboard.beats.map((beat) => ({
+          index: beat.index,
+          startWord: beat.startWord,
+          endWord: beat.endWord,
+          intent: toBeatIntent(beat.intent),
+        }));
+
+        const secondsByIndex: Record<number, number> = {};
+        for (const beat of storyboard.beats) {
+          secondsByIndex[beat.index] = beat.durationSeconds;
+        }
+
+        const intents = await labelBeatIntents({
+          beats,
+          words: assembled.ctx.words,
+          secondsByIndex,
+        });
+
+        const result = assignIntents(beats, intents);
+
+        /* Stored before anything is designed, so the beat strip shows what
+         * each beat is FOR while the slow part runs — which is the only
+         * information a customer can act on during the design stage. Still
+         * not metered: a video is counted when its design succeeds. */
+        await saveMotionDesign({
+          organizationId,
+          projectId,
+          styleId: storyboard.styleId,
+          beats: result.map((beat) => ({
+            index: beat.index,
+            startWord: beat.startWord,
+            endWord: beat.endWord,
+            intent: beat.intent,
+          })),
+          countVideo: false,
+        });
+
+        console.info(
+          `[project.generate] ${projectId}: labelled ${Object.keys(intents).length}` +
+            ` of ${beats.length} beat(s).`,
+        );
+
+        return result.map((beat) => ({
+          index: beat.index,
+          intent: beat.intent,
+        }));
+      });
+
+      const intentFor = new Map(
+        labelled.map((beat) => [beat.index, toBeatIntent(beat.intent)]),
+      );
+
+      const designedBeats: StoredMotionBeat[] = [];
 
       for (const beat of storyboard.beats) {
         const result = await step.run(`design-beat-${beat.index}`, async () => {
@@ -892,7 +983,7 @@ export const projectGenerateFunction = inngestClient.createFunction(
               index: beat.index,
               startWord: beat.startWord,
               endWord: beat.endWord,
-              intent: "emphasis",
+              intent: intentFor.get(beat.index) ?? "emphasis",
             },
             words: assembled.ctx.words,
             style,
@@ -926,12 +1017,36 @@ export const projectGenerateFunction = inngestClient.createFunction(
           return { scene: resolved, source: outcome.source };
         });
 
+        /**
+         * SOURCE OF TRUTH KEYWORDS: A_SCENE_IS_PARSED_BACK_NOT_CAST
+         *
+         * A step's return value crosses a JSON boundary, so what comes back is
+         * shaped like a `Scene` without being one as far as the compiler is
+         * concerned. Parsing it is the honest conversion AND the last gate
+         * before a jsonb column is asked to hold it — the same argument
+         * `saveMotionDesign` makes about proving its payload is JSON.
+         *
+         * A failure here is a bug rather than a bad model answer: the scene
+         * passed `checkScene` minutes ago and only its anchors were rewritten
+         * since. So it is logged and the beat is stored WITHOUT a scene, which
+         * the generator draws as a measured fallback
+         * (A_MISSING_SCENE_IS_A_FALLBACK) rather than failing a whole video
+         * over one beat.
+         */
+        const parsedScene = sceneSchema.safeParse(result.scene);
+        if (!parsedScene.success) {
+          console.warn(
+            `[project.generate] ${projectId}: beat ${beat.index} did not ` +
+              `parse back from its design step; storing it without a scene.`,
+          );
+        }
+
         designedBeats.push({
           index: beat.index,
           startWord: beat.startWord,
           endWord: beat.endWord,
-          intent: beat.intent,
-          scene: result.scene,
+          intent: intentFor.get(beat.index) ?? "emphasis",
+          ...(parsedScene.success ? { scene: parsedScene.data } : {}),
           source: result.source,
         });
       }
@@ -943,18 +1058,7 @@ export const projectGenerateFunction = inngestClient.createFunction(
           organizationId,
           projectId,
           styleId: storyboard.styleId,
-          beats: designedBeats.map((beat) => ({
-            index: beat.index,
-            startWord: beat.startWord,
-            endWord: beat.endWord,
-            intent: beat.intent,
-            ...(beat.scene !== undefined
-              ? { scene: beat.scene as never }
-              : {}),
-            ...(beat.source !== undefined
-              ? { source: beat.source as never }
-              : {}),
-          })),
+          beats: designedBeats,
           countVideo: true,
         });
 
@@ -973,6 +1077,92 @@ export const projectGenerateFunction = inngestClient.createFunction(
             ? `${fallbacks} beat${fallbacks === 1 ? "" : "s"} could not be designed and ${fallbacks === 1 ? "is" : "are"} showing the narration plainly. Redesign ${fallbacks === 1 ? "it" : "them"} from the beat strip.`
             : undefined,
         );
+      });
+
+      /**
+       * SOURCE OF TRUTH KEYWORDS: DETERMINISTIC_CHECKS_FIRST, SAMPLED_NOT_EXHAUSTIVE,
+       *   VISION_CATCHES_WHAT_GEOMETRY_CANNOT, REVIEW_NEVER_FAILS_THE_RUN
+       *
+       * The phase's step 12, second half: photograph two or three of the
+       * busiest beats and ask a vision model what is wrong with them.
+       *
+       * AFTER the design stage completes, on purpose. The review is advice
+       * about a video that already exists — the beats are stored, the video
+       * is metered, and the stage that could fail has already succeeded.
+       * Running it inside the design stage would let an opinion about three
+       * frames hold up a finished storyboard, and a vision pass is the one
+       * part of this pipeline whose answer nothing downstream depends on.
+       *
+       * REVIEW_NEVER_FAILS_THE_RUN. `reviewBeats` does not throw, for any
+       * reason (REVIEW_NEVER_THROWS), and this step stores whatever it
+       * returned. A deployment with no renderer configured, a model that
+       * refused, a still that would not render: each one is a video with no
+       * badges, which is what every video had before this step existed.
+       */
+      await step.run("review-beats", async () => {
+        const tier = await getOrganizationTier(organizationId);
+        const assembled = await generatorContextFor(
+          prisma,
+          organizationId,
+          projectId,
+          tier.tier,
+        );
+
+        /* No project, no review — and nothing to fail, because the design
+         * stage has already completed and this step owns no stage. */
+        if (assembled === null) return { stills: 0, flagged: 0 };
+
+        const words = assembled.ctx.words;
+        const secondsByIndex = new Map(
+          storyboard.beats.map((beat) => [beat.index, beat.durationSeconds]),
+        );
+
+        /* Only beats that HAVE a scene can be photographed. A beat stored
+         * without one is a design the generator will replace with a measured
+         * fallback, and there is nothing yet to look at. */
+        const reviewable = designedBeats.flatMap((beat) =>
+          beat.scene === undefined || beat.source === undefined
+            ? []
+            : [
+                {
+                  index: beat.index,
+                  scene: beat.scene,
+                  text: words
+                    .slice(beat.startWord, beat.endWord + 1)
+                    .map((word) => word.w)
+                    .join(" "),
+                  durationSeconds: secondsByIndex.get(beat.index) ?? 0,
+                  source: beat.source,
+                },
+              ],
+        );
+
+        const outcome = await reviewBeats({
+          beats: reviewable,
+          canvas,
+          style,
+          safeZone,
+        });
+
+        const annotated = await saveMotionReviews({
+          organizationId,
+          projectId,
+          reviews: outcome.reviews,
+        });
+
+        const flagged = Object.values(outcome.reviews).filter(
+          (review) => review.verdict !== "ok",
+        ).length;
+
+        console.info(
+          `[project.generate] ${projectId}: reviewed ${outcome.stills} still(s), ` +
+            `annotated ${annotated} beat(s), ${flagged} flagged` +
+            (outcome.skipped === null
+              ? "."
+              : ` (skipped: ${outcome.skipped}).`),
+        );
+
+        return { stills: outcome.stills, flagged };
       });
     }
 

@@ -255,4 +255,62 @@ describe("reading the design stage's output", () => {
      * outcome — a half-read storyboard would place some beats and not others. */
     expect(read.beats).toEqual([]);
   });
+
+  it("reads a beat in the shape the design stage actually writes", () => {
+    /**
+     * SOURCE OF TRUTH KEYWORDS: A_STORED_SHAPE_IS_NOT_STRICT
+     *
+     * This is the regression test for a shipped bug, and the bug is worth
+     * stating because the test looks redundant without it. Every fixture above
+     * writes the beat fields this module declares — but the DESIGN STAGE also
+     * stores `source` on every beat and, after the vision pass, sometimes
+     * `review`. With a `.strict()` beat schema those extra keys failed the
+     * whole blob, `readMotionSettings` returned no beats, and the generator
+     * built a motion video with no scene track: narration and captions over a
+     * background, reported as a success.
+     *
+     * So this asserts against the shape the PIPELINE writes rather than the
+     * one this file describes, which is the only version of the assertion that
+     * could have caught it.
+     */
+    const read = readMotionSettings({
+      motion: {
+        styleId: "studio",
+        beats: [
+          {
+            index: 0,
+            startWord: 0,
+            endWord: 3,
+            intent: "stat",
+            source: "designed",
+            review: { verdict: "ok", note: "Reads cleanly." },
+            scene: {
+              layout: "stack-center",
+              elements: [
+                { id: "head", kind: "title", text: "Forty one percent" },
+              ],
+            },
+          },
+        ],
+      },
+    });
+
+    expect(read.styleId).toBe("studio");
+    expect(read.beats).toHaveLength(1);
+    expect(read.beats[0]?.intent).toBe("stat");
+    expect(read.beats[0]?.scene?.elements[0]?.id).toBe("head");
+  });
+
+  it("keeps a beat whose intent this build has never heard of", () => {
+    /* A_STORED_INTENT_IS_NARROWED_NOT_CAST — a settings blob from a newer
+     * release loses the LABEL, never the beat. */
+    const read = readMotionSettings({
+      motion: {
+        beats: [{ index: 0, startWord: 0, endWord: 3, intent: "sankey" }],
+      },
+    });
+
+    expect(read.beats).toHaveLength(1);
+    expect(read.beats[0]?.intent).toBe("emphasis");
+  });
 });

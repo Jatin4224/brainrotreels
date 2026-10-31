@@ -1074,9 +1074,24 @@ export const RESOURCES = {
        * design styles would be a trial of the most expensive thing we sell. */
       availableOnFreeTrial: false,
     },
+    /**
+     * SOURCE OF TRUTH KEYWORDS: RATE_LIMITED_NOT_METERED,
+     *   THE_KEY_IS_THE_PROCEDURE_NAME
+     *
+     * THE_KEY_IS_THE_PROCEDURE_NAME: the factory resolves these from the tRPC
+     * PATH, so each key has to spell its procedure exactly — a key that does
+     * not match a procedure is a limit that silently never applies.
+     *
+     * `redesignBeat` is RATE_LIMITED_NOT_METERED. It spends up to two model
+     * requests and increments nothing, because fixing one ugly beat is not
+     * another video — so this is the only thing standing between a frustrated
+     * customer and an unbounded bill. Twenty an hour is more beats than a
+     * human will review in that time and far fewer than a script would ask
+     * for.
+     */
     rateLimit: {
       designStyle: { count: 10, window: "5 m" },
-      designBeats: { count: 20, window: "1 h" },
+      redesignBeat: { count: 20, window: "1 h" },
     },
   },
 

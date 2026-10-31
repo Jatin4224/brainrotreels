@@ -71,6 +71,7 @@ import {
   type CaptionWeight,
   type SafeZone,
 } from "./caption";
+import type { AspectRatio } from "./project";
 
 /* The document's own id rule, restated rather than imported: timeline/schema.ts
  * keeps `idSchema` private, and an element id has the same job — short, stable,
@@ -993,6 +994,287 @@ export const beatSchema = z
   .strict();
 
 export type Beat = z.infer<typeof beatSchema>;
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: beatIntentPlanSchema, BeatIntentPlan,
+ *   ONE_CALL_FOR_THE_WHOLE_VIDEO, A_SPARSE_ANSWER_IS_VALID,
+ *   INTENT_PICKS_THE_PRIMITIVE
+ *
+ * WHAT:  What a model returns when asked what each beat of a video is ABOUT —
+ *        a list of (beat index, intent) pairs.
+ *
+ * WHY:   ONE_CALL_FOR_THE_WHOLE_VIDEO. Choosing a beat's intent needs to see
+ *        the OTHER beats: "the second of three numbers" is a `stat`, and
+ *        "and here is the list of all of them" is a `list` precisely because
+ *        of what came before it. A per-beat call would both cost a request per
+ *        beat and answer worse, because each one would be deciding blind. So
+ *        the answer is a list and the request is one.
+ *
+ *        A_SPARSE_ANSWER_IS_VALID: a list, not a full array, and nothing here
+ *        requires it to mention every beat. A model that labels eleven of
+ *        twelve leaves the twelfth at its default rather than failing the
+ *        video — the same bias toward finishing the repair loop has, and the
+ *        reason `assignIntents` takes a map. A duplicate index is harmless
+ *        for the same reason: the last one wins and no beat is lost.
+ * WHERE: Returned by `labelBeatIntents` in src/lib/script/motion-intents.ts,
+ *        applied by `assignIntents` in src/lib/scene/storyboard.ts.
+ */
+export const beatIntentPlanSchema = z
+  .object({
+    beats: z
+      .array(
+        z
+          .object({
+            index: z.number().int().min(0),
+            intent: beatIntentSchema,
+          })
+          .strict(),
+      )
+      .max(400),
+  })
+  .strict();
+
+export type BeatIntentPlan = z.infer<typeof beatIntentPlanSchema>;
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: toBeatIntent, INTENT_HAS_A_FREE_DEFAULT,
+ *   A_STORED_INTENT_IS_NARROWED_NOT_CAST
+ *
+ * WHAT:  An intent from a value that came out of a jsonb column or across a
+ *        workflow step boundary.
+ *
+ * WHY:   A_STORED_INTENT_IS_NARROWED_NOT_CAST. Both of those boundaries lose
+ *        the union: `Project.settings` holds a string, and an Inngest step's
+ *        return value is JSON by the time the next line reads it. The wrong
+ *        answers are a cast (CLAUDE.md rule 4) and a throw — a settings blob
+ *        written by a NEWER release can legitimately carry an intent this
+ *        build has never heard of, and refusing to read it would make a
+ *        rollback drop every beat rather than one label.
+ *
+ *        So it falls back to `emphasis`, which is the default the storyboard
+ *        hands out anyway (INTENT_HAS_A_FREE_DEFAULT) and the one intent every
+ *        primitive can serve. The cost of being wrong is a beat designed a
+ *        little plainer than it could have been.
+ * WHERE: The design stage, the beat strip's reader, and the motion generator.
+ */
+export function toBeatIntent(value: unknown): BeatIntent {
+  const parsed = beatIntentSchema.safeParse(value);
+  return parsed.success ? parsed.data : "emphasis";
+}
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: redesignBeatSchema, RedesignBeatValues,
+ *   ONE_BEAT_IS_THE_UNIT, THE_RANGE_IS_NOT_AN_INPUT,
+ *   ORGANIZATION_ID_IS_ON_EVERY_INPUT
+ *
+ * WHAT:  Redesign exactly one beat of a motion project.
+ *
+ * WHY:   THE_RANGE_IS_NOT_AN_INPUT, and this is the whole security and
+ *        correctness argument of the procedure. The only thing a customer may
+ *        name is WHICH beat — the word range, the intent and the style all come
+ *        from what is already stored. A field for `startWord` would let a
+ *        caller point a beat at words it never covered, which is both a
+ *        storyboard with a gap in it (narration over a stale graphic) and the
+ *        one way to make the stored design disagree with the beats the
+ *        generator lays out. There is deliberately no field for a scene
+ *        either: the model writes scenes, and a client that could post one
+ *        would bypass `checkScene` entirely.
+ *
+ *        The two inputs are ONE schema extended rather than two, because the
+ *        read and the write address the same thing: a client that can see a
+ *        beat strip can name a beat in it, and a drift between the two shapes
+ *        would be a screen reading one project and redesigning another.
+ *
+ *        `beatIndex` is the key rather than an array position, matching
+ *        `assignIntents` and the stored `index` — positions shift, indices do
+ *        not.
+ *
+ *        ORGANIZATION_ID_IS_ON_EVERY_INPUT because the procedure factory reads
+ *        the tenant from the input to establish the boundary before any gate
+ *        runs; a procedure whose input omits it is refused with a BAD_REQUEST
+ *        at runtime.
+ * WHERE: `motionStudio.redesignBeat`; the beat strip's redesign button.
+ */
+export const motionDesignSchema = z.object({
+  organizationId: z.string().min(1),
+  projectId: z.string().min(1),
+});
+
+export type MotionDesignValues = z.infer<typeof motionDesignSchema>;
+
+export const redesignBeatSchema = motionDesignSchema.extend({
+  beatIndex: z.number().int().min(0),
+});
+
+export type RedesignBeatValues = z.infer<typeof redesignBeatSchema>;
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: SCENE_DESIGN_SOURCES, SceneDesignSource,
+ *   sceneDesignSourceSchema, A_FALLBACK_IS_RECORDED
+ *
+ * WHAT:  How a stored scene came to exist — first try, repaired after a
+ *        refusal, or the measured fallback.
+ *
+ * WHY:   A_FALLBACK_IS_RECORDED. The beat strip has to show this: a customer
+ *        looking at a plain beat should be able to see that it IS the fallback
+ *        and press redesign, rather than assume that is what the model thought
+ *        best. `repaired` is kept distinct from `designed` for the operator's
+ *        question instead — when motion quality drops, how often the repair
+ *        loop is firing is the first number worth having.
+ *
+ *        Named here rather than written inline at each of its three users
+ *        (`DesignedBeat`, `StoredMotionBeat`, the beat strip's view) because
+ *        it crosses a jsonb column, and a fourth copy is how one of them ends
+ *        up accepting a value the others do not.
+ * WHERE: src/lib/script/motion-beat.ts, src/services/motion.service.ts, the
+ *        beat strip.
+ */
+export const SCENE_DESIGN_SOURCES = [
+  "designed",
+  "repaired",
+  "fallback",
+] as const;
+
+export const sceneDesignSourceSchema = z.enum(SCENE_DESIGN_SOURCES);
+
+export type SceneDesignSource = z.infer<typeof sceneDesignSourceSchema>;
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: SCENE_REVIEW_VERDICTS, SceneReviewVerdict,
+ *   sceneReviewSchema, SceneReview, beatReviewPlanSchema, BeatReviewPlan,
+ *   VISION_CATCHES_WHAT_GEOMETRY_CANNOT, THE_VERDICT_IS_A_CLOSED_SET
+ *
+ * WHAT:  What a vision model is allowed to say about a rendered beat, and the
+ *        shape of its answer for a handful of them.
+ *
+ * WHY:   VISION_CATCHES_WHAT_GEOMETRY_CANNOT, which is the phase's step 12
+ *        read carefully. The deterministic checks already prove every number
+ *        that can be measured: the text fits, nothing overlaps, everything is
+ *        inside the safe zone, the element count is in range. What they cannot
+ *        see is whether the frame is a MESS, whether the words on it are the
+ *        point of the sentence, or whether a glyph the metrics table does not
+ *        know about has pushed a line off the edge. Those three are exactly
+ *        the three verdicts here, and there is no fourth, because a verdict
+ *        that duplicated a deterministic check would be a paid request
+ *        answering a question a millisecond of arithmetic already answered.
+ *
+ *        THE_VERDICT_IS_A_CLOSED_SET rather than free text. A reviewer — human
+ *        or model — handed "describe any problems" writes a paragraph about a
+ *        frame that is fine, and a pile of those is indistinguishable from no
+ *        review at all. A closed union makes "ok" the cheapest thing to say
+ *        and makes a complaint countable, which is what lets the beat strip
+ *        show a badge and an operator watch a rate.
+ *
+ *        `note` is short and REQUIRED even for `ok`, because a verdict with
+ *        no reason attached cannot be argued with — and the first thing
+ *        anybody does with a vision finding is argue with it.
+ * WHERE: src/lib/script/motion-review.ts; stored per beat by the motion
+ *        service; shown by the beat strip.
+ */
+export const SCENE_REVIEW_VERDICTS = [
+  "ok",
+  /* Too much on screen to read in the time the beat runs. */
+  "clutter",
+  /* Text running out of the frame, or too small to read at a phone's size. */
+  "cutoff",
+  /* A correct, tidy graphic about something other than what is being said. */
+  "offtopic",
+] as const;
+
+export const sceneReviewVerdictSchema = z.enum(SCENE_REVIEW_VERDICTS);
+
+export type SceneReviewVerdict = z.infer<typeof sceneReviewVerdictSchema>;
+
+export const sceneReviewSchema = z
+  .object({
+    verdict: sceneReviewVerdictSchema,
+    /* One sentence. Long enough to be specific, short enough to fit on a card
+     * and to make a paragraph impossible. */
+    note: z.string().trim().min(1).max(240),
+  })
+  .strict();
+
+export type SceneReview = z.infer<typeof sceneReviewSchema>;
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: beatReviewPlanSchema, BeatReviewPlan,
+ *   A_SPARSE_ANSWER_IS_VALID
+ *
+ * The answer for the sampled beats, keyed by beat index — the same sparse
+ * shape, and for the same reason, as `beatIntentPlanSchema`: a model that
+ * reports on two of the three stills has still told us something worth
+ * storing.
+ */
+export const beatReviewPlanSchema = z
+  .object({
+    beats: z
+      .array(
+        z
+          .object({
+            index: z.number().int().min(0),
+            verdict: sceneReviewVerdictSchema,
+            note: z.string().trim().min(1).max(240),
+          })
+          .strict(),
+      )
+      .max(8),
+  })
+  .strict();
+
+export type BeatReviewPlan = z.infer<typeof beatReviewPlanSchema>;
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: MotionBeatView, MotionDesignView,
+ *   THE_STRIP_READS_A_VIEW_NOT_THE_BLOB, A_RESOLVED_STYLE_NOT_AN_ID
+ *
+ * WHAT:  One beat as the beat strip shows it, and the whole design around it.
+ *
+ * WHY:   THE_STRIP_READS_A_VIEW_NOT_THE_BLOB. The screen gets the beat's TEXT
+ *        and its SECONDS, neither of which is stored: the words live in the
+ *        alignment and the beat holds indices into them
+ *        (TIMED_BY_ANCHOR_OR_SECONDS). Resolving both server-side is what
+ *        keeps the client from having to download a whole transcript to label
+ *        twelve cards, and it means a re-alignment moves the strip with the
+ *        audio for free.
+ *
+ *        A_RESOLVED_STYLE_NOT_AN_ID, the same lesson `MotionPreview` records:
+ *        the view carries the STYLE, not its id, so the preview cannot
+ *        silently draw the default's tokens under another style's name.
+ *
+ *        `scene` is nullable because the design stage stores the storyboard
+ *        BEFORE it designs anything — a strip opened while the stage is
+ *        running shows every beat, its intent and its words, with the pictures
+ *        filling in. That is the only state a customer can watch, so it has to
+ *        be representable.
+ * WHERE: Returned by `motionStudio.design`; consumed by the beat strip.
+ */
+export interface MotionBeatView {
+  index: number;
+  intent: BeatIntent;
+  /** The words this beat covers, joined — what the graphic is about. */
+  text: string;
+  startSeconds: number;
+  durationSeconds: number;
+  /** Null until the design stage reaches this beat. */
+  scene: Scene | null;
+  source: SceneDesignSource | null;
+  /**
+   * What the vision pass thought of this beat, when it looked at it. Null
+   * covers both "not reviewed" cases and they are deliberately not
+   * distinguished: only a sample of beats is ever reviewed
+   * (SAMPLED_NOT_EXHAUSTIVE), and a deployment with no renderer configured
+   * reviews none. Neither is a problem with the beat, so neither earns a badge.
+   */
+  review: SceneReview | null;
+}
+
+export interface MotionDesignView {
+  /** Resolved, not an id — see A_RESOLVED_STYLE_NOT_AN_ID. */
+  style: MotionStyle;
+  aspect: AspectRatio;
+  safeZone: SafeZone;
+  beats: MotionBeatView[];
+}
 
 /**
  * SOURCE OF TRUTH KEYWORDS: GalleryScene, GALLERY_IS_THE_REVIEW_SURFACE
