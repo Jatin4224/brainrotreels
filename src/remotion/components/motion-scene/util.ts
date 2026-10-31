@@ -26,7 +26,48 @@
  * WHERE: Every primitive under motion-scene/.
  */
 
+import {
+  MOTION_RADIUS_SCALE,
+  MOTION_STROKE_SCALE,
+  type MotionStyle,
+} from "@/lib/types/motion-style";
 import type { PlacedElement, PlacedTextRun } from "@/lib/types/scene";
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: radiusPx, strokePx, A_TOKEN_IS_A_CHOICE_NOT_A_NUMBER,
+ *   TOKENS_MUST_CHANGE_THE_PICTURE
+ *
+ * WHAT:  The two style tokens that are geometry, turned into pixels.
+ *
+ * WHY:   The scale tables live in `src/lib/types/motion-style.ts` as data and
+ *        the arithmetic lives here, once, so five primitives cannot each
+ *        interpret `bold` slightly differently. That is the same split
+ *        `captionFontPx` makes for a caption's `sizeVh`.
+ *
+ *        `radiusPx` takes the box's own height because the scale is a FRACTION
+ *        of it — which is what makes `round` a pill on a short meter track and
+ *        on a tall graph node alike, rather than a fixed corner that looks
+ *        like a mistake on one of them.
+ *
+ *        `strokePx` takes a BASE width because the lines a style governs are
+ *        read at different distances: a graph edge, a node border and a
+ *        callout rule do not want the same weight, they want the same
+ *        RELATIVE weight. A `floor` keeps a hairline from disappearing
+ *        entirely on a 480p proxy, where a 0.6x multiplier on an already thin
+ *        line rounds to nothing.
+ * WHERE: The meter and bar tracks, the graph nodes and edges, the callout rule.
+ */
+export function radiusPx(style: MotionStyle, boxHeight: number): number {
+  return MOTION_RADIUS_SCALE[style.radius] * boxHeight;
+}
+
+export function strokePx(
+  style: MotionStyle,
+  basePx: number,
+  floor = 1,
+): number {
+  return Math.max(basePx * MOTION_STROKE_SCALE[style.strokeWeight], floor);
+}
 
 export function runByPath(
   placed: PlacedElement,

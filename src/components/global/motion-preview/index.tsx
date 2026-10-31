@@ -43,18 +43,39 @@
 
 import * as React from "react";
 
+import { useRenderFonts } from "@/components/global/render-fonts";
 import { getPalette } from "@/lib/palettes";
 import { safeRectFor } from "@/lib/scene";
 import type { CanvasSpec } from "@/lib/timeline";
 import type { SafeZone } from "@/lib/types/caption";
+import type { MotionStyle } from "@/lib/types/motion-style";
 import type { Scene } from "@/lib/types/scene";
 import { MotionSceneCanvas } from "@/remotion/components/motion-scene/canvas";
 
 export interface MotionPreviewProps {
   scene: Scene;
   canvas: CanvasSpec;
-  /** A palette id; an unknown one falls back, as everywhere else. */
-  paletteId: string;
+  /**
+   * SOURCE OF TRUTH KEYWORDS: A_RESOLVED_STYLE_NOT_AN_ID
+   *
+   * The motion style itself, already resolved.
+   *
+   * WHY NOT AN ID: a style designed by the model is not in the library, so
+   * `getMotionStyle` would fall back to the default for it — and the preview
+   * would show the DEFAULT's radius, stroke and motion personality under the
+   * designed style's name. Every token would look wrong and nothing would say
+   * so. Callers resolve: the gallery calls `getMotionStyle(styleId)`, the
+   * design panel passes the proposal straight through.
+   */
+  style: MotionStyle;
+  /**
+   * A palette id, which OVERRIDES the style's own. The gallery previews one
+   * style against every palette in turn, which the phase file requires — and
+   * which is only possible because `MotionSceneCanvas` takes a resolved
+   * palette rather than looking one up from the style. Omitted, the style's
+   * palette is used, which is what a real render does.
+   */
+  paletteId?: string | undefined;
   safeZone: SafeZone;
   /** The beat's length in seconds. The loop restarts here. */
   durationSeconds: number;
@@ -69,6 +90,7 @@ export interface MotionPreviewProps {
 export function MotionPreview({
   scene,
   canvas,
+  style,
   paletteId,
   safeZone,
   durationSeconds,
@@ -77,7 +99,11 @@ export function MotionPreview({
   frozenAt,
 }: MotionPreviewProps) {
   const seconds = useLoopedSeconds(durationSeconds, frozenAt);
-  const palette = getPalette(paletteId);
+  /* THE_PREVIEW_MUST_LOAD_THE_FACE — without this the card draws in the
+   * browser's default serif and the text has nothing to do with the advances
+   * the overflow check measured. */
+  const fontsReady = useRenderFonts();
+  const palette = getPalette(paletteId ?? style.paletteId);
   const scale = width / canvas.width;
   const height = canvas.height * scale;
 
@@ -102,14 +128,21 @@ export function MotionPreview({
           left: 0,
         }}
       >
+        {/* Held until the face is ready, so the card never paints a frame in
+            the fallback and then reflows — the browser equivalent of
+            FONT_BLOCKS_THE_FIRST_FRAME. The gradient behind it is already
+            drawn, so the card has its shape throughout. */}
+        {!fontsReady ? null : (
         <MotionSceneCanvas
           scene={scene}
+          style={style}
           palette={palette}
           canvas={canvas}
           safeZone={safeZone}
           seconds={seconds}
           beatSeconds={durationSeconds}
         />
+        )}
         {showSafeZone ? (
           <SafeZoneGuide canvas={canvas} safeZone={safeZone} />
         ) : null}

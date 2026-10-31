@@ -54,13 +54,13 @@
 
 import type { ReactNode } from "react";
 
+import {
+  MOTION_PERSONALITY_TIMING,
+  type MotionEasing,
+  type MotionPersonality,
+  type MotionPersonalityTiming,
+} from "@/lib/types/motion-style";
 import type { SceneAnimation } from "@/lib/types/scene";
-
-/* Long enough to read as a move rather than a cut, short enough that a 1.5s
- * beat is not mostly animation. The exit is quicker than the entrance because
- * a departure nobody is looking at any more only needs to not be abrupt. */
-const ENTRANCE_SECONDS = 0.35;
-const EXIT_SECONDS = 0.25;
 
 /* Travel distances, as fractions of the canvas. */
 const RISE_FRACTION = 0.03;
@@ -93,17 +93,17 @@ export function animationStyle(args: {
       return {};
 
     case "fade":
-      return { opacity: progress };
+      return { opacity: shown(progress) };
 
     case "rise":
       return {
-        opacity: progress,
+        opacity: shown(progress),
         transform: `translateY(${away * RISE_FRACTION * canvas.height}px)`,
       };
 
     case "fall":
       return {
-        opacity: progress,
+        opacity: shown(progress),
         transform: `translateY(${-away * RISE_FRACTION * canvas.height}px)`,
       };
 
@@ -112,19 +112,19 @@ export function animationStyle(args: {
        * RIGHT. The alternative reading — named for where it comes from — makes
        * every pair of adjacent elements look like a mistake. */
       return {
-        opacity: progress,
+        opacity: shown(progress),
         transform: `translateX(${away * SLIDE_FRACTION * canvas.width}px)`,
       };
 
     case "slide-right":
       return {
-        opacity: progress,
+        opacity: shown(progress),
         transform: `translateX(${-away * SLIDE_FRACTION * canvas.width}px)`,
       };
 
     case "pop":
       return {
-        opacity: progress,
+        opacity: shown(progress),
         transform: `scale(${POP_FROM + (1 - POP_FROM) * progress})`,
       };
 
@@ -134,7 +134,10 @@ export function animationStyle(args: {
        * moves no ink: the glyphs stay exactly where they were measured. */
       return {
         opacity: progress > 0 ? 1 : 0,
-        clipPath: `inset(${away * 100}% 0 0 0)`,
+        /* Clamped, unlike the transforms: a negative inset is not a valid
+         * clip-path, so an `overshoot` personality cannot overshoot a wipe.
+         * The element simply finishes revealed. */
+        clipPath: `inset(${Math.max(away, 0) * 100}% 0 0 0)`,
       };
 
     default: {
@@ -167,16 +170,33 @@ export function elementProgress(args: {
   window: { from: number; to: number };
   hasEntrance: boolean;
   hasExit: boolean;
+  /**
+   * The style's personality timing — Phase 16c. Defaulted rather than
+   * required, because the default IS a personality (`precise`) and every
+   * caller that has a style passes one; a required argument here would have
+   * meant threading a style through the two tests that only care about the
+   * shape of the curve.
+   */
+  timing?: MotionPersonalityTiming;
 }): number {
-  const { seconds, window: visible, hasEntrance, hasExit } = args;
+  const {
+    seconds,
+    window: visible,
+    hasEntrance,
+    hasExit,
+    timing = MOTION_PERSONALITY_TIMING.precise,
+  } = args;
   const span = visible.to - visible.from;
 
   const wanted =
-    (hasEntrance ? ENTRANCE_SECONDS : 0) + (hasExit ? EXIT_SECONDS : 0);
-  /* SHORT_ELEMENTS_SCALE_THEIR_MOTION — never more than half the window each. */
+    (hasEntrance ? timing.entranceSeconds : 0) +
+    (hasExit ? timing.exitSeconds : 0);
+  /* SHORT_ELEMENTS_SCALE_THEIR_MOTION — never more than half the window each.
+   * This matters more with a style than without: `calm` asks for 0.5s in and
+   * 0.35s out, which is longer than a 0.8s element exists for. */
   const scale = wanted > span && wanted > 0 ? span / wanted : 1;
-  const entranceSeconds = hasEntrance ? ENTRANCE_SECONDS * scale : 0;
-  const exitSeconds = hasExit ? EXIT_SECONDS * scale : 0;
+  const entranceSeconds = hasEntrance ? timing.entranceSeconds * scale : 0;
+  const exitSeconds = hasExit ? timing.exitSeconds * scale : 0;
 
   if (seconds < visible.from || seconds > visible.to) return 0;
 
@@ -184,23 +204,68 @@ export function elementProgress(args: {
   const until = visible.to - seconds;
 
   const arriving =
-    entranceSeconds > 0 ? easeOutCubic(since / entranceSeconds) : 1;
-  const leaving = exitSeconds > 0 ? easeInCubic(until / exitSeconds) : 1;
+    entranceSeconds > 0 ? ease(since / entranceSeconds, timing.easing) : 1;
+  const leaving =
+    exitSeconds > 0 ? easeOut(until / exitSeconds, timing.easing) : 1;
 
   return Math.min(arriving, leaving);
 }
 
-/* Both clamp to 0..1, so a caller never has to. `out` decelerates into place,
- * which is what makes an entrance read as arriving rather than as stopping;
- * `in` accelerates away, which is the same gesture reversed. */
-function easeOutCubic(t: number): number {
+/**
+ * SOURCE OF TRUTH KEYWORDS: ease, MOTION_EASINGS, OVERSHOOT_PASSES_ONE
+ *
+ * WHAT:  The three named curves a motion personality can ask for, on the way
+ *        in.
+ *
+ * WHY:   OVERSHOOT_PASSES_ONE is the only one that needs explaining: it
+ *        returns values slightly ABOVE 1 before settling, which is what makes
+ *        `playful` look springy. Every consumer has to tolerate that —
+ *        `animationStyle` clamps opacity with `shown()` and lets the
+ *        transforms run past rest, which is exactly where the spring lives,
+ *        and the wipe clamps its inset because a negative one is not valid
+ *        CSS.
+ *
+ *        It is a closed-form polynomial rather than Remotion's `spring`, for
+ *        DETERMINISTIC_MOTION: a spring is frame-rate dependent in a way that
+ *        would make the same beat differ between a 30fps proxy and a 60fps
+ *        render.
+ * WHERE: elementProgress.
+ */
+function ease(t: number, easing: MotionEasing): number {
   const x = clamp01(t);
-  return 1 - (1 - x) ** 3;
+  switch (easing) {
+    case "soft":
+      /* Decelerates into place — the gentlest arrival. */
+      return 1 - (1 - x) ** 3;
+    case "sharp":
+      /* Quicker off the mark and still settled: a quintic ease-out. */
+      return 1 - (1 - x) ** 5;
+    case "overshoot": {
+      /* Back-out. 1.70158 is the standard constant for a ~10% overshoot;
+       * larger values read as a bounce rather than as confidence. */
+      const c = 1.70158;
+      return 1 + (c + 1) * (x - 1) ** 3 + c * (x - 1) ** 2;
+    }
+    default: {
+      const exhaustive: never = easing;
+      throw new Error(
+        `[motion-scene/animation] Unknown easing ${String(exhaustive)}`,
+      );
+    }
+  }
 }
 
-function easeInCubic(t: number): number {
+/* The same curves reversed, for a departure. `overshoot` is deliberately NOT
+ * mirrored: an element springing past its resting place on the way OUT reads
+ * as it being yanked, so a playful exit is simply a soft one. */
+function easeOut(t: number, easing: MotionEasing): number {
   const x = clamp01(t);
-  return x ** 3;
+  return easing === "sharp" ? x ** 5 : x ** 3;
+}
+
+/* Opacity never exceeds 1, whatever the curve did. */
+function shown(progress: number): number {
+  return clamp01(progress);
 }
 
 function clamp01(value: number): number {
@@ -227,6 +292,7 @@ export function ElementShell({
   window: visible,
   canvas,
   seconds,
+  personality,
   children,
 }: {
   animation: SceneAnimation;
@@ -235,15 +301,19 @@ export function ElementShell({
   canvas: { width: number; height: number };
   /** Seconds since the start of the beat — see TIME_IS_A_PROP. */
   seconds: number;
+  /** The style's motion personality, which decides the durations and curve. */
+  personality: MotionPersonality;
   children: ReactNode;
 }) {
   if (seconds < visible.from || seconds > visible.to) return null;
 
+  const timing = MOTION_PERSONALITY_TIMING[personality];
   const progress = elementProgress({
     seconds,
     window: visible,
     hasEntrance: animation !== "none",
     hasExit: exitAnimation !== "none",
+    timing,
   });
 
   /* Which of the two movements is showing: the exit's, once past the midpoint

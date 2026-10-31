@@ -274,7 +274,35 @@ function runBoxes(
       if (element.subhead === undefined) {
         boxes.set("text", slot);
       } else {
-        const [head, sub] = splitVertical(slot, 0.66, gap);
+        /**
+         * SOURCE OF TRUTH KEYWORDS: A_TITLE_IS_ONE_BLOCK
+         *
+         * The headline and its subhead are placed inside a CENTRED BLOCK of
+         * the slot rather than across the whole of it.
+         *
+         * Splitting the full slot 66/34 was the first implementation and the
+         * gallery is what showed it was wrong: each run centres inside its own
+         * band, so on a 9:16 frame — where `stack-center` gives a single
+         * element the entire safe rectangle — the subhead ended up a third of
+         * a frame below the headline. Two pieces of text that far apart read
+         * as two elements, not as a title with a line under it.
+         *
+         * The block is a fraction rather than fitted to the measured text,
+         * which is the honest limit of this approach: a one-line headline
+         * still sits a little high. Fitting it would mean measuring before
+         * placing and placing before measuring — the two-pass the engine
+         * deliberately does not do, because `fitTextRun` needs a box and a box
+         * would then need a height. This is a tunable number, like `GAP_VH`
+         * and the 62/38 hero split; the gallery is where it gets tuned.
+         */
+        const blockHeight = slot.height * 0.72;
+        const block: PlacedRect = {
+          x: slot.x,
+          y: slot.y + (slot.height - blockHeight) / 2,
+          width: slot.width,
+          height: blockHeight,
+        };
+        const [head, sub] = splitVertical(block, 0.64, gap);
         boxes.set("text", head);
         boxes.set("subhead", sub);
       }

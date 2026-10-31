@@ -41,7 +41,7 @@
 
 import { continueRender, delayRender, staticFile } from "remotion";
 
-import { RENDER_FONT_FAMILY } from "@/lib/captions/fonts";
+import { RENDER_FONT_FACES, RENDER_FONT_FAMILY } from "@/lib/captions/fonts";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: RENDER_FONT_FAMILY
@@ -53,12 +53,11 @@ import { RENDER_FONT_FAMILY } from "@/lib/captions/fonts";
  */
 export { RENDER_FONT_FAMILY };
 
-/* Mirrors the two weights copied into public/fonts. 400 for body, 700 for the
- * emphatic short-form text this product mostly draws. */
-const FACES: readonly { weight: "400" | "700"; file: string }[] = [
-  { weight: "400", file: "fonts/geist-sans-400.woff2" },
-  { weight: "700", file: "fonts/geist-sans-700.woff2" },
-];
+/* The face list moved to src/lib/captions/fonts.ts in Phase 16c, because a
+ * SECOND loader now needs it: the app's own preview surfaces register the same
+ * family without Remotion. Two copies of this list is how one loader ends up a
+ * weight behind the other. Grep ONE_FACE_LIST_TWO_LOADERS. */
+const FACES = RENDER_FONT_FACES;
 
 /* Module-scoped so a composition that mounts repeatedly — which the Player
  * does on every prop change — registers each face once. `document.fonts.add`

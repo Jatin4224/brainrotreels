@@ -65,6 +65,7 @@ import { z } from "zod";
 
 import type { Palette } from "@/lib/palettes";
 import type { CanvasSpec, TimeValue } from "@/lib/timeline";
+import type { MotionStyle } from "./motion-style";
 import {
   CAPTION_WEIGHTS,
   type CaptionWeight,
@@ -255,6 +256,24 @@ export interface SceneTextRoleSpec {
   maxLines: number;
   /** Multiplied by the font size to get the baseline-to-baseline distance. */
   lineHeight: number;
+  /**
+   * SOURCE OF TRUTH KEYWORDS: fontSlot, TWO_FONTS_ONE_FAMILY
+   *
+   * Which of a motion style's two fonts draws this role.
+   *
+   * WHY: this is what makes "a style names two fonts" mean something. The
+   * display slot takes the roles a viewer reads at a glance — a headline, a
+   * figure, a callout — and the body slot takes the roles they read as text.
+   * Deciding it per ROLE rather than per primitive is why a counter's label and
+   * a list item are set in the same face without either component knowing the
+   * other exists.
+   *
+   * Both slots resolve to one family today (see TWO_FONTS_ONE_FAMILY in
+   * src/lib/types/motion-style.ts), so this currently changes nothing on
+   * screen. It is wired now because retro-fitting it after a second face is
+   * licensed would mean revisiting every primitive.
+   */
+  fontSlot: "display" | "body";
 }
 
 export const SCENE_TEXT_ROLES = [
@@ -273,20 +292,56 @@ export type SceneTextRole = z.infer<typeof sceneTextRoleSchema>;
 export const SCENE_TEXT_ROLE_SPECS: Readonly<
   Record<SceneTextRole, SceneTextRoleSpec>
 > = {
-  display: { sizeVh: 9, minSizeVh: 5, weight: 700, maxLines: 3, lineHeight: 1.1 },
-  kinetic: { sizeVh: 8, minSizeVh: 5, weight: 700, maxLines: 2, lineHeight: 1.1 },
+  display: {
+    sizeVh: 9,
+    minSizeVh: 5,
+    weight: 700,
+    maxLines: 3,
+    lineHeight: 1.1,
+    fontSlot: "display",
+  },
+  kinetic: {
+    sizeVh: 8,
+    minSizeVh: 5,
+    weight: 700,
+    maxLines: 2,
+    lineHeight: 1.1,
+    fontSlot: "display",
+  },
   /* A counter is one token and must never wrap: "1,250,000" broken across two
    * lines reads as two numbers. One line, and a tighter floor than the rest,
    * because a long figure in a narrow slot has nowhere else to go. */
-  numeral: { sizeVh: 14, minSizeVh: 6, weight: 700, maxLines: 1, lineHeight: 1 },
-  body: { sizeVh: 4.6, minSizeVh: 3, weight: 400, maxLines: 3, lineHeight: 1.25 },
-  label: { sizeVh: 3.4, minSizeVh: 2.4, weight: 400, maxLines: 2, lineHeight: 1.2 },
+  numeral: {
+    sizeVh: 14,
+    minSizeVh: 6,
+    weight: 700,
+    maxLines: 1,
+    lineHeight: 1,
+    fontSlot: "display",
+  },
+  body: {
+    sizeVh: 4.6,
+    minSizeVh: 3,
+    weight: 400,
+    maxLines: 3,
+    lineHeight: 1.25,
+    fontSlot: "body",
+  },
+  label: {
+    sizeVh: 3.4,
+    minSizeVh: 2.4,
+    weight: 400,
+    maxLines: 2,
+    lineHeight: 1.2,
+    fontSlot: "body",
+  },
   callout: {
     sizeVh: 5.4,
     minSizeVh: 3.6,
     weight: 700,
     maxLines: 3,
     lineHeight: 1.15,
+    fontSlot: "display",
   },
 };
 
@@ -778,6 +833,17 @@ export interface MotionPrimitiveProps {
   element: StrictSceneElement;
   /** Its slot, its graph and its fitted text runs — see DRAWN_IS_MEASURED. */
   placed: PlacedElement;
+  /**
+   * SOURCE OF TRUTH KEYWORDS: TOKENS_MUST_CHANGE_THE_PICTURE
+   *
+   * The motion style — Phase 16c. Carried alongside the resolved `palette`
+   * rather than instead of it, because a primitive needs the colours on every
+   * line it draws and resolving `style.paletteId` ten times per frame to get
+   * them would be the lookup this prop exists to avoid. The gallery also
+   * previews a style against a palette it does not own, which only works if
+   * the two are separable.
+   */
+  style: MotionStyle;
   palette: Palette;
   canvas: CanvasSpec;
   /** When this element is on screen, in seconds from the start of the beat. */

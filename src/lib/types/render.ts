@@ -280,6 +280,8 @@ export interface RenderItemProps {
     paletteId: string;
     captionStyleId: string;
     safeZone: SafeZone;
+    /** Phase 16c — see STYLE_BELONGS_IN_THE_DOCUMENT in the timeline schema. */
+    motionStyleId?: string | undefined;
   };
 }
 

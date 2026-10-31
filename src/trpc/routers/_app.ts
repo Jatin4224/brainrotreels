@@ -38,6 +38,7 @@ import { scriptsRouter } from "./scripts";
 import { captionsRouter } from "./captions";
 import { voicesRouter } from "./voices";
 import { timelineRouter } from "./timeline";
+import { motionRouter } from "./motion";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: appRouter, AppRouter
@@ -68,6 +69,9 @@ export const appRouter = createTRPCRouter({
    * factory refuses every verb of a flag resource the plan does not include —
    * GATE_IS_THE_WHOLE_ROUTER in src/trpc/routers/timeline.ts. */
   timelineEditor: timelineRouter,
+  /* Mounted under the REGISTRY KEY, which gates the whole router including its
+   * reads — GATE_IS_THE_WHOLE_ROUTER in src/trpc/routers/motion.ts. */
+  motionStudio: motionRouter,
   usage: usageRouter,
   auditLogs: auditLogsRouter,
   member: memberRouter,

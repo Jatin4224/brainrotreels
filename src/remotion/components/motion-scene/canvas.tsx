@@ -42,6 +42,7 @@ import { createElement, type ComponentType } from "react";
 import type { Palette } from "@/lib/palettes";
 import { elementWindowSeconds, layoutScene } from "@/lib/scene";
 import type { CanvasSpec } from "@/lib/timeline";
+import type { MotionStyle } from "@/lib/types/motion-style";
 import type {
   MotionPrimitiveProps,
   Scene,
@@ -86,6 +87,7 @@ export const MOTION_PRIMITIVES: Readonly<
 
 export function MotionSceneCanvas({
   scene,
+  style,
   palette,
   canvas,
   safeZone,
@@ -93,6 +95,20 @@ export function MotionSceneCanvas({
   beatSeconds,
 }: {
   scene: Scene;
+  /**
+   * The motion style — Phase 16c. Every token in it reaches a primitive from
+   * here (TOKENS_MUST_CHANGE_THE_PICTURE): the personality sets the shell's
+   * timing and curve, the fonts reach `TextBlock` through each role's
+   * `fontSlot`, and radius and stroke reach the meter, the bars, the graph and
+   * the callout rule.
+   */
+  style: MotionStyle;
+  /**
+   * Resolved by the CALLER rather than looked up from `style.paletteId` here,
+   * because the gallery previews one style against every palette in turn —
+   * which only works if the two are separable. The render path passes
+   * `getPalette(style.paletteId)` and gets the style's own colours.
+   */
   palette: Palette;
   canvas: CanvasSpec;
   safeZone: SafeZone;
@@ -123,6 +139,7 @@ export function MotionSceneCanvas({
             window={visible}
             canvas={canvas}
             seconds={seconds}
+            personality={style.motionPersonality}
           >
             {/* `createElement`, not JSX with a capitalised local, for the same
                 reason the renderer's own dispatch uses it: assigning a
@@ -133,6 +150,7 @@ export function MotionSceneCanvas({
             {createElement(MOTION_PRIMITIVES[element.kind], {
               element,
               placed: placedElement,
+              style,
               palette,
               canvas,
               window: visible,

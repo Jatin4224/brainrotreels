@@ -72,3 +72,9 @@ export {
   scriptUserPrompt,
   wrapUntrusted,
 } from "./prompt";
+export { designMotionStyle } from "./motion-style";
+export type { DesignedMotionStyle } from "./motion-style";
+export {
+  motionStyleSystemPrompt,
+  motionStyleUserPrompt,
+} from "./motion-style-prompt";

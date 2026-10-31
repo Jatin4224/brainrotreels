@@ -39,7 +39,7 @@ import { SceneIconGlyph } from "./icons";
 import { TextBlock } from "./text-block";
 import { localProgress, runByPath } from "./util";
 
-export function Compare({ element, placed, palette }: MotionPrimitiveProps) {
+export function Compare({ element, placed, palette, style }: MotionPrimitiveProps) {
   if (element.kind !== "compare") return null;
 
   const leftLabel = runByPath(placed, "left.label");
@@ -67,16 +67,16 @@ export function Compare({ element, placed, palette }: MotionPrimitiveProps) {
         }}
       />
       {leftLabel === null ? null : (
-        <TextBlock run={leftLabel} color={palette.text} />
+        <TextBlock run={leftLabel} color={palette.text} style={style} />
       )}
       {rightLabel === null ? null : (
-        <TextBlock run={rightLabel} color={palette.text} />
+        <TextBlock run={rightLabel} color={palette.text} style={style} />
       )}
       {leftValue === null ? null : (
-        <TextBlock run={leftValue} color={palette.accent} />
+        <TextBlock run={leftValue} color={palette.accent} style={style} />
       )}
       {rightValue === null ? null : (
-        <TextBlock run={rightValue} color={palette.accent} />
+        <TextBlock run={rightValue} color={palette.accent} style={style} />
       )}
     </>
   );
@@ -89,6 +89,7 @@ export function List({
   canvas,
   window: visible,
   seconds,
+  style,
 }: MotionPrimitiveProps) {
   if (element.kind !== "list") return null;
 
@@ -109,8 +110,12 @@ export function List({
                 spread: 0.28,
               });
 
-        /* STAGGER_REUSES_THE_MOVEMENT — the element's own entrance per row. */
-        const style = animationStyle({
+        /* STAGGER_REUSES_THE_MOVEMENT — the element's own entrance per row.
+         * Named `rowEntrance` rather than `style`, which now means the MOTION
+         * STYLE in this file: a CSS object and a style token set sharing one
+         * name is how a row ends up with a `MotionStyle` in its `style`
+         * attribute and no error anywhere. */
+        const rowEntrance = animationStyle({
           animation: element.entrance === "none" ? "fade" : element.entrance,
           progress,
           canvas,
@@ -118,7 +123,7 @@ export function List({
         const markSize = Math.max(run.fontPx * 0.26, 4);
 
         return (
-          <div key={item} style={style}>
+          <div key={item} style={rowEntrance}>
             <div
               style={{
                 position: "absolute",
@@ -134,6 +139,7 @@ export function List({
                 left-aligned in a narrowed box rather than centred: a centred
                 list with a bullet to one side reads as two columns. */}
             <TextBlock
+              style={style}
               run={{
                 ...run,
                 box: {
@@ -153,7 +159,7 @@ export function List({
   );
 }
 
-export function Icon({ element, placed, palette }: MotionPrimitiveProps) {
+export function Icon({ element, placed, palette, style }: MotionPrimitiveProps) {
   if (element.kind !== "icon") return null;
 
   const label = runByPath(placed, "label");
@@ -184,7 +190,7 @@ export function Icon({ element, placed, palette }: MotionPrimitiveProps) {
         <SceneIconGlyph icon={element.icon} size={size} />
       </div>
       {label === null ? null : (
-        <TextBlock run={label} color={toneColor("neutral", palette)} />
+        <TextBlock run={label} color={toneColor("neutral", palette)} style={style} />
       )}
     </>
   );

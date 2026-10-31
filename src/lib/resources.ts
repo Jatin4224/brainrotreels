@@ -1027,6 +1027,58 @@ export const RESOURCES = {
     },
   },
 
+  /**
+   * SOURCE OF TRUTH KEYWORDS: RESOURCES.motionStudio, motionStudio.designStyle,
+   *   GATE_IS_THE_WHOLE_ROUTER, A_FLAG_NOT_A_LIMIT, METERING_COMES_WITH_THE_DESIGNER,
+   *   DESIGN_IS_A_MODEL_REQUEST
+   *
+   * Phase 16c. The motion graphics studio: AI-designed animated explainers.
+   *
+   * GATE_IS_THE_WHOLE_ROUTER, the same arrangement `timelineEditor` uses. The
+   * router is mounted under this key, so the procedure factory's flag gate
+   * refuses EVERY verb including the reads — `free: false` here is the whole
+   * of the server-side enforcement and there is no per-procedure check to
+   * forget. That matters more than usual for this resource: `designStyle`
+   * spends a model request, so a workspace without the feature must not be
+   * able to reach it by calling the procedure directly.
+   *
+   * DESIGN_IS_A_MODEL_REQUEST, which is why the rate limit is tight. Designing
+   * a style is a paid request that produces no artifact — somebody clicking it
+   * twenty times while they decide is twenty charges for nothing stored. Ten
+   * in five minutes is generous for a human and useless for a loop.
+   *
+   * METERING_COMES_WITH_THE_DESIGNER. The `motionVideos` limit the phase file
+   * specifies is deliberately NOT here yet: 16c ships the style library and
+   * the designer for a STYLE, neither of which produces a video, and a limit
+   * that nothing decrements would read as a feature somebody forgot to wire.
+   * It arrives with 16d, which is the first commit that can render one.
+   *
+   * A_FLAG_NOT_A_LIMIT for the studio itself, for the reason the phase file
+   * gives: motion is priced separately because cost per video is several times
+   * the rest of the pipeline, and the per-video metering is where that is
+   * collected — not by rationing access to the style picker.
+   */
+  motionStudio: {
+    name: "Motion studio",
+    description: "AI-designed animated explainer videos",
+    flag: {
+      perPlan: {
+        free: false,
+        starter: false,
+        pro: true,
+        enterprise: true,
+        portal: true,
+      },
+      upgradeMessage: "Upgrade to {nextPlan} for motion graphics videos",
+      /* The phase file's `availableOnFreeTrial: false`. A trial that could
+       * design styles would be a trial of the most expensive thing we sell. */
+      availableOnFreeTrial: false,
+    },
+    rateLimit: {
+      designStyle: { count: 10, window: "5 m" },
+    },
+  },
+
   invitation: {
     name: "Invitations",
     description: "Send invites and cancel pending invitations",

@@ -33,9 +33,9 @@ import type { MotionPrimitiveProps } from "@/lib/types/scene";
 
 import { animationStyle } from "./animation";
 import { TextBlock } from "./text-block";
-import { localProgress, runByPath } from "./util";
+import { localProgress, runByPath, strokePx } from "./util";
 
-export function Title({ element, placed, palette }: MotionPrimitiveProps) {
+export function Title({ element, placed, palette, style }: MotionPrimitiveProps) {
   if (element.kind !== "title") return null;
 
   const head = runByPath(placed, "text");
@@ -43,11 +43,11 @@ export function Title({ element, placed, palette }: MotionPrimitiveProps) {
 
   return (
     <>
-      {head === null ? null : <TextBlock run={head} color={palette.text} />}
+      {head === null ? null : <TextBlock run={head} color={palette.text} style={style} />}
       {sub === null ? null : (
         /* The accent, not the text colour: a subhead set in the same colour at
          * half the size reads as a headline that got cut off. */
-        <TextBlock run={sub} color={palette.accent} />
+        <TextBlock run={sub} color={palette.accent} style={style} />
       )}
     </>
   );
@@ -60,6 +60,7 @@ export function KineticText({
   canvas,
   window: visible,
   seconds,
+  style,
 }: MotionPrimitiveProps) {
   if (element.kind !== "kineticText") return null;
 
@@ -67,13 +68,14 @@ export function KineticText({
   if (run === null) return null;
 
   if (element.unit === "line") {
-    return <TextBlock run={run} color={palette.text} />;
+    return <TextBlock run={run} color={palette.text} style={style} />;
   }
 
   const words = run.lines.join(" ").split(" ").length;
 
   return (
     <TextBlock
+      style={style}
       run={run}
       color={palette.text}
       /* STAGGER_REUSES_THE_MOVEMENT — the element's own entrance, applied per
@@ -97,7 +99,7 @@ export function KineticText({
   );
 }
 
-export function Callout({ element, placed, palette }: MotionPrimitiveProps) {
+export function Callout({ element, placed, palette, style }: MotionPrimitiveProps) {
   if (element.kind !== "callout") return null;
 
   const run = runByPath(placed, "text");
@@ -116,12 +118,12 @@ export function Callout({ element, placed, palette }: MotionPrimitiveProps) {
           left: run.box.x,
           top: run.box.y + run.box.height / 2 - run.heightPx / 2 - run.fontPx * 0.45,
           width: run.box.width,
-          height: Math.max(2, run.fontPx * 0.06),
+          height: strokePx(style, run.fontPx * 0.06, 2),
           backgroundColor: colour,
           opacity: 0.9,
         }}
       />
-      <TextBlock run={run} color={colour} />
+      <TextBlock run={run} color={colour} style={style} />
     </>
   );
 }
