@@ -8,13 +8,13 @@
   or distribution is prohibited.
 -->
 
-# Phase 17 — the platform surface (17a and 17b)
+# Phase 17 — the platform surface (17a, 17b and 17c)
 
 The phase opens the product three ways: prompt-to-video footage, a public REST
-API, and an MCP server so agents can use it. **This document covers 17a, the
-shared operation seam, and 17b, the public REST API on top of it.** 17c (MCP)
-and the AI-footage half are not built — footage is blocked on an owner decision
-about the video model's commercial-use terms.
+API, and an MCP server so agents can use it. **This document covers 17a (the
+shared operation seam), 17b (the public REST API) and 17c (the MCP server).**
+The AI-footage half is not built: it is blocked on an owner decision about the
+video model's commercial-use terms.
 
 Nothing customer-facing changed. There is no new route, no key, no tool, no
 footage. What changed is where the business logic of seven verbs lives, and the
@@ -264,15 +264,12 @@ load-bearing:
   prices the verb, so the button's number, the refusal's number and the
   workflow's hold are provably the same.
 
-## What 17c inherits
+## What 17c inherited
 
-**17c is thin if 17a and 17b were done properly:** seven tools over the same
-seven operation functions, structured JSON plus a one-line human summary, and
-tool descriptions that say a client disconnect never cancels server-side work —
-because the work lives in Inngest and an agent must not retry a render it
-already started. It needs no new gate, no new key model and no new failure
-vocabulary; it needs a third translation table, and the two that exist show
-what one looks like.
+It turned out to be exactly what the seam promised: no new gate, no new key
+model, no new failure vocabulary, and no business logic of its own. The 17c
+section below is mostly about the protocol, because that was the only part
+left to decide.
 
 ## What has never run
 
@@ -542,4 +539,246 @@ Unchanged in kind from every phase since 02, and specific here:
   makes but for a weaker reason — here it means a retry can double-charge. It
   is the one piece of this phase that genuinely requires Redis in production
   rather than merely benefiting from it.
+
+---
+
+# 17c — the MCP server
+
+One endpoint, eight tools, and the same key. `/api/mcp` speaks JSON-RPC and
+calls the same operation functions the REST API calls, so an agent and a
+customer's script get identical behaviour from identical rules.
+
+## Where 17c's code lives
+
+| Path | Contains | Touches the database? |
+| --- | --- | --- |
+| `src/lib/api/mcp.ts` | JSON-RPC and MCP envelopes, version negotiation | **no** |
+| `src/lib/api/mcp-tools.ts` | the tool table, bound to operations | via operations |
+| `src/app/api/mcp/route.ts` | the transport: parse, authenticate, dispatch | no |
+| `src/lib/api/authenticate.ts` | **moved up** from the REST folder, now shared | via the service |
+| `src/lib/api/gates.ts` | **extracted**, so both surfaces gate identically | via the gate |
+
+## The seam held, which is the headline
+
+17c added **no business logic**. Every rule it needs already existed: the
+operations from 17a, the gate order from 17b, the key check from 17b. A tool
+is a name, a description, a schema, a metered resource, a summary sentence
+and a one-line call to an operation.
+
+That is the test 17a was written to pass. If a tool had needed to re-check a
+plan or re-derive a price, the seam would have failed at its own purpose —
+and the failure would have been invisible, because the tool would still work.
+
+### Two things moved up to make it true
+
+Writing 17c surfaced that two pieces of 17b were in the wrong place:
+
+- **`authenticateApiKey`** lived under `src/app/api/v1/_lib/` and returned a
+  `Response`. MCP needs the identical sequence — shape check, digest lookup,
+  revocation filter, `apiAccess` flag, per-key daily quota — so it moved to
+  `src/lib/api/` and now returns a **refusal as data**: a code, a message, a
+  status and headers. Each surface renders it.
+- **The gate order** was inline in `runApiRoute`. It is now
+  `checkApiEntitlements` and `countApiUsage` in `src/lib/api/gates.ts`,
+  because the thing most easily got wrong is not which gates but their order
+  and which runs before the work.
+
+Neither was a rewrite; both were a function moving one directory up and
+returning data instead of HTTP. But leaving them where they were would have
+meant a second copy of the gate sequence in the MCP dispatcher — the exact
+drift the phase warns about, and silent: an MCP server that forgot the
+`apiAccess` check would work perfectly for a paying workspace and quietly
+serve a free one.
+
+## No SDK, and the conditions under which that is wrong
+
+`@modelcontextprotocol/sdk` is not a dependency of this project and was not
+added. That deserves an argument rather than a shrug.
+
+**What this server is:** eight tools, no resources, no prompts, no sampling,
+no roots, no server-initiated messages, no sessions. Every call is one POST
+in and one JSON object out. The protocol surface that leaves is three methods
+— `initialize`, `tools/list`, `tools/call` — plus a notification to ignore
+and a ping to answer. That is one file of envelope construction, and it is
+testable without a transport.
+
+**What the SDK is mostly for** is the part this server does not use: session
+management, the SSE stream for server-initiated messages, and the client
+side. Taking it would put a dependency with a moving API into a route handler
+that runs on every agent call, to save about a hundred lines, and would make
+the wire format something read from a changelog rather than from a file.
+
+**When this becomes the wrong call**, stated so the next person can reverse
+it without re-deriving the argument: the moment this server needs
+**resources**, **prompts**, **sampling** or a **server-initiated stream**,
+the SDK is the right answer and `src/lib/api/mcp.ts` becomes a liability. It
+is sized for exactly what step 14 asks for and nothing beyond it.
+
+## A tool failure is not a protocol failure
+
+The distinction that matters most to an agent, and the one most easily got
+wrong.
+
+A tool that could not do its job — no such project, not enough credits, a
+plan that does not include the API — returns a **successful JSON-RPC
+response** carrying `isError: true` and the message. A JSON-RPC **error** is
+for the protocol being broken: an unknown method, a malformed envelope, a
+tool name that does not exist.
+
+Getting this backwards is worse than it looks. Reporting "not enough
+credits" as a JSON-RPC error hides it inside the client's transport layer,
+where the model never sees it — the model is told only that the tool call
+failed, with nothing to act on. The whole point of returning it as a result
+is that the model **reads the sentence and adapts**, which is why the
+operations' own customer-facing messages travel through unchanged.
+
+The one exception is an unknown tool name, which is a client working from a
+`tools/list` it never read. That is the protocol being used wrongly, so it is
+a `methodNotFound`.
+
+## The description is the interface
+
+This is where MCP differs most from REST, and it changed how the tools were
+written. A REST client is read by a programmer with the documentation open; a
+**tool description is read by a model** deciding whether to call it, with
+nothing else to go on.
+
+So each description says what the tool does, **what it costs**, and **what
+happens next**. A model that does not know a render is asynchronous will poll
+nothing; one that does not know a script costs credits cannot warn anybody.
+
+### Work outliving the connection is in the descriptions
+
+Step 16 asks for this and the descriptions are the only place it can live.
+The expensive verbs queue durable work in Inngest: a disconnect, a timeout or
+a client restart cancels nothing. An agent that retries `start_render` after
+losing its connection has started a **second paid render**.
+
+A test asserts that `generate_script` and `start_render` both say *"do not
+retry"* and both say `COSTS CREDITS`. That assertion earns its place because
+nothing else would catch a tool added without the caveat — the types are
+fine, the tool works, and the only symptom is a customer billed twice.
+
+### `instructions` carries the order
+
+The `initialize` result includes `instructions`, which is read once by the
+model. It states the **sequence** — project, script, voices, render, poll,
+download — because that is the one thing eight independent tool descriptions
+cannot convey. A model holding eight descriptions still has to work out that
+a render needs a script and a script needs a project.
+
+## Structured JSON plus a sentence
+
+Step 15, and MCP's own result shape fits it exactly: `content` is what a
+person watching the agent reads, `structuredContent` is what the model
+parses. Sending only one makes either the transcript unreadable or the data
+unusable.
+
+The summary is a **function of the result**, not a constant, because the
+sentence worth reading is about what happened: *"Render queued, costing 12
+credits"* and *"This video had already been rendered, so nothing was
+charged"* are the same tool and genuinely different outcomes.
+
+## Eight tools, not seven
+
+The phase file names seven. `list_voices` is the eighth, and it is here
+because **`assign_voices` is unusable without it** — a model has no other way
+to learn a voice id, and telling it to read a REST catalogue it cannot call
+would be a dead end. The REST surface has three catalogues; the MCP surface
+exposes the two an agent needs to finish a video.
+
+## What MCP does not have, and will not pretend to
+
+**No idempotency key.** MCP has no header for one and nowhere for a model to
+put it, so this surface does **not** have the REST API's replay guarantee.
+What protects a customer from a duplicated render is the description telling
+the model not to retry, plus the reuse rule, which makes a second identical
+render free. A second *script* is not free, which is why that description
+carries the same caveat. This is a real gap and it is stated rather than
+papered over.
+
+**No event stream.** A GET on an MCP endpoint means "open a stream for
+server-initiated messages", and this server never initiates any. It answers
+405 with a sentence, so a client learns that in one request rather than
+holding a connection open for messages that will never come. A client that
+*requires* the stream will not work here; the fix would be a GET handler, not
+a redesign.
+
+**No sessions.** A DELETE ends a session and there is none to end. Also
+answered with a sentence rather than Next's bodiless 405.
+
+## The transport details that bite
+
+Writing the protocol by hand means these are ours to get right, so they are
+tested rather than assumed:
+
+- **A notification wants no answer.** `notifications/initialized` carries no
+  id and gets a 202 with an empty body. Answering it is a violation some
+  clients treat as a hard error. An explicit `id: null` counts as a
+  notification too, because some clients send it that way.
+- **Version negotiation echoes what we support.** Three revisions are
+  accepted, newest first, because agent clients upgrade on their own
+  schedule and the tool surface is identical across them. An unknown version
+  gets our newest and the client decides.
+- **Auth failures use HTTP status codes** as well as a JSON-RPC body. An MCP
+  client's transport looks for bearer failures at the HTTP level, which is
+  where its own authorization flow lives; anything reading the body still
+  gets a well-formed JSON-RPC error rather than a bare page.
+- **Batches are refused.** The 2025-06-18 revision removed them, so accepting
+  an array would mean implementing semantics the current specification does
+  not have.
+
+## One TypeScript problem worth recording
+
+The tool table is heterogeneous — every entry has different input and output
+types — so a plain array of them is a union that, after a lookup by name, no
+longer knows element N's schema produces exactly what element N's operation
+accepts. The pairing is real and the type system cannot carry it through the
+lookup.
+
+The fix is `defineTool`, a generic factory where each tool's two types are
+closed over **once**: parse, run, count and summarise all happen inside, where
+the relationship is still visible, and what comes out is a uniform
+`BoundTool` whose `invoke` takes `Record<string, unknown>`. No `any`, no
+assertion, and no way to hand one tool's input to another's operation.
+
+The first attempt used `as const` with `satisfies` per entry and a cast at the
+call site. It type-checked in places and lied — which is the usual outcome of
+casting around a lost relationship rather than restoring it.
+
+## Step 17: the developers screen
+
+The MCP endpoint and a **copy-paste config block**, because an endpoint is
+useless without the JSON that goes into a client's config file and nobody
+types one from a description. The key in it is a placeholder: the real one is
+shown once, above, and pasting a live credential into a block that also gets
+screenshotted is how keys leak.
+
+Two small things that were load-bearing:
+
+- **The origin comes from the server.** The snippets contain a URL, and it
+  has to be the deployment the customer is looking at — a config copied from
+  a preview and silently pointing at production is a mistake nobody spots in
+  a code block. The page reads the request headers and passes it down, rather
+  than an effect reading `window.location` (which the
+  `react-hooks/set-state-in-effect` rule catches) or a render-time read
+  (which would differ between server and client markup).
+- **The tool count is read from the table**, not written in the copy, so
+  adding a tool cannot leave the screen claiming the wrong number.
+
+## What has never run
+
+- `tsc` clean, lint clean, **1438 tests passing** (25 new).
+- **No agent has ever connected.** The envelopes, the notification handling,
+  version negotiation, the tool catalogue's shape and the descriptions'
+  promises are genuinely verified — they are pure and they are tested. The
+  handshake against a real client, the gate pipeline and every tool's actual
+  work need a database and a Redis, and this machine has had neither since
+  Phase 05.
+- **The protocol is unverified against a real client**, which is the specific
+  risk of writing it by hand. The envelopes match the specification as read,
+  and no Claude or Cursor client has confirmed that. First connection is the
+  test.
+- `next build` still fails here for the pre-existing font-fetch reason in
+  `src/app/layout.tsx`; nothing under `api/` is implicated.
 

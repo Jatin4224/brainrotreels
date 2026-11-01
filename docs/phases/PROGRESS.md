@@ -88,17 +88,19 @@ worse than an empty box.
       Claude, and the whole motion pipeline (Neon has been unreachable since Phase 05). Two gaps
       are not code gaps — only one font family is bundled, and `stack-center` holds three list
       items plus a heading in a vertical frame, not four. See the four notes.
-- [ ] Phase 17: Platform surface — **17a and 17b are built; 17c and the AI-footage half are not.**
-      17a is the shared operation seam: the business logic of the seven multi-surface verbs lives in
+- [ ] Phase 17: Platform surface — **17a, 17b and 17c are built; the AI-footage half is not.**
+      17a is the shared operation seam: the business logic of the multi-surface verbs lives in
       `src/lib/api/operations/`, behind an explicit `OperationContext` and a transport-neutral
       failure vocabulary, and the web app's routers call it through `runOperation`. 17b is the
-      public REST API on top of it: the `ApiKey` model, nine route files under `/api/v1`, one
-      pipeline applying the SAME registry gates the procedure factory applies, `Idempotency-Key`
-      with fingerprinting, cursor pagination, a generated OpenAPI 3.1 document, and the developers
-      screen. Still missing: the MCP server (17c), and AI footage — which is **blocked on an owner
-      decision** (commercial-use terms for the chosen video model) and must not be started before it
-      is settled. **No HTTP request has ever reached the API**: the pure halves are tested (40 new
-      tests), the pipeline needs a database and a Redis. See docs/27-phase17.md.
+      public REST API: the `ApiKey` model, nine route files under `/api/v1`, one pipeline applying
+      the SAME registry gates the procedure factory applies, `Idempotency-Key` with fingerprinting,
+      cursor pagination, a generated OpenAPI 3.1 document, and the developers screen. 17c is the MCP
+      server at `/api/mcp` — eight tools over the same operations, JSON-RPC written by hand rather
+      than with the SDK (argued in the note), and the copy-paste agent config. **AI footage is
+      blocked on an owner decision** (commercial-use terms for the chosen video model) and must not
+      be started before it is settled. **No HTTP request has ever reached either surface and no
+      agent has ever connected**: the pure halves are tested (65 new tests across 17b and 17c), the
+      pipelines need a database and a Redis. See docs/27-phase17.md.
 
 ## Blocked on an owner decision
 
@@ -3114,3 +3116,91 @@ no deduplication** — idempotency degrades to "every request runs", which is th
 rate limiting makes but for a weaker reason, since here it means a retry can double-charge. It is the
 one piece of this phase that genuinely requires Redis in production rather than merely benefiting
 from it.
+
+### Phase 17c — 2026-11-01
+
+The MCP server. One endpoint, eight tools, the same key, and no business logic of its own — which is
+the headline rather than a modesty note.
+
+**The seam held.** 17c added NO rules. Every one it needs already existed: the operations from 17a,
+the gate order from 17b, the key check from 17b. A tool is a name, a description, a schema, a
+metered resource, a summary sentence and a one-line call. That was the test 17a was written to pass
+— if a tool had needed to re-check a plan or re-derive a price, the seam would have failed at its own
+purpose, and invisibly, because the tool would still have worked.
+
+**Two pieces of 17b moved up to make that true.** `authenticateApiKey` lived under
+`src/app/api/v1/_lib/` and returned a `Response`; it now lives in `src/lib/api/` and returns a
+REFUSAL AS DATA (code, message, status, headers) that each surface renders. The gate order was inline
+in `runApiRoute`; it is now `checkApiEntitlements` and `countApiUsage` in `src/lib/api/gates.ts`.
+Neither was a rewrite, but leaving them would have meant a SECOND COPY of the gate sequence in the
+MCP dispatcher — the exact drift the phase warns about, and silent: an MCP server that forgot the
+`apiAccess` check would work perfectly for a paying workspace and quietly serve a free one. Grep
+`ONE_AUTHENTICATION_TWO_SURFACES`, `ONE_GATE_ORDER_TWO_SURFACES`.
+
+**No MCP SDK, deliberately, with the reversal condition written down.** This server is eight tools,
+no resources, no prompts, no sampling, no roots, no server-initiated messages and no sessions — so
+the protocol surface is three methods plus a notification to ignore and a ping to answer. That is one
+file of envelope construction, testable without a transport. What the SDK is mostly for is the part
+we do not use: sessions, the SSE stream, and the client side. **When this becomes the wrong call:**
+the moment the server needs resources, prompts, sampling or a server-initiated stream, the SDK is
+right and `src/lib/api/mcp.ts` becomes a liability. Grep `NO_SDK_FOR_A_STATELESS_SERVER`.
+
+**A tool failure is NOT a protocol failure**, and getting it backwards is worse than it looks. A tool
+that could not do its job — no such project, not enough credits, a plan without the API — returns a
+SUCCESSFUL JSON-RPC response with `isError: true` and the message, because the MODEL is supposed to
+read it and adapt. Reporting "not enough credits" as a JSON-RPC error hides it inside the client's
+transport layer, where the model is told only that the call failed. The one exception is an unknown
+tool NAME, which means the client never read `tools/list` — that is the protocol being used wrongly
+and gets a `methodNotFound`. Grep `A_TOOL_FAILURE_IS_NOT_A_PROTOCOL_FAILURE`.
+
+**The description IS the interface**, which is where MCP differs most from REST. A REST client is
+read by a programmer with the docs open; a tool description is read by a model with nothing else to
+go on. So each one says what the tool does, WHAT IT COSTS, and WHAT HAPPENS NEXT. Step 16's
+"disconnects never cancel server-side work" lives there too: an agent that retries `start_render`
+after a dropped connection has started a SECOND PAID RENDER. A test asserts that `generate_script`
+and `start_render` both say "do not retry" and both say COSTS CREDITS — it earns its place because
+nothing else would catch a tool added without the caveat: the types are fine, the tool works, and the
+only symptom is a customer billed twice. Grep `THE_DESCRIPTION_IS_THE_INTERFACE`,
+`WORK_OUTLIVES_THE_CONNECTION`.
+
+**`instructions` carries the ORDER.** The `initialize` result includes it, which is the one place to
+say project → script → voices → render → poll → download. Eight independent descriptions cannot
+convey a sequence.
+
+**Eight tools, not seven.** `list_voices` is the extra one and it is necessary:
+`assign_voices` is unusable without it, since a model has no other way to learn a voice id and
+telling it to read a REST catalogue it cannot call would be a dead end.
+
+**What MCP does not have, and will not pretend to.** NO IDEMPOTENCY KEY — the protocol has no header
+for one and nowhere for a model to put it, so this surface lacks the REST API's replay guarantee.
+What protects a customer is the description telling the model not to retry plus the reuse rule, which
+makes a second identical render free; a second SCRIPT is not free, which is why that description
+carries the same caveat. A real gap, stated rather than papered over. Also no event stream (a GET
+gets 405 with a sentence, so a client learns in one request rather than holding a connection open
+for messages that never come) and no sessions (a DELETE likewise).
+
+**One TypeScript problem worth recording.** The tool table is heterogeneous, so after a lookup by
+name the union no longer knows element N's schema produces what element N's operation accepts — the
+pairing is real and the type system cannot carry it through the lookup. The fix is `defineTool`, a
+generic factory where each tool's two types are closed over ONCE: parse, run, count and summarise all
+happen inside, and what comes out is a uniform `BoundTool`. No `any`, no assertion. The first
+attempt used `as const` with per-entry `satisfies` and a cast at the call site; it type-checked in
+places and lied, which is the usual outcome of casting around a lost relationship instead of
+restoring it. Grep `THE_FACTORY_CLOSES_OVER_THE_TYPES`.
+
+**Step 17, the developers screen**, gained the MCP endpoint and a COPY-PASTE config block, because an
+endpoint is useless without the JSON that goes into a client's config and nobody types one from a
+description. The key in it is a placeholder: the real one is shown once and pasting a live credential
+into a block that gets screenshotted is how keys leak. Two small load-bearing details: the ORIGIN
+comes from the server (the page reads the request headers and passes it down, so a config copied from
+a preview cannot silently point at production — an effect reading `window.location` trips
+`react-hooks/set-state-in-effect` and a render-time read would differ between server and client
+markup), and the TOOL COUNT is read from the table rather than written in the copy.
+
+**What has never run.** No agent has ever connected. Verified by the 25 new tests: the JSON-RPC
+envelopes, notification handling (including an explicit `id: null`), version negotiation, batch
+refusal, the tool catalogue's shape, and the descriptions' promises about cost and retries. NOT
+verified: the protocol against a real client, which is the specific risk of writing it by hand — the
+envelopes match the specification as read, and no Claude or Cursor client has confirmed that. First
+connection is the test. The gate pipeline and every tool's actual work need a database and a Redis,
+and this machine has had neither since Phase 05.

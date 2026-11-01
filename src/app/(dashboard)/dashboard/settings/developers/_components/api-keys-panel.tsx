@@ -88,7 +88,62 @@ import { useActiveOrganizationId } from "@/hooks/use-active-organization";
 import { createApiKeySchema, type CreateApiKeyValues } from "@/lib/types/api";
 import { trpc } from "@/trpc/react-provider";
 
-export function ApiKeysPanel() {
+/**
+ * SOURCE OF TRUTH KEYWORDS: mcpConfig, THE_CONFIG_IS_COPY_PASTE
+ *
+ * The block that goes into an agent client's config file. Written out here
+ * rather than described, because the difference between "we have an MCP
+ * server" and somebody actually using it is whether they had to work out the
+ * JSON themselves.
+ *
+ * The shape is the one Claude and Cursor both read for a remote server: a
+ * named entry with a `url` and the headers to send. The key is a placeholder
+ * on purpose — the real one is shown once, above, and pasting a live
+ * credential into a block that also gets screenshotted is how keys leak.
+ */
+function mcpConfig(origin: string): string {
+  return JSON.stringify(
+    {
+      mcpServers: {
+        brainrotreels: {
+          url: `${origin}/api/mcp`,
+          headers: { Authorization: "Bearer brr_live_…" },
+        },
+      },
+    },
+    null,
+    2,
+  );
+}
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: ApiKeysPanel, THE_ORIGIN_COMES_FROM_THE_SERVER
+ *
+ * THE_ORIGIN_COMES_FROM_THE_SERVER. The snippets below contain a URL, and it
+ * has to be the URL of the deployment the customer is looking at — a curl
+ * command or an MCP config copied from a preview and silently pointing at
+ * production is a mistake nobody spots in a code block.
+ *
+ * It is a PROP rather than `window.location.origin` in an effect for two
+ * reasons: an effect that only sets state is the pattern
+ * `react-hooks/set-state-in-effect` exists to catch, and reading `window`
+ * during render would make the server's markup differ from the client's. The
+ * page is already a server component, so it knows the host from the request
+ * headers and passes it down — no effect, no hydration mismatch, and accurate
+ * on every deployment.
+ */
+export function ApiKeysPanel({
+  origin,
+  toolCount,
+}: {
+  origin: string;
+  /**
+   * How many MCP tools exist, counted from the table rather than written
+   * here. A number in prose goes stale the first time a tool is added, and
+   * the panel cannot import the table itself — it is `server-only`.
+   */
+  toolCount: number;
+}) {
   const organizationId = useActiveOrganizationId();
   const utils = trpc.useUtils();
 
@@ -294,15 +349,61 @@ export function ApiKeysPanel() {
       >
         <div className="flex flex-col gap-4">
           <pre className="bg-muted overflow-x-auto rounded-md p-4 text-xs">
-            {`curl -X POST ${"https://your-app/api/v1/projects"} \\
+            {`curl -X POST ${origin}/api/v1/projects \\
   -H "Authorization: Bearer brr_live_…" \\
   -H "Content-Type: application/json" \\
   -d '{"title":"My video","kind":"voiceover","aspect":"9:16"}'`}
           </pre>
           <p className="text-muted-foreground text-sm">
             The machine-readable description lives at{" "}
-            <code className="font-mono text-xs">/api/v1/openapi.json</code> —
-            point a client generator at it rather than hand-writing types.
+            <a
+              href="/api/v1/openapi.json"
+              className="underline underline-offset-4"
+              target="_blank"
+              rel="noreferrer"
+            >
+              <code className="font-mono text-xs">/api/v1/openapi.json</code>
+            </a>{" "}
+            — point a client generator at it rather than hand-writing types.
+          </p>
+        </div>
+      </SettingsSection>
+
+      {/* SOURCE OF TRUTH KEYWORDS: THE_CONFIG_IS_COPY_PASTE
+          The phase's step 17. An MCP endpoint is useless without the JSON
+          block that goes into a client's config file, and nobody types one
+          from a description — so it is rendered ready to copy, with the real
+          origin in it rather than a placeholder somebody has to notice. */}
+      <SettingsSection
+        title="Agents (MCP)"
+        description="Let Claude, Cursor or your own agent make videos with the same key."
+        label="MCP server"
+        labelDescription={`${toolCount} tools: create a project, write a script, assign voices, render, poll, download, and browse the catalogues.`}
+        contentWidth="full"
+      >
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-1">
+            <p className="text-sm font-medium">Endpoint</p>
+            <code className="bg-muted overflow-x-auto rounded-md p-3 font-mono text-xs">
+              {`${origin}/api/mcp`}
+            </code>
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <p className="text-sm font-medium">Configuration</p>
+            <p className="text-muted-foreground text-sm">
+              Paste this into your client&apos;s MCP config, replacing the key
+              with one from above.
+            </p>
+            <pre className="bg-muted overflow-x-auto rounded-md p-4 text-xs">
+              {mcpConfig(origin)}
+            </pre>
+          </div>
+
+          <p className="text-muted-foreground text-sm">
+            Rendering and script writing cost credits and keep running after
+            the tool returns, so an agent should poll rather than retry. The
+            tool descriptions say so, and they are what the model reads.
           </p>
         </div>
       </SettingsSection>

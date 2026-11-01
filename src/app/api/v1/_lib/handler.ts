@@ -5,7 +5,8 @@
 /**
  * SOURCE OF TRUTH KEYWORDS: runApiRoute, ONE_PIPELINE_EVERY_ROUTE,
  *   THE_GATE_IS_CALLED_NOT_REIMPLEMENTED, QUOTAS_ARE_SHARED_PER_ORGANIZATION,
- *   COUNTED_AFTER_SUCCESS, A_ROUTE_IS_FOUR_LINES
+ *   COUNTED_AFTER_SUCCESS, A_ROUTE_IS_FOUR_LINES,
+ *   THE_REFUSAL_IS_RENDERED_NOT_DECIDED
  *
  * WHAT:  Everything that happens around a shared operation on the REST
  *        surface: authenticate, gate, validate, deduplicate, run, envelope,
@@ -20,30 +21,18 @@
  *        same argument that puts the gates in the tRPC procedure factory
  *        rather than trusting each handler.
  *
- *        THE_GATE_IS_CALLED_NOT_REIMPLEMENTED. Every entitlement decision is a
- *        call into `src/lib/feature-gate.ts`, reading the same registry
- *        entries the web app reads. There is no plan comparison and no limit
- *        arithmetic in this file.
+ *        THE_REFUSAL_IS_RENDERED_NOT_DECIDED. The decisions — who the caller
+ *        is, whether their plan includes the API, whether they are over a
+ *        quota — live in `src/lib/api/authenticate.ts` and
+ *        `src/lib/api/gates.ts`, because 17c's MCP server makes exactly the
+ *        same ones. This file's job is to render what they decided as HTTP:
+ *        a status, the `{ error, requestId }` envelope, and any headers the
+ *        refusal implies. A second copy of the gate ORDER on the MCP side is
+ *        the drift the phase warns about, so there is only one.
  *
- *        QUOTAS_ARE_SHARED_PER_ORGANIZATION, which is the phase file's step 12
- *        and its most easily misread done-when: "burning the API quota does
- *        not block the same workspace's UI jobs beyond the shared cap — and
- *        the shared cap is the intended behaviour, not a bug". So a render
- *        started through the API counts against the SAME monthly `renders`
- *        limit the dashboard counts against, because it is the same video on
- *        the same plan. What is NOT shared is the per-key daily quota, which
- *        is a blast radius rather than an entitlement — see the authenticator.
- *
- *        COUNTED_AFTER_SUCCESS. `apiCalls` and the verb's own resource are
- *        incremented only once the operation has returned, mirroring the
- *        factory's "increments after the handler". A refused request must not
- *        consume the allowance it was refused by, or a workspace at its limit
- *        would be unable to discover that it is at its limit.
- *
- *        A REPLAYED request counts nothing, because it did nothing. That is
- *        the one place this file deliberately differs from "count every
- *        request": charging twice for a deduplicated retry would make the
- *        idempotency key a liability.
+ *        COUNTED_AFTER_SUCCESS, and a REPLAYED request counts nothing because
+ *        it did nothing — charging twice for a deduplicated retry would make
+ *        the idempotency key a liability.
  * WHERE: Every route under src/app/api/v1/.
  */
 
@@ -51,14 +40,13 @@ import "server-only";
 
 import type { z } from "zod";
 
+import { authenticateApiKey } from "@/lib/api/authenticate";
+import { checkApiEntitlements, countApiUsage } from "@/lib/api/gates";
 import { OperationError, isOperationError } from "@/lib/errors";
-import { checkFeatureGate } from "@/lib/feature-gate";
 import { resolveRequestId } from "@/lib/observability";
 import type { LimitResourceKey } from "@/lib/resources";
 import { API_ERROR_CODES, type OperationContext } from "@/lib/types/api";
-import { incrementUsage } from "@/services/usage.service";
 
-import { authenticateApiRequest } from "./authenticate";
 import {
   OPERATION_FAILURE_TO_API_ERROR,
   apiFail,
@@ -86,6 +74,11 @@ export interface ApiRouteConfig<TInput, TOutput> {
    * nothing beyond the `apiCalls` quota every request pays.
    */
   resource?: LimitResourceKey;
+  /** POSTs honour `Idempotency-Key`; reads have nothing to deduplicate. */
+  idempotent?: boolean;
+  /** 201 for a creation, which is the only reason to override 200. */
+  successStatus?: number;
+  run: (operation: OperationContext, input: TInput) => Promise<TOutput>;
   /**
    * SOURCE OF TRUTH KEYWORDS: countOnSuccess, THE_GATE_ALWAYS_THE_COUNTER_SOMETIMES
    *
@@ -104,11 +97,6 @@ export interface ApiRouteConfig<TInput, TOutput> {
    * report is spent.
    */
   countOnSuccess?: (output: TOutput) => boolean;
-  /** POSTs honour `Idempotency-Key`; reads have nothing to deduplicate. */
-  idempotent?: boolean;
-  /** 201 for a creation, which is the only reason to override 200. */
-  successStatus?: number;
-  run: (operation: OperationContext, input: TInput) => Promise<TOutput>;
 }
 
 export async function runApiRoute<TInput, TOutput>(
@@ -117,8 +105,20 @@ export async function runApiRoute<TInput, TOutput>(
 ): Promise<Response> {
   const requestId = resolveRequestId(request.headers);
 
-  const auth = await authenticateApiRequest(request, requestId);
-  if (!auth.ok) return auth.response;
+  const auth = await authenticateApiKey({
+    authorization: request.headers.get("authorization"),
+    requestId,
+  });
+  if (!auth.ok) {
+    /* THE_REFUSAL_IS_RENDERED_NOT_DECIDED — the decision was made in lib. */
+    return apiFail(
+      auth.refusal.code,
+      auth.refusal.message,
+      auth.refusal.status,
+      requestId,
+      auth.refusal.headers,
+    );
+  }
   const { operation } = auth.caller;
 
   /* Read ONCE: a Request body is a stream and reading it twice throws. The
@@ -137,37 +137,21 @@ export async function runApiRoute<TInput, TOutput>(
     }
   }
 
-  /**
-   * COUNTED_AFTER_SUCCESS, but CHECKED here — before the body is even parsed,
-   * because a workspace over its quota should be told so for the price of one
-   * gate read rather than after we have done the work.
-   *
-   * Two gates, both from the registry: the API's own call allowance and the
-   * verb's own metered resource (QUOTAS_ARE_SHARED_PER_ORGANIZATION).
-   */
-  const callGate = await checkFeatureGate(operation.organizationId, "apiCalls");
-  if (!callGate.allowed) {
+  /* Checked BEFORE the body is parsed, because a workspace over its quota
+   * should be told so for the price of one gate read rather than after we have
+   * done the work. The order of the two gates lives in lib/api/gates.ts, so
+   * the MCP server applies the same one. */
+  const entitlements = await checkApiEntitlements({
+    organizationId: operation.organizationId,
+    resource: config.resource,
+  });
+  if (!entitlements.allowed) {
     return apiFail(
-      API_ERROR_CODES.quota_exceeded,
-      callGate.reason ?? callGate.upgradeMessage,
-      429,
+      entitlements.refusal.code,
+      entitlements.refusal.message,
+      entitlements.refusal.status,
       requestId,
     );
-  }
-
-  if (config.resource !== undefined) {
-    const resourceGate = await checkFeatureGate(
-      operation.organizationId,
-      config.resource,
-    );
-    if (!resourceGate.allowed) {
-      return apiFail(
-        API_ERROR_CODES.quota_exceeded,
-        resourceGate.reason ?? resourceGate.upgradeMessage,
-        429,
-        requestId,
-      );
-    }
   }
 
   const parsed = parseInput(config, request, rawBody);
@@ -218,17 +202,14 @@ export async function runApiRoute<TInput, TOutput>(
   try {
     const output = await config.run(operation, parsed.value);
 
-    /* COUNTED_AFTER_SUCCESS — both counters, after the work, never on a
-     * refusal. A replay reaches neither, because it did nothing. */
-    await incrementUsage(operation.organizationId, "apiCalls", 1);
-
-    /* THE_GATE_ALWAYS_THE_COUNTER_SOMETIMES — the gate above ran whatever
-     * happened; this follows what the operation reports it did. */
-    const consumed =
-      config.countOnSuccess === undefined || config.countOnSuccess(output);
-    if (config.resource !== undefined && consumed) {
-      await incrementUsage(operation.organizationId, config.resource, 1);
-    }
+    /* COUNTED_AFTER_SUCCESS — after the work, never on a refusal, and never on
+     * a replay because a replay reaches neither branch. */
+    await countApiUsage({
+      organizationId: operation.organizationId,
+      resource: config.resource,
+      consumed:
+        config.countOnSuccess === undefined || config.countOnSuccess(output),
+    });
 
     const status = config.successStatus ?? 200;
     const body = JSON.stringify({ data: output, requestId });
