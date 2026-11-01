@@ -1169,6 +1169,96 @@ export const RESOURCES = {
     },
   },
 
+  /**
+   * SOURCE OF TRUTH KEYWORDS: RESOURCES.apiAccess, A_FLAG_NOT_A_LIMIT,
+   *   THE_QUOTA_IS_THE_SIBLING_ENTRY
+   *
+   * Phase 17b. Whether this workspace may use the public REST API and the
+   * MCP server at all.
+   *
+   * A_FLAG_NOT_A_LIMIT, and the split from `apiCalls` below is the whole
+   * design: this entry answers "may you call us", and `apiCalls` answers "how
+   * often". Collapsing them would mean either giving every free workspace a
+   * key with a small quota — a support surface and an abuse surface for no
+   * revenue — or rationing access to a feature that is sold as unlimited on
+   * enterprise.
+   *
+   * It carries no `nav` because there is no screen for it. The screen is
+   * `apiKeys` below, which is where a customer goes to do something.
+   */
+  apiAccess: {
+    name: "API access",
+    description: "Use the public REST API and the MCP server",
+    flag: {
+      perPlan: {
+        free: false,
+        starter: false,
+        pro: true,
+        enterprise: true,
+        portal: true,
+      },
+      upgradeMessage: "Upgrade to {nextPlan} to use the API",
+      /* A trial that could mint API keys would be a trial of the thing most
+       * worth abusing: a key outlives the trial window in a script
+       * somewhere, and revoking it is a support conversation. */
+      availableOnFreeTrial: false,
+    },
+  },
+
+  /**
+   * SOURCE OF TRUTH KEYWORDS: RESOURCES.apiKeys, SHOWN_ONCE_NEVER_AGAIN,
+   *   REVOKED_NOT_DELETED, THE_KEY_IS_THE_PROCEDURE_NAME
+   *
+   * Phase 17b. Minting, listing and revoking the credentials themselves.
+   *
+   * Separate from `apiAccess` because it is a RESOURCE WITH PERMISSIONS: who
+   * on a team may mint a credential that acts for the whole workspace is a
+   * different question from whether the workspace has the feature, and it is
+   * one an owner should be able to answer with a custom role. A key is
+   * org-scoped authority, so `create` is the most consequential permission on
+   * this screen.
+   *
+   * The audit templates name the PREFIX rather than the id, because that is
+   * what a person recognises when they come back to work out which key did
+   * something — and it is the only part of a key we still have
+   * (SHOWN_ONCE_NEVER_AGAIN).
+   *
+   * THE_KEY_IS_THE_PROCEDURE_NAME: the rate-limit keys below must spell their
+   * procedures exactly, because the factory resolves them from the tRPC path.
+   * Five mints an hour is the phase file's own number and is generous for a
+   * human — a key is minted once and lives in a deploy config.
+   */
+  apiKeys: {
+    name: "API keys",
+    description: "Create and revoke credentials for the public API",
+    permissions: ["create", "read", "delete"],
+    nav: {
+      label: "Developers",
+      href: "/dashboard/settings/developers",
+      icon: "Settings",
+      section: "settings",
+      /* Deliberately NOT flag-gated, per the phase file. A workspace without
+       * API access still sees the screen, and the screen explains what the
+       * feature is and what upgrading would buy. Hiding it means the only
+       * people who discover the API are the ones already paying for it. */
+      requireFlag: false,
+    },
+    audit: {
+      describe: {
+        create: "Created API key {output.prefix}",
+        /* Keyed `revoke`, not `delete`, because `writeAuditRow` looks a
+         * template up by the PATH VERB and the procedure is called `revoke` —
+         * a key is turned off and kept (REVOKED_NOT_DELETED), so naming the
+         * verb `delete` would describe the wrong thing in the one place
+         * somebody reads months later. */
+        revoke: "Revoked API key {input.id}",
+      },
+    },
+    rateLimit: {
+      create: { count: 5, window: "1 h" },
+    },
+  },
+
   apiCalls: {
     name: "API Calls",
     description: "Total API calls per month",

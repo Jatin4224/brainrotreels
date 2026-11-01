@@ -358,6 +358,35 @@ export async function upsertSpeakers(
 }
 
 /**
+ * SOURCE OF TRUTH KEYWORDS: findSpeaker, TENANT_SCOPED_QUERY,
+ *   THE_READ_MOVED_OUT_OF_THE_ROUTER
+ *
+ * WHAT:  One speaker's project, only if the speaker belongs to this workspace.
+ *
+ * WHY:   THE_READ_MOVED_OUT_OF_THE_ROUTER. This was a `ctx.db.speaker.findFirst`
+ *        inline in `voices.assign`; Phase 17 makes that verb reachable from a
+ *        REST route and an MCP tool through a shared operation, and an
+ *        operation may not touch Prisma (CLAUDE.md rule 3).
+ *
+ *        It is read BEFORE the write rather than after, for two reasons worth
+ *        keeping: the assignment check that follows needs the project id, and
+ *        reading it first turns a guessed speaker id from another workspace
+ *        into a clean not-found rather than a write that matches no rows and
+ *        looks like success.
+ * WHERE: assignVoiceOperation.
+ */
+export async function findSpeaker(
+  db: DbClient,
+  organizationId: string,
+  speakerId: string,
+): Promise<{ projectId: string } | null> {
+  return db.speaker.findFirst({
+    where: { id: speakerId, organizationId },
+    select: { projectId: true },
+  });
+}
+
+/**
  * SOURCE OF TRUTH KEYWORDS: assignSpeakerVoice, ASSIGNMENT_SETS_STATE
  *
  * WHAT:  Gives a speaker a voice and marks it ready.

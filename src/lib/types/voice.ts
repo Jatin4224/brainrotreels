@@ -297,8 +297,26 @@ export const listSpeakersSchema = z.object({
   projectId: z.string().min(1),
 });
 
+/**
+ * SOURCE OF TRUTH KEYWORDS: assignVoiceSchema, THE_PROJECT_IS_NAMED_NOT_INFERRED
+ *
+ * THE_PROJECT_IS_NAMED_NOT_INFERRED. `projectId` is required even though a
+ * speaker already belongs to exactly one project, and it is not redundant: it
+ * is an ASSERTION the caller makes, which the operation checks before writing.
+ *
+ * Phase 17b is what made it necessary. The REST route is
+ * `POST /projects/:id/voices`, and without this field that path segment would
+ * be decorative — a client could name any project, we would ignore it, and the
+ * assignment would land wherever the speaker happened to live. A URL that does
+ * not mean what it says is worse than one that is shorter.
+ *
+ * It also catches a real client bug on BOTH surfaces: a stale speaker id from
+ * a previous project, which otherwise assigns a voice in a video nobody is
+ * looking at.
+ */
 export const assignVoiceSchema = z.object({
   organizationId: z.string().min(1),
+  projectId: z.string().min(1),
   speakerId: z.string().min(1),
   voiceId: z.string().min(1),
 });

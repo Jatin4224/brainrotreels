@@ -35,7 +35,6 @@ import { TRPCError } from "@trpc/server";
 import { createTRPCRouter } from "../init";
 import { protectedProcedure } from "../procedures";
 import { permissions } from "@/lib/permissions";
-import { checkBooleanFeature, getOrganizationTier } from "@/lib/feature-gate";
 import { getTtsAdapter } from "@/lib/adapters/tts";
 import { enqueue } from "@/lib/adapters/jobs";
 import { signAssetUrl } from "@/services/assets.service";
@@ -47,9 +46,13 @@ import {
   listVoicesSchema,
   previewVoiceSchema,
   syncVoicesSchema,
-  voiceAvailableOnPlan,
 } from "@/lib/types/voice";
 import { mapProviderLabels } from "@/lib/voices/map-labels";
+import {
+  assignVoiceOperation,
+  listVoiceCatalogOperation,
+} from "@/lib/api/operations";
+import { runOperation } from "../operation-context";
 
 /** A preview is a short clip; the URL only has to outlive a click. */
 const PREVIEW_URL_TTL_SECONDS = 900;
@@ -67,36 +70,16 @@ export const voicesRouter = createTRPCRouter({
    */
   list: protectedProcedure({ requirePermission: permissions.VOICES_READ })
     .input(listVoicesSchema)
-    .query(async ({ ctx, input }) => {
-      const [tier, premium] = await Promise.all([
-        getOrganizationTier(input.organizationId),
-        checkBooleanFeature(input.organizationId, "premiumVoices"),
-      ]);
-
-      const voices = await voicesService.listVoices(ctx.db, {
-        search: input.search,
-        gender: input.gender,
-        accent: input.accent,
-        tone: input.tone,
-      });
-
-      return {
-        plan: tier.tier,
-        premiumEnabled: premium.enabled,
-        upgradeMessage: premium.upgradeMessage,
-        voices: voices.map((voice) => {
-          const withinPlan = voiceAvailableOnPlan(voice.minPlan, tier.tier);
-          /* A voice above the free tier needs the flag as well — the flag is
-           * what a trial turns off wholesale. */
-          const needsPremium = voice.minPlan !== "free";
-          return {
-            ...voice,
-            locked: !withinPlan || (needsPremium && !premium.enabled),
-            hasPreview: voice.previewAssetId !== null,
-          };
+    .query(({ ctx, input }) =>
+      runOperation(ctx, input.organizationId, (operation) =>
+        listVoiceCatalogOperation(operation, {
+          search: input.search,
+          gender: input.gender,
+          accent: input.accent,
+          tone: input.tone,
         }),
-      };
-    }),
+      ),
+    ),
 
   /**
    * SOURCE OF TRUTH KEYWORDS: voices.preview, PREVIEWS_ARE_NEVER_GATED
@@ -204,75 +187,15 @@ export const voicesRouter = createTRPCRouter({
     audit: { action: "assign" },
   })
     .input(assignVoiceSchema)
-    .mutation(async ({ ctx, input }) => {
-      const voice = await voicesService.findVoice(ctx.db, input.voiceId);
-      if (voice === null) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "That voice is no longer available.",
-        });
-      }
-
-      const [tier, premium] = await Promise.all([
-        getOrganizationTier(input.organizationId),
-        checkBooleanFeature(input.organizationId, "premiumVoices"),
-      ]);
-
-      const withinPlan = voicesService.assertVoiceAllowedOnPlan(
-        voice.minPlan,
-        tier.tier,
-      );
-      const needsPremium = voice.minPlan !== "free";
-
-      if (!withinPlan || (needsPremium && !premium.enabled)) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message:
-            premium.upgradeMessage ??
-            "That voice is not included in your current plan.",
-        });
-      }
-
-      /* Read FIRST, for the project id — the validation below needs it, and
-       * reading it here also turns a guessed speaker id from another
-       * workspace into a clean NOT_FOUND rather than a silent no-op. */
-      const speaker = await ctx.db.speaker.findFirst({
-        where: { id: input.speakerId, organizationId: input.organizationId },
-        select: { projectId: true },
-      });
-      if (speaker === null) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "That speaker no longer exists.",
-        });
-      }
-
-      const updated = await voicesService.assignSpeakerVoice(
-        ctx.db,
-        input.organizationId,
-        input.speakerId,
-        input.voiceId,
-      );
-      if (updated === 0) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "That speaker no longer exists.",
-        });
-      }
-
-      /* Returned so the panel can re-enable the generate button without a
-       * second round trip — and so the two numbers it compares were read
-       * after the write rather than before it. */
-      return {
-        speakerId: input.speakerId,
-        voiceId: input.voiceId,
-        assignments: await voicesService.validateAssignments(
-          ctx.db,
-          input.organizationId,
-          speaker.projectId,
-        ),
-      };
-    }),
+    .mutation(({ ctx, input }) =>
+      runOperation(ctx, input.organizationId, (operation) =>
+        assignVoiceOperation(operation, {
+          projectId: input.projectId,
+          speakerId: input.speakerId,
+          voiceId: input.voiceId,
+        }),
+      ),
+    ),
 
   /**
    * SOURCE OF TRUTH KEYWORDS: voices.sync, PORTAL_ONLY_SYNC, CATALOGUE_SYNC,

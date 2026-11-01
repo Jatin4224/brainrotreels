@@ -59,28 +59,27 @@
 
 import { TRPCError } from "@trpc/server";
 
-import { createStructuredError, createTRPCRouter } from "../init";
+import { createTRPCRouter } from "../init";
 import { protectedProcedure } from "../procedures";
 import { permissions } from "@/lib/permissions";
-import { checkBooleanFeature, getOrganizationTier } from "@/lib/feature-gate";
 import { enqueue } from "@/lib/adapters/jobs";
 import { incrementUsage } from "@/services/usage.service";
 import { getBalance } from "@/services/credits.service";
 import { estimateRenderCost } from "@/lib/credits";
-import { ERROR_CODES } from "@/lib/errors";
 import { findProjectWithTimeline } from "@/services/projects.service";
-import { signAssetUrl } from "@/services/assets.service";
 import * as rendersService from "@/services/renders.service";
-import { resolveWordAnchors, tryMigrate, validate } from "@/lib/timeline";
-import { planComposition, renderCacheKey } from "@/lib/render";
+import { resolveWordAnchors, tryMigrate } from "@/lib/timeline";
+import { planComposition } from "@/lib/render";
 import {
-  FINAL_URL_TTL_SECONDS,
+  createRenderOperation,
+  getRenderOperation,
+} from "@/lib/api/operations";
+import { runOperation } from "../operation-context";
+import {
   RENDER_ATTEMPT_LIMIT,
   createRenderSchema,
   getRenderSchema,
-  isResolutionAllowedForPlan,
   listRendersSchema,
-  resolutionsForPlan,
   estimateRenderSchema,
   retryRenderSchema,
 } from "@/lib/types";
@@ -109,178 +108,55 @@ export const rendersRouter = createTRPCRouter({
   create: protectedProcedure({ requirePermission: permissions.RENDERS_CREATE })
     .input(createRenderSchema)
     .mutation(async ({ ctx, input }) => {
-      const project = await findProjectWithTimeline(
-        ctx.db,
+      const result = await runOperation(
+        ctx,
         input.organizationId,
-        input.projectId,
+        (operation) => createRenderOperation(operation, input),
       );
-      if (!project)
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Project not found",
-        });
-
-      if (project.timeline === null) {
-        throw new TRPCError({
-          code: "PRECONDITION_FAILED",
-          message:
-            "This project has no timeline yet. Generate one before rendering.",
-        });
-      }
-
-      /* LOCKED_NOT_HIDDEN is a client affordance; this is the boundary. A
-       * disabled radio stops a mistake, not a request. */
-      const tier = await getOrganizationTier(input.organizationId);
-      if (!isResolutionAllowedForPlan(tier.tier, input.resolution)) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message:
-            `${input.resolution} rendering is not included in your plan. ` +
-            `Available: ${resolutionsForPlan(tier.tier).join(", ")}.`,
-        });
-      }
-
-      const migrated = tryMigrate(project.timeline.doc);
-      if (!migrated.ok) {
-        throw new TRPCError({
-          code: "UNPROCESSABLE_CONTENT",
-          message:
-            "This timeline was written in a format this version cannot open, so it cannot be rendered.",
-        });
-      }
-
-      const resolved = resolveWordAnchors(migrated.doc);
-      const validated = validate(resolved);
-      if (!validated.ok) {
-        throw new TRPCError({
-          code: "UNPROCESSABLE_CONTENT",
-          /* The first error only. `validate` returns one per problem and they
-           * are usually one cause repeated; the panel renders this inline. */
-          message: `This timeline cannot be rendered: ${validated.errors[0]?.message ?? "it is not valid."}`,
-        });
-      }
-
-      /* WATERMARK_RESOLVED_ONCE — see the file header for why this is here and
-       * not in `finalize`, which is where the phase put it. */
-      const watermarkFree = await checkBooleanFeature(
-        input.organizationId,
-        "watermarkFree",
-      );
-      const watermark = !watermarkFree.enabled;
-
-      const docHash = renderCacheKey({
-        doc: validated.doc,
-        resolution: input.resolution,
-        watermark,
-      });
-
-      const existing = await rendersService.findReusableRender(
-        ctx.db,
-        project.id,
-        docHash,
-      );
-      if (existing !== null) {
-        /* REUSE_COSTS_NOTHING, and it takes a deliberate correction to be
-         * true. The factory auto-increments the `renders` counter on ANY
-         * successful `<resource>.create` (section 13 of protected.ts) — it
-         * cannot see that this call reused a row instead of making one. Left
-         * alone, re-downloading an unchanged video would spend a render from
-         * the monthly quota, which is precisely what the phase's reuse rule
-         * exists to prevent.
-         *
-         * So the handler cancels the bump that is about to happen. The order
-         * is the point: the factory increments AFTER the handler returns, both
-         * inside one transaction, so a -1 here and a +1 there net to exactly
-         * zero and the intermediate value is never observed.
-         *
-         * `incrementUsage(-1)` rather than `decrementUsage(1)` on purpose:
-         * decrement FLOORS AT ZERO, which would be wrong in a real case — a
-         * render made in January is still reusable in February, when the
-         * monthly counter has been reset to 0. Flooring there would leave the
-         * customer charged 1 for a render that cost nothing. A raw -1 nets
-         * correctly whatever the starting value, including from no row at all.
-         *
-         * ONE CAVEAT, stated rather than hidden: the factory's GATE runs
-         * before the handler, so a workspace already at its monthly cap is
-         * refused here even though this call would have cost nothing. It does
-         * not bite in practice, because nothing has to call this to get an
-         * existing video — the panel reads `renders.list` and `renders.get`,
-         * both plain queries with no limit gate, and shows Download straight
-         * off them. This branch is a guard against a stale client or a
-         * double-click, not the download path. */
-        await incrementUsage(input.organizationId, "renders", -1, ctx.db);
-        return { render: existing, reused: true, cost: null };
-      }
 
       /**
-       * SOURCE OF TRUTH KEYWORDS: REFUSE_BEFORE_PAYING, INSUFFICIENT_CREDITS
+       * SOURCE OF TRUTH KEYWORDS: REUSE_COSTS_NOTHING,
+       *   THE_OPERATION_REPORTS_THE_SURFACE_METERS
        *
-       * The credit check, and it is deliberately AFTER the reuse check and
-       * BEFORE the row. After reuse, because a render that costs nothing must
-       * not be refused for lack of credits — the customer already paid for
-       * that file. Before the row, because a refusal must leave no trace: a
-       * queued `Render` that was never affordable would show in the panel as a
-       * render that is about to start and never will.
+       * The one thing this procedure still does for itself, and it has to:
+       * it cancels the bump the FACTORY is about to apply.
        *
-       * This refuses on the ESTIMATE; the hold is placed by the workflow (see
-       * HOLD_IN_THE_WORKFLOW there). The two are separated because the gap
-       * between them is small and the alternative is worse: holding here would
-       * put a credit movement inside the request's 10-second transaction, and
-       * a request that timed out after holding would strand the money with no
-       * workflow in existence to release it.
+       * The factory auto-increments the `renders` counter on ANY successful
+       * `<resource>.create` (section 13 of protected.ts) and cannot see that
+       * this call reused a row instead of making one. Left alone,
+       * re-downloading an unchanged video would spend a render from the
+       * monthly quota, which is precisely what the reuse rule exists to
+       * prevent. The order is the point: the factory increments AFTER the
+       * handler returns, both inside one transaction, so a -1 here and a +1
+       * there net to exactly zero and the intermediate value is never
+       * observed.
        *
-       * The error carries `required` and `available` through the EXISTING
-       * `INSUFFICIENT_CREDITS` cause, which has been declared in
-       * src/lib/errors with no producer since Phase 00. This is its first.
-       * The client renders the top-up prompt straight off it.
+       * It lives HERE rather than in the operation because it is knowledge
+       * about THIS SURFACE's pipeline. A REST caller meters explicitly and
+       * no `+1` is coming, so the same `-1` there would hand out free
+       * renders. The operation reports what happened; each surface meters.
+       *
+       * `incrementUsage(-1)` rather than `decrementUsage(1)` on purpose:
+       * decrement FLOORS AT ZERO, which would be wrong in a real case — a
+       * render made in January is still reusable in February, when the
+       * monthly counter has been reset to 0. Flooring there would leave the
+       * customer charged 1 for a render that cost nothing. A raw -1 nets
+       * correctly whatever the starting value, including from no row at all.
+       *
+       * ONE CAVEAT, stated rather than hidden: the factory's GATE runs before
+       * the handler, so a workspace already at its monthly cap is refused
+       * here even though this call would have cost nothing. It does not bite
+       * in practice, because nothing has to call this to get an existing
+       * video — the panel reads `renders.list` and `renders.get`, both plain
+       * queries with no limit gate, and shows Download straight off them.
+       * This branch is a guard against a stale client or a double-click, not
+       * the download path.
        */
-      const cost = estimateRenderCost({
-        durationSeconds: planComposition(validated.doc).durationInSeconds,
-        resolution: input.resolution,
-      });
-
-      const available = await getBalance(input.organizationId, ctx.db);
-      if (available < cost.total) {
-        throw createStructuredError(
-          "FORBIDDEN",
-          `This render costs ${cost.total} credits and this workspace has ${available}.`,
-          {
-            errorCode: ERROR_CODES.INSUFFICIENT_CREDITS,
-            resource: "credits",
-            required: cost.total,
-            available,
-            message: `Not enough credits to render. ${cost.total} needed, ${available} available.`,
-          },
-        );
+      if (result.reused) {
+        await incrementUsage(input.organizationId, "renders", -1, ctx.db);
       }
 
-      const render = await rendersService.createQueuedRender(ctx.db, {
-        organizationId: input.organizationId,
-        projectId: project.id,
-        docHash,
-        resolution: input.resolution,
-        watermark,
-      });
-
-      /* Keyed on the render id, not on the document: a retry of the SAME row
-       * must be able to enqueue again (it is a new attempt of a render the
-       * customer asked for twice), while a double-click on one request must
-       * not produce two runs. The id is unique per row, so both hold. */
-      await enqueue({
-        requestId: ctx.requestId,
-        name: "render/requested",
-        data: {
-          renderId: render.id,
-          organizationId: input.organizationId,
-          attempt: render.attempts,
-        },
-        id: `render-${render.id}-attempt-${render.attempts}`,
-      });
-
-      /* The cost travels back so the panel can say what the render will cost
-       * without re-deriving it — and so the number the customer is told is
-       * provably the number that was checked against their balance. */
-      return { render, reused: false, cost };
+      return result;
     }),
 
   /**
@@ -396,34 +272,11 @@ export const rendersRouter = createTRPCRouter({
    */
   get: protectedProcedure({ requirePermission: permissions.RENDERS_READ })
     .input(getRenderSchema)
-    .query(async ({ ctx, input }) => {
-      const render = await rendersService.findRenderForOrganization(
-        ctx.db,
-        input.organizationId,
-        input.id,
-      );
-      if (!render)
-        throw new TRPCError({ code: "NOT_FOUND", message: "Render not found" });
-
-      const [downloadUrl, posterUrl] = await Promise.all([
-        render.outputAssetId === null
-          ? Promise.resolve(null)
-          : signAssetUrl(
-              render.outputAssetId,
-              input.organizationId,
-              FINAL_URL_TTL_SECONDS,
-            ),
-        render.posterAssetId === null
-          ? Promise.resolve(null)
-          : signAssetUrl(
-              render.posterAssetId,
-              input.organizationId,
-              FINAL_URL_TTL_SECONDS,
-            ),
-      ]);
-
-      return { render, downloadUrl, posterUrl };
-    }),
+    .query(({ ctx, input }) =>
+      runOperation(ctx, input.organizationId, (operation) =>
+        getRenderOperation(operation, { id: input.id }),
+      ),
+    ),
 
   /**
    * SOURCE OF TRUTH KEYWORDS: renders.retry, RETRY_ONCE, FRESH_PROVIDER_ID

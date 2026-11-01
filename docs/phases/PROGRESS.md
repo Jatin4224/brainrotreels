@@ -88,7 +88,19 @@ worse than an empty box.
       Claude, and the whole motion pipeline (Neon has been unreachable since Phase 05). Two gaps
       are not code gaps — only one font family is bundled, and `stack-center` holds three list
       items plus a heading in a vertical frame, not four. See the four notes.
-- [ ] Phase 17: Platform surface
+- [ ] Phase 17: Platform surface — **17a, 17b and 17c are built; the AI-footage half is not.**
+      17a is the shared operation seam: the business logic of the multi-surface verbs lives in
+      `src/lib/api/operations/`, behind an explicit `OperationContext` and a transport-neutral
+      failure vocabulary, and the web app's routers call it through `runOperation`. 17b is the
+      public REST API: the `ApiKey` model, nine route files under `/api/v1`, one pipeline applying
+      the SAME registry gates the procedure factory applies, `Idempotency-Key` with fingerprinting,
+      cursor pagination, a generated OpenAPI 3.1 document, and the developers screen. 17c is the MCP
+      server at `/api/mcp` — eight tools over the same operations, JSON-RPC written by hand rather
+      than with the SDK (argued in the note), and the copy-paste agent config. **AI footage is
+      blocked on an owner decision** (commercial-use terms for the chosen video model) and must not
+      be started before it is settled. **No HTTP request has ever reached either surface and no
+      agent has ever connected**: the pure halves are tested (65 new tests across 17b and 17c), the
+      pipelines need a database and a Redis. See docs/27-phase17.md.
 
 ## Blocked on an owner decision
 
@@ -2920,3 +2932,275 @@ over generated transcripts, the fallback's validity at both aspects in all four 
 prompts' cacheability and injection fencing, the still document's validity and its midpoint frame,
 the sample selector's cost model, and the generator building a valid document from the shape the
 pipeline actually stores.
+
+### Phase 17a — 2026-11-01
+
+The shared operation seam. No new route, no key, no tool, no footage — what changed is WHERE the
+business logic of seven verbs lives, so that 17b and 17c cannot drift from the web app.
+
+**Why first, and why not as a refactor nobody asked for.** The phase's done-when is "a rule changed
+in an operation function changes behaviour on web, REST and MCP at once", and the failure mode is
+silent: a REST route that re-derives one rule compiles, passes its own tests, and returns plausible
+answers. Nothing goes red. It shows up as a customer whose API client was charged for a render the
+dashboard gives away free. So the logic moved before any surface existed to drift from.
+
+**The seven verbs** are the phase file's REST route list and its MCP tool list, which match exactly:
+create a project, generate a script, assign a voice, start a render, read a render, fetch an output,
+read the catalogues. A deliberate boundary rather than everything the product does — the web app has
+over a hundred procedures and a public API exposing all of them is a promise to keep every one
+stable forever.
+
+**An operation never throws a `TRPCError`.** It throws `OperationError` carrying one of six
+SITUATIONS (`not_found`, `invalid`, `precondition`, `refused`, `unprocessable`, `conflict`) and each
+transport owns ONE table turning them into its own vocabulary. The table is a `Record` over the
+whole union rather than a switch with a default, so a seventh situation is a compile error in every
+surface's table instead of a 500 on whichever one nobody updated. `detail` reuses the existing
+`StructuredErrorCause`, so a workspace that cannot afford a render still gets `required` and
+`available` and still sees the top-up prompt, through whichever transport asked. Grep
+`AN_OPERATION_NEVER_THROWS_A_TRPC_ERROR`, `THE_TABLE_IS_TOTAL`.
+
+**The context is explicit because two of the three callers have no session.** An MCP tool call and a
+key-authenticated REST request have no cookie, so nothing in an operation may read `headers()`, a
+session or a module singleton. Three details are load-bearing: `plan` is for PRICING and never for
+access (whether this workspace may act at all was decided before the context existed); `userId` is
+NULLABLE because a key has an organization and no human, and a fabricated id would attribute a
+script to whoever created the key months earlier; and `db` is a `DbClient` so an operation's
+writes stay inside its caller's transaction. Grep `CONTEXT_IS_EXPLICIT_NOT_AMBIENT`,
+`USER_IS_NULL_FOR_A_KEY`, `THE_TX_IS_THE_DB`.
+
+**`runOperation` welds the context build to the error mapping** because a forgotten `catch` is
+invisible: the procedure would compile and work right up until an operation refused something, and
+then the customer gets a 500 and a stack trace instead of "not enough credits" — with no failing
+test, because the happy path is identical. The same argument that puts the gates in the procedure
+factory rather than trusting each handler. Grep `THE_MAPPING_CANNOT_BE_FORGOTTEN`.
+
+**Metering stayed in the router, and this is the decision most likely to be undone by someone**
+**tidying up.** A reused render must not spend a slot from the monthly quota, and on the web that is
+not simply "don't increment": the procedure factory auto-increments on any successful
+`<resource>.create` and cannot see that the handler reused a row, so the router posts a
+compensating `-1` that nets to zero inside the same transaction. That compensation is knowledge
+about THIS SURFACE's pipeline — the REST surface will meter explicitly and no `+1` is coming, so the
+same `-1` there would hand out free renders. So the operation REPORTS `reused` and each surface
+meters. An operation that metered would be wrong on at least one surface, in the direction nobody
+notices, because an uncharged render looks exactly like a working one. Grep
+`THE_OPERATION_REPORTS_THE_SURFACE_METERS`.
+
+**The catalogues share a rule, not a shape.** `voices.list` and `captions.styles` now ARE their
+operations. Backgrounds are the one exception: the picker needs signed thumbnails, a breadth cursor
+and the project's selection, which is several more queries and tens of kilobytes of URLs an agent
+choosing an id has no use for — so the catalogue operation is a leaner projection that shares the
+AVAILABILITY DECISION through the same `backgroundAvailableOnPlan` and `isWithinBreadth` the picker
+and the write refusal use. `LOCKED_NOT_HIDDEN` survives onto the API: a catalogue returns the row
+with `locked: true` and the registry's upgrade sentence rather than filtering it out. Grep
+`ONE_AVAILABILITY_RULE_MANY_PROJECTIONS`, `THE_FLAG_IS_HALF_THE_RULE`.
+
+**Three writes moved into the service layer.** Extracting the operations surfaced three routers
+holding a Prisma handle and using it — `projects.create`, `scripts.generate` and `voices.assign` —
+which was legal while a router was the only caller and is not legal for an operation (CLAUDE.md rule
+3). They became `createProject`, `recordScriptSource` and `findSpeaker`.
+`recordScriptSource` reads, merges and writes `Project.settings` rather than assigning, because that
+column holds every feature's configuration and replacing it would silently drop a customer's caption
+choice the first time they generated a script — and it returns whether a row matched, so a project
+deleted WHILE WE WERE FETCHING ITS SOURCE is a clean refusal rather than a job queued for a project
+that no longer exists.
+
+**Behaviour deliberately unchanged.** Every ordering in the extracted handlers was preserved: reuse
+before credits (a free render must not be refused for lack of credits), credits before the row (a
+refusal must leave no trace), credits before the fetch in the script path, and the watermark resolved
+at request time because it is part of the cache key.
+
+**What has never run.** The extraction is exercised only through the web app's own procedures, which
+are themselves blocked on the credentials gap. The error table, the payload round trip and the
+rethrow rule are genuinely verified by the 11 new tests; the operations are verified only to the
+extent their pure rules already were, because there is no database fixture in this repo and
+inventing one for a seam whose job is delegation would test the stub. **Nothing has gone through a
+second surface, because no second surface exists yet** — the promise that one rule change lands
+everywhere is today a property of the code's shape, not an observed fact. 17b is the first time it
+can be demonstrated.
+
+### Phase 17b — 2026-11-01
+
+The public REST API: a credential, nine routes, and one pipeline around them. Every endpoint calls a
+17a operation and adds nothing of its own, which is what makes the phase's promise checkable rather
+than merely intended.
+
+**A key is ORGANIZATION authority, not a user's.** It carries no scopes and may do anything the seven
+public verbs do. Three consequences worth knowing before extending it: there is no permission check
+on an API request, because there is no member whose role could be read (`userId` is null, so audit
+rows attribute to the workspace rather than to whoever minted the key months ago); MINTING is
+therefore the privileged act, which is why `apiKeys.create` is permissioned and capped at five an
+hour; and narrowing a key later — read-only, per-project — is ADDITIVE to the model and the
+authenticator rather than a redesign. Grep `A_KEY_IS_ORG_AUTHORITY`.
+
+**App-owned, not the Better Auth apiKey plugin**, for the three reasons the phase file gives: the
+plugin list has a documented mandatory order and adding one is a real regression risk for a feature
+that needs no session machinery; keys are org-scoped, which is not the plugin's model; and
+per-tenant concerns stay app-owned so a provider switch cannot take them hostage.
+
+**SHA-256, unsalted, and that is correct here.** The decision most likely to be "fixed" by somebody
+applying password advice. A slow KDF exists to defend a ~30-bit secret against an offline dictionary;
+an API key here is 32 bytes from a CSPRNG, so there is no dictionary and making each verification
+expensive defends against nothing while adding its own latency to EVERY API request. The unsalted
+digest is also what makes verification ONE INDEXED READ on a unique column — a salted KDF cannot be
+looked up, so the number of keys a tenant holds would start affecting their API latency. A test
+asserts the key length against the documented constant, so shortening it breaks a test rather than
+silently invalidating the argument. Grep `SHA256_IS_RIGHT_FOR_A_HIGH_ENTROPY_SECRET`.
+
+**Revocation is checked on every request and nothing is cached.** It is the customer's only off
+switch; a cache would delay it. Revoking keeps the row (`REVOKED_NOT_DELETED`) so the audit trail
+can still name the key months later, and a second revoke returns false rather than moving the
+timestamp — the first revocation is the one an investigation cares about.
+
+**The gates are CALLED, never reimplemented.** Every entitlement decision under `src/app/api/v1/`
+is a call into `src/lib/feature-gate.ts` — the same functions `protectedProcedure` calls, reading
+the same registry entries. There is no plan comparison, no limit arithmetic and no upgrade copy
+written anywhere in the REST layer. In order per request: `apiAccess` flag, the key's daily quota
+in Redis, the `apiCalls` monthly allowance, then the verb's own resource. Grep
+`THE_GATE_IS_CALLED_NOT_REIMPLEMENTED`.
+
+**Shared quotas are the intended behaviour**, per the done-when. A render started through the API
+counts against the same monthly `renders` limit the dashboard counts against, because it is the same
+video on the same plan. What is NOT shared is the per-key `dailyQuota`, and the distinction is the
+point: `apiCalls` is an entitlement, `dailyQuota` is a BLAST RADIUS — a leaked or looping key burns
+its own allowance while the workspace's other keys and its dashboard keep working.
+
+**The gate always, the counter sometimes.** A reused render must not spend a slot, but the gate must
+still run so a workspace at its limit is refused before any work. `runApiRoute` splits them:
+`resource` decides what is gated, `countOnSuccess` decides what is counted. This is where 17a's
+"operation reports, surface meters" split pays off — the web app compensates for the factory's
+automatic `+1` with a `-1`, this surface simply does not count, and neither piece of surface
+knowledge leaked into the operation. Grep `THE_GATE_ALWAYS_THE_COUNTER_SOMETIMES`.
+
+**Idempotency has THREE states.** A stored entry holds a fingerprint (method + path + body, NOT
+headers — a retry legitimately changes `User-Agent` and tracing headers) beside the response. Same
+key + same request replays; same key + DIFFERENT request is a 409, because that is a client bug and
+silently returning the first call's answer to the second call's question is the worst possible
+response to it; a claim still in flight is a 409 too, since the claim is a `SET NX` and exactly one
+of two concurrent requests wins. A FAILURE RELEASES THE CLAIM, so the retry the header exists for
+can proceed — leaving it would turn one failed request into 24 hours of conflicts. Only successes
+are stored, and a replay counts nothing because it did nothing. Grep
+`THE_FINGERPRINT_CATCHES_A_REUSED_KEY`, `A_FAILURE_RELEASES_THE_CLAIM`.
+
+**The path is not decorative, and making that true changed a shared schema.** `assignVoiceSchema`
+gained a required `projectId`. It is not redundant — it is an ASSERTION the caller makes, which the
+operation checks before writing. Without it `POST /projects/:id/voices` would ignore its own path
+segment and a stale speaker id would quietly assign a voice in a different video. The check landed in
+the OPERATION rather than the route, so the web app gained it too, and the web panel now threads its
+project id. A mismatch is a `not_found`: "that speaker exists, but in another project" is a small
+oracle about rows the caller did not name. Grep `THE_PROJECT_IS_NAMED_NOT_INFERRED`.
+
+**The OpenAPI document is generated from the Zod schemas** — Zod 4 emits JSON Schema natively and
+OpenAPI 3.1 aligned its schema object with JSON Schema 2020-12, so the conversion is one call per
+schema with no converter dependency. `io: "input"` matters: a schema with defaults has a different
+shape going in than coming out. **The honest limitation**: request bodies are exact, RESPONSE
+payloads are described rather than typed, because the operations return Prisma rows and composed
+views with no Zod schema to derive from — and a hand-written response schema is exactly what this
+file refuses to do for requests. A test asserts the document covers every route file ON DISK, read
+from the directory rather than compared against a list, because a route added without a path in the
+document is an endpoint no generated client can reach and nothing else would notice.
+
+**Two small things that were load-bearing.** Next's typed routes REFUSED the registry's
+`nav.href` until the developers page existed — the nav cannot point at a 404, which is worth
+knowing. And the Redis client moved from inside `rate-limit.ts` to `src/lib/redis.ts`, because
+idempotency needs plain get/set and a second client would mean two connection pools and two answers
+to "is Redis configured".
+
+**What has never run.** No HTTP request has ever reached these routes. What IS verified by the 40 new
+tests is everything pure: the key format and its entropy, the failure→HTTP table and its pairings,
+both envelope shapes, the idempotency fingerprint, and the OpenAPI document's coverage of the route
+directory. The pipeline around them — authentication, the gate order, the counters, the replay path —
+needs a database and a Redis, and this machine has had neither since Phase 05. `next build` fails
+here for a PRE-EXISTING reason unrelated to the phase: `next/font` cannot fetch Geist from Google
+Fonts without network access, and both errors are in `src/app/layout.tsx`. **Without Redis there is
+no deduplication** — idempotency degrades to "every request runs", which is the same fail-open choice
+rate limiting makes but for a weaker reason, since here it means a retry can double-charge. It is the
+one piece of this phase that genuinely requires Redis in production rather than merely benefiting
+from it.
+
+### Phase 17c — 2026-11-01
+
+The MCP server. One endpoint, eight tools, the same key, and no business logic of its own — which is
+the headline rather than a modesty note.
+
+**The seam held.** 17c added NO rules. Every one it needs already existed: the operations from 17a,
+the gate order from 17b, the key check from 17b. A tool is a name, a description, a schema, a
+metered resource, a summary sentence and a one-line call. That was the test 17a was written to pass
+— if a tool had needed to re-check a plan or re-derive a price, the seam would have failed at its own
+purpose, and invisibly, because the tool would still have worked.
+
+**Two pieces of 17b moved up to make that true.** `authenticateApiKey` lived under
+`src/app/api/v1/_lib/` and returned a `Response`; it now lives in `src/lib/api/` and returns a
+REFUSAL AS DATA (code, message, status, headers) that each surface renders. The gate order was inline
+in `runApiRoute`; it is now `checkApiEntitlements` and `countApiUsage` in `src/lib/api/gates.ts`.
+Neither was a rewrite, but leaving them would have meant a SECOND COPY of the gate sequence in the
+MCP dispatcher — the exact drift the phase warns about, and silent: an MCP server that forgot the
+`apiAccess` check would work perfectly for a paying workspace and quietly serve a free one. Grep
+`ONE_AUTHENTICATION_TWO_SURFACES`, `ONE_GATE_ORDER_TWO_SURFACES`.
+
+**No MCP SDK, deliberately, with the reversal condition written down.** This server is eight tools,
+no resources, no prompts, no sampling, no roots, no server-initiated messages and no sessions — so
+the protocol surface is three methods plus a notification to ignore and a ping to answer. That is one
+file of envelope construction, testable without a transport. What the SDK is mostly for is the part
+we do not use: sessions, the SSE stream, and the client side. **When this becomes the wrong call:**
+the moment the server needs resources, prompts, sampling or a server-initiated stream, the SDK is
+right and `src/lib/api/mcp.ts` becomes a liability. Grep `NO_SDK_FOR_A_STATELESS_SERVER`.
+
+**A tool failure is NOT a protocol failure**, and getting it backwards is worse than it looks. A tool
+that could not do its job — no such project, not enough credits, a plan without the API — returns a
+SUCCESSFUL JSON-RPC response with `isError: true` and the message, because the MODEL is supposed to
+read it and adapt. Reporting "not enough credits" as a JSON-RPC error hides it inside the client's
+transport layer, where the model is told only that the call failed. The one exception is an unknown
+tool NAME, which means the client never read `tools/list` — that is the protocol being used wrongly
+and gets a `methodNotFound`. Grep `A_TOOL_FAILURE_IS_NOT_A_PROTOCOL_FAILURE`.
+
+**The description IS the interface**, which is where MCP differs most from REST. A REST client is
+read by a programmer with the docs open; a tool description is read by a model with nothing else to
+go on. So each one says what the tool does, WHAT IT COSTS, and WHAT HAPPENS NEXT. Step 16's
+"disconnects never cancel server-side work" lives there too: an agent that retries `start_render`
+after a dropped connection has started a SECOND PAID RENDER. A test asserts that `generate_script`
+and `start_render` both say "do not retry" and both say COSTS CREDITS — it earns its place because
+nothing else would catch a tool added without the caveat: the types are fine, the tool works, and the
+only symptom is a customer billed twice. Grep `THE_DESCRIPTION_IS_THE_INTERFACE`,
+`WORK_OUTLIVES_THE_CONNECTION`.
+
+**`instructions` carries the ORDER.** The `initialize` result includes it, which is the one place to
+say project → script → voices → render → poll → download. Eight independent descriptions cannot
+convey a sequence.
+
+**Eight tools, not seven.** `list_voices` is the extra one and it is necessary:
+`assign_voices` is unusable without it, since a model has no other way to learn a voice id and
+telling it to read a REST catalogue it cannot call would be a dead end.
+
+**What MCP does not have, and will not pretend to.** NO IDEMPOTENCY KEY — the protocol has no header
+for one and nowhere for a model to put it, so this surface lacks the REST API's replay guarantee.
+What protects a customer is the description telling the model not to retry plus the reuse rule, which
+makes a second identical render free; a second SCRIPT is not free, which is why that description
+carries the same caveat. A real gap, stated rather than papered over. Also no event stream (a GET
+gets 405 with a sentence, so a client learns in one request rather than holding a connection open
+for messages that never come) and no sessions (a DELETE likewise).
+
+**One TypeScript problem worth recording.** The tool table is heterogeneous, so after a lookup by
+name the union no longer knows element N's schema produces what element N's operation accepts — the
+pairing is real and the type system cannot carry it through the lookup. The fix is `defineTool`, a
+generic factory where each tool's two types are closed over ONCE: parse, run, count and summarise all
+happen inside, and what comes out is a uniform `BoundTool`. No `any`, no assertion. The first
+attempt used `as const` with per-entry `satisfies` and a cast at the call site; it type-checked in
+places and lied, which is the usual outcome of casting around a lost relationship instead of
+restoring it. Grep `THE_FACTORY_CLOSES_OVER_THE_TYPES`.
+
+**Step 17, the developers screen**, gained the MCP endpoint and a COPY-PASTE config block, because an
+endpoint is useless without the JSON that goes into a client's config and nobody types one from a
+description. The key in it is a placeholder: the real one is shown once and pasting a live credential
+into a block that gets screenshotted is how keys leak. Two small load-bearing details: the ORIGIN
+comes from the server (the page reads the request headers and passes it down, so a config copied from
+a preview cannot silently point at production — an effect reading `window.location` trips
+`react-hooks/set-state-in-effect` and a render-time read would differ between server and client
+markup), and the TOOL COUNT is read from the table rather than written in the copy.
+
+**What has never run.** No agent has ever connected. Verified by the 25 new tests: the JSON-RPC
+envelopes, notification handling (including an explicit `id: null`), version negotiation, batch
+refusal, the tool catalogue's shape, and the descriptions' promises about cost and retries. NOT
+verified: the protocol against a real client, which is the specific risk of writing it by hand — the
+envelopes match the specification as read, and no Claude or Cursor client has confirmed that. First
+connection is the test. The gate pipeline and every tool's actual work need a database and a Redis,
+and this machine has had neither since Phase 05.

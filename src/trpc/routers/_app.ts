@@ -39,6 +39,7 @@ import { captionsRouter } from "./captions";
 import { voicesRouter } from "./voices";
 import { timelineRouter } from "./timeline";
 import { motionRouter } from "./motion";
+import { apiKeysRouter } from "./api-keys";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: appRouter, AppRouter
@@ -72,6 +73,10 @@ export const appRouter = createTRPCRouter({
   /* Mounted under the REGISTRY KEY, which gates the whole router including its
    * reads — GATE_IS_THE_WHOLE_ROUTER in src/trpc/routers/motion.ts. */
   motionStudio: motionRouter,
+  /* Mounted under the REGISTRY KEY, which wires its three permissions, its
+   * audit templates and the five-an-hour cap on minting. NOT gated by
+   * `apiAccess` — see MINTING_IS_NOT_USING in src/trpc/routers/api-keys.ts. */
+  apiKeys: apiKeysRouter,
   usage: usageRouter,
   auditLogs: auditLogsRouter,
   member: memberRouter,

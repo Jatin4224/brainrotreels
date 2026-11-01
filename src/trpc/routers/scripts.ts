@@ -55,16 +55,17 @@
 
 import { TRPCError } from '@trpc/server'
 
-import { createStructuredError, createTRPCRouter } from '../init'
+import { createTRPCRouter } from '../init'
 import { protectedProcedure } from '../procedures'
 import { permissions } from '@/lib/permissions'
-import { ERROR_CODES } from '@/lib/errors'
-import { enqueue } from '@/lib/adapters/jobs'
-import { estimate } from '@/lib/credits'
+import {
+  generateScriptOperation,
+  scriptCostFor,
+} from '@/lib/api/operations'
+import { runOperation } from '../operation-context'
 import { getBalance } from '@/services/credits.service'
-import { findProjectForOrganization } from '@/services/projects.service'
 import * as scriptsService from '@/services/scripts.service'
-import { SourceExtractionError, extractSource, regenerateScriptBlock } from '@/lib/script'
+import { regenerateScriptBlock } from '@/lib/script'
 import {
   SCRIPT_WARN_SECONDS,
   addScriptBlockSchema,
@@ -80,19 +81,10 @@ import {
 
 } from '@/lib/types/script'
 
-/**
- * SOURCE OF TRUTH KEYWORDS: scriptCostFor, ONE_PRICE_TWO_SURFACES
- *
- * WHAT:  What generating a script of this length costs.
- * WHY:   ONE_PRICE_TWO_SURFACES — the same call prices the button, the
- *        refusal here, and the hold in the workflow. A cost computed
- *        separately anywhere would let the button promise one number while the
- *        handler charged another.
- * WHERE: `generate`, `estimateCost`, and the workflow's hold.
- */
-function scriptCostFor(targetSeconds: number) {
-  return estimate({ kind: 'script', durationSeconds: targetSeconds })
-}
+/* ONE_PRICE_TWO_SURFACES — `scriptCostFor` moved into the shared operation
+ * with the verb it prices, so the button's number, the refusal's number and
+ * the workflow's hold are provably one function on every surface. It is
+ * imported rather than re-declared here. */
 
 export const scriptsRouter = createTRPCRouter({
   /**
@@ -114,98 +106,16 @@ export const scriptsRouter = createTRPCRouter({
     txTimeout: 30_000,
   })
     .input(generateScriptSchema)
-    .mutation(async ({ ctx, input }) => {
-      const project = await findProjectForOrganization(
-        ctx.db,
-        input.organizationId,
-        input.projectId,
-      )
-      if (!project) throw new TRPCError({ code: 'NOT_FOUND', message: 'Project not found' })
-
-      /* REFUSE_BEFORE_PAYING — before the fetch, so a workspace with no
-       * credits is not made to wait for a download it cannot use. */
-      const cost = scriptCostFor(input.targetSeconds)
-      const available = await getBalance(input.organizationId, ctx.db)
-      if (available < cost.total) {
-        throw createStructuredError(
-          'FORBIDDEN',
-          `Writing this script costs ${cost.total} credits and this workspace has ${available}.`,
-          {
-            errorCode: ERROR_CODES.INSUFFICIENT_CREDITS,
-            resource: 'credits',
-            required: cost.total,
-            available,
-            message: `Not enough credits. ${cost.total} needed, ${available} available.`,
-          },
-        )
-      }
-
-      /* The customer-facing failures all live in here — a paywall, a dead
-       * link, a scanned PDF. They are raised as readable messages that offer
-       * raw-text entry, which is the phase's own requirement. */
-      let extracted
-      try {
-        extracted = await extractSource(input.source)
-      } catch (error) {
-        if (error instanceof SourceExtractionError) {
-          console.warn(`[scripts.generate] extraction refused: ${error.detail}`)
-          throw new TRPCError({ code: 'UNPROCESSABLE_CONTENT', message: error.message })
-        }
-        throw error
-      }
-
-      /* RECORD_THE_PATH — what the customer gave us, and what we made of it,
-       * on the project. The phase says to use these columns rather than adding
-       * new ones: `sourceRef` is the normalised input, `settings` carries the
-       * extracted body and the provenance. */
-      await ctx.db.project.update({
-        where: { id: project.id },
-        data: {
-          sourceRef: extracted.finalUrl ?? input.source.value,
-          settings: {
-            ...(typeof project.settings === 'object' && project.settings !== null
-              ? (project.settings as Record<string, unknown>)
-              : {}),
-            script: {
-              sourceKind: extracted.kind,
-              sourceTitle: extracted.title ?? null,
-              truncated: extracted.truncated,
-              targetSeconds: input.targetSeconds,
-              tone: input.tone,
-              /* The extracted body, so a retry does not re-fetch — and so an
-               * operator can see exactly what the model was given. */
-              sourceText: extracted.text,
-            },
-          },
-        },
-      })
-
-      /* The model call goes to a workflow. Keyed on the project and the
-       * request's shape, so a double-click produces one run while a genuine
-       * second attempt with different settings produces another. */
-      await enqueue({
-        requestId: ctx.requestId,
-        name: 'script/requested',
-        data: {
-          projectId: project.id,
-          organizationId: input.organizationId,
+    .mutation(({ ctx, input }) =>
+      runOperation(ctx, input.organizationId, (operation) =>
+        generateScriptOperation(operation, {
+          projectId: input.projectId,
+          source: input.source,
           targetSeconds: input.targetSeconds,
           tone: input.tone,
-        },
-        id: `script-${project.id}-${input.targetSeconds}-${input.tone}-${extracted.text.length}`,
-      })
-
-      return {
-        queued: true,
-        cost,
-        source: {
-          kind: extracted.kind,
-          title: extracted.title ?? null,
-          truncated: extracted.truncated,
-          characters: extracted.text.length,
-        },
-      }
-    }),
+        }),
+      ),
+    ),
 
   /**
    * SOURCE OF TRUTH KEYWORDS: scripts.estimateCost, COST_ON_THE_BUTTON

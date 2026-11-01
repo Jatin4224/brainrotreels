@@ -170,3 +170,89 @@ export type StructuredErrorCause =
     };
 
 export type StructuredError = StructuredErrorCause;
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: OPERATION_FAILURES, OperationFailure, OperationError,
+ *   ONE_FAILURE_VOCABULARY_MANY_TRANSPORTS, AN_OPERATION_NEVER_THROWS_A_TRPC_ERROR,
+ *   OperationContext
+ *
+ * WHAT:  How a shared operation says it could not do the thing — a closed set
+ *        of six situations, plus the existing structured payload.
+ *
+ * WHY:   AN_OPERATION_NEVER_THROWS_A_TRPC_ERROR. Phase 17 moves the business
+ *        logic of every multi-surface verb into `src/lib/api/operations/`, so
+ *        the same function answers the web app, the REST API and the MCP
+ *        server. A function that threw a `TRPCError` would force the other two
+ *        surfaces to read tRPC's status vocabulary and translate it, which is
+ *        exactly the drift the phase warns about: the REST layer would be
+ *        re-deciding what `PRECONDITION_FAILED` means as an HTTP status, and a
+ *        seventh case added to one surface would be a 500 on the others.
+ *
+ *        ONE_FAILURE_VOCABULARY_MANY_TRANSPORTS. These six are SITUATIONS, not
+ *        status codes: the thing is not there, the input is wrong, the state is
+ *        wrong, you may not, it is well-formed but unusable, somebody else got
+ *        there first. Each transport maps them once, in a total table under an
+ *        exhaustive check — see `toTRPCError` — so a new failure is a compile
+ *        error in every surface rather than a default branch in one.
+ *
+ *        It deliberately does NOT include the gate refusals — no plan, no
+ *        permission, no quota, rate limited. Those are decided BEFORE an
+ *        operation runs, by the procedure factory on the web and by the key
+ *        middleware on REST, and an operation that could report them would
+ *        imply it had checked. It has not, and it must not: that is the
+ *        surface's job and it happens before any work.
+ *
+ *        `detail` reuses `StructuredErrorCause` rather than inventing a second
+ *        payload, so `INSUFFICIENT_CREDITS` keeps carrying `required` and
+ *        `available` all the way to the top-up prompt, through whichever
+ *        transport asked. Named `detail` and not `cause` because `Error` already
+ *        owns `cause`, and because `LlmError` and `RenderProviderError` already
+ *        use that name for the same idea.
+ * WHERE: Thrown by src/lib/api/operations/*; mapped by src/trpc/operation-error.ts
+ *        for the web app and (Phase 17b) by the REST route handler.
+ */
+export const OPERATION_FAILURES = [
+  /** The named thing does not exist, or not for this workspace. */
+  "not_found",
+  /** The input is wrong in a way a schema could not express. */
+  "invalid",
+  /** The request is right and the state is not ready for it. */
+  "precondition",
+  /** Understood, well-formed, and not allowed — policy or money. */
+  "refused",
+  /** Well-formed and impossible to act on, such as a document we cannot open. */
+  "unprocessable",
+  /** Somebody else changed it first. */
+  "conflict",
+] as const;
+
+export type OperationFailure = (typeof OPERATION_FAILURES)[number];
+
+export class OperationError extends Error {
+  readonly failure: OperationFailure;
+  /** The existing structured payload, when the client can act on specifics. */
+  readonly detail: StructuredErrorCause | null;
+
+  constructor(
+    failure: OperationFailure,
+    message: string,
+    detail: StructuredErrorCause | null = null,
+  ) {
+    super(message);
+    this.name = "OperationError";
+    this.failure = failure;
+    this.detail = detail;
+  }
+}
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: isOperationError
+ *
+ * A guard rather than an `instanceof` at each call site, because a surface
+ * catching these runs in a different module graph from the one that threw
+ * (a route handler, a tool handler, a procedure) and `instanceof` across a
+ * duplicated class is the bug nobody finds. The marker is the name.
+ */
+export function isOperationError(error: unknown): error is OperationError {
+  return error instanceof OperationError;
+}

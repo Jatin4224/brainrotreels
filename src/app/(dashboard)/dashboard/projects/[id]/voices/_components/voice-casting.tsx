@@ -131,6 +131,7 @@ export function VoiceCasting({ projectId }: { projectId: string }) {
       {cast.length > 0 ? (
         <VoicePicker
           organizationId={organizationId}
+          projectId={projectId}
           activeSpeakerId={activeSpeakerId}
           canAssign={canAssign}
           onAssigned={() => void speakers.refetch()}
@@ -278,11 +279,15 @@ function SpeakerPanel({
  */
 function VoicePicker({
   organizationId,
+  projectId,
   activeSpeakerId,
   canAssign,
   onAssigned,
 }: {
   organizationId: string;
+  /* THE_PROJECT_IS_NAMED_NOT_INFERRED — the assignment asserts which
+   * project it is for, and the server checks it. */
+  projectId: string;
   activeSpeakerId: string | null;
   canAssign: boolean;
   onAssigned: () => void;
@@ -435,6 +440,7 @@ function VoicePicker({
                   }
                   assign.mutate({
                     organizationId,
+                    projectId,
                     speakerId: activeSpeakerId,
                     voiceId: voice.id,
                   });

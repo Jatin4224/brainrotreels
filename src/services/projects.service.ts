@@ -4,8 +4,9 @@
 
 /**
  * SOURCE OF TRUTH KEYWORDS: listProjects, findProjectForOrganization,
- *   findProjectWithTimeline, saveTimelineDocument, PROJECT_LIST_SELECT,
- *   ProjectListItem, ProjectWithTimeline, TENANT_SCOPED_QUERY, DbClient
+ *   findProjectWithTimeline, saveTimelineDocument, createProject,
+ *   recordScriptSource, PROJECT_LIST_SELECT, ProjectListItem,
+ *   ProjectWithTimeline, TENANT_SCOPED_QUERY, DbClient
  *
  * WHAT:  The Prisma reads of the `project` and `timeline` tables that more than
  *        one caller needs.
@@ -28,6 +29,7 @@
 import "server-only";
 
 import type { Prisma, PrismaClient } from "@/generated/prisma";
+import { jsonObjectSchema } from "@/lib/types/json";
 
 type DbClient = PrismaClient | Prisma.TransactionClient;
 
@@ -211,4 +213,104 @@ export async function saveTimelineDocument(
     },
   });
   return true;
+}
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: createProject, SERVICES_OWN_THE_DATABASE,
+ *   THE_WRITE_MOVED_OUT_OF_THE_ROUTER
+ *
+ * WHAT:  A new project row.
+ *
+ * WHY:   THE_WRITE_MOVED_OUT_OF_THE_ROUTER. This was `ctx.db.project.create`
+ *        inline in `projects.create`, which worked because the router had a
+ *        Prisma handle. Phase 17 makes the same verb reachable from a REST
+ *        route and an MCP tool, and the operation that serves all three may
+ *        not touch Prisma itself (CLAUDE.md rule 3) — so the write belongs
+ *        here, where every other write to this table already lives and where
+ *        `import 'server-only'` keeps it off a client bundle.
+ *
+ *        The optional fields are spread conditionally rather than passed as
+ *        `undefined`, because `exactOptionalPropertyTypes` distinguishes the two
+ *        and Prisma treats an explicit `undefined` differently from an absent
+ *        key on a column with a default.
+ * WHERE: createProjectOperation.
+ */
+export async function createProject(
+  db: DbClient,
+  args: {
+    organizationId: string;
+    title: string;
+    kind: string;
+    aspect: string;
+    sourceRef?: string | undefined;
+    settings?: Prisma.InputJsonValue | undefined;
+  },
+): Promise<Prisma.ProjectGetPayload<Record<string, never>>> {
+  return db.project.create({
+    data: {
+      organizationId: args.organizationId,
+      title: args.title,
+      kind: args.kind,
+      aspect: args.aspect,
+      ...(args.sourceRef !== undefined ? { sourceRef: args.sourceRef } : {}),
+      ...(args.settings !== undefined ? { settings: args.settings } : {}),
+    },
+  });
+}
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: recordScriptSource, RECORD_THE_PATH,
+ *   SETTINGS_ARE_MERGED_NOT_REPLACED, TENANT_SCOPED_QUERY
+ *
+ * WHAT:  Stores what the customer gave us and what we made of it, on the
+ *        project, before the script workflow is enqueued.
+ *
+ * WHY:   RECORD_THE_PATH is Phase 06's rule and the columns are the ones it
+ *        chose: `sourceRef` is the normalised input and `settings.script`
+ *        carries the extracted body and its provenance. The body is kept so a
+ *        retry does not re-fetch a URL that may since have gone behind a
+ *        paywall, and so an operator can see exactly what the model was given
+ *        when a script comes out wrong.
+ *
+ *        SETTINGS_ARE_MERGED_NOT_REPLACED. `Project.settings` holds every
+ *        feature's configuration — captions, generate, motion — so this reads,
+ *        merges and writes rather than assigning. Replacing the object would
+ *        silently drop a customer's caption choice the first time they
+ *        generated a script.
+ *
+ *        Scoped by `organizationId` as well as `id` (TENANT_SCOPED_QUERY) and
+ *        returns whether a row matched, so a project deleted between the read
+ *        and this write is a clean refusal rather than a silent no-op
+ *        followed by an enqueued job for a project that is gone.
+ * WHERE: generateScriptOperation.
+ */
+export async function recordScriptSource(
+  db: DbClient,
+  args: {
+    organizationId: string;
+    projectId: string;
+    sourceRef: string;
+    script: Prisma.InputJsonObject;
+  },
+): Promise<boolean> {
+  const project = await db.project.findFirst({
+    where: { id: args.projectId, organizationId: args.organizationId },
+    select: { settings: true },
+  });
+  if (project === null) return false;
+
+  const existing = jsonObjectSchema.safeParse(project.settings);
+
+  const result = await db.project.updateMany({
+    where: { id: args.projectId, organizationId: args.organizationId },
+    data: {
+      sourceRef: args.sourceRef,
+      settings: {
+        ...(existing.success ? existing.data : {}),
+        script: args.script,
+      },
+    },
+  });
+
+  return result.count > 0;
 }
