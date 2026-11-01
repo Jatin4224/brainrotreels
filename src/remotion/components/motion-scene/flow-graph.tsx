@@ -38,7 +38,7 @@ import { withAlpha } from "@/lib/captions";
 import type { MotionPrimitiveProps } from "@/lib/types/scene";
 
 import { TextBlock } from "./text-block";
-import { localProgress, runByPath } from "./util";
+import { localProgress, radiusPx, runByPath, strokePx } from "./util";
 
 export function FlowGraph({
   element,
@@ -47,6 +47,7 @@ export function FlowGraph({
   canvas,
   window: visible,
   seconds,
+  style,
 }: MotionPrimitiveProps) {
   if (element.kind !== "flowGraph") return null;
 
@@ -64,7 +65,7 @@ export function FlowGraph({
     });
 
   const nodeIndex = new Map(graph.nodes.map((node, index) => [node.id, index]));
-  const stroke = Math.max(canvas.height * 0.0022, 2);
+  const stroke = strokePx(style, canvas.height * 0.0022, 1.5);
 
   return (
     <>
@@ -114,7 +115,7 @@ export function FlowGraph({
                 height: node.rect.height,
                 /* Radius proportional to the box, so a node looks the same at
                  * every resolution and in every graph size. */
-                borderRadius: Math.min(node.rect.height * 0.28, 24),
+                borderRadius: radiusPx(style, node.rect.height),
                 border: `${stroke}px solid ${palette.accent}`,
                 /* The palette's text colour at low alpha rather than a literal
                  * fill: it tints toward the backdrop, so a node reads as
@@ -128,7 +129,7 @@ export function FlowGraph({
               }}
             />
             {run === null ? null : (
-              <TextBlock run={run} color={palette.text} />
+              <TextBlock run={run} color={palette.text} style={style} />
             )}
           </div>
         );

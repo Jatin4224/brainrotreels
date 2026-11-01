@@ -4,10 +4,19 @@
 
 /**
  * SOURCE OF TRUTH KEYWORDS: ProjectMotionPage, ROUTE_AUTHORIZATION,
- *   SERVER_PAGE_CLIENT_GALLERY, GALLERY_IS_THE_REVIEW_SURFACE
+ *   SERVER_PAGE_CLIENT_GALLERY, GALLERY_IS_THE_REVIEW_SURFACE,
+ *   TWO_REVIEW_SURFACES_ONE_ROUTE
  *
- * WHAT:  /dashboard/projects/[id]/motion — the motion primitive gallery: every
- *        primitive in every layout, in every palette, at both aspects.
+ * WHAT:  /dashboard/projects/[id]/motion — THIS project's designed beats, and
+ *        beneath them the primitive gallery: every primitive in every layout,
+ *        in every palette, at both aspects.
+ *
+ * WHY:   TWO_REVIEW_SURFACES_ONE_ROUTE, and the order is the point. The beat
+ *        strip answers "is my video any good", which is what somebody arrives
+ *        asking; the gallery answers "is the LIBRARY any good", which is the
+ *        question behind a bad answer to the first one. Putting them on one
+ *        screen means a reviewer who finds a cluttered beat can tell in the
+ *        same scroll whether the primitive is at fault or the design is.
  * WHY:   SERVER_PAGE_CLIENT_GALLERY, the same split as the captions, voices,
  *        script and preview pages: the page costs no JavaScript of its own,
  *        and the gallery is a client child because it holds the palette and
@@ -31,16 +40,26 @@
 import type { Metadata } from "next";
 
 import { ContentLayout } from "@/components/global/page-header";
+import { BeatStrip } from "./_components/beat-strip";
 import { MotionGallery } from "./_components/motion-gallery";
 
 export const metadata: Metadata = {
   title: "Motion",
 };
 
-export default function ProjectMotionPage() {
+export default async function ProjectMotionPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+
   return (
-    <ContentLayout title="Motion primitives" width="lg">
-      <MotionGallery />
+    <ContentLayout title="Motion" width="lg">
+      <div className="flex flex-col gap-8">
+        <BeatStrip projectId={id} />
+        <MotionGallery />
+      </div>
     </ContentLayout>
   );
 }

@@ -5,7 +5,8 @@
 /**
  * SOURCE OF TRUTH KEYWORDS: RenderAdapter, RenderOptions, RenderStartResult,
  *   RenderProgressResult, RENDER_PROVIDER_IDS, RenderProviderId,
- *   LAMBDA_IS_RIGHT_FOR_RENDERING, RenderProviderError, start, getProgress
+ *   LAMBDA_IS_RIGHT_FOR_RENDERING, RenderProviderError, start, getProgress,
+ *   renderStill, StillOptions, A_STILL_IS_NOT_A_RENDER
  *
  * WHAT:  The contract for turning a timeline document into a video file
  *        somewhere other than this process.
@@ -25,10 +26,12 @@
  *            writing a scheduler is how this seam gets replaced later rather
  *            than now.
  *
- *        The interface is TWO METHODS and no more, which is the shape the
- *        phase asks for and is also the smallest thing a self-hosted renderer
- *        could implement. Specifically it does NOT include "wait for the
- *        render" or "download the output":
+ *        The interface is THREE METHODS and no more. Two of them are the
+ *        shape Phase 10's phase file asks for and are also the smallest thing
+ *        a self-hosted renderer could implement; the third is `renderStill`,
+ *        added in Phase 16d and argued for on its own below
+ *        (A_STILL_IS_NOT_A_RENDER). Specifically the interface does NOT
+ *        include "wait for the render" or "download the output":
  *
  *          - Waiting is the workflow's job, by webhook. A `wait()` on this
  *            interface would be a method no caller is allowed to use, because
@@ -44,8 +47,25 @@
  *        is dead or merely slow. It is NOT a polling loop, and the phase's
  *        "without any polling step" check is about the happy path, which uses
  *        the webhook. Grep PROGRESS_IS_FOR_THE_TIMEOUT_PATH.
+ *        A_STILL_IS_NOT_A_RENDER, which is why `renderStill` is a third
+ *        method rather than a flag on `start`. Every sentence above about
+ *        `start` is false of it: a still is ONE frame, so it does not
+ *        parallelise and has nothing to chunk; it finishes in seconds, so it
+ *        neither needs a webhook nor risks a step timeout; it produces no
+ *        `Render` row, is never handed to a customer, and costs a fraction of
+ *        a cent rather than a billable render. Modelling it as a render with
+ *        `durationInFrames: 1` would drag a video's whole lifecycle — a row,
+ *        a webhook, a credit hold, a copy into R2 — around a picture whose
+ *        only reader is a model that looks at it once and forgets it.
+ *
+ *        It is therefore the one method here that RETURNS something usable
+ *        straight away. It still returns a URL rather than bytes, keeping the
+ *        rule above that this folder never learns what a bucket is; the
+ *        caller fetches it, exactly as the render workflow fetches an output.
  * WHERE: Implemented by ./lambda. Reached through getRenderAdapter() in
- *        ./index. Called ONLY from src/inngest/functions/project-render.ts —
+ * ./index. `start` and `getProgress` are called ONLY from
+ * src/inngest/functions/project-render.ts, and `renderStill` only from
+ * src/lib/script/motion-review.ts —
  *        never from a route, a router or a component, because starting a
  *        render is an action with a bill attached and the gates that authorise
  *        it live in the procedure layer.
@@ -182,6 +202,46 @@ export class RenderProviderError extends Error {
   }
 }
 
+/**
+ * SOURCE OF TRUTH KEYWORDS: StillOptions, RenderStillResult,
+ *   A_STILL_IS_NOT_A_RENDER, THE_FRAME_IS_THE_WHOLE_REQUEST
+ *
+ * WHAT:  Which frame of a document to draw, and how big.
+ *
+ * WHY:   THE_FRAME_IS_THE_WHOLE_REQUEST — no webhook, no secret, no custom
+ *        data, no watermark and no resolution ladder, because none of the
+ *        reasons those exist on `RenderOptions` apply to a picture nobody is
+ *        charged for and nobody is shown. A watermark on a frame whose only
+ *        viewer is a model would be paying to obscure our own evidence.
+ *
+ *        `scale` is a fraction of the composition's own size and the caller
+ *        chooses it, because the trade-off belongs to the caller: a vision
+ *        model is billed by pixels, and half size is enough to judge whether
+ *        text is cut off while costing a quarter of the tokens.
+ *
+ *        `assets` stays, for the same PRE_RESOLVED_ASSETS reason: a still of a
+ *        document that names an asset must be able to draw it.
+ * WHERE: The one argument of RenderAdapter.renderStill.
+ */
+export interface StillOptions {
+  /** Signed URLs for every handle in the document — see PRE_RESOLVED_ASSETS. */
+  assets: AssetUrlMap;
+  /** Which frame to draw. Clamped by the provider to the composition's range. */
+  frame: number;
+  /** 0..1 of the composition's own pixel size. */
+  scale: number;
+}
+
+export interface RenderStillResult {
+  /**
+   * Where the provider put the image. SHORT-LIVED and never handed to a
+   * customer — the caller reads it once. See OUTPUT_IS_COPIED_NOT_SERVED for
+   * the same argument about a video's output.
+   */
+  url: string;
+  mediaType: "image/png" | "image/jpeg";
+}
+
 export interface RenderAdapter {
   readonly id: RenderProviderId;
 
@@ -193,6 +253,12 @@ export interface RenderAdapter {
 
   /** Where one already-started render has got to. See RenderProgressResult. */
   getProgress(providerRenderId: string): Promise<RenderProgressResult>;
+
+  /**
+   * One frame, drawn and returned. Unlike `start`, this WAITS — a still
+   * finishes in seconds. See A_STILL_IS_NOT_A_RENDER.
+   */
+  renderStill(doc: TimelineDoc, options: StillOptions): Promise<RenderStillResult>;
 }
 
 export const RENDER_PROVIDER_IDS = ["lambda"] as const;

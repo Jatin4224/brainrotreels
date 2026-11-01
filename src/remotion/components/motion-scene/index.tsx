@@ -45,6 +45,7 @@
 import { useCurrentFrame, useVideoConfig } from "remotion";
 import { z } from "zod";
 
+import { getMotionStyle } from "@/lib/motion-styles";
 import { getPalette } from "@/lib/palettes";
 import { fromSceneSpec } from "@/lib/scene";
 import { sceneSpecSchema } from "@/lib/timeline";
@@ -88,6 +89,13 @@ export function MotionScene({ item, canvas, style, frames }: RenderItemProps) {
   return (
     <MotionSceneCanvas
       scene={parsed.scene}
+      /* The DOCUMENT's style id, resolved with the fallback — a document
+       * written by a newer release naming a style this worker has never heard
+       * of still produces a video (UNKNOWN_STYLE_FALLS_BACK). */
+      style={getMotionStyle(style.motionStyleId)}
+      /* The document's palette, not the motion style's: applying a style
+       * copies its palette into the document, so this is the one answer to
+       * "what colour is this video" (APPLYING_A_STYLE_WRITES_THE_PALETTE). */
       palette={getPalette(style.paletteId)}
       canvas={canvas}
       safeZone={style.safeZone}

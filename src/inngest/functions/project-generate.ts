@@ -131,6 +131,24 @@ import {
 } from "@/services/credits.service";
 import { incrementUsage } from "@/services/usage.service";
 import {
+  assignIntents,
+  buildStoryboard,
+  beatSeconds,
+  checkStoryboard,
+  mergeShortTail,
+  resolveSceneAnchors,
+} from "@/lib/scene";
+import { getMotionStyle } from "@/lib/motion-styles";
+import { designBeat, labelBeatIntents, reviewBeats } from "@/lib/script";
+import {
+  saveMotionDesign,
+  saveMotionReviews,
+  type StoredMotionBeat,
+} from "@/services/motion.service";
+import { sceneSchema, toBeatIntent, type Beat } from "@/lib/types/scene";
+import { SAFE_ZONE_BY_ASPECT } from "@/lib/generators/common";
+import { CANVAS_BY_ASPECT } from "@/lib/types/project";
+import {
   planProjectVisuals,
   readBlockVisuals,
   writeBlockVisuals,
@@ -314,6 +332,24 @@ function visualsRef(projectId: string): string {
  * fifty projects and own the pipeline.
  */
 const GENERATE_CONCURRENCY = 2;
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: readStyleId, UNKNOWN_STYLE_FALLS_BACK
+ *
+ * The motion style a project asked for, if any. Returns undefined rather
+ * than a default, because `getMotionStyle` owns the fallback and two places
+ * deciding what the default style is would be two defaults.
+ */
+function readStyleId(
+  settings: Readonly<Record<string, unknown>>,
+): string | undefined {
+  const bag = jsonObjectSchema.safeParse(settings);
+  if (!bag.success) return undefined;
+  const motion = jsonObjectSchema.safeParse(bag.data["motion"]);
+  if (!motion.success) return undefined;
+  const styleId = motion.data["styleId"];
+  return typeof styleId === "string" ? styleId : undefined;
+}
 
 export const projectGenerateFunction = inngestClient.createFunction(
   {
@@ -703,6 +739,432 @@ export const projectGenerateFunction = inngestClient.createFunction(
       );
       return { degraded };
     });
+
+    // ───────────────────────────────────────────────────────────────────────
+    // [6a2] STORYBOARD and DESIGN — the motion studio. Phase 16d.
+    //
+    //      Runs only for the kinds whose generator does not skip these two
+    //      stages, which today is `motion` alone. Gated on the generator's own
+    //      `skips` rather than on `kind === "motion"`, so a second format that
+    //      designs scenes needs no edit here (SKIPS_LIVE_ON_THE_GENERATOR).
+    //
+    //      MOTION_SCENES_ARE_ALREADY_DESIGNED: the generator is pure and may
+    //      not call a model, so the design happens HERE and is stored in
+    //      `Project.settings`. The same split Phase 13's quiz writer makes.
+    // ───────────────────────────────────────────────────────────────────────
+    const motionSkips = new Set(
+      resolveGenerator(parsedKind).skips as readonly string[],
+    );
+
+    if (!motionSkips.has("storyboard") && !motionSkips.has("design")) {
+      /**
+       * SOURCE OF TRUTH KEYWORDS: COVERAGE_IS_CHECKED_BEFORE_DESIGNING,
+       *   THE_SPLIT_IS_DETERMINISTIC
+       *
+       * The split is arithmetic over word timings, so it costs nothing and is
+       * checked before a single model request is spent. A storyboard with a
+       * gap in it is narration playing over whatever the last beat left on
+       * screen, and catching that here rather than after forty billed calls is
+       * the whole reason the phase orders the two steps this way.
+       */
+      const storyboard = await step.run("storyboard", async () => {
+        await beginStage(prisma, projectId, "storyboard");
+
+        const tier = await getOrganizationTier(organizationId);
+        const assembled = await generatorContextFor(
+          prisma,
+          organizationId,
+          projectId,
+          tier.tier,
+        );
+
+        if (assembled === null) {
+          const reason = "This project is no longer available.";
+          await failStage(prisma, projectId, "storyboard", reason);
+          throw new NonRetriableError(`[project.generate] ${projectId}: ${reason}`);
+        }
+
+        const words = assembled.ctx.words;
+        const beats = mergeShortTail(buildStoryboard(words), words);
+        const errors = checkStoryboard(beats, words);
+
+        if (errors.length > 0) {
+          const reason = errors
+            .slice(0, 3)
+            .map((error) => error.message)
+            .join(" ");
+          await failStage(prisma, projectId, "storyboard", reason);
+          throw new NonRetriableError(`Storyboard: ${reason}`);
+        }
+
+        /* Stored WITHOUT scenes first, so an interrupted design stage leaves a
+         * storyboard the beat strip can show and the generator can fall back
+         * over, rather than nothing at all. Not metered yet — a video is
+         * counted when its design SUCCEEDS (COUNTED_WHEN_THE_DESIGN_SUCCEEDS). */
+        const styleId = getMotionStyle(
+          readStyleId(assembled.ctx.settings),
+        ).id;
+
+        await saveMotionDesign({
+          organizationId,
+          projectId,
+          styleId,
+          beats: beats.map((beat) => ({
+            index: beat.index,
+            startWord: beat.startWord,
+            endWord: beat.endWord,
+            intent: beat.intent,
+          })),
+          countVideo: false,
+        });
+
+        await completeStage(prisma, projectId, "storyboard");
+
+        return {
+          styleId,
+          aspect: assembled.ctx.aspect,
+          beats: beats.map((beat) => {
+            const span = beatSeconds(beat, words);
+            return {
+              index: beat.index,
+              startWord: beat.startWord,
+              endWord: beat.endWord,
+              intent: beat.intent,
+              /* The beat's absolute start, which is what turns a word anchor
+               * into a BEAT-RELATIVE second — see RESOLVE_BEFORE_STORING. */
+              startSeconds: span.start,
+              durationSeconds: span.end - span.start,
+            };
+          }),
+        };
+      });
+
+      /**
+       * SOURCE OF TRUTH KEYWORDS: ONE_STEP_PER_BEAT, THE_PIPELINE_ALWAYS_FINISHES,
+       *   DESIGN_ONE_BEAT_ONLY
+       *
+       * ONE_STEP_PER_BEAT is the phase's "fan out in Inngest", and a
+       * `step.run` per beat is what that means here: each beat is durable on
+       * its own, retried on its own, and memoised across a replay — so a run
+       * that dies on beat thirty does not pay for the first twenty-nine twice.
+       *
+       * SEQUENTIAL, not parallel, and that is the throttle the phase asks for
+       * ("throttle to stay inside the provider's rate limits"). A
+       * `Promise.all` over forty steps would issue forty concurrent requests
+       * and be rate-limited on a long video, which is the one failure mode
+       * that gets worse the more a customer paid.
+       *
+       * `designBeat` never throws for a DESIGN failure — it falls back — so a
+       * thrown error here is a transport failure worth retrying, and letting
+       * it propagate is correct.
+       */
+      const designed = await step.run("design-begin", async () => {
+        await beginStage(prisma, projectId, "design");
+        return true;
+      });
+      void designed;
+
+      const style = getMotionStyle(storyboard.styleId);
+      const canvas = CANVAS_BY_ASPECT[storyboard.aspect];
+      const safeZone = SAFE_ZONE_BY_ASPECT[storyboard.aspect];
+
+      /**
+       * SOURCE OF TRUTH KEYWORDS: ONE_CALL_FOR_THE_WHOLE_VIDEO,
+       *   INTENT_PICKS_THE_PRIMITIVE, THE_SPLIT_IS_DETERMINISTIC
+       *
+       * WHAT the beats are about, in one request, before any of them is
+       * designed.
+       *
+       * This is the seam `assignIntents` exists for and the reason the split
+       * above is pure arithmetic: WHERE a beat ends is a fact about word
+       * timings, and WHAT it is for is a judgement. Without this step every
+       * beat reaches the designer as `emphasis` — the free default — and a
+       * designer told "emphasis" writes a text block, so the counters, meters,
+       * flow graphs and comparisons are all built, drawable, and never chosen.
+       *
+       * ONE request for the whole video rather than one per beat, because the
+       * neighbours are the evidence: the third of three numbers is a `stat`
+       * only in the company of the other two. It adds one request to the
+       * forty a long video already spends here.
+       *
+       * It cannot fail the run — `labelBeatIntents` returns an empty map on a
+       * refusal and every beat keeps its default, which is exactly the
+       * behaviour of the release before this step existed.
+       */
+      const labelled = await step.run("beat-intents", async () => {
+        const tier = await getOrganizationTier(organizationId);
+        const assembled = await generatorContextFor(
+          prisma,
+          organizationId,
+          projectId,
+          tier.tier,
+        );
+
+        if (assembled === null) {
+          const reason = "This project is no longer available.";
+          await failStage(prisma, projectId, "design", reason);
+          throw new NonRetriableError(`[project.generate] ${projectId}: ${reason}`);
+        }
+
+        /* Narrowed rather than cast: a step's return value is JSON by the time
+         * this line reads it (A_STORED_INTENT_IS_NARROWED_NOT_CAST). */
+        const beats: Beat[] = storyboard.beats.map((beat) => ({
+          index: beat.index,
+          startWord: beat.startWord,
+          endWord: beat.endWord,
+          intent: toBeatIntent(beat.intent),
+        }));
+
+        const secondsByIndex: Record<number, number> = {};
+        for (const beat of storyboard.beats) {
+          secondsByIndex[beat.index] = beat.durationSeconds;
+        }
+
+        const intents = await labelBeatIntents({
+          beats,
+          words: assembled.ctx.words,
+          secondsByIndex,
+        });
+
+        const result = assignIntents(beats, intents);
+
+        /* Stored before anything is designed, so the beat strip shows what
+         * each beat is FOR while the slow part runs — which is the only
+         * information a customer can act on during the design stage. Still
+         * not metered: a video is counted when its design succeeds. */
+        await saveMotionDesign({
+          organizationId,
+          projectId,
+          styleId: storyboard.styleId,
+          beats: result.map((beat) => ({
+            index: beat.index,
+            startWord: beat.startWord,
+            endWord: beat.endWord,
+            intent: beat.intent,
+          })),
+          countVideo: false,
+        });
+
+        console.info(
+          `[project.generate] ${projectId}: labelled ${Object.keys(intents).length}` +
+            ` of ${beats.length} beat(s).`,
+        );
+
+        return result.map((beat) => ({
+          index: beat.index,
+          intent: beat.intent,
+        }));
+      });
+
+      const intentFor = new Map(
+        labelled.map((beat) => [beat.index, toBeatIntent(beat.intent)]),
+      );
+
+      const designedBeats: StoredMotionBeat[] = [];
+
+      for (const beat of storyboard.beats) {
+        const result = await step.run(`design-beat-${beat.index}`, async () => {
+          const tier = await getOrganizationTier(organizationId);
+          const assembled = await generatorContextFor(
+            prisma,
+            organizationId,
+            projectId,
+            tier.tier,
+          );
+
+          if (assembled === null) {
+            const reason = "This project is no longer available.";
+            await failStage(prisma, projectId, "design", reason);
+            throw new NonRetriableError(`[project.generate] ${projectId}: ${reason}`);
+          }
+
+          const outcome = await designBeat({
+            beat: {
+              index: beat.index,
+              startWord: beat.startWord,
+              endWord: beat.endWord,
+              intent: intentFor.get(beat.index) ?? "emphasis",
+            },
+            words: assembled.ctx.words,
+            style,
+            aspect: storyboard.aspect,
+            ctx: { canvas, safeZone },
+            durationSeconds: beat.durationSeconds,
+          });
+
+          /**
+           * SOURCE OF TRUTH KEYWORDS: RESOLVE_BEFORE_STORING
+           *
+           * The model may anchor an element to a WORD, which is how the
+           * phase's "every number or diagram appears on the word that
+           * introduces it" is expressed. A renderer cannot resolve one — it is
+           * handed an item, a canvas and a style, never the transcript — so
+           * the conversion happens HERE, once, against the alignment that
+           * produced the beat.
+           *
+           * Without this the scene reaches the renderer still anchored, and
+           * `elementWindowSeconds` shows the element for the whole beat with a
+           * warning: the content right and the timing wrong, which is the
+           * fallback being load-bearing instead of being a safety net.
+           */
+          const resolved = resolveSceneAnchors({
+            scene: outcome.scene,
+            words: assembled.ctx.words,
+            beatStart: beat.startSeconds,
+            beatDuration: beat.durationSeconds,
+          });
+
+          return { scene: resolved, source: outcome.source };
+        });
+
+        /**
+         * SOURCE OF TRUTH KEYWORDS: A_SCENE_IS_PARSED_BACK_NOT_CAST
+         *
+         * A step's return value crosses a JSON boundary, so what comes back is
+         * shaped like a `Scene` without being one as far as the compiler is
+         * concerned. Parsing it is the honest conversion AND the last gate
+         * before a jsonb column is asked to hold it — the same argument
+         * `saveMotionDesign` makes about proving its payload is JSON.
+         *
+         * A failure here is a bug rather than a bad model answer: the scene
+         * passed `checkScene` minutes ago and only its anchors were rewritten
+         * since. So it is logged and the beat is stored WITHOUT a scene, which
+         * the generator draws as a measured fallback
+         * (A_MISSING_SCENE_IS_A_FALLBACK) rather than failing a whole video
+         * over one beat.
+         */
+        const parsedScene = sceneSchema.safeParse(result.scene);
+        if (!parsedScene.success) {
+          console.warn(
+            `[project.generate] ${projectId}: beat ${beat.index} did not ` +
+              `parse back from its design step; storing it without a scene.`,
+          );
+        }
+
+        designedBeats.push({
+          index: beat.index,
+          startWord: beat.startWord,
+          endWord: beat.endWord,
+          intent: intentFor.get(beat.index) ?? "emphasis",
+          ...(parsedScene.success ? { scene: parsedScene.data } : {}),
+          source: result.source,
+        });
+      }
+
+      await step.run("design-done", async () => {
+        /* DESIGN_IS_STORED_WHOLE, and metered here — the video is counted when
+         * its design succeeds, in the same write that stores it. */
+        await saveMotionDesign({
+          organizationId,
+          projectId,
+          styleId: storyboard.styleId,
+          beats: designedBeats,
+          countVideo: true,
+        });
+
+        /* A beat that fell back is a worse video, not a failed one — so the
+         * stage completes with a WARNING naming how many, which is what the
+         * beat strip's "redesign this beat" is for. */
+        const fallbacks = designedBeats.filter(
+          (beat) => beat.source === "fallback",
+        ).length;
+
+        await completeStage(
+          prisma,
+          projectId,
+          "design",
+          fallbacks > 0
+            ? `${fallbacks} beat${fallbacks === 1 ? "" : "s"} could not be designed and ${fallbacks === 1 ? "is" : "are"} showing the narration plainly. Redesign ${fallbacks === 1 ? "it" : "them"} from the beat strip.`
+            : undefined,
+        );
+      });
+
+      /**
+       * SOURCE OF TRUTH KEYWORDS: DETERMINISTIC_CHECKS_FIRST, SAMPLED_NOT_EXHAUSTIVE,
+       *   VISION_CATCHES_WHAT_GEOMETRY_CANNOT, REVIEW_NEVER_FAILS_THE_RUN
+       *
+       * The phase's step 12, second half: photograph two or three of the
+       * busiest beats and ask a vision model what is wrong with them.
+       *
+       * AFTER the design stage completes, on purpose. The review is advice
+       * about a video that already exists — the beats are stored, the video
+       * is metered, and the stage that could fail has already succeeded.
+       * Running it inside the design stage would let an opinion about three
+       * frames hold up a finished storyboard, and a vision pass is the one
+       * part of this pipeline whose answer nothing downstream depends on.
+       *
+       * REVIEW_NEVER_FAILS_THE_RUN. `reviewBeats` does not throw, for any
+       * reason (REVIEW_NEVER_THROWS), and this step stores whatever it
+       * returned. A deployment with no renderer configured, a model that
+       * refused, a still that would not render: each one is a video with no
+       * badges, which is what every video had before this step existed.
+       */
+      await step.run("review-beats", async () => {
+        const tier = await getOrganizationTier(organizationId);
+        const assembled = await generatorContextFor(
+          prisma,
+          organizationId,
+          projectId,
+          tier.tier,
+        );
+
+        /* No project, no review — and nothing to fail, because the design
+         * stage has already completed and this step owns no stage. */
+        if (assembled === null) return { stills: 0, flagged: 0 };
+
+        const words = assembled.ctx.words;
+        const secondsByIndex = new Map(
+          storyboard.beats.map((beat) => [beat.index, beat.durationSeconds]),
+        );
+
+        /* Only beats that HAVE a scene can be photographed. A beat stored
+         * without one is a design the generator will replace with a measured
+         * fallback, and there is nothing yet to look at. */
+        const reviewable = designedBeats.flatMap((beat) =>
+          beat.scene === undefined || beat.source === undefined
+            ? []
+            : [
+                {
+                  index: beat.index,
+                  scene: beat.scene,
+                  text: words
+                    .slice(beat.startWord, beat.endWord + 1)
+                    .map((word) => word.w)
+                    .join(" "),
+                  durationSeconds: secondsByIndex.get(beat.index) ?? 0,
+                  source: beat.source,
+                },
+              ],
+        );
+
+        const outcome = await reviewBeats({
+          beats: reviewable,
+          canvas,
+          style,
+          safeZone,
+        });
+
+        const annotated = await saveMotionReviews({
+          organizationId,
+          projectId,
+          reviews: outcome.reviews,
+        });
+
+        const flagged = Object.values(outcome.reviews).filter(
+          (review) => review.verdict !== "ok",
+        ).length;
+
+        console.info(
+          `[project.generate] ${projectId}: reviewed ${outcome.stills} still(s), ` +
+            `annotated ${annotated} beat(s), ${flagged} flagged` +
+            (outcome.skipped === null
+              ? "."
+              : ` (skipped: ${outcome.skipped}).`),
+        );
+
+        return { stills: outcome.stills, flagged };
+      });
+    }
 
     // ───────────────────────────────────────────────────────────────────────
     // [6b] VISUALS — a picture per script block. Phase 14.

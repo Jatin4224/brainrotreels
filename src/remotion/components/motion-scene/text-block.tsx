@@ -39,8 +39,9 @@
  * WHERE: Every text-drawing primitive under motion-scene/.
  */
 
+import { captionFontFamily } from "@/lib/captions/fonts";
+import type { MotionStyle } from "@/lib/types/motion-style";
 import { SCENE_TEXT_ROLE_SPECS, type PlacedTextRun } from "@/lib/types/scene";
-import { RENDER_FONT_FAMILY } from "../../fonts";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: TextBlock, STAGGER_REUSES_THE_MOVEMENT
@@ -53,17 +54,26 @@ import { RENDER_FONT_FAMILY } from "../../fonts";
 export function TextBlock({
   run,
   color,
+  style,
   align = "center",
   justify = "center",
   wordStyle,
 }: {
   run: PlacedTextRun;
   color: string;
+  /**
+   * The motion style — Phase 16c. Its `fonts` pair is resolved through the
+   * role's `fontSlot`, which is how "a style names two fonts" becomes a
+   * typeface on screen rather than a field in an object. One family is bundled
+   * today, so both slots land on it; see TWO_FONTS_ONE_FAMILY.
+   */
+  style: MotionStyle;
   align?: "left" | "center" | "right";
   justify?: "flex-start" | "center" | "flex-end";
   wordStyle?: (wordIndex: number) => React.CSSProperties;
 }) {
   const spec = SCENE_TEXT_ROLE_SPECS[run.role];
+  const family = captionFontFamily(style.fonts[spec.fontSlot]);
   let wordIndex = 0;
 
   return (
@@ -82,7 +92,7 @@ export function TextBlock({
          * is no longer where the text is. */
         justifyContent: "center",
         alignItems: justify,
-        fontFamily: RENDER_FONT_FAMILY,
+        fontFamily: family,
         fontWeight: spec.weight,
         fontSize: run.fontPx,
         lineHeight: spec.lineHeight,

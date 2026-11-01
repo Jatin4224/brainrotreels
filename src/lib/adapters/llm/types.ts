@@ -3,9 +3,10 @@
  */
 
 /**
- * SOURCE OF TRUTH KEYWORDS: LlmAdapter, LlmGenerateArgs, LlmProviderId,
+ * SOURCE OF TRUTH KEYWORDS: LlmAdapter, LlmGenerateArgs, LlmImage, LlmProviderId,
  *   LLM_PROVIDER_IDS, LlmError, SCHEMA_IS_THE_CONTRACT,
- *   RETRY_ONCE_WITH_THE_ERROR, UNTRUSTED_TEXT_IS_NEVER_SYSTEM
+ *   RETRY_ONCE_WITH_THE_ERROR, UNTRUSTED_TEXT_IS_NEVER_SYSTEM,
+ *   AN_IMAGE_IS_PART_OF_THE_REQUEST
  *
  * WHAT:  The contract for asking a language model for STRUCTURED output.
  *
@@ -76,9 +77,48 @@ export interface LlmGenerateArgs<T> {
   user: string;
   /** The shape the answer must take. Enforced, not suggested. */
   schema: z.ZodType<T>;
+  /**
+   * SOURCE OF TRUTH KEYWORDS: AN_IMAGE_IS_PART_OF_THE_REQUEST
+   *
+   * Pictures the question is about, placed BEFORE the text in the same user
+   * message. Still one request-shaped question with a known answer shape, so
+   * it needs no second method: "look at this frame and tell me what is wrong
+   * with it" is the same seam as "write this script", with an attachment.
+   *
+   * They go in the USER message by construction, which is the same boundary
+   * the untrusted-text rule draws and for a stronger reason — a rendered frame
+   * can contain whatever text a customer's script put on screen, so an image
+   * is never operator input.
+   */
+  images?: readonly LlmImage[];
   maxTokens?: number;
   /** A short label for logs, e.g. `script.generate`. */
   purpose?: string;
+}
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: LlmImage, IMAGE_IS_BYTES_NOT_A_URL
+ *
+ * WHAT:  One picture, as base64 bytes and a media type.
+ *
+ * WHY:   IMAGE_IS_BYTES_NOT_A_URL. A provider that fetches a URL for us is a
+ *        provider we have asked to reach a bucket on our behalf, which means
+ *        the object has to be readable by somebody who is not us for as long
+ *        as the request takes. Handing over BYTES keeps every frame of a
+ *        customer's video inside our own trust boundary, and it makes this
+ *        seam work for an image that was never stored anywhere — which is the
+ *        case it was added for.
+ *
+ *        The media types are a closed union rather than a string because every
+ *        provider accepts a different set, and the narrow intersection is
+ *        better than a runtime 400 naming a format one of them has never
+ *        supported.
+ * WHERE: `LlmGenerateArgs.images`; produced by src/lib/script/motion-review.ts.
+ */
+export interface LlmImage {
+  /** Base64, with no `data:` prefix. */
+  data: string;
+  mediaType: "image/png" | "image/jpeg" | "image/webp";
 }
 
 /**

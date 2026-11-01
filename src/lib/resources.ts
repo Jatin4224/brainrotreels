@@ -1027,6 +1027,119 @@ export const RESOURCES = {
     },
   },
 
+  /**
+   * SOURCE OF TRUTH KEYWORDS: RESOURCES.motionStudio, motionStudio.designStyle,
+   *   GATE_IS_THE_WHOLE_ROUTER, A_FLAG_NOT_A_LIMIT, METERING_COMES_WITH_THE_DESIGNER,
+   *   DESIGN_IS_A_MODEL_REQUEST
+   *
+   * Phase 16c. The motion graphics studio: AI-designed animated explainers.
+   *
+   * GATE_IS_THE_WHOLE_ROUTER, the same arrangement `timelineEditor` uses. The
+   * router is mounted under this key, so the procedure factory's flag gate
+   * refuses EVERY verb including the reads — `free: false` here is the whole
+   * of the server-side enforcement and there is no per-procedure check to
+   * forget. That matters more than usual for this resource: `designStyle`
+   * spends a model request, so a workspace without the feature must not be
+   * able to reach it by calling the procedure directly.
+   *
+   * DESIGN_IS_A_MODEL_REQUEST, which is why the rate limit is tight. Designing
+   * a style is a paid request that produces no artifact — somebody clicking it
+   * twenty times while they decide is twenty charges for nothing stored. Ten
+   * in five minutes is generous for a human and useless for a loop.
+   *
+   * METERING_IS_THE_SIBLING_ENTRY. The per-video cost lives in
+   * `motionVideos` below, added in 16d once there was something to count — a
+   * limit that nothing decrements would read as a feature somebody forgot to
+   * wire. This entry stays a pure FLAG: it gates access to the studio, and the
+   * videos are counted next door.
+   *
+   * A_FLAG_NOT_A_LIMIT for the studio itself, for the reason the phase file
+   * gives: motion is priced separately because cost per video is several times
+   * the rest of the pipeline, and the per-video metering is where that is
+   * collected — not by rationing access to the style picker.
+   */
+  motionStudio: {
+    name: "Motion studio",
+    description: "AI-designed animated explainer videos",
+    flag: {
+      perPlan: {
+        free: false,
+        starter: false,
+        pro: true,
+        enterprise: true,
+        portal: true,
+      },
+      upgradeMessage: "Upgrade to {nextPlan} for motion graphics videos",
+      /* The phase file's `availableOnFreeTrial: false`. A trial that could
+       * design styles would be a trial of the most expensive thing we sell. */
+      availableOnFreeTrial: false,
+    },
+    /**
+     * SOURCE OF TRUTH KEYWORDS: RATE_LIMITED_NOT_METERED,
+     *   THE_KEY_IS_THE_PROCEDURE_NAME
+     *
+     * THE_KEY_IS_THE_PROCEDURE_NAME: the factory resolves these from the tRPC
+     * PATH, so each key has to spell its procedure exactly — a key that does
+     * not match a procedure is a limit that silently never applies.
+     *
+     * `redesignBeat` is RATE_LIMITED_NOT_METERED. It spends up to two model
+     * requests and increments nothing, because fixing one ugly beat is not
+     * another video — so this is the only thing standing between a frustrated
+     * customer and an unbounded bill. Twenty an hour is more beats than a
+     * human will review in that time and far fewer than a script would ask
+     * for.
+     */
+    rateLimit: {
+      designStyle: { count: 10, window: "5 m" },
+      redesignBeat: { count: 20, window: "1 h" },
+    },
+  },
+
+  /**
+   * SOURCE OF TRUTH KEYWORDS: RESOURCES.motionVideos, MOTION_IS_METERED_SEPARATELY,
+   *   A_LIMIT_NOT_A_FLAG, COUNTED_WHEN_THE_DESIGN_SUCCEEDS
+   *
+   * Phase 16d. How many motion videos a workspace may DESIGN per month.
+   *
+   * MOTION_IS_METERED_SEPARATELY, in the phase file's own words: motion is
+   * "priced and metered separately because cost per video is several times the
+   * rest of the pipeline — per-beat LLM calls, still renders, and a vision
+   * pass". A sixty-second explainer is dozens of model requests before a single
+   * frame is rendered, which is a different shape of cost from every other
+   * format in this product, and it cannot be collected by the per-render
+   * charge that covers the others.
+   *
+   * A_LIMIT_NOT_A_FLAG, and it sits BESIDE `motionStudio` rather than
+   * replacing it. The flag answers "may this workspace use the studio at all",
+   * which gates the style picker and the designer; the limit answers "how many
+   * videos this month", which is where the money is. Collapsing them would
+   * mean either rationing access to a style picker that costs nothing, or
+   * leaving the expensive step uncounted.
+   *
+   * COUNTED_WHEN_THE_DESIGN_SUCCEEDS — the usage is recorded by the design
+   * stage after the beats are stored, not when a generation is requested. A
+   * run that fails before designing anything has spent nothing worth counting,
+   * and counting it would charge a customer for our outage. Credits for the
+   * individual model calls are a separate matter and are handled by the
+   * pipeline's own estimate, as they are for every other format.
+   */
+  motionVideos: {
+    name: "Motion videos",
+    description: "Motion graphics videos per month",
+    limit: {
+      perPlan: {
+        free: 0,
+        starter: 0,
+        pro: 50,
+        enterprise: "unlimited",
+        portal: "unlimited",
+      },
+      upgradeMessage: "Upgrade to {nextPlan} for motion graphics videos",
+      availableOnFreeTrial: false,
+      unit: "videos",
+    },
+  },
+
   invitation: {
     name: "Invitations",
     description: "Send invites and cancel pending invitations",

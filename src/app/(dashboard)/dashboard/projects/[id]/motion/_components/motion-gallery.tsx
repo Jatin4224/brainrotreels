@@ -44,6 +44,7 @@
 import * as React from "react";
 
 import { MotionPreview } from "@/components/global/motion-preview";
+import { DesignStylePanel } from "./design-style-panel";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -55,6 +56,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { getMotionStyle, listMotionStyles } from "@/lib/motion-styles";
 import { listPalettes } from "@/lib/palettes";
 import { checkScene, GALLERY_SCENES } from "@/lib/scene";
 import { ASPECT_RATIOS, CANVAS_BY_ASPECT, type AspectRatio } from "@/lib/types";
@@ -66,12 +68,19 @@ const CARD_WIDTH = 300;
 
 export function MotionGallery() {
   const [aspect, setAspect] = React.useState<AspectRatio>("9:16");
-  const [paletteId, setPaletteId] = React.useState("default");
+  const [styleId, setStyleId] = React.useState("studio");
+  /* An empty string means "use the style's own palette", which is what a real
+   * render does. The override exists because the phase requires reviewing
+   * every primitive in every PALETTE, not only in the five the styles pick. */
+  const [paletteId, setPaletteId] = React.useState("");
   const [safeZone, setSafeZone] = React.useState<SafeZone>("none");
   const [showSafeZone, setShowSafeZone] = React.useState(false);
 
   const canvas = CANVAS_BY_ASPECT[aspect];
   const palettes = listPalettes();
+  const styles = listMotionStyles();
+  /* Resolved here rather than inside the preview — see A_RESOLVED_STYLE_NOT_AN_ID. */
+  const style = getMotionStyle(styleId);
 
   return (
     <div className="flex flex-col gap-6">
@@ -101,6 +110,26 @@ export function MotionGallery() {
           </Select>
         </Field>
 
+        <Field label="Style">
+          <Select
+            value={styleId}
+            onValueChange={(value) => {
+              if (value !== null) setStyleId(value);
+            }}
+          >
+            <SelectTrigger className="w-44">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {styles.map((style) => (
+                <SelectItem key={style.id} value={style.id}>
+                  {style.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </Field>
+
         <Field label="Palette">
           <Select
             value={paletteId}
@@ -112,6 +141,7 @@ export function MotionGallery() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value="">Style default</SelectItem>
               {palettes.map((palette) => (
                 <SelectItem key={palette.id} value={palette.id}>
                   {palette.name}
@@ -190,7 +220,8 @@ export function MotionGallery() {
                 <MotionPreview
                   scene={entry.scene}
                   canvas={canvas}
-                  paletteId={paletteId}
+                  style={style}
+                  paletteId={paletteId === "" ? undefined : paletteId}
                   safeZone={safeZone}
                   durationSeconds={entry.durationSeconds}
                   width={CARD_WIDTH}
@@ -214,6 +245,11 @@ export function MotionGallery() {
           );
         })}
       </div>
+
+      {/* The phase's step 9. Last on the screen because the library above it is
+          what a reviewer judges first — a designed style is only trustworthy
+          once the primitives it is made of have been looked at. */}
+      <DesignStylePanel canvas={canvas} safeZone={safeZone} width={CARD_WIDTH} />
     </div>
   );
 }

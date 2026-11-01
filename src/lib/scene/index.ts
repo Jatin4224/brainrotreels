@@ -41,9 +41,25 @@ export type { ElementWindow } from "./anchors";
 export { checkScene } from "./check";
 export { parseScene, toSceneSpec, fromSceneSpec } from "./document";
 export type { ParsedScene } from "./document";
+export { fallbackScene } from "./fallback";
 export { layoutGraph } from "./flow";
 export { GALLERY_SCENES } from "./gallery";
+export {
+  assignIntents,
+  beatSeconds,
+  beatWords,
+  buildStoryboard,
+  checkStoryboard,
+  mergeShortTail,
+} from "./storyboard";
+export type { StoryboardResult } from "./storyboard";
 export { layoutScene, safeRectFor, layoutSlotRule } from "./layouts";
+export {
+  STILL_ITEM_ID,
+  STILL_TRACK_ID,
+  buildStillDocument,
+  stillFrameFor,
+} from "./still";
 export {
   fitTextRun,
   lineHeightPx,

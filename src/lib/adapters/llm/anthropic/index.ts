@@ -45,7 +45,12 @@ import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import type { z } from "zod";
 
-import { LlmError, type LlmAdapter, type LlmGenerateArgs } from "../types";
+import {
+  LlmError,
+  type LlmAdapter,
+  type LlmGenerateArgs,
+  type LlmImage,
+} from "../types";
 import { DEFAULT_MAX_TOKENS, anthropicConfig } from "./config";
 
 let client: Anthropic | null = null;
@@ -88,7 +93,7 @@ export const anthropicLlmAdapter: LlmAdapter = {
           model: config.model,
           max_tokens: args.maxTokens ?? DEFAULT_MAX_TOKENS,
           system: args.system,
-          messages: [{ role: "user", content: user }],
+          messages: [{ role: "user", content: userContent(user, args.images) }],
           output_config: {
             effort: config.effort,
             /* SCHEMA_IS_THE_CONTRACT — the response format is constrained by
@@ -155,6 +160,46 @@ export const anthropicLlmAdapter: LlmAdapter = {
     );
   },
 };
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: userContent, AN_IMAGE_IS_PART_OF_THE_REQUEST,
+ *   IMAGES_COME_BEFORE_THE_TEXT
+ *
+ * WHAT:  The user message, as a plain string when there are no images and as
+ *        content blocks when there are.
+ *
+ * WHY:   A STRING when there are no images, which is not a cosmetic choice:
+ *        every existing caller sends text only, and wrapping those in a
+ *        one-element block array would change the request bytes of every
+ *        generation in the product — and therefore every prompt-cache key.
+ *        This way adding image support costs nothing anywhere it is unused.
+ *
+ *        IMAGES_COME_BEFORE_THE_TEXT, which is this provider's documented
+ *        preference: a question placed after the pictures it is about is
+ *        answered more accurately than one placed before them. The text block
+ *        is always last, so the instruction is the final thing read.
+ * WHERE: The single `messages` argument above.
+ */
+function userContent(
+  user: string,
+  images: readonly LlmImage[] | undefined,
+): string | Anthropic.ContentBlockParam[] {
+  if (images === undefined || images.length === 0) return user;
+
+  return [
+    ...images.map(
+      (image): Anthropic.ContentBlockParam => ({
+        type: "image",
+        source: {
+          type: "base64",
+          media_type: image.mediaType,
+          data: image.data,
+        },
+      }),
+    ),
+    { type: "text", text: user },
+  ];
+}
 
 /**
  * SOURCE OF TRUTH KEYWORDS: retryInstruction, RETRY_ONCE_WITH_THE_ERROR

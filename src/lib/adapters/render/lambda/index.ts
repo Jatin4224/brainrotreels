@@ -4,7 +4,7 @@
 
 /**
  * SOURCE OF TRUTH KEYWORDS: lambdaRenderAdapter, renderMediaOnLambda,
- *   getRenderProgress, PROVIDER_ISOLATION, RenderProviderError,
+ *   renderStillOnLambda, getRenderProgress, PROVIDER_ISOLATION, RenderProviderError,
  *   PERMANENT_VS_TRANSIENT_FAILURE, SCALE_NOT_CANVAS, DETERMINISTIC_ENCODE,
  *   PROGRESS_IS_FOR_THE_TIMEOUT_PATH, WEBHOOK_NOT_POLLING
  *
@@ -52,6 +52,7 @@ import "server-only";
 import {
   getRenderProgress,
   renderMediaOnLambda,
+  renderStillOnLambda,
 } from "@remotion/lambda-client";
 /* The region list is imported from the SDK rather than typed out, so it cannot
  * drift from the union it is validating against across a Remotion upgrade. */
@@ -68,6 +69,8 @@ import type {
   RenderOptions,
   RenderProgressResult,
   RenderStartResult,
+  RenderStillResult,
+  StillOptions,
 } from "../types";
 import { RenderProviderError } from "../types";
 import { lambdaRenderConfig } from "./config";
@@ -249,6 +252,71 @@ export const lambdaRenderAdapter: RenderAdapter = {
       };
     } catch (error) {
       throw toProviderError(error, "getRenderProgress failed");
+    }
+  },
+
+  /**
+   * SOURCE OF TRUTH KEYWORDS: renderStill, renderStillOnLambda,
+   *   A_STILL_IS_NOT_A_RENDER, STILLS_ARE_DELETED, PNG_FOR_JUDGING_TEXT
+   *
+   * WHAT:  One frame of a document, drawn and returned.
+   *
+   * WHY:   SYNCHRONOUS, unlike `start`, and that is the whole reason this is a
+   *        separate method: `renderStillOnLambda` invokes one function and
+   *        waits a few seconds, so there is no webhook, no row and no
+   *        progress to report. See A_STILL_IS_NOT_A_RENDER on the contract.
+   *
+   *        STILLS_ARE_DELETED. `deleteAfter: "1-day"` is set here and NOT on
+   *        the video path, because the two objects have opposite lifetimes: a
+   *        render's output is the product and is copied into R2, while a still
+   *        exists to be looked at once by a model. A QA frame that outlived the
+   *        check would be a growing pile of customer video frames in a bucket
+   *        nothing ever reads.
+   *
+   *        PNG_FOR_JUDGING_TEXT rather than the jpeg the video uses. The one
+   *        question asked of this image is whether text is legible and inside
+   *        the frame, and jpeg ringing around white type on a dark background
+   *        is exactly the artifact that makes a model report cut-off or
+   *        illegible text that a viewer would never notice. Lossless removes
+   *        the doubt, and one frame's size does not matter.
+   *
+   *        `privacy: "public"` with an unguessable key, the same trade-off the
+   *        video path records: this process holds no AWS read credentials for
+   *        the Remotion bucket, the object expires in a day, and its URL is
+   *        read once by the caller and handed to nobody.
+   */
+  async renderStill(
+    doc: TimelineDoc,
+    options: StillOptions,
+  ): Promise<RenderStillResult> {
+    const config = lambdaRenderConfig();
+
+    try {
+      const result = await renderStillOnLambda({
+        region: toAwsRegion(config.region),
+        functionName: config.functionName,
+        serveUrl: config.serveUrl,
+        composition: TIMELINE_COMPOSITION_ID,
+        inputProps: {
+          doc,
+          assets: options.assets,
+          /* No watermark on a frame whose only viewer is a model — see
+           * THE_FRAME_IS_THE_WHOLE_REQUEST. */
+          watermark: false,
+        },
+        imageFormat: "png",
+        /* Negative or fractional frames are a caller's arithmetic error, and
+         * the provider's own error for one is unhelpful. */
+        frame: Math.max(0, Math.round(options.frame)),
+        scale: options.scale,
+        privacy: "public",
+        deleteAfter: "1-day",
+        maxRetries: 1,
+      });
+
+      return { url: result.url, mediaType: "image/png" };
+    } catch (error) {
+      throw toProviderError(error, "renderStillOnLambda failed");
     }
   },
 };

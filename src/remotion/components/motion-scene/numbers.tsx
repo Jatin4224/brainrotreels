@@ -43,7 +43,7 @@ import { formatCounterValue } from "@/lib/scene";
 import type { MotionPrimitiveProps, PlacedRect } from "@/lib/types/scene";
 
 import { TextBlock } from "./text-block";
-import { localProgress, runByPath } from "./util";
+import { localProgress, radiusPx, runByPath, strokePx } from "./util";
 
 /* How long a count takes, and the share of a short window it may use. A count
  * that ran the whole beat would still be moving as the beat cut, which reads
@@ -57,6 +57,7 @@ export function Counter({
   palette,
   window: visible,
   seconds,
+  style,
 }: MotionPrimitiveProps) {
   if (element.kind !== "counter") return null;
 
@@ -90,8 +91,8 @@ export function Counter({
       {/* The measured run with the current string swapped in — see
           MEASURED_WIDEST_DRAWN_CURRENT. Everything else about it, including
           the fitted size, is what the check was run against. */}
-      <TextBlock run={{ ...figure, lines: [text] }} color={palette.accent} />
-      {label === null ? null : <TextBlock run={label} color={palette.text} />}
+      <TextBlock run={{ ...figure, lines: [text] }} color={palette.accent} style={style} />
+      {label === null ? null : <TextBlock run={label} color={palette.text} style={style} />}
     </>
   );
 }
@@ -103,6 +104,7 @@ export function Meter({
   canvas,
   window: visible,
   seconds,
+  style,
 }: MotionPrimitiveProps) {
   if (element.kind !== "meter") return null;
 
@@ -114,7 +116,9 @@ export function Meter({
   const top = label === null ? placed.rect.y : label.box.y + label.box.height;
   const bottom =
     value === null ? placed.rect.y + placed.rect.height : value.box.y;
-  const height = Math.max(canvas.height * 0.008, 6);
+  /* The track thickness IS a stroke, so the style sets it: a hairline meter
+   * and a hairline graph edge should read as the same decision. */
+  const height = strokePx(style, canvas.height * 0.008, 4);
   const width = placed.rect.width * 0.86;
   const track: PlacedRect = {
     x: placed.rect.x + (placed.rect.width - width) / 2,
@@ -129,7 +133,7 @@ export function Meter({
 
   return (
     <>
-      {label === null ? null : <TextBlock run={label} color={palette.text} />}
+      {label === null ? null : <TextBlock run={label} color={palette.text} style={style} />}
       <div
         style={{
           position: "absolute",
@@ -137,7 +141,7 @@ export function Meter({
           top: track.y,
           width: track.width,
           height: track.height,
-          borderRadius: track.height / 2,
+          borderRadius: radiusPx(style, track.height),
           /* The palette's own text colour at low opacity, so the empty part of
            * the track belongs to the palette without needing a sixth colour
            * that has to pass its own contrast check. */
@@ -152,11 +156,11 @@ export function Meter({
           top: track.y,
           width: track.width * filled,
           height: track.height,
-          borderRadius: track.height / 2,
+          borderRadius: radiusPx(style, track.height),
           backgroundColor: palette.accent,
         }}
       />
-      {value === null ? null : <TextBlock run={value} color={palette.accent} />}
+      {value === null ? null : <TextBlock run={value} color={palette.accent} style={style} />}
     </>
   );
 }
@@ -167,6 +171,7 @@ export function BarChart({
   palette,
   window: visible,
   seconds,
+  style,
 }: MotionPrimitiveProps) {
   if (element.kind !== "barChart") return null;
 
@@ -186,7 +191,7 @@ export function BarChart({
         const trackLeft = label.box.x + label.box.width;
         const trackRight =
           figure === null ? placed.rect.x + placed.rect.width : figure.box.x;
-        const height = Math.max(label.box.height * 0.34, 4);
+        const height = strokePx(style, label.box.height * 0.34, 4);
         const grown =
           largest === 0
             ? 0
@@ -201,7 +206,7 @@ export function BarChart({
 
         return (
           <div key={bar.label}>
-            <TextBlock run={label} color={palette.text} align="left" justify="flex-start" />
+            <TextBlock run={label} color={palette.text} align="left" justify="flex-start" style={style} />
             <div
               style={{
                 position: "absolute",
@@ -209,12 +214,12 @@ export function BarChart({
                 top: label.box.y + label.box.height / 2 - height / 2,
                 width: Math.max(trackRight - trackLeft, 0) * grown,
                 height,
-                borderRadius: height / 2,
+                borderRadius: radiusPx(style, height),
                 backgroundColor: palette.accent,
               }}
             />
             {figure === null ? null : (
-              <TextBlock run={figure} color={palette.text} align="right" justify="flex-end" />
+              <TextBlock run={figure} color={palette.text} align="right" justify="flex-end" style={style} />
             )}
           </div>
         );

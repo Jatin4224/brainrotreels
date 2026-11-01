@@ -142,6 +142,32 @@ export const styleSpecSchema = z
     /* Which platform's UI chrome to stay clear of. Phase 08 turns this into
      * actual inset pixels; here it is only the choice. */
     safeZone: z.enum(["tiktok", "reels", "shorts", "none"]),
+    /**
+     * SOURCE OF TRUTH KEYWORDS: motionStyleId, STYLE_BELONGS_IN_THE_DOCUMENT,
+     *   APPLYING_A_STYLE_WRITES_THE_PALETTE
+     *
+     * Which motion style a `motion` document was designed with — Phase 16c.
+     *
+     * WHY IT IS HERE and not only in `Project.settings`: Phase 04 decides a
+     * paid render can be REUSED by hashing the document (`hashDoc`). A style
+     * that lived outside the document would mean switching from `Boardroom`
+     * to `Launch` produced an identical hash, the cache served the old video,
+     * and the customer's restyle silently did nothing. Anything that changes
+     * the picture has to be inside the thing that gets hashed.
+     *
+     * APPLYING_A_STYLE_WRITES_THE_PALETTE: a motion style also NAMES a
+     * palette, and applying one copies that into `paletteId` above rather than
+     * leaving two sources of colour. So `paletteId` stays the single answer to
+     * "what colour is this video" for every format, and this field answers the
+     * narrower "which motion style was chosen" — which the renderer needs for
+     * radius, stroke, fonts and motion personality.
+     *
+     * Optional, and an unknown id falls back (UNKNOWN_STYLE_FALLS_BACK), so
+     * every document stored before this phase is still valid and there is
+     * nothing for a migration step to change — the same argument
+     * ADDING_A_KIND_IS_NOT_A_MIGRATION makes about `backdrop`.
+     */
+    motionStyleId: idSchema.optional(),
   })
   .strict();
 

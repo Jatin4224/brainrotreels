@@ -25,7 +25,12 @@ import "server-only";
 import { LLM_PROVIDER } from "./provider";
 import type { LlmAdapter } from "./types";
 
-export type { LlmAdapter, LlmGenerateArgs, LlmProviderId } from "./types";
+export type {
+  LlmAdapter,
+  LlmGenerateArgs,
+  LlmImage,
+  LlmProviderId,
+} from "./types";
 export { LLM_PROVIDER_IDS, LlmError } from "./types";
 export { LLM_PROVIDER, DEFAULT_LLM_PROVIDER } from "./provider";
 

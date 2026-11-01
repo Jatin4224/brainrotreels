@@ -40,6 +40,7 @@
 
 import * as React from "react";
 
+import { useRenderFonts } from "@/components/global/render-fonts";
 import { CaptionCard } from "./caption-card";
 import { buildCaptionTrack, captionBox, getCaptionStyle } from "@/lib/captions";
 import type { CanvasSpec, WordToken } from "@/lib/timeline";
@@ -106,6 +107,12 @@ export function CaptionPreview({
   showSafeZone = false,
   canvas = DEFAULT_CANVAS,
 }: CaptionPreviewProps) {
+  /* THE_PREVIEW_MUST_LOAD_THE_FACE. Until Phase 16c nothing registered the
+   * render family in the browser, so this gallery had been previewing every
+   * caption style in the default serif since Phase 08 — a style reviewed in
+   * the wrong typeface. Grep ONE_FACE_LIST_TWO_LOADERS. */
+  useRenderFonts();
+
   const style = getCaptionStyle(styleId);
   const source = words !== undefined && words.length > 0 ? words : SAMPLE_CAPTION_WORDS;
 

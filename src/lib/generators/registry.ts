@@ -48,6 +48,7 @@ import type { ProjectKind } from "@/lib/types/project";
 import type { PipelineStageName } from "@/lib/types/pipeline";
 import { GeneratorNotImplementedError, type Generator } from "./types";
 import { quizGenerator } from "./quiz";
+import { motionGenerator } from "./motion";
 import { redditStoryGenerator } from "./reddit-story";
 import { voiceoverGenerator } from "./voiceover";
 
@@ -82,6 +83,9 @@ export const GENERATORS: Partial<Record<ProjectKind, Generator>> = {
   voiceover: voiceoverGenerator,
   "reddit-story": redditStoryGenerator,
   quiz: quizGenerator,
+  /* Phase 16d. Pure like the rest: the scenes were designed in an earlier
+   * stage and stored — see MOTION_SCENES_ARE_ALREADY_DESIGNED. */
+  motion: motionGenerator,
 };
 
 export function hasGenerator(kind: ProjectKind): boolean {
