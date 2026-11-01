@@ -88,7 +88,15 @@ worse than an empty box.
       Claude, and the whole motion pipeline (Neon has been unreachable since Phase 05). Two gaps
       are not code gaps — only one font family is bundled, and `stack-center` holds three list
       items plus a heading in a vertical frame, not four. See the four notes.
-- [ ] Phase 17: Platform surface
+- [ ] Phase 17: Platform surface — **17a is built; 17b, 17c and the AI-footage half are not.**
+      17a is the shared operation seam: the business logic of the seven multi-surface verbs now
+      lives in `src/lib/api/operations/`, behind an explicit `OperationContext` and a
+      transport-neutral failure vocabulary, and the web app's routers call it through
+      `runOperation`. Nothing customer-facing changed. Still missing: the `ApiKey` model and the
+      `/api/v1` routes (17b), the MCP server (17c), and AI footage — which is **blocked on an
+      owner decision** (commercial-use terms for the chosen video model) and must not be started
+      before it is settled. 11 new tests cover the failure table and its translation; the
+      operations themselves have no database to be tested against. See docs/27-phase17.md.
 
 ## Blocked on an owner decision
 
@@ -2920,3 +2928,88 @@ over generated transcripts, the fallback's validity at both aspects in all four 
 prompts' cacheability and injection fencing, the still document's validity and its midpoint frame,
 the sample selector's cost model, and the generator building a valid document from the shape the
 pipeline actually stores.
+
+### Phase 17a — 2026-11-01
+
+The shared operation seam. No new route, no key, no tool, no footage — what changed is WHERE the
+business logic of seven verbs lives, so that 17b and 17c cannot drift from the web app.
+
+**Why first, and why not as a refactor nobody asked for.** The phase's done-when is "a rule changed
+in an operation function changes behaviour on web, REST and MCP at once", and the failure mode is
+silent: a REST route that re-derives one rule compiles, passes its own tests, and returns plausible
+answers. Nothing goes red. It shows up as a customer whose API client was charged for a render the
+dashboard gives away free. So the logic moved before any surface existed to drift from.
+
+**The seven verbs** are the phase file's REST route list and its MCP tool list, which match exactly:
+create a project, generate a script, assign a voice, start a render, read a render, fetch an output,
+read the catalogues. A deliberate boundary rather than everything the product does — the web app has
+over a hundred procedures and a public API exposing all of them is a promise to keep every one
+stable forever.
+
+**An operation never throws a `TRPCError`.** It throws `OperationError` carrying one of six
+SITUATIONS (`not_found`, `invalid`, `precondition`, `refused`, `unprocessable`, `conflict`) and each
+transport owns ONE table turning them into its own vocabulary. The table is a `Record` over the
+whole union rather than a switch with a default, so a seventh situation is a compile error in every
+surface's table instead of a 500 on whichever one nobody updated. `detail` reuses the existing
+`StructuredErrorCause`, so a workspace that cannot afford a render still gets `required` and
+`available` and still sees the top-up prompt, through whichever transport asked. Grep
+`AN_OPERATION_NEVER_THROWS_A_TRPC_ERROR`, `THE_TABLE_IS_TOTAL`.
+
+**The context is explicit because two of the three callers have no session.** An MCP tool call and a
+key-authenticated REST request have no cookie, so nothing in an operation may read `headers()`, a
+session or a module singleton. Three details are load-bearing: `plan` is for PRICING and never for
+access (whether this workspace may act at all was decided before the context existed); `userId` is
+NULLABLE because a key has an organization and no human, and a fabricated id would attribute a
+script to whoever created the key months earlier; and `db` is a `DbClient` so an operation's
+writes stay inside its caller's transaction. Grep `CONTEXT_IS_EXPLICIT_NOT_AMBIENT`,
+`USER_IS_NULL_FOR_A_KEY`, `THE_TX_IS_THE_DB`.
+
+**`runOperation` welds the context build to the error mapping** because a forgotten `catch` is
+invisible: the procedure would compile and work right up until an operation refused something, and
+then the customer gets a 500 and a stack trace instead of "not enough credits" — with no failing
+test, because the happy path is identical. The same argument that puts the gates in the procedure
+factory rather than trusting each handler. Grep `THE_MAPPING_CANNOT_BE_FORGOTTEN`.
+
+**Metering stayed in the router, and this is the decision most likely to be undone by someone**
+**tidying up.** A reused render must not spend a slot from the monthly quota, and on the web that is
+not simply "don't increment": the procedure factory auto-increments on any successful
+`<resource>.create` and cannot see that the handler reused a row, so the router posts a
+compensating `-1` that nets to zero inside the same transaction. That compensation is knowledge
+about THIS SURFACE's pipeline — the REST surface will meter explicitly and no `+1` is coming, so the
+same `-1` there would hand out free renders. So the operation REPORTS `reused` and each surface
+meters. An operation that metered would be wrong on at least one surface, in the direction nobody
+notices, because an uncharged render looks exactly like a working one. Grep
+`THE_OPERATION_REPORTS_THE_SURFACE_METERS`.
+
+**The catalogues share a rule, not a shape.** `voices.list` and `captions.styles` now ARE their
+operations. Backgrounds are the one exception: the picker needs signed thumbnails, a breadth cursor
+and the project's selection, which is several more queries and tens of kilobytes of URLs an agent
+choosing an id has no use for — so the catalogue operation is a leaner projection that shares the
+AVAILABILITY DECISION through the same `backgroundAvailableOnPlan` and `isWithinBreadth` the picker
+and the write refusal use. `LOCKED_NOT_HIDDEN` survives onto the API: a catalogue returns the row
+with `locked: true` and the registry's upgrade sentence rather than filtering it out. Grep
+`ONE_AVAILABILITY_RULE_MANY_PROJECTIONS`, `THE_FLAG_IS_HALF_THE_RULE`.
+
+**Three writes moved into the service layer.** Extracting the operations surfaced three routers
+holding a Prisma handle and using it — `projects.create`, `scripts.generate` and `voices.assign` —
+which was legal while a router was the only caller and is not legal for an operation (CLAUDE.md rule
+3). They became `createProject`, `recordScriptSource` and `findSpeaker`.
+`recordScriptSource` reads, merges and writes `Project.settings` rather than assigning, because that
+column holds every feature's configuration and replacing it would silently drop a customer's caption
+choice the first time they generated a script — and it returns whether a row matched, so a project
+deleted WHILE WE WERE FETCHING ITS SOURCE is a clean refusal rather than a job queued for a project
+that no longer exists.
+
+**Behaviour deliberately unchanged.** Every ordering in the extracted handlers was preserved: reuse
+before credits (a free render must not be refused for lack of credits), credits before the row (a
+refusal must leave no trace), credits before the fetch in the script path, and the watermark resolved
+at request time because it is part of the cache key.
+
+**What has never run.** The extraction is exercised only through the web app's own procedures, which
+are themselves blocked on the credentials gap. The error table, the payload round trip and the
+rethrow rule are genuinely verified by the 11 new tests; the operations are verified only to the
+extent their pure rules already were, because there is no database fixture in this repo and
+inventing one for a seam whose job is delegation would test the stub. **Nothing has gone through a
+second surface, because no second surface exists yet** — the promise that one rule change lands
+everywhere is today a property of the code's shape, not an observed fact. 17b is the first time it
+can be demonstrated.

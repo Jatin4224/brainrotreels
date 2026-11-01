@@ -64,6 +64,8 @@ import {
   tryMigrate,
 } from "@/lib/timeline";
 import { collectAssetHandles, planComposition } from "@/lib/render";
+import { createProjectOperation } from "@/lib/api/operations";
+import { runOperation } from "../operation-context";
 import {
   createProjectSchema,
   deleteProjectSchema,
@@ -92,23 +94,24 @@ import {
 } from "@/services/pipeline.service";
 
 export const projectsRouter = createTRPCRouter({
-  /* No gate, no counter, no audit row written here — the factory does all three
-   * because the path is `projects.create` and the registry entry has a limit. */
+  /**
+   * SOURCE OF TRUTH KEYWORDS: projects.create, ONE_OPERATION_THREE_SURFACES
+   *
+   * No gate, no counter, no audit row written here — the factory does all
+   * three, because the path is `projects.create` and the registry entry has a
+   * limit.
+   *
+   * The body is now one call into the SHARED OPERATION (Phase 17a), which is
+   * what a REST route and an MCP tool will call too. This procedure's job is
+   * reduced to what only it can do: prove who is asking, apply the registry's
+   * gates, and shape the answer for a tRPC client.
+   */
   create: protectedProcedure({ requirePermission: permissions.PROJECTS_CREATE })
     .input(createProjectSchema)
     .mutation(({ ctx, input }) =>
-      ctx.db.project.create({
-        data: {
-          organizationId: input.organizationId,
-          title: input.title,
-          kind: input.kind,
-          aspect: input.aspect,
-          ...(input.sourceRef !== undefined
-            ? { sourceRef: input.sourceRef }
-            : {}),
-          ...(input.settings !== undefined ? { settings: input.settings } : {}),
-        },
-      }),
+      runOperation(ctx, input.organizationId, (operation) =>
+        createProjectOperation(operation, input),
+      ),
     ),
 
   list: protectedProcedure({

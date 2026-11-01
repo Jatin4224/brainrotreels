@@ -37,13 +37,7 @@ import { protectedProcedure } from "../procedures";
 import { permissions } from "@/lib/permissions";
 import { checkBooleanFeature, getOrganizationTier } from "@/lib/feature-gate";
 import { enqueue } from "@/lib/adapters/jobs";
-import {
-  CAPTION_STYLE_FAMILIES,
-  getCaptionStyle,
-  isCaptionStyleId,
-  listCaptionStyles,
-  passesContrast,
-} from "@/lib/captions";
+import { getCaptionStyle, isCaptionStyleId } from "@/lib/captions";
 import {
   alignProjectSchema,
   applyCaptionStyleSchema,
@@ -51,6 +45,8 @@ import {
   getCaptionsSchema,
   listCaptionStylesSchema,
 } from "@/lib/types/caption";
+import { listCaptionStyleCatalogOperation } from "@/lib/api/operations";
+import { runOperation } from "../operation-context";
 import * as alignmentService from "@/services/alignment.service";
 import { findProjectForOrganization } from "@/services/projects.service";
 
@@ -72,38 +68,14 @@ export const captionsRouter = createTRPCRouter({
    */
   styles: protectedProcedure({ requirePermission: permissions.CAPTION_STYLES_READ })
     .input(listCaptionStylesSchema)
-    .query(async ({ input }) => {
-      const [tier, premium] = await Promise.all([
-        getOrganizationTier(input.organizationId),
-        checkBooleanFeature(input.organizationId, "premiumCaptionStyles"),
-      ]);
-
-      const styles = listCaptionStyles({
-        search: input.search,
-        family: input.family,
-      });
-
-      return {
-        plan: tier.tier,
-        premiumEnabled: premium.enabled,
-        upgradeMessage: premium.upgradeMessage,
-        families: CAPTION_STYLE_FAMILIES,
-        styles: styles.map((style) => {
-          const withinPlan = captionStyleAvailableOnPlan(
-            style.minPlan,
-            tier.tier,
-          );
-          /* A style above the free tier needs the flag as well — the flag is
-           * what a trial turns off wholesale. */
-          const needsPremium = style.minPlan !== "free";
-          return {
-            ...style,
-            locked: !withinPlan || (needsPremium && !premium.enabled),
-            contrastOk: passesContrast(style).ok,
-          };
+    .query(({ ctx, input }) =>
+      runOperation(ctx, input.organizationId, (operation) =>
+        listCaptionStyleCatalogOperation(operation, {
+          search: input.search,
+          family: input.family,
         }),
-      };
-    }),
+      ),
+    ),
 
   /**
    * SOURCE OF TRUTH KEYWORDS: captions.get, DEGRADED_IS_NOT_A_CACHE_HIT,
