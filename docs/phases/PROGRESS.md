@@ -106,6 +106,52 @@ worse than an empty box.
       17b–17d), every pipeline needs a database, a Redis and a provider credential.
       See docs/27-phase17.md.
 
+      **17e closed the gaps against the phase file (2026-11-02).** Six were real and are now built.
+      The **plan-quota 429 carries its reset** — `ApiRefusal` moved to `lib/types/api` so one
+      refusal shape serves both deciders (the gates had a second copy *without* `headers`, which is
+      precisely why the hint was missing), and `quotaRefusal` emits `RateLimit-*` + `Retry-After`
+      through the same `buildRateLimitHeaders` the per-key window uses; only PERIODIC resources get
+      one, because `Retry-After` on an absolute cap promises a recovery that never comes. The
+      **public API reference** is at `/docs/api`, generated from `buildOpenApiDocument` via
+      `buildApiReference` — a hand-written docs page beside a generated document would be the same
+      drift one file along. It is in `(marketing)`, renders `APP_URL` rather than `headers()`, and
+      the build confirms it stays **static**. **Per-client MCP configs** (Claude Code, Claude
+      Desktop, Cursor) replace the one generic block, each with the file it goes in or the command
+      to run, from `lib/api/mcp-clients.ts` so the screen and the docs page cannot disagree; the
+      server label became `APP_SLUG` (`RENAMING_BREAKS_A_SHIPPED_CONFIG`). Footage gained
+      **regenerate** (`REGENERATE_BYPASSES_THE_CACHE_NOT_THE_GATES` — it skips the cache lookup and
+      nothing else) and **insert into project**, which is `backgroundLibrary.applyBackground` plus a
+      project picker and *no new mutation*, since `ai_footage` has been a legal background since
+      Phase 11. The workflow now **notifies on failure** — `requestedByUserId` travels on the event
+      rather than on a column (`THE_RECIPIENT_IS_ON_THE_REQUEST`, so no migration), and only the
+      failure is emailed because success is already reported by the grid's poll while ten minutes of
+      silence is not.
+
+      **A latent data-loss bug was found and fixed on the way**: the clip's storage key was derived
+      from the prompt hash, so a regenerated clip would have uploaded *over* the first take's bytes
+      — two rows, one object. It is now a random segment, following `assets.createUploadUrl`.
+
+      **Three of the apparent gaps were deliberate decisions, left alone** and recorded here so they
+      are not "fixed" later: there is **no aspect control** (the phase's own `VideoAdapter` contract
+      types `aspect: '9:16'`, so a control would have one option —
+      `THE_PROMPT_IS_THE_ONLY_FREE_FIELD`); **no cursor pagination on voices or caption styles**
+      (closed sets, documented on the backgrounds route as the only endpoint that needs it); and
+      **no idempotency on MCP** (`NO_IDEMPOTENCY_KEY_IN_A_TOOL_CALL` — the protocol has no header
+      for one; the reuse rule and the tool descriptions carry that weight). The **step-7 fallback
+      also needed no work**: `resolveProjectBackground` already falls through a failed clip to the
+      workspace's last pick, then a stock row, then the styled backdrop, because every candidate is
+      re-checked for `status: "ready"` at resolve time.
+
+      `firstIssueMessage` was globalized out of the REST handler and the MCP dispatcher, which had
+      written the same first-issue logic twice — one mistake now reads the same on both surfaces.
+      **51 new tests** (1511 total, green), `tsc --noEmit` clean, `eslint` clean, production build
+      clean. **Still unrun, and still the honest state**: the done-when list is thirteen runtime
+      checks and none has been performed. The MCP route handler and `callMcpTool` remain untested
+      because they need a database and this suite has no mocking pattern — what was extractable and
+      pure (`findMcpTool`, each tool's `validate`, `quotaRefusal`) now is, and is tested.
+      **The owner decision on the video model is unchanged and still blocking** AI footage on a
+      paying plan.
+
 - [ ] Phase 18: Product explainer pack — **not started.** Specified in
       `docs/phases/18-product-explainer.md` after an inventory of what Phase 16 actually built: the
       section model and the `persistent` lane, ten artifact primitives, the `cream` palette and the

@@ -235,3 +235,39 @@ export const API_ERROR_CODES = {
 } as const;
 
 export type ApiErrorCode = (typeof API_ERROR_CODES)[keyof typeof API_ERROR_CODES];
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: ApiRefusal, A_REFUSAL_IS_DATA_NOT_A_RESPONSE,
+ *   ONE_REFUSAL_SHAPE_EVERY_DECIDER, THE_HEADERS_TRAVEL_WITH_THE_REFUSAL
+ *
+ * WHAT:  Everything a surface needs to tell a caller no: the stable wire code,
+ *        the sentence for a person, the HTTP status for the surfaces that have
+ *        one, and any headers the refusal implies (a `429`'s reset hint, a
+ *        `401`'s challenge).
+ *
+ * WHY:   A_REFUSAL_IS_DATA_NOT_A_RESPONSE. The two deciders — `authenticateApiKey`
+ *        and `checkApiEntitlements` — are called by REST and by MCP, and only
+ *        one of those has a status line to put a code on. Returning data lets
+ *        each surface render it: REST as a status and headers, MCP as a tool
+ *        error.
+ *
+ *        ONE_REFUSAL_SHAPE_EVERY_DECIDER. This lived in
+ *        `src/lib/api/authenticate.ts` while the gates had a near-identical
+ *        second interface WITHOUT `headers`, which is precisely why a
+ *        quota refusal shipped without its reset hint: the field did not exist
+ *        to fill. One shape means a decider that learns to say "and come back
+ *        at midnight UTC" is heard by every surface.
+ *
+ *        THE_HEADERS_TRAVEL_WITH_THE_REFUSAL rather than being rebuilt by the
+ *        renderer, because only the decider knows WHICH limit was hit and when
+ *        it resets — a monthly plan quota and a per-key sliding window reset
+ *        at completely different times, and both are `429`.
+ * WHERE: Returned by `authenticateApiKey` and `checkApiEntitlements`; rendered
+ *        by `runApiRoute` (REST) and `callMcpTool` (MCP).
+ */
+export interface ApiRefusal {
+  code: ApiErrorCode;
+  message: string;
+  status: number;
+  headers: Record<string, string>;
+}

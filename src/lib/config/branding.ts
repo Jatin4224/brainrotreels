@@ -3,7 +3,7 @@
  */
 
 /**
- * SOURCE OF TRUTH KEYWORDS: APP_NAME, APP_DESCRIPTION, APP_URL,
+ * SOURCE OF TRUTH KEYWORDS: APP_NAME, APP_SLUG, APP_DESCRIPTION, APP_URL,
  *   APP_METADATA_BASE, APP_DOMAIN, BRANDING
  *
  * WHAT:  Public app identity strings + URL primitives plus the consolidated
@@ -23,6 +23,35 @@ export const APP_NAME = process.env["NEXT_PUBLIC_APP_NAME"] ?? "My App";
 export const APP_DESCRIPTION =
   process.env["NEXT_PUBLIC_APP_DESCRIPTION"] ??
   `${APP_NAME} — multi-tenant SaaS.`;
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: APP_SLUG, A_SLUG_IS_AN_IDENTIFIER_NOT_A_LABEL,
+ *   RENAMING_BREAKS_A_SHIPPED_CONFIG
+ *
+ * WHAT:  The app's machine-facing short name — lowercase, no spaces. The name
+ *        this product appears under inside somebody else's configuration file.
+ *
+ * WHY:   A_SLUG_IS_AN_IDENTIFIER_NOT_A_LABEL, which is why it is NOT derived
+ *        from `APP_NAME`. `APP_NAME` is display copy an operator may reword at
+ *        any time — "Video Studio" to "Video Studio Pro" — and a slug derived
+ *        from it would change with it.
+ *
+ *        RENAMING_BREAKS_A_SHIPPED_CONFIG is the consequence that makes that
+ *        unacceptable. This string is the key of the `mcpServers` entry a
+ *        customer has already pasted into their Cursor or Claude Desktop
+ *        config, and the name they type to invoke the server. Changing it does
+ *        not migrate anything — it silently leaves every existing agent
+ *        configuration pointing at a server name that no longer matches, which
+ *        is the same class of promise as the MCP tool names themselves.
+ *
+ *        Env-driven with a fixed default so a fork can own its own identifier
+ *        without editing code, and separate from `APP_DOMAIN` because a
+ *        hostname is not a usable identifier (dots are not legal in a tool
+ *        namespace and a domain can move).
+ * WHERE: `MCP_SERVER_LABEL` in src/lib/api/mcp-clients.ts, and every snippet
+ *        rendered from it.
+ */
+export const APP_SLUG = process.env["NEXT_PUBLIC_APP_SLUG"] ?? "brainrotreels";
 
 export const APP_URL =
   process.env["NEXT_PUBLIC_APP_URL"] ?? "http://localhost:3000";
@@ -52,6 +81,7 @@ export const APP_DOMAIN = APP_METADATA_BASE.hostname;
  */
 export const BRANDING = {
   appName: APP_NAME,
+  appSlug: APP_SLUG,
   appDescription: APP_DESCRIPTION,
   appUrl: APP_URL,
   appDomain: APP_DOMAIN,

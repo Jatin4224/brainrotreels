@@ -25,7 +25,8 @@
  *        The root layout still wraps this, so the theme, the fonts and the
  *        analytics provider all apply — which is why there is no `<html>` here
  *        and why a visitor's cookie choice is honoured on these pages too.
- * WHERE: Wraps src/app/(marketing)/pricing and src/app/(marketing)/legal.
+ * WHERE: Wraps src/app/(marketing)/pricing, src/app/(marketing)/legal and
+ *        src/app/(marketing)/docs.
  */
 
 import Link from "next/link";
@@ -48,6 +49,12 @@ export default function MarketingLayout({
             <Link href="/pricing" className="text-muted-foreground hover:text-foreground">
               Pricing
             </Link>
+            {/* The API reference is a reason to choose the product, not a
+                support page — so it sits in the header beside pricing rather
+                than only in the footer. */}
+            <Link href="/docs/api" className="text-muted-foreground hover:text-foreground">
+              API
+            </Link>
             <Link href="/legal" className="text-muted-foreground hover:text-foreground">
               Legal
             </Link>
@@ -63,6 +70,9 @@ export default function MarketingLayout({
             © {new Date().getFullYear()} {APP_NAME}
           </p>
           <div className="flex gap-4">
+            <Link href="/docs/api" className="hover:text-foreground">
+              API
+            </Link>
             <Link href="/legal/terms" className="hover:text-foreground">
               Terms
             </Link>

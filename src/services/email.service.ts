@@ -7,7 +7,8 @@ import "server-only";
 /**
  * SOURCE OF TRUTH KEYWORDS: sendVerificationEmail, sendPasswordResetEmail,
  *   sendOrganizationInvitationEmail, sendProjectReadyEmail,
- *   sendRenderFailedEmail, sendLowBalanceEmail, EmailSendResult, renderAndSend
+ *   sendRenderFailedEmail, sendLowBalanceEmail, sendFootageFailedEmail,
+ *   EmailSendResult, renderAndSend
  *
  * WHAT:  The single transactional-email abstraction — renders a React Email
  *        template to HTML and sends it through Resend.
@@ -30,6 +31,7 @@ import {
 } from "@/lib/config/resend";
 import {
   EmailVerificationEmail,
+  FootageFailedEmail,
   LowBalanceEmail,
   PasswordResetEmail,
   ProjectReadyEmail,
@@ -223,6 +225,73 @@ export function sendRenderFailedEmail(args: {
       ...(args.recipientName ? { recipientName: args.recipientName } : {}),
     }),
   });
+}
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: sendFootageFailedEmail, FOOTAGE_PROMPT_IN_THE_SUBJECT,
+ *   REFUND_IS_THE_HEADLINE, ONLY_THE_FAILURE_IS_EMAILED
+ *
+ * WHAT:  Sends the "that clip could not be generated" notice.
+ *
+ * WHY:   ONLY_THE_FAILURE_IS_EMAILED, and the asymmetry is the decision worth
+ *        recording. A SUCCESSFUL clip needs no email: the footage studio polls
+ *        while anything is processing and the clip appears in the grid, which
+ *        is how every other asset ingest in this product reports itself. A
+ *        FAILURE is different on two counts — the generation has a ten-minute
+ *        ceiling, so the person has very likely closed the tab, and credits
+ *        moved and came back, which is information they cannot see from a grid
+ *        they are not looking at. Emailing every success instead would be
+ *        twenty messages a month on the Pro allowance, which is how a useful
+ *        notification becomes a filter rule.
+ *
+ *        FOOTAGE_PROMPT_IN_THE_SUBJECT, truncated here rather than in the
+ *        template: a prompt may be five hundred characters and a subject line
+ *        cannot, while the body can afford more. A clip has no title, so the
+ *        prompt is the only thing that identifies WHICH request failed for
+ *        somebody who queued several.
+ *
+ *        REFUND_IS_THE_HEADLINE, as in the render email.
+ * WHERE: The footage workflow's failure paths.
+ */
+export function sendFootageFailedEmail(args: {
+  to: string;
+  prompt: string;
+  reason: string;
+  refundedCredits?: number;
+  recipientName?: string | null;
+}): Promise<EmailSendResult> {
+  /* Short enough for a subject line that is not truncated by a mail client,
+   * which is where the ellipsis would land anyway. */
+  const short = truncatePrompt(args.prompt, 60);
+
+  return renderAndSend({
+    to: args.to,
+    subject:
+      args.refundedCredits !== undefined && args.refundedCredits > 0
+        ? `“${short}” could not be generated — credits returned`
+        : `“${short}” could not be generated`,
+    template: React.createElement(FootageFailedEmail, {
+      /* The body affords more than the subject, so it truncates later. */
+      prompt: truncatePrompt(args.prompt, 160),
+      studioLink: `${APP_URL}/dashboard/footage`,
+      reason: args.reason,
+      ...(args.refundedCredits !== undefined
+        ? { refundedCredits: args.refundedCredits }
+        : {}),
+      ...(args.recipientName ? { recipientName: args.recipientName } : {}),
+    }),
+  });
+}
+
+/* An ellipsis on a word boundary where there is one nearby, so a truncated
+ * prompt still reads as a phrase rather than being cut mid-word. */
+function truncatePrompt(prompt: string, max: number): string {
+  const trimmed = prompt.trim();
+  if (trimmed.length <= max) return trimmed;
+
+  const cut = trimmed.slice(0, max);
+  const lastSpace = cut.lastIndexOf(" ");
+  return `${(lastSpace > max * 0.6 ? cut.slice(0, lastSpace) : cut).trimEnd()}…`;
 }
 
 /**

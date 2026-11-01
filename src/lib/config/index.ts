@@ -3,7 +3,7 @@
  */
 
 /**
- * SOURCE OF TRUTH KEYWORDS: prisma, DbClient, APP_NAME, APP_URL, APP_DOMAIN,
+ * SOURCE OF TRUTH KEYWORDS: prisma, DbClient, APP_NAME, APP_SLUG, APP_URL, APP_DOMAIN,
  *   APP_DESCRIPTION, APP_METADATA_BASE, BRANDING, AUTH_ROUTES,
  *   REGISTRATION_OPEN, PLANS, PlanKey, PlanDefinition, resend,
  *   AUTH_CALLBACK_PARAM, resolveAuthCallback, authRouteWithCallback,
@@ -25,6 +25,7 @@ export { prisma } from "./prisma";
 export type { DbClient } from "./prisma";
 export {
   APP_NAME,
+  APP_SLUG,
   APP_URL,
   APP_DOMAIN,
   APP_DESCRIPTION,

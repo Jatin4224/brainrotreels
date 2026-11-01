@@ -69,7 +69,7 @@ import {
 } from "@/lib/rate-limit";
 import {
   API_ERROR_CODES,
-  type ApiErrorCode,
+  type ApiRefusal,
   type OperationContext,
 } from "@/lib/types/api";
 import { findActiveApiKey, touchApiKey } from "@/services/api-keys.service";
@@ -82,19 +82,11 @@ export interface AuthenticatedCaller {
   keyPrefix: string;
 }
 
-/**
- * SOURCE OF TRUTH KEYWORDS: ApiRefusal, A_REFUSAL_IS_DATA_NOT_A_RESPONSE
- *
- * Everything a surface needs to tell a caller no: the stable wire code, the
- * sentence for a person, the HTTP status for the surfaces that have one, and
- * any headers the refusal implies (a `429`'s reset hint, a `401`'s challenge).
- */
-export interface ApiRefusal {
-  code: ApiErrorCode;
-  message: string;
-  status: number;
-  headers: Record<string, string>;
-}
+/* ApiRefusal moved to @/lib/types/api — ONE_REFUSAL_SHAPE_EVERY_DECIDER. The
+ * gates return the same shape, and a second copy here is what let a quota
+ * refusal ship without its reset hint. Re-exported so a surface importing the
+ * authenticator does not need a second import to render what it returns. */
+export type { ApiRefusal };
 
 export type ApiAuthResult =
   | { ok: true; caller: AuthenticatedCaller }

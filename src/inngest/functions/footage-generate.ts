@@ -5,7 +5,8 @@
 /**
  * SOURCE OF TRUTH KEYWORDS: footageGenerateFunction, clip/requested,
  *   POLL_IN_SEPARATE_STEPS, HOLD_IN_THE_WORKFLOW, ONE_REF_PER_CLIP,
- *   A_FAILURE_RELEASES_THE_HOLD, REFUSED_IS_NOT_RETRIED,
+ *   A_FAILURE_RELEASES_THE_HOLD, REFUSED_IS_NOT_RETRIED, notifyClipFailed,
+ *   ONLY_THE_FAILURE_IS_EMAILED, THE_RECIPIENT_IS_ON_THE_REQUEST,
  *   FETCH_ONCE_THEN_HAND_OVER, MODERATION_HAPPENED_IN_THE_ROUTER
  *
  * WHAT:  Generates one video clip: hold the credits, start the generation,
@@ -76,6 +77,7 @@ import { downloadUrlToFile, uploadFile, withStagingDir } from "@/lib/media";
 import { enqueue } from "@/lib/adapters/jobs";
 import { markAssetFailed, setModerationStatus } from "@/services/assets.service";
 import { commit, hold, release } from "@/services/credits.service";
+import { sendFootageFailedEmail } from "@/services/email.service";
 import { recordFootageProvenance } from "@/services/footage.service";
 import { incrementUsage } from "@/services/usage.service";
 
@@ -96,6 +98,29 @@ const clipRequestedEventSchema = z.object({
   assetId: z.string().min(1),
   prompt: z.string().min(1),
   durationSec: z.number().positive(),
+  /**
+   * SOURCE OF TRUTH KEYWORDS: requestedByUserId, THE_RECIPIENT_IS_ON_THE_REQUEST,
+   *   ADDRESS_IS_RESOLVED_NOT_STORED
+   *
+   * Who asked for this clip, so a failure can tell them.
+   *
+   * THE_RECIPIENT_IS_ON_THE_REQUEST rather than on the asset, and that is why
+   * there is no migration here. "Who should hear about this" is a property of
+   * the REQUEST — the same reasoning that puts `notifyUserId` in a project's
+   * generate settings rather than on a column. An `Asset` row is a file; it
+   * outlives the request, is shared across projects, and has no business
+   * carrying a notification address.
+   *
+   * ADDRESS_IS_RESOLVED_NOT_STORED: an id, never an email. The address is
+   * looked up when the mail is sent, so it cannot go stale and no personal
+   * data is copied into a queue payload that is retained and replayed.
+   *
+   * OPTIONAL because an event enqueued by an earlier release does not have it,
+   * and EVENT_PAYLOAD_PARSED means a payload that does not parse is a
+   * permanent failure — refusing an in-flight clip over a notification field
+   * would turn a cosmetic addition into lost work and a stranded hold.
+   */
+  requestedByUserId: z.string().min(1).optional(),
 });
 
 /**
@@ -151,17 +176,28 @@ export const footageGenerateFunction = inngestClient.createFunction(
         return;
       }
 
-      const { organizationId, assetId } = input.data;
+      const { organizationId, assetId, prompt, requestedByUserId } =
+        input.data;
 
-      await markAssetFailed(
-        prisma,
-        assetId,
-        "The clip could not be generated. The credits for it have been returned.",
-      ).catch((error: unknown) => {
-        console.error("[footage.generate] Could not mark the asset failed:", error);
+      const reason =
+        "The clip could not be generated. The credits for it have been returned.";
+
+      await markAssetFailed(prisma, assetId, reason).catch(
+        (error: unknown) => {
+          console.error("[footage.generate] Could not mark the asset failed:", error);
+        },
+      );
+
+      const refunded = await releaseClipHold(organizationId, assetId);
+
+      /* Last, because the row and the money come first and this must not be
+       * able to prevent either — THE_NOTICE_NEVER_FAILS_THE_RUN. */
+      await notifyClipFailed({
+        requestedByUserId,
+        prompt,
+        reason,
+        refundedCredits: refunded,
       });
-
-      await releaseClipHold(organizationId, assetId);
     },
   },
   async ({ event, step }) => {
@@ -172,7 +208,8 @@ export const footageGenerateFunction = inngestClient.createFunction(
       );
     }
 
-    const { organizationId, assetId, prompt, durationSec } = input.data;
+    const { organizationId, assetId, prompt, durationSec, requestedByUserId } =
+      input.data;
 
     // ───────────────────────────────────────────────────────────────────────
     // [1] HOLD — see HOLD_IN_THE_WORKFLOW. The router already refused on the
@@ -259,13 +296,18 @@ export const footageGenerateFunction = inngestClient.createFunction(
         /* The provider's own reason, which is already a sentence. Permanent:
          * a generation that failed does not un-fail. */
         await step.run(`fail-${attempt}`, async () => {
-          await markAssetFailed(
-            prisma,
-            assetId,
+          const reason =
             polled.error ??
-              "The video model could not produce this clip. The credits have been returned.",
-          );
-          await releaseClipHold(organizationId, assetId);
+            "The video model could not produce this clip. The credits have been returned.";
+
+          await markAssetFailed(prisma, assetId, reason);
+          const refunded = await releaseClipHold(organizationId, assetId);
+          await notifyClipFailed({
+            requestedByUserId,
+            prompt,
+            reason,
+            refundedCredits: refunded,
+          });
           return { failed: true };
         });
 
@@ -278,12 +320,19 @@ export const footageGenerateFunction = inngestClient.createFunction(
     if (finished === null) {
       /* THE_WAIT_IS_BOUNDED — ten minutes and no clip. */
       await step.run("give-up", async () => {
-        await markAssetFailed(
-          prisma,
-          assetId,
-          "The clip took too long to generate and was abandoned. The credits have been returned.",
-        );
-        await releaseClipHold(organizationId, assetId);
+        const reason =
+          "The clip took too long to generate and was abandoned. The credits have been returned.";
+
+        await markAssetFailed(prisma, assetId, reason);
+        const refunded = await releaseClipHold(organizationId, assetId);
+        /* The path most worth an email: ten minutes have passed and nobody is
+         * still watching the grid. */
+        await notifyClipFailed({
+          requestedByUserId,
+          prompt,
+          reason,
+          refundedCredits: refunded,
+        });
         return { abandoned: true };
       });
 
@@ -303,7 +352,9 @@ export const footageGenerateFunction = inngestClient.createFunction(
       });
       if (asset === null) {
         /* Deleted while we were generating. Nothing to write to, so the money
-         * goes back and the run ends. */
+         * goes back and the run ends. No email: the customer deleted the row
+         * themselves, so a notice telling them it failed would be reporting
+         * their own action back to them as a problem. */
         await releaseClipHold(organizationId, assetId);
         throw new NonRetriableError(
           `[footage.generate] Asset ${assetId} no longer exists.`,
@@ -391,31 +442,104 @@ function clipHoldRef(assetId: string): string {
 }
 
 /**
+ * SOURCE OF TRUTH KEYWORDS: notifyClipFailed, ONLY_THE_FAILURE_IS_EMAILED,
+ *   THE_NOTICE_NEVER_FAILS_THE_RUN, ADDRESS_IS_RESOLVED_NOT_STORED
+ *
+ * WHAT:  Tells the person who asked that their clip did not come out, and that
+ *        the credits are back.
+ *
+ * WHY:   ONLY_THE_FAILURE_IS_EMAILED, argued in full on `sendFootageFailedEmail`:
+ *        a successful clip appears in a grid the studio is already polling,
+ *        while a failure arrives up to ten minutes later, when the tab is
+ *        shut, and carries the one fact the customer cannot see — the refund.
+ *
+ *        THE_NOTICE_NEVER_FAILS_THE_RUN. Every error is swallowed and logged.
+ *        By the time this runs the asset is already marked failed and the hold
+ *        is already released, which is the part that matters; a dead mail
+ *        provider must not turn a correctly-handled failure into a retry that
+ *        marks the row twice. Same posture as `notifyIfRequested` in the
+ *        project pipeline, and the reason both are steps of their own.
+ *
+ *        Silent when the event carried no user id — an older enqueued event,
+ *        or a surface that had no human on the request. There is nobody to
+ *        write to, which is not an error.
+ * WHERE: Every failure path in this file, including `onFailure`.
+ */
+async function notifyClipFailed(args: {
+  requestedByUserId: string | undefined;
+  prompt: string;
+  reason: string;
+  refundedCredits: number | undefined;
+}): Promise<{ notified: boolean }> {
+  const { requestedByUserId } = args;
+  if (requestedByUserId === undefined) return { notified: false };
+
+  try {
+    /* ADDRESS_IS_RESOLVED_NOT_STORED — looked up now, from the id. */
+    const recipient = await prisma.user.findUnique({
+      where: { id: requestedByUserId },
+      select: { email: true, name: true },
+    });
+    if (recipient === null) return { notified: false };
+
+    const result = await sendFootageFailedEmail({
+      to: recipient.email,
+      prompt: args.prompt,
+      reason: args.reason,
+      ...(args.refundedCredits !== undefined
+        ? { refundedCredits: args.refundedCredits }
+        : {}),
+      recipientName: recipient.name,
+    });
+    return { notified: result.success };
+  } catch (error) {
+    console.error(
+      "[footage.generate] Could not send the failure notice:",
+      error,
+    );
+    return { notified: false };
+  }
+}
+
+/**
  * SOURCE OF TRUTH KEYWORDS: releaseClipHold, A_FAILURE_RELEASES_THE_HOLD
  *
- * WHAT:  Returns the money for a clip that did not happen.
+ * WHAT:  Returns the money for a clip that did not happen, and reports how much
+ *        was returned.
  * WHY:   Looks the hold up by REFERENCE rather than taking an id, because the
  *        failure paths that need it include `onFailure`, which has the event
  *        payload and not the step results. Failures are logged and swallowed:
  *        this runs where there is no error path left, and the Phase 05
  *        reconciler is the backstop for what it misses.
+ *
+ *        THE_AMOUNT_IS_RETURNED_SO_IT_CAN_BE_SAID. The failure email's whole
+ *        point is REFUND_IS_THE_HEADLINE, which needs a NUMBER — and the only
+ *        thing that knows it is the hold that was just released. `undefined`
+ *        rather than `0` when there was nothing to release or the release
+ *        failed, because the template says "no credits were charged" for
+ *        `undefined` and that is a claim worth not making falsely: a hold the
+ *        reconciler has yet to pick up is money still against the balance.
  * WHERE: Every failure path in this file.
  */
 async function releaseClipHold(
   organizationId: string,
   assetId: string,
-): Promise<void> {
+): Promise<number | undefined> {
   try {
     const { findOpenHoldForRef } = await import("@/services/credits.service");
     const open = await findOpenHoldForRef(prisma, clipHoldRef(assetId));
-    if (open === null) return;
+    if (open === null) return undefined;
 
     await release(prisma, open.id, { assetId, organizationId });
+    /* A hold's `delta` is a DEBIT and therefore negative; what the customer
+     * reads is the magnitude. */
+    return Math.abs(open.delta);
   } catch (error) {
     console.error(
       `[footage.generate] Could not release the hold for ${assetId}:`,
       error,
     );
+    return undefined;
   }
 }
 

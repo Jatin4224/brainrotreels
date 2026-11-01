@@ -31,11 +31,10 @@
  */
 
 import type { Metadata } from "next";
-import { headers } from "next/headers";
 
 import { ContentLayout } from "@/components/global/page-header";
 import { MCP_TOOL_NAMES } from "@/lib/api/mcp-tools";
-import { APP_URL } from "@/lib/config/branding";
+import { resolveRequestOrigin } from "@/lib/request-origin";
 import { ApiKeysPanel } from "./_components/api-keys-panel";
 
 export const metadata: Metadata = {
@@ -50,35 +49,9 @@ export default async function DevelopersSettingsPage() {
           wrong number. The panel is a client component and the table is
           `server-only`, which is why it arrives as a prop. */}
       <ApiKeysPanel
-        origin={await resolveOrigin()}
+        origin={await resolveRequestOrigin()}
         toolCount={MCP_TOOL_NAMES.length}
       />
     </ContentLayout>
   );
-}
-
-/**
- * SOURCE OF TRUTH KEYWORDS: resolveOrigin, THE_ORIGIN_COMES_FROM_THE_SERVER
- *
- * WHAT:  The origin this page was requested on.
- * WHY:   `x-forwarded-*` first, because behind a proxy the `host` header is
- *        the proxy's view and the forwarded pair is the client's. Falls back
- *        to the configured `APP_URL` when neither is present, which is the
- *        case in a test or a direct server render — better a configured URL
- *        than a broken one.
- *
- *        The protocol defaults to https rather than http: every deployment
- *        that matters is served over TLS, and a copied snippet pointing at
- *        http would fail in a way that looks like our bug.
- * WHERE: This page.
- */
-async function resolveOrigin(): Promise<string> {
-  const requestHeaders = await headers();
-
-  const host =
-    requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host");
-  if (host === null || host.length === 0) return APP_URL;
-
-  const protocol = requestHeaders.get("x-forwarded-proto") ?? "https";
-  return `${protocol}://${host}`;
 }
