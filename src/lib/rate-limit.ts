@@ -33,30 +33,13 @@
  * almost always worse than letting more requests through. */
 
 import { Ratelimit } from "@upstash/ratelimit";
-import { Redis } from "@upstash/redis";
 
-const GLOBAL_REDIS_KEY = Symbol.for("app.upstash.redis");
+/* ONE_REDIS_CLIENT — the client moved to src/lib/redis.ts when the REST
+ * API became a second consumer that needs plain get/set rather than a
+ * sliding window. The limiters below are unchanged. */
+import { getRedisClient } from "@/lib/redis";
 
-type GlobalWithRedis = typeof globalThis & {
-  [GLOBAL_REDIS_KEY]?: Redis | null;
-};
-
-function resolveRedisClient(): Redis | null {
-  const globalWithRedis = globalThis as GlobalWithRedis;
-  if (GLOBAL_REDIS_KEY in globalWithRedis) {
-    return globalWithRedis[GLOBAL_REDIS_KEY] ?? null;
-  }
-  const url = process.env["UPSTASH_REDIS_REST_URL"];
-  const token = process.env["UPSTASH_REDIS_REST_TOKEN"];
-  if (!url || !token) {
-    globalWithRedis[GLOBAL_REDIS_KEY] = null;
-    return null;
-  }
-  globalWithRedis[GLOBAL_REDIS_KEY] = new Redis({ url, token });
-  return globalWithRedis[GLOBAL_REDIS_KEY];
-}
-
-const redis: Redis | null = resolveRedisClient();
+const redis = getRedisClient();
 
 function buildLimiter(
   prefix: string,

@@ -215,6 +215,7 @@ model Organization {
   speakers          Speaker[]
   narrationLines    NarrationLine[]
   moderationRecords ModerationRecord[]
+  apiKeys           ApiKey[]
 
   @@map("organization")
 }
@@ -1208,4 +1209,48 @@ model ModerationRecord {
   @@index([subjectType, subjectId])
   @@index([status, createdAt])
   @@map("moderation_record")
+}
+
+/// ApiKey — a long-lived credential that lets a program act for an
+/// ORGANIZATION over the public REST API and the MCP server.
+///
+/// SOURCE OF TRUTH KEYWORD: ApiKey
+///
+/// APP_OWNED_NOT_A_PLUGIN. Better Auth ships an apiKey plugin and this is
+/// deliberately not it, for the three reasons docs/phases/17-platform-surface.md
+/// gives: the plugin list in src/lib/better-auth/auth.ts has a documented
+/// mandatory order and adding a plugin is a real regression risk for a feature
+/// that needs none of Better Auth's session machinery; keys here are scoped to
+/// an ORGANIZATION rather than a user, which is not the plugin's model; and
+/// per-tenant concerns stay app-owned so a provider switch cannot take them
+/// hostage — the same argument that keeps roles in OrganizationRole.
+///
+/// THE_SECRET_IS_NEVER_STORED. `hash` is a SHA-256 of the whole key and
+/// `prefix` is the first few characters, which is all the UI ever shows again.
+/// A leaked database therefore leaks no usable credential. The hash is unique
+/// so a verified lookup is one indexed read rather than a scan.
+///
+/// REVOKED_NOT_DELETED. Revoking sets `revokedAt` and keeps the row, because
+/// the audit trail has to be able to say which key did something months after
+/// somebody turned it off. Every request checks the column.
+model ApiKey {
+  id              String    @id @default(cuid())
+  organizationId  String
+  createdByUserId String
+  name            String
+  // Shown in the UI, e.g. "brr_live_a1b2c3". Indexed so a key can be
+  // identified in a log without the secret ever being written down.
+  prefix          String
+  // SHA-256 of the full key. See THE_SECRET_IS_NEVER_STORED.
+  hash            String    @unique
+  dailyQuota      Int       @default(1000)
+  lastUsedAt      DateTime?
+  revokedAt       DateTime?
+  createdAt       DateTime  @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([prefix])
+  @@map("api_key")
 }

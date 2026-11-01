@@ -190,6 +190,7 @@ export const voicesRouter = createTRPCRouter({
     .mutation(({ ctx, input }) =>
       runOperation(ctx, input.organizationId, (operation) =>
         assignVoiceOperation(operation, {
+          projectId: input.projectId,
           speakerId: input.speakerId,
           voiceId: input.voiceId,
         }),

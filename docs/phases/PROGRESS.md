@@ -88,15 +88,17 @@ worse than an empty box.
       Claude, and the whole motion pipeline (Neon has been unreachable since Phase 05). Two gaps
       are not code gaps — only one font family is bundled, and `stack-center` holds three list
       items plus a heading in a vertical frame, not four. See the four notes.
-- [ ] Phase 17: Platform surface — **17a is built; 17b, 17c and the AI-footage half are not.**
-      17a is the shared operation seam: the business logic of the seven multi-surface verbs now
-      lives in `src/lib/api/operations/`, behind an explicit `OperationContext` and a
-      transport-neutral failure vocabulary, and the web app's routers call it through
-      `runOperation`. Nothing customer-facing changed. Still missing: the `ApiKey` model and the
-      `/api/v1` routes (17b), the MCP server (17c), and AI footage — which is **blocked on an
-      owner decision** (commercial-use terms for the chosen video model) and must not be started
-      before it is settled. 11 new tests cover the failure table and its translation; the
-      operations themselves have no database to be tested against. See docs/27-phase17.md.
+- [ ] Phase 17: Platform surface — **17a and 17b are built; 17c and the AI-footage half are not.**
+      17a is the shared operation seam: the business logic of the seven multi-surface verbs lives in
+      `src/lib/api/operations/`, behind an explicit `OperationContext` and a transport-neutral
+      failure vocabulary, and the web app's routers call it through `runOperation`. 17b is the
+      public REST API on top of it: the `ApiKey` model, nine route files under `/api/v1`, one
+      pipeline applying the SAME registry gates the procedure factory applies, `Idempotency-Key`
+      with fingerprinting, cursor pagination, a generated OpenAPI 3.1 document, and the developers
+      screen. Still missing: the MCP server (17c), and AI footage — which is **blocked on an owner
+      decision** (commercial-use terms for the chosen video model) and must not be started before it
+      is settled. **No HTTP request has ever reached the API**: the pure halves are tested (40 new
+      tests), the pipeline needs a database and a Redis. See docs/27-phase17.md.
 
 ## Blocked on an owner decision
 
@@ -3013,3 +3015,102 @@ inventing one for a seam whose job is delegation would test the stub. **Nothing 
 second surface, because no second surface exists yet** — the promise that one rule change lands
 everywhere is today a property of the code's shape, not an observed fact. 17b is the first time it
 can be demonstrated.
+
+### Phase 17b — 2026-11-01
+
+The public REST API: a credential, nine routes, and one pipeline around them. Every endpoint calls a
+17a operation and adds nothing of its own, which is what makes the phase's promise checkable rather
+than merely intended.
+
+**A key is ORGANIZATION authority, not a user's.** It carries no scopes and may do anything the seven
+public verbs do. Three consequences worth knowing before extending it: there is no permission check
+on an API request, because there is no member whose role could be read (`userId` is null, so audit
+rows attribute to the workspace rather than to whoever minted the key months ago); MINTING is
+therefore the privileged act, which is why `apiKeys.create` is permissioned and capped at five an
+hour; and narrowing a key later — read-only, per-project — is ADDITIVE to the model and the
+authenticator rather than a redesign. Grep `A_KEY_IS_ORG_AUTHORITY`.
+
+**App-owned, not the Better Auth apiKey plugin**, for the three reasons the phase file gives: the
+plugin list has a documented mandatory order and adding one is a real regression risk for a feature
+that needs no session machinery; keys are org-scoped, which is not the plugin's model; and
+per-tenant concerns stay app-owned so a provider switch cannot take them hostage.
+
+**SHA-256, unsalted, and that is correct here.** The decision most likely to be "fixed" by somebody
+applying password advice. A slow KDF exists to defend a ~30-bit secret against an offline dictionary;
+an API key here is 32 bytes from a CSPRNG, so there is no dictionary and making each verification
+expensive defends against nothing while adding its own latency to EVERY API request. The unsalted
+digest is also what makes verification ONE INDEXED READ on a unique column — a salted KDF cannot be
+looked up, so the number of keys a tenant holds would start affecting their API latency. A test
+asserts the key length against the documented constant, so shortening it breaks a test rather than
+silently invalidating the argument. Grep `SHA256_IS_RIGHT_FOR_A_HIGH_ENTROPY_SECRET`.
+
+**Revocation is checked on every request and nothing is cached.** It is the customer's only off
+switch; a cache would delay it. Revoking keeps the row (`REVOKED_NOT_DELETED`) so the audit trail
+can still name the key months later, and a second revoke returns false rather than moving the
+timestamp — the first revocation is the one an investigation cares about.
+
+**The gates are CALLED, never reimplemented.** Every entitlement decision under `src/app/api/v1/`
+is a call into `src/lib/feature-gate.ts` — the same functions `protectedProcedure` calls, reading
+the same registry entries. There is no plan comparison, no limit arithmetic and no upgrade copy
+written anywhere in the REST layer. In order per request: `apiAccess` flag, the key's daily quota
+in Redis, the `apiCalls` monthly allowance, then the verb's own resource. Grep
+`THE_GATE_IS_CALLED_NOT_REIMPLEMENTED`.
+
+**Shared quotas are the intended behaviour**, per the done-when. A render started through the API
+counts against the same monthly `renders` limit the dashboard counts against, because it is the same
+video on the same plan. What is NOT shared is the per-key `dailyQuota`, and the distinction is the
+point: `apiCalls` is an entitlement, `dailyQuota` is a BLAST RADIUS — a leaked or looping key burns
+its own allowance while the workspace's other keys and its dashboard keep working.
+
+**The gate always, the counter sometimes.** A reused render must not spend a slot, but the gate must
+still run so a workspace at its limit is refused before any work. `runApiRoute` splits them:
+`resource` decides what is gated, `countOnSuccess` decides what is counted. This is where 17a's
+"operation reports, surface meters" split pays off — the web app compensates for the factory's
+automatic `+1` with a `-1`, this surface simply does not count, and neither piece of surface
+knowledge leaked into the operation. Grep `THE_GATE_ALWAYS_THE_COUNTER_SOMETIMES`.
+
+**Idempotency has THREE states.** A stored entry holds a fingerprint (method + path + body, NOT
+headers — a retry legitimately changes `User-Agent` and tracing headers) beside the response. Same
+key + same request replays; same key + DIFFERENT request is a 409, because that is a client bug and
+silently returning the first call's answer to the second call's question is the worst possible
+response to it; a claim still in flight is a 409 too, since the claim is a `SET NX` and exactly one
+of two concurrent requests wins. A FAILURE RELEASES THE CLAIM, so the retry the header exists for
+can proceed — leaving it would turn one failed request into 24 hours of conflicts. Only successes
+are stored, and a replay counts nothing because it did nothing. Grep
+`THE_FINGERPRINT_CATCHES_A_REUSED_KEY`, `A_FAILURE_RELEASES_THE_CLAIM`.
+
+**The path is not decorative, and making that true changed a shared schema.** `assignVoiceSchema`
+gained a required `projectId`. It is not redundant — it is an ASSERTION the caller makes, which the
+operation checks before writing. Without it `POST /projects/:id/voices` would ignore its own path
+segment and a stale speaker id would quietly assign a voice in a different video. The check landed in
+the OPERATION rather than the route, so the web app gained it too, and the web panel now threads its
+project id. A mismatch is a `not_found`: "that speaker exists, but in another project" is a small
+oracle about rows the caller did not name. Grep `THE_PROJECT_IS_NAMED_NOT_INFERRED`.
+
+**The OpenAPI document is generated from the Zod schemas** — Zod 4 emits JSON Schema natively and
+OpenAPI 3.1 aligned its schema object with JSON Schema 2020-12, so the conversion is one call per
+schema with no converter dependency. `io: "input"` matters: a schema with defaults has a different
+shape going in than coming out. **The honest limitation**: request bodies are exact, RESPONSE
+payloads are described rather than typed, because the operations return Prisma rows and composed
+views with no Zod schema to derive from — and a hand-written response schema is exactly what this
+file refuses to do for requests. A test asserts the document covers every route file ON DISK, read
+from the directory rather than compared against a list, because a route added without a path in the
+document is an endpoint no generated client can reach and nothing else would notice.
+
+**Two small things that were load-bearing.** Next's typed routes REFUSED the registry's
+`nav.href` until the developers page existed — the nav cannot point at a 404, which is worth
+knowing. And the Redis client moved from inside `rate-limit.ts` to `src/lib/redis.ts`, because
+idempotency needs plain get/set and a second client would mean two connection pools and two answers
+to "is Redis configured".
+
+**What has never run.** No HTTP request has ever reached these routes. What IS verified by the 40 new
+tests is everything pure: the key format and its entropy, the failure→HTTP table and its pairings,
+both envelope shapes, the idempotency fingerprint, and the OpenAPI document's coverage of the route
+directory. The pipeline around them — authentication, the gate order, the counters, the replay path —
+needs a database and a Redis, and this machine has had neither since Phase 05. `next build` fails
+here for a PRE-EXISTING reason unrelated to the phase: `next/font` cannot fetch Geist from Google
+Fonts without network access, and both errors are in `src/app/layout.tsx`. **Without Redis there is
+no deduplication** — idempotency degrades to "every request runs", which is the same fail-open choice
+rate limiting makes but for a weaker reason, since here it means a retry can double-charge. It is the
+one piece of this phase that genuinely requires Redis in production rather than merely benefiting
+from it.

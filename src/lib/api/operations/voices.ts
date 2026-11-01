@@ -89,6 +89,22 @@ export async function assignVoiceOperation(
     throw new OperationError("not_found", "That speaker no longer exists.");
   }
 
+  /**
+   * SOURCE OF TRUTH KEYWORDS: THE_PROJECT_IS_NAMED_NOT_INFERRED
+   *
+   * The caller asserted which project this speaker is in; this is where the
+   * assertion is checked, before anything is written. A mismatch is a
+   * `not_found` rather than its own code on purpose — telling a caller "that
+   * speaker exists, but in a different project" is a small oracle about rows
+   * they did not name, and the fix is the same either way.
+   */
+  if (speaker.projectId !== input.projectId) {
+    throw new OperationError(
+      "not_found",
+      "That speaker is not part of this project.",
+    );
+  }
+
   const updated = await voicesService.assignSpeakerVoice(
     ctx.db,
     ctx.organizationId,
