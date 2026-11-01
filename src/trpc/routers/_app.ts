@@ -40,6 +40,7 @@ import { voicesRouter } from "./voices";
 import { timelineRouter } from "./timeline";
 import { motionRouter } from "./motion";
 import { apiKeysRouter } from "./api-keys";
+import { footageRouter } from "./footage";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: appRouter, AppRouter
@@ -61,6 +62,11 @@ export const appRouter = createTRPCRouter({
   /* Mounted under the REGISTRY KEY, which is what wires its permissions and
    * rate limits — the factory derives both from the procedure path. */
   aiImages: visualsRouter,
+  /* Mounted under the REGISTRY KEY, which wires its two permissions, its
+   * audit template and the monthly clip allowance. The limit GATE is called
+   * explicitly in the router rather than inherited — see
+   * THE_GATE_IS_CALLED_NOT_INHERITED there. */
+  aiFootage: footageRouter,
   renders: rendersRouter,
   credits: creditsRouter,
   scripts: scriptsRouter,

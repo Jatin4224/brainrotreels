@@ -8,13 +8,17 @@
   or distribution is prohibited.
 -->
 
-# Phase 17 — the platform surface (17a, 17b and 17c)
+# Phase 17 — the platform surface
 
 The phase opens the product three ways: prompt-to-video footage, a public REST
-API, and an MCP server so agents can use it. **This document covers 17a (the
-shared operation seam), 17b (the public REST API) and 17c (the MCP server).**
-The AI-footage half is not built: it is blocked on an owner decision about the
-video model's commercial-use terms.
+API, and an MCP server so agents can use it. **All four commits are built** —
+17a the shared operation seam, 17b the REST API, 17c the MCP server, 17d AI
+footage.
+
+17d was built against an **open owner decision**: which video model to ship,
+and whether its terms permit commercial use. That decision is still open, and
+the section on it below says exactly what was deferred because of it and what
+has to be checked before the feature is enabled on a paying plan.
 
 Nothing customer-facing changed. There is no new route, no key, no tool, no
 footage. What changed is where the business logic of seven verbs lives, and the
@@ -781,4 +785,270 @@ Two small things that were load-bearing:
   test.
 - `next build` still fails here for the pre-existing font-fetch reason in
   `src/app/layout.tsx`; nothing under `api/` is implicated.
+
+---
+
+# 17d — AI footage
+
+A prompt becomes a video clip in the workspace's library. It is the most
+expensive operation in the product, the most legally exposed, and the only
+one that runs for minutes — so most of the decisions below are about money,
+refusals and waiting.
+
+## Built against an open decision, and what that cost
+
+The phase file is blunt: *"confirm the chosen model's terms permit commercial
+use before building on it — ask the owner, do not assume"*. That has not been
+settled. It was built anyway, on instruction, and the honest accounting is:
+
+- **The seam absorbs the choice.** Everything except one folder is
+  provider-agnostic: the contract, the workflow, the moderation, the
+  metering, the screen, the registry. Switching providers is
+  `src/lib/adapters/video/<provider>/` plus an env var.
+- **Replicate is implemented first**, and the reason is the one axis the
+  phase file does specify: step 4 requires storing `modelVersion` for the
+  audit trail, and Replicate's API is built around **immutable version
+  hashes**, so what gets recorded is exact rather than a label that may have
+  moved. That is a reason to build it first, not a finding that it is the
+  right answer.
+- **The model is not pinned in code.** `VIDEO_MODEL` is an env var with a
+  placeholder default, so changing it is a deploy rather than a release —
+  which is what you want for a choice that may be made on legal advice.
+- **The price is a placeholder with a stated property.** Grep
+  `THE_RATE_MUST_EXCEED_THE_COST`: 8 credits a second is anchored to the
+  shape of generative-video pricing, not to a contract. **Check the chosen
+  model's real per-second price against it before enabling this on a paying
+  plan.** A rate below cost is a feature that loses money on every use and
+  looks like success in every metric.
+
+## Where 17d's code lives
+
+| Path | Contains | Touches the database? |
+| --- | --- | --- |
+| `src/lib/adapters/video/types.ts` | the contract: `start`, `poll`, the failure reasons | **no** |
+| `src/lib/adapters/video/replicate/` | the one implementation, over plain `fetch` | **no** |
+| `src/lib/types/footage.ts` | the closed duration set, the request schemas, the view | **no** |
+| `src/services/footage.service.ts` | moderation, the cache, the row, the library read | **yes** |
+| `src/inngest/functions/footage-generate.ts` | hold, start, poll across steps, store, hand over | via services |
+| `src/trpc/routers/footage.ts` | `aiFootage.estimate` / `.list` / `.generate` | via services |
+| `src/lib/credits/estimate.ts` | the `aiFootage` kind and its per-second rate | **no** |
+| `.../dashboard/footage/` | the prompt box, the cost on the button, the grid | via tRPC |
+
+**No migration.** `Asset` already had every column this needed —
+`kind: ai_footage`, `promptText`, `modelVersion`, `promptHash`, `durationSec`
+— because Phase 02 added the provenance columns and Phase 14 added the
+prompt ones. The kind's own comment in the schema already named Phase 17.
+
+## Start and poll, not generate
+
+The one place this seam differs in shape from its sibling `ImageAdapter`. An
+image model answers in seconds and `generate()` can wait; a video model takes
+minutes. The phase file says it outright — *"poll in separate steps with
+sleeps between; polling inside one step times out"* — and the two-method
+contract is what makes that possible.
+
+It is the same split `RenderAdapter` makes (`start` + `getProgress`), which
+is worth noticing: the two slowest operations in the product both outlive a
+request, and both are modelled as *hand it over, then ask*.
+
+### The job id lives in a step result, not a column
+
+Inngest memoises a completed step, so a replay of `start-generation` returns
+the id it already got instead of starting — and paying for — a second clip. A
+column would work too, and would be a migration for something the queue
+already guarantees.
+
+### The wait is bounded
+
+Forty polls, fifteen seconds apart: ten minutes. A deliberate ceiling rather
+than a guess at the slowest case — a generation still running after ten
+minutes is almost certainly stuck, and the customer is better served by a
+released hold and a clear failure than a tile that spins for an hour.
+
+Fifteen seconds rather than three because the clip will not arrive sooner for
+being asked more often, and some provider plans bill per request.
+
+## Refused is not failed
+
+Video providers run their own safety classifier and decline prompts ours
+allowed — a likeness, a trademark, something they read differently. That is a
+distinct failure reason in the contract, and the distinction exists for the
+**customer**: a refusal means reword, a failure means try again.
+
+It also decides retries. A refusal is raised as `NonRetriableError`, because
+the provider will decline it again and **every attempt may be billed**.
+Collapsing it into "failed" produces three identical refusals and a support
+ticket.
+
+Replicate gives no machine-readable refusal code, so this reads the error
+**text**. That is fragile and is written down as such — the cost of a miss is
+bounded (one pointless retry in one direction, a customer told to reword in
+the other) and the boundaries are pinned by a test, because a heuristic
+nobody pinned down drifts.
+
+## Moderation is in the router, before anything exists
+
+Step 3 requires the check before the model call and requires it to **fail
+closed**. It happens in the request rather than the workflow, and that is
+deliberate: a customer whose prompt is refused is told **immediately** and
+can reword, instead of watching a tile fail a minute later with nothing to
+act on.
+
+The implementation is deliberately the same shape as Phase 14's
+`moderateImagePrompt` — context `prompt`, subject type `prompt`, the hash as
+the subject id — because this is the same decision about a more expensive
+call, and two implementations of one safety rule is how one of them ends up
+weaker. `moderateText` never throws and fails closed, so a classifier outage
+blocks the generation rather than letting an unclassified prompt through.
+
+The workflow does not repeat the check: the router is its only producer, and
+a second classifier call would be paying twice for an answer already
+recorded.
+
+### The examples teach the rule
+
+Step 6 asks for examples, and the four on the screen are every one a **scene**
+with no person, no brand and no likeness. A customer who starts from one does
+not meet the content refusal — which is a better way to explain the rule than
+the refusal message.
+
+## Five checks, in this order, before anything is written
+
+`aiFootage.generate` is a sequence and each step is before the next for a
+reason:
+
+1. **A provider is configured** — otherwise refuse before anything is
+   recorded.
+2. **The plan's allowance** — the registry's own limit and upgrade sentence.
+3. **Moderation** — before the cache, so a refused prompt is refused even if
+   an identical one slipped through earlier.
+4. **The cache** — an identical prompt at the same length returns the
+   existing clip, synchronously, with no job and no charge.
+5. **The balance** — on the estimate, before the row, because a refusal must
+   leave no trace. A `processing` asset that was never affordable sits in the
+   library as a clip that is about to arrive and never will.
+
+The **hold** is placed by the workflow, not here — the same reasoning
+`renders.create` records: a credit movement inside a request that may time
+out strands money with no run in existence to release it.
+
+### The gate is called, not inherited
+
+The procedure factory applies a limit gate automatically, but only on the
+`create` verb — and `create` would **also** auto-increment the counter at
+request time. That would charge a customer one of their twenty monthly clips
+for a generation the provider may refuse.
+
+So the verb is `generate`, and the gate is called explicitly through the same
+`checkFeatureGate` the factory uses, reading the same registry entry. The
+allowance is spent in the workflow when a clip actually **exists**. Same
+discipline as 17b's REST surface: call the rule, never restate it.
+
+## The money is returned on every failure path
+
+A customer who got no clip must not be charged. The hold is released on a
+provider failure, on a timeout, on an asset deleted mid-generation, and in
+`onFailure` for a run that exhausted its retries — which is the one that
+matters, because without it the asset sits on `processing` forever and the
+hold sits against the balance until the Phase 05 reconciler notices.
+
+`releaseClipHold` looks the hold up by **reference** rather than taking an
+id, because `onFailure` has the event payload and not the step results. Its
+own failures are logged and swallowed: it runs where there is no error path
+left.
+
+### The ledger reference is not a project ref
+
+`clip:<assetId>`, and deliberately **not** in `PROJECT_HOLD_REFS`. A clip
+belongs to the workspace's library rather than to a project, so cancelling a
+project's generation must not release a clip the customer is still waiting
+for.
+
+## Fetch once, then hand over
+
+The workflow downloads the provider's file, uploads it under our key, and
+then sends `asset/uploaded` so the **one** ingest pipeline that owns probing,
+variants and the readiness transition does that work. The vertical variant
+and the proxy the first done-when asks for come from there.
+
+Copied from the library ingest, which solved the same problem for a third
+party's bytes. Two producers, one pipeline.
+
+### A new event name, one word from an existing one
+
+`clip/requested`, not `footage/requested` — which is taken, and means
+something else: that event asks the pipeline to resolve **one block's**
+visual from the stock-then-image-then-background chain. Reusing the name
+would have put two unrelated payload shapes behind one trigger.
+
+A test asserts both names, beside each other, precisely because they are one
+word apart.
+
+## Step 7, read rather than skipped
+
+> Fall back to a stock clip or the styled background when generation fails,
+> so a failure degrades the video rather than the job.
+
+This requirement is **already met, by Phase 14**, and does not arise again
+here. The reason is worth stating rather than quietly leaving a box unticked:
+
+Phase 14's `resolveBlockChoice` picks a block's visual from a chain — stock
+clip, then generated image, then the styled background — and that chain is
+what degrades when a generation fails. **The pipeline never generates
+video.** 17d's clips are a library a customer builds and inserts from
+deliberately, so a failed generation has no video to degrade: there is a
+failed tile with its reason and the credits back.
+
+Wiring AI video into the per-block chain would be a different feature — one
+that spends the most expensive call in the product automatically, without
+anybody asking — and the phase file does not ask for it.
+
+## A failed clip is still shown
+
+The row is created **before** the model is called, carrying the prompt, so
+the grid shows the request the instant it is made and shows it failing if it
+fails. Creating it only on success would mean a minute of blank screen and
+then either a clip or nothing, with no way to tell a slow generation from a
+lost one.
+
+A failed tile carries the provider's reason and says the credits came back. A
+customer who spent money and got nothing needs both facts without asking.
+
+The grid polls every five seconds **only while something is processing**, and
+stops when nothing is. Polling a quiet screen forever is a request every few
+seconds per open tab, for a library that changes a few times a month.
+
+## A limit, not a flag
+
+`aiFootage` gates with a **zero allowance** on free and starter rather than a
+feature flag, and the screen is reachable on every plan (`requireFlag:
+false`). A flag hides a feature; a limit lets somebody see what it is and be
+told what it would cost. Hiding it means the only people who discover it are
+the ones already paying for it.
+
+It is a quota **and** a price — twenty clips a month on pro, plus credits per
+clip from the ledger. The same `A_QUOTA_AND_A_PRICE` pairing Phase 14's
+images use: the plan says how many a customer is entitled to, the balance
+says how many they can pay for, and a generation needs both.
+
+## What has never run
+
+- `tsc` clean, lint clean, **1460 tests passing** (22 new).
+- **No clip has ever been generated.** Nothing here has touched a video
+  model: there is no `VIDEO_API_KEY` on this machine, and there is no chosen
+  model to put behind one. What is genuinely verified is everything pure —
+  the pricing and its relationship to a render, the closed duration set, the
+  refusal heuristic's boundaries, the output-shape reader, the failure
+  classification that decides retries, and the prompt hash the cache depends
+  on.
+- **The four done-when items all need a live run.** A clip in the library with
+  its variants, a blocked prompt, a released hold, and a job surviving a
+  closed browser are each code-complete and each unobserved. Three of them
+  additionally need the database and R2 that Phases 02 and 05 are blocked on.
+- **The price is unverified against a real contract**, which is the specific
+  consequence of building before the decision. Grep
+  `THE_RATE_MUST_EXCEED_THE_COST`.
+- `next build` still fails here for the pre-existing font-fetch reason in
+  `src/app/layout.tsx`; nothing under `api/` or `dashboard/footage` is
+  implicated.
 

@@ -93,6 +93,11 @@ describe("jobs seam", () => {
        * here would look exactly like a sync that simply did nothing. */
       "library/requested",
       "footage/requested",
+      /* Phase 17d's generated clip. Asserted beside `footage/requested`
+       * precisely because the two names are one word apart and mean different
+       * things — a rename that collapsed them would compile and would send a
+       * prompt to a workflow expecting a block id. */
+      "clip/requested",
       "line/changed",
     ]) {
       expect(JOB_EVENT_NAMES).toContain(name);

@@ -93,6 +93,7 @@ Ship to public beta at the end of Phase 10. Everything after is additive.
 | 15 | Timeline editor | Manual editing, revision conflicts |
 | 16 | Motion graphics studio | Scene engine, then AI designer |
 | 17 | Platform surface | AI footage, public API, MCP |
+| 18 | Product explainer pack | Persistent HUD, sections, ten artifact primitives |
 
 Phase files are `NN-<slug>.md`. Each has: Goal · Depends on · Registry · Data · Build · Done when ·
 Not in this phase. Tick it in `PROGRESS.md` when the checks pass.

@@ -90,6 +90,38 @@ describe('estimate', () => {
     expect(four.total - none.total).toBe(CREDIT_RATES.perAiImage * 4)
   })
 
+  it('charges a generated clip by its length', () => {
+    /* Phase 17d. A clip is priced per SECOND because that is what the provider
+     * bills, and with no base fee — a two-second clip should not carry a flat
+     * charge we could not explain. */
+    const five = estimate({ kind: 'aiFootage', durationSeconds: 5 })
+    const ten = estimate({ kind: 'aiFootage', durationSeconds: 10 })
+
+    expect(five.total).toBe(CREDIT_RATES.perSecond.aiFootage * 5)
+    expect(ten.total).toBe(five.total * 2)
+  })
+
+  it('prices a generated clip far above a render of the same length', () => {
+    /**
+     * THE_RATE_MUST_EXCEED_THE_COST, asserted as a RELATIONSHIP rather than a
+     * number. The exact rate is an owner decision against a contract that does
+     * not exist yet, so pinning it here would be a test of a placeholder — but
+     * the ordering is not negotiable: generative video costs the provider
+     * roughly two orders of magnitude more per second than rendering one does,
+     * and a rate that drifted below the render rate would mean selling the most
+     * expensive call in the product for less than the cheapest.
+     */
+    const clip = estimate({ kind: 'aiFootage', durationSeconds: 5 })
+    const render = estimate({ kind: 'render', durationSeconds: 5 })
+    expect(clip.total).toBeGreaterThan(render.total * 10)
+  })
+
+  it('charges nothing for a clip with no length', () => {
+    /* The nothing-case, as for every other kind: no base fee means a zero
+     * duration is free rather than a flat charge for no footage. */
+    expect(estimate({ kind: 'aiFootage', durationSeconds: 0 }).total).toBe(0)
+  })
+
   it('adds the premium-voice surcharge only when there is narration to charge for', () => {
     const plain = estimate({ kind: 'tts', durationSeconds: 60 })
     const premium = estimate({ kind: 'tts', durationSeconds: 60, premiumVoice: true })

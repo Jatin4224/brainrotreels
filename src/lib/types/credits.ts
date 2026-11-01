@@ -144,6 +144,14 @@ export const CREDITABLE_KINDS = [
   "tts",
   "alignment",
   "footage",
+  /* Phase 17d. GENERATED VIDEO, which is a different thing from `footage`
+   * above: that kind prices the footage STAGE of a video and bills per
+   * generated still, while this one prices a single clip from a video model
+   * and bills per second of output. They are separate because the unit
+   * economics differ by an order of magnitude — charging a clip at the stage
+   * rate would sell the most expensive call in the product at the price of a
+   * picture. */
+  "aiFootage",
 ] as const;
 
 export const creditableKindSchema = z.enum(CREDITABLE_KINDS);

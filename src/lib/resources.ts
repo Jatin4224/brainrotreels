@@ -1186,6 +1186,66 @@ export const RESOURCES = {
    * It carries no `nav` because there is no screen for it. The screen is
    * `apiKeys` below, which is where a customer goes to do something.
    */
+  /**
+   * SOURCE OF TRUTH KEYWORDS: RESOURCES.aiFootage, A_LIMIT_NOT_A_FLAG,
+   *   ZERO_IS_A_VALID_ALLOWANCE, THE_SCREEN_IS_REACHABLE_ON_EVERY_PLAN
+   *
+   * Phase 17d. Generated video clips: the most expensive operation in the
+   * product and the most legally exposed.
+   *
+   * A_LIMIT_NOT_A_FLAG, and the distinction matters for how a customer meets
+   * it. A flag hides a feature; a limit lets somebody see what it is and be
+   * told what it would cost. ZERO_IS_A_VALID_ALLOWANCE is what makes that
+   * work: free and starter get zero, so THE_SCREEN_IS_REACHABLE_ON_EVERY_PLAN
+   * (`requireFlag: false`) and the refusal happens at the point of
+   * spending, with the registry's own upgrade sentence. Hiding it would mean
+   * the only people who discover the feature are the ones already paying for
+   * it.
+   *
+   * Twenty a month on pro is the phase file's own number. It is a QUOTA and
+   * not the price: each clip also spends credits from the ledger
+   * (`aiFootage` in CREDIT_RATES), which is the A_QUOTA_AND_A_PRICE pairing
+   * Phase 14's images use — the plan says how many a customer is entitled to
+   * and the balance says how many they can pay for, and a generation needs
+   * both.
+   *
+   * Counted when the CLIP EXISTS, not when it is requested: a refused prompt,
+   * a provider that declined and a generation that failed all cost nothing
+   * from the allowance. Grep COUNTED_WHEN_THE_CLIP_EXISTS.
+   */
+  aiFootage: {
+    name: "AI footage",
+    description: "Generated video clips per month",
+    /* Generating a clip spends a customer's money, so whether a teammate may
+     * do it is a thing an owner should be able to decide with a custom role —
+     * the same reason `renders` and `aiImages` are permissioned. */
+    permissions: ["create", "read"],
+    limit: {
+      perPlan: {
+        free: 0,
+        starter: 0,
+        pro: 20,
+        enterprise: "unlimited",
+        portal: "unlimited",
+      },
+      upgradeMessage: "Upgrade to {nextPlan} to generate video footage",
+      /* A trial that could generate video would be a trial of the single
+       * most expensive call we make, and the one with the least recoverable
+       * cost — the provider bills us whether or not the customer stays. */
+      availableOnFreeTrial: false,
+      unit: "clips",
+      period: "month",
+    },
+    nav: {
+      label: "AI footage",
+      href: "/dashboard/footage",
+      icon: "Folder",
+      section: "main",
+      /* See THE_SCREEN_IS_REACHABLE_ON_EVERY_PLAN. */
+      requireFlag: false,
+    },
+  },
+
   apiAccess: {
     name: "API access",
     description: "Use the public REST API and the MCP server",

@@ -107,6 +107,21 @@ export const JOB_EVENT_NAMES = [
    */
   'library/requested',
   'footage/requested',
+  /**
+   * A_CLIP_IS_NOT_A_BLOCKS_FOOTAGE. Phase 17d. Sent by `footage.generate`
+   * once the prompt has been classified and the row created, so the video
+   * model call — which takes MINUTES — happens in a durable run that polls
+   * across steps rather than inside a request.
+   *
+   * Deliberately NOT `footage/requested`, which is taken and means something
+   * else: that event asks the pipeline to resolve ONE BLOCK's visual from the
+   * stock-then-image-then-background chain, for a video being generated. This
+   * one asks for a single clip from a prompt, for the workspace's library,
+   * with no project and no block. Reusing the name would have put two
+   * unrelated payload shapes behind one trigger and made the consumer branch
+   * on which it got.
+   */
+  'clip/requested',
   'line/changed',
 ] as const
 

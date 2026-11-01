@@ -88,7 +88,7 @@ worse than an empty box.
       Claude, and the whole motion pipeline (Neon has been unreachable since Phase 05). Two gaps
       are not code gaps — only one font family is bundled, and `stack-center` holds three list
       items plus a heading in a vertical frame, not four. See the four notes.
-- [ ] Phase 17: Platform surface — **17a, 17b and 17c are built; the AI-footage half is not.**
+- [ ] Phase 17: Platform surface — **all four commits are built; nothing in it has run.**
       17a is the shared operation seam: the business logic of the multi-surface verbs lives in
       `src/lib/api/operations/`, behind an explicit `OperationContext` and a transport-neutral
       failure vocabulary, and the web app's routers call it through `runOperation`. 17b is the
@@ -96,18 +96,39 @@ worse than an empty box.
       the SAME registry gates the procedure factory applies, `Idempotency-Key` with fingerprinting,
       cursor pagination, a generated OpenAPI 3.1 document, and the developers screen. 17c is the MCP
       server at `/api/mcp` — eight tools over the same operations, JSON-RPC written by hand rather
-      than with the SDK (argued in the note), and the copy-paste agent config. **AI footage is
-      blocked on an owner decision** (commercial-use terms for the chosen video model) and must not
-      be started before it is settled. **No HTTP request has ever reached either surface and no
-      agent has ever connected**: the pure halves are tested (65 new tests across 17b and 17c), the
-      pipelines need a database and a Redis. See docs/27-phase17.md.
+      than with the SDK (argued in the note). 17d is AI footage: a `video` adapter seam, the
+      `clip/requested` workflow that polls across steps, moderation before the model call, its own
+      hold and price, and `/dashboard/footage`. **17d was built against an OPEN OWNER DECISION** —
+      which video model to ship and whether its terms permit commercial use — so the model is an
+      env var and the credit rate is a placeholder with a stated property to check
+      (`THE_RATE_MUST_EXCEED_THE_COST`). **No HTTP request has reached the API, no agent has
+      connected, and no clip has been generated**: the pure halves are tested (87 new tests across
+      17b–17d), every pipeline needs a database, a Redis and a provider credential.
+      See docs/27-phase17.md.
+
+- [ ] Phase 18: Product explainer pack — **not started.** Specified in
+      `docs/phases/18-product-explainer.md` after an inventory of what Phase 16 actually built: the
+      section model and the `persistent` lane, ten artifact primitives, the `cream` palette and the
+      `cream-amber` style, and the storyboard/designer changes. Two findings worth carrying into the
+      work — it needs **no migration and no `TIMELINE_DOC_VERSION` bump** (everything it adds is an
+      optional field or a new enum value, per `ADDING_A_KIND_IS_NOT_A_MIGRATION`), and it needs **no
+      new registry resource** (`motionStudio` + `motionVideos` already have the right cost shape).
+      Three known gaps are inherited rather than introduced: no mono font is bundled, so a terminal
+      would render in a proportional face; no avatar artwork exists, so the corner character draws
+      nothing; and `MUSIC_MOODS` has no `light-electronic` because the music licence is still an
+      open owner decision.
 
 ## Blocked on an owner decision
 
 These cannot be unblocked by writing code. Settle each before its phase starts.
 
 - [ ] **Gameplay-footage licensing** (Phase 11) — the largest non-technical risk in the product.
-- [ ] **Commercial-use terms for the chosen video model** (Phase 17).
+- [ ] **Commercial-use terms for the chosen video model** (Phase 17). **Still open, and 17d was
+      built anyway on instruction.** The seam absorbs the choice — switching providers is one
+      folder and an env var — but two things must happen before AI footage is enabled on a paying
+      plan: set `VIDEO_MODEL` to a model whose terms permit commercial use, and check its real
+      per-second price against `CREDIT_RATES.perSecond.aiFootage`, which is currently a
+      placeholder. Grep `THE_RATE_MUST_EXCEED_THE_COST`.
 - [ ] **Music and SFX licences** must explicitly permit end-user publication and monetisation
       (Phase 11).
 
@@ -3204,3 +3225,113 @@ verified: the protocol against a real client, which is the specific risk of writ
 envelopes match the specification as read, and no Claude or Cursor client has confirmed that. First
 connection is the test. The gate pipeline and every tool's actual work need a database and a Redis,
 and this machine has had neither since Phase 05.
+
+### Phase 17d — 2026-11-01
+
+AI footage: a prompt becomes a video clip in the workspace's library. The most expensive operation
+in the product, the most legally exposed, and the only one that runs for minutes.
+
+**Built against an open owner decision, which is the first thing to know.** The phase file says
+"confirm the chosen model's terms permit commercial use before building on it — ask the owner, do
+not assume", and that is still unsettled; it was built anyway on instruction. The honest accounting:
+the SEAM absorbs the choice (everything but one folder is provider-agnostic — contract, workflow,
+moderation, metering, screen, registry), the MODEL is an env var with a placeholder default so
+changing it is a deploy rather than a release, and the PRICE is a placeholder with a stated property
+rather than a number anybody verified. Replicate is implemented first for the one reason the phase
+file does specify: step 4 requires storing `modelVersion` for the audit trail, and its API is built
+around immutable version hashes, so what gets recorded is exact rather than a label that may have
+moved. **Before enabling this on a paying plan: set `VIDEO_MODEL` to a model whose terms permit
+commercial use, and check its real per-second price against `CREDIT_RATES.perSecond.aiFootage`.**
+Grep `THE_RATE_MUST_EXCEED_THE_COST`.
+
+**No migration.** `Asset` already had every column — `kind: ai_footage`, `promptText`,
+`modelVersion`, `promptHash`, `durationSec` — because Phase 02 added the provenance columns and
+Phase 14 the prompt ones. The kind's own schema comment already named Phase 17.
+
+**START_AND_POLL, not generate**, which is the one place this seam differs in shape from its sibling
+`ImageAdapter`. An image model answers in seconds and `generate()` can wait; a video model takes
+minutes, and the phase file warns that "polling inside one step times out". So each poll is its own
+durable step with a `step.sleep` between — the worker is free during the wait, the run survives a
+deploy, and a replay resumes at the last poll rather than starting a second generation. It is the
+same split `RenderAdapter` makes, which is worth noticing: the two slowest operations in the
+product both outlive a request. The provider's JOB ID lives in a step result rather than a column,
+because Inngest memoises a completed step — a column would be a migration for something the queue
+already guarantees. Grep `START_AND_POLL_NOT_GENERATE`, `POLL_IN_SEPARATE_STEPS`.
+
+**REFUSED is a distinct failure reason, and it decides retries.** Video providers decline prompts
+ours allowed — a likeness, a trademark, something they read differently. That is not an outage: it
+means REWORD, where a failure means TRY AGAIN, and it is raised as `NonRetriableError` because the
+provider will decline it again and every attempt may be billed. Replicate gives no machine-readable
+refusal code, so this reads the error TEXT — fragile, written down as such, and pinned by a test,
+because a heuristic nobody pinned down drifts. Grep `REFUSED_IS_NOT_FAILED`.
+
+**Moderation is in the ROUTER, before anything exists.** Step 3 requires the check before the model
+call and requires it to fail closed. Doing it in the request means a customer whose prompt is refused
+is told IMMEDIATELY and can reword, instead of watching a tile fail a minute later with nothing to
+act on. The implementation is deliberately the same shape as Phase 14's `moderateImagePrompt`
+(context `prompt`, subject type `prompt`, the hash as the subject id), because two implementations
+of one safety rule is how one of them ends up weaker. The workflow does not repeat it: the router is
+its only producer and a second classifier call would pay twice for a recorded answer. The four
+on-screen EXAMPLES are each a scene with no person, brand or likeness in it — teaching the rule is a
+better explanation than the refusal message.
+
+**Five checks in order, and nothing written until all five pass:** a provider is configured, the
+plan's allowance, moderation (BEFORE the cache, so a refused prompt is refused even if an identical
+one slipped through earlier), the cache (an identical prompt at the same length returns the existing
+clip with no job and no charge), then the balance on the estimate — before the row, because a
+refusal must leave no trace. A `processing` asset that was never affordable sits in the library as a
+clip that is about to arrive and never will.
+
+**The gate is CALLED, not inherited**, and this is the plumbing decision worth knowing. The procedure
+factory applies a limit gate automatically — but only on the `create` verb, and `create` would also
+auto-increment the counter at request time. That would charge a customer one of their twenty monthly
+clips for a generation the provider may refuse. So the verb is `generate`, the gate is called
+explicitly through the same `checkFeatureGate` the factory uses, and the allowance is spent in the
+workflow when a clip actually EXISTS. Same discipline as 17b's REST surface: call the rule, never
+restate it. Grep `THE_GATE_IS_CALLED_NOT_INHERITED`, `COUNTED_WHEN_THE_CLIP_EXISTS`.
+
+**The money comes back on every failure path** — a provider failure, a timeout, an asset deleted
+mid-generation, and `onFailure` for a run that exhausted its retries. That last one matters most:
+without it the asset sits on `processing` forever and the hold sits against the balance until the
+Phase 05 reconciler notices. `releaseClipHold` looks the hold up by REFERENCE rather than taking an
+id, because `onFailure` has the event payload and not the step results. The ledger ref is
+`clip:<assetId>` and deliberately NOT in `PROJECT_HOLD_REFS`: a clip belongs to the library rather
+than to a project, so cancelling a project must not release a clip somebody is still waiting for.
+
+**FETCH_ONCE_THEN_HAND_OVER**, copied from the library ingest. The workflow downloads the provider's
+file, uploads it under our key, then sends `asset/uploaded` so the ONE ingest pipeline that owns
+probing, variants and readiness does that work — the vertical variant and the proxy the first
+done-when asks for come from there. Two producers, one pipeline. The new event is `clip/requested`
+and NOT `footage/requested`, which is taken and means "resolve one block's visual from the
+stock-then-image-then-background chain"; reusing it would have put two unrelated payload shapes
+behind one trigger. A test asserts both names side by side, precisely because they are one word
+apart.
+
+**Step 7 is met by Phase 14 and does not arise again here**, which is a reading rather than a skip.
+The step asks footage to "fall back to a stock clip or the styled background when generation fails,
+so a failure degrades the video rather than the job". Phase 14's `resolveBlockChoice` already does
+exactly that for a block's visual — and THE PIPELINE NEVER GENERATES VIDEO. 17d's clips are a library
+a customer builds and inserts from deliberately, so a failed generation has no video to degrade:
+there is a failed tile with its reason and the credits back. Wiring AI video into the per-block chain
+would be a different feature, one that spends the most expensive call in the product automatically
+without anybody asking, and the phase file does not ask for it.
+
+**A failed clip is still shown.** The row is created BEFORE the model is called, carrying the prompt,
+so the grid shows the request the instant it is made and shows it failing if it fails — creating it
+only on success would mean a minute of blank screen and then either a clip or nothing, with no way
+to tell a slow generation from a lost one. A failed tile carries the provider's reason and says the
+credits came back. The grid polls every five seconds ONLY while something is processing.
+
+**A LIMIT, not a flag**, with a zero allowance on free and starter and the screen reachable on every
+plan. A flag hides a feature; a limit lets somebody see what it is and be told what it would cost.
+It is a quota AND a price — twenty clips a month on pro plus credits per clip — which is the
+`A_QUOTA_AND_A_PRICE` pairing Phase 14's images use.
+
+**What has never run.** No clip has ever been generated: there is no `VIDEO_API_KEY` on this machine
+and no chosen model to put behind one. Verified by the 22 new tests: the pricing and its relationship
+to a render (asserted as a RELATIONSHIP, since the rate is a placeholder), the closed duration set,
+the refusal heuristic's boundaries, the output-shape reader, the failure classification that decides
+retries, and the prompt hash the cache depends on. All four of the phase's footage done-when items —
+a clip with its variants, a blocked prompt, a released hold, a job surviving a closed browser — are
+code-complete and unobserved, and three of them additionally need the database and R2 that Phases 02
+and 05 are blocked on.
