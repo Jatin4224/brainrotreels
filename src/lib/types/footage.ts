@@ -4,7 +4,7 @@
 
 /**
  * SOURCE OF TRUTH KEYWORDS: FOOTAGE_DURATIONS, FootageDuration,
- *   generateFootageSchema, listFootageSchema, estimateFootageSchema,
+ *   generateFootageSchema, listFootageSchema, estimateFootageSchema, regenerate,
  *   FootageClip, DURATION_IS_A_CLOSED_SET, THE_PROMPT_IS_THE_ONLY_FREE_FIELD
  *
  * WHAT:  The vocabulary of generated footage: how long a clip may be, what a
@@ -70,10 +70,57 @@ export const DEFAULT_FOOTAGE_DURATION: FootageDuration = FOOTAGE_DURATIONS[0];
  */
 export const FOOTAGE_PROMPT_MAX = 500;
 
-export const generateFootageSchema = z.object({
+/**
+ * SOURCE OF TRUTH KEYWORDS: footageFormSchema, FootageFormValues,
+ *   THE_FORM_IS_WHAT_A_PERSON_TYPES, DERIVED_NOT_REDECLARED
+ *
+ * WHAT:  The fields the footage form actually collects.
+ *
+ * WHY:   THE_FORM_IS_WHAT_A_PERSON_TYPES, and `regenerate` is not one of them
+ *        — it is a decision made by which BUTTON was pressed, not by anything
+ *        filled in. Keeping it out of the resolver's schema is also what keeps
+ *        the form's types sound: a Zod `.default()` makes a schema's input and
+ *        output types differ, and React Hook Form resolves against ONE type,
+ *        so a defaulted field in a form schema is a type error rather than a
+ *        convenience.
+ *
+ *        DERIVED_NOT_REDECLARED — the procedure's schema extends this one, so
+ *        the 500-character limit a customer meets on screen is provably the
+ *        one the server enforces. There is no second object to keep in step.
+ * WHERE: The `useForm` resolver in the footage studio.
+ */
+export const footageFormSchema = z.object({
   organizationId: z.string().min(1),
   prompt: z.string().trim().min(3).max(FOOTAGE_PROMPT_MAX),
   durationSec: footageDurationSchema,
+});
+
+export type FootageFormValues = z.infer<typeof footageFormSchema>;
+
+export const generateFootageSchema = footageFormSchema.extend({
+  /**
+   * SOURCE OF TRUTH KEYWORDS: regenerate, A_SECOND_TAKE_IS_A_SECOND_SPEND,
+   *   REGENERATE_BYPASSES_THE_CACHE_NOT_THE_GATES
+   *
+   * Ask for a NEW clip even though this workspace already has one for this
+   * prompt and length.
+   *
+   * A_SECOND_TAKE_IS_A_SECOND_SPEND, which is why this is an explicit flag and
+   * not the default. `CACHE_BEFORE_SPEND` exists because the model is the most
+   * expensive call in the product, and re-submitting the same prompt is
+   * overwhelmingly a customer who forgot they had already asked — so the
+   * default stays "give them the clip they paid for". But a generative model
+   * returns a DIFFERENT take for the same prompt, and "try that again" is the
+   * single most obvious thing to want from one. Without this flag the cache
+   * makes that impossible: every attempt returns the first clip forever.
+   *
+   * REGENERATE_BYPASSES_THE_CACHE_NOT_THE_GATES. It skips exactly one of the
+   * five checks in `aiFootage.generate` — the cache lookup. The provider
+   * check, the plan allowance, the moderation call and the balance refusal all
+   * still run, in the same order, because a second take is a second full-price
+   * generation of a prompt that must be classified again.
+   */
+  regenerate: z.boolean().default(false),
 });
 
 export type GenerateFootageValues = z.infer<typeof generateFootageSchema>;

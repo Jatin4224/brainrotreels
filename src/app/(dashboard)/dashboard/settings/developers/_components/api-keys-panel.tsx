@@ -6,6 +6,7 @@
 
 /**
  * SOURCE OF TRUTH KEYWORDS: ApiKeysPanel, SHOWN_ONCE_NEVER_AGAIN,
+ *   A_CLIENT_NEEDS_ITS_OWN_BLOCK, mcpClientConfigs, CodeBlock,
  *   REVOKED_NOT_DELETED, THE_SCREEN_IS_NOT_GATED, ZOD_SCHEMA_IS_THE_FORM,
  *   THEME_TOKENS_ONLY
  *
@@ -45,6 +46,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 
+import { CodeBlock } from "@/components/global/code-block";
 import { SettingsSection } from "@/components/global/settings-section";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -85,36 +87,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useActiveOrganizationId } from "@/hooks/use-active-organization";
+import {
+  MCP_KEY_PLACEHOLDER,
+  mcpClientConfigs,
+} from "@/lib/api/mcp-clients";
 import { createApiKeySchema, type CreateApiKeyValues } from "@/lib/types/api";
 import { trpc } from "@/trpc/react-provider";
-
-/**
- * SOURCE OF TRUTH KEYWORDS: mcpConfig, THE_CONFIG_IS_COPY_PASTE
- *
- * The block that goes into an agent client's config file. Written out here
- * rather than described, because the difference between "we have an MCP
- * server" and somebody actually using it is whether they had to work out the
- * JSON themselves.
- *
- * The shape is the one Claude and Cursor both read for a remote server: a
- * named entry with a `url` and the headers to send. The key is a placeholder
- * on purpose — the real one is shown once, above, and pasting a live
- * credential into a block that also gets screenshotted is how keys leak.
- */
-function mcpConfig(origin: string): string {
-  return JSON.stringify(
-    {
-      mcpServers: {
-        brainrotreels: {
-          url: `${origin}/api/mcp`,
-          headers: { Authorization: "Bearer brr_live_…" },
-        },
-      },
-    },
-    null,
-    2,
-  );
-}
 
 /**
  * SOURCE OF TRUTH KEYWORDS: ApiKeysPanel, THE_ORIGIN_COMES_FROM_THE_SERVER
@@ -348,14 +326,25 @@ export function ApiKeysPanel({
         contentWidth="full"
       >
         <div className="flex flex-col gap-4">
-          <pre className="bg-muted overflow-x-auto rounded-md p-4 text-xs">
-            {`curl -X POST ${origin}/api/v1/projects \\
-  -H "Authorization: Bearer brr_live_…" \\
+          <CodeBlock
+            language="bash"
+            copyLabel="Command copied."
+            code={`curl -X POST ${origin}/api/v1/projects \\
+  -H "Authorization: Bearer ${MCP_KEY_PLACEHOLDER}" \\
   -H "Content-Type: application/json" \\
   -d '{"title":"My video","kind":"voiceover","aspect":"9:16"}'`}
-          </pre>
+          />
           <p className="text-muted-foreground text-sm">
-            The machine-readable description lives at{" "}
+            The{" "}
+            <a
+              href="/docs/api"
+              className="underline underline-offset-4"
+              target="_blank"
+              rel="noreferrer"
+            >
+              full reference
+            </a>{" "}
+            lists every endpoint, and the machine-readable description lives at{" "}
             <a
               href="/api/v1/openapi.json"
               className="underline underline-offset-4"
@@ -381,24 +370,34 @@ export function ApiKeysPanel({
         labelDescription={`${toolCount} tools: create a project, write a script, assign voices, render, poll, download, and browse the catalogues.`}
         contentWidth="full"
       >
-        <div className="flex flex-col gap-4">
-          <div className="flex flex-col gap-1">
-            <p className="text-sm font-medium">Endpoint</p>
-            <code className="bg-muted overflow-x-auto rounded-md p-3 font-mono text-xs">
-              {`${origin}/api/mcp`}
-            </code>
-          </div>
+        <div className="flex flex-col gap-6">
+          <CodeBlock
+            language="http"
+            copyLabel="Endpoint copied."
+            code={`${origin}/api/mcp`}
+            caption="Replace the placeholder key in every block below with one from above."
+          />
 
-          <div className="flex flex-col gap-1">
-            <p className="text-sm font-medium">Configuration</p>
-            <p className="text-muted-foreground text-sm">
-              Paste this into your client&apos;s MCP config, replacing the key
-              with one from above.
-            </p>
-            <pre className="bg-muted overflow-x-auto rounded-md p-4 text-xs">
-              {mcpConfig(origin)}
-            </pre>
-          </div>
+          {/* A_CLIENT_NEEDS_ITS_OWN_BLOCK — one block per client, each with
+              the file it goes in or the command to run, because WHERE the
+              config lives is the thing people are actually stuck on. The list
+              comes from lib so this screen and /docs/api cannot disagree. */}
+          {mcpClientConfigs(origin).map((config) => (
+            <div key={config.client} className="flex flex-col gap-1.5">
+              <div>
+                <p className="text-sm font-medium">{config.client}</p>
+                <p className="text-muted-foreground font-mono text-xs break-all">
+                  {config.target}
+                </p>
+              </div>
+              <CodeBlock
+                language={config.language}
+                code={config.snippet}
+                caption={config.note}
+                copyLabel={`${config.client} config copied.`}
+              />
+            </div>
+          ))}
 
           <p className="text-muted-foreground text-sm">
             Rendering and script writing cost credits and keep running after

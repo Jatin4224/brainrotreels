@@ -49,6 +49,29 @@ export function currentPeriodStart(now: Date = new Date()): Date {
 }
 
 /**
+ * SOURCE OF TRUTH KEYWORDS: nextPeriodStart, THE_RESET_IS_A_FACT_NOT_A_GUESS,
+ *   CALENDAR_MONTH_ANCHOR
+ *
+ * WHAT:  The instant a periodic counter next reads as zero — the start of the
+ *        following calendar month, UTC.
+ *
+ * WHY:   THE_RESET_IS_A_FACT_NOT_A_GUESS. A `429` without a reset hint leaves a
+ *        client with one strategy: retry on a timer it invented. That is the
+ *        case the IETF `RateLimit-Reset` and `Retry-After` headers exist for,
+ *        and a monthly quota can answer it EXACTLY rather than approximately,
+ *        because CALENDAR_MONTH_ANCHOR fixes the boundary for everyone.
+ *
+ *        `Date.UTC` with a month of 12 rolls into January on its own, so
+ *        December needs no special case.
+ * WHERE: `checkApiEntitlements`, which puts it on the quota refusal's headers.
+ */
+export function nextPeriodStart(now: Date = new Date()): Date {
+  return new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1, 0, 0, 0, 0),
+  );
+}
+
+/**
  * True when a stored counter predates the current window and must read as
  * zero. Absolute resources are never stale — a seat count is not a period.
  */

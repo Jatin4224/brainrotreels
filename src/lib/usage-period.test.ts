@@ -25,6 +25,7 @@ import {
   effectiveUsage,
   isPeriodicResource,
   isUsageStale,
+  nextPeriodStart,
   periodicResourceKeys,
 } from "./usage-period";
 
@@ -122,5 +123,57 @@ describe("effectiveUsage", () => {
   /* The gate must be correct whether or not the cron has ever run. */
   it("is correct with no stamp, as on a row the cron has never touched", () => {
     expect(effectiveUsage("apiCalls", 12, null, JAN)).toBe(12);
+  });
+});
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: nextPeriodStart, THE_RESET_IS_A_FACT_NOT_A_GUESS
+ *
+ * The instant a `429` tells a client to come back. Asserted in UTC because
+ * CALENDAR_MONTH_ANCHOR fixes the boundary for every customer at once — a
+ * reset that drifted with a server's local zone would hand two customers
+ * different answers for the same quota.
+ */
+describe("nextPeriodStart", () => {
+  it("is the first instant of the following month, UTC", () => {
+    expect(nextPeriodStart(JAN).toISOString()).toBe("2026-02-01T00:00:00.000Z");
+  });
+
+  it("rolls December into the next January", () => {
+    /* `Date.UTC` carries the month over on its own, so December needs no
+     * special case — this is the test that proves it rather than the comment. */
+    const december = new Date(Date.UTC(2026, 11, 20, 8, 30, 0));
+    expect(nextPeriodStart(december).toISOString()).toBe(
+      "2027-01-01T00:00:00.000Z",
+    );
+  });
+
+  it("is always in the future relative to its own input", () => {
+    for (const month of [0, 1, 5, 10, 11]) {
+      const now = new Date(Date.UTC(2026, month, 28, 23, 59, 59));
+      expect(nextPeriodStart(now).getTime()).toBeGreaterThan(now.getTime());
+    }
+  });
+
+  it("is exactly one period after the current period's start", () => {
+    /* The two helpers bracket the same window, so a gate that reads usage from
+     * one and a reset from the other cannot disagree about which month it is
+     * talking about. */
+    expect(nextPeriodStart(JAN).getTime()).toBeGreaterThan(
+      currentPeriodStart(JAN).getTime(),
+    );
+    expect(currentPeriodStart(nextPeriodStart(JAN)).toISOString()).toBe(
+      nextPeriodStart(JAN).toISOString(),
+    );
+  });
+
+  it("does not move during a month", () => {
+    /* Every request in a window gets the same answer, so a client is not told
+     * a slightly different reset on each refusal. */
+    const early = new Date(Date.UTC(2026, 2, 1, 0, 0, 1));
+    const late = new Date(Date.UTC(2026, 2, 31, 23, 59, 59));
+    expect(nextPeriodStart(early).toISOString()).toBe(
+      nextPeriodStart(late).toISOString(),
+    );
   });
 });

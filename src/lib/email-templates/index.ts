@@ -3,7 +3,7 @@
 /**
  * SOURCE OF TRUTH KEYWORDS: BaseLayout, emailStyles, EmailButton,
  *   EmailVerificationEmail, PasswordResetEmail, TeamInvitationEmail,
- *   ProjectReadyEmail, RenderFailedEmail, LowBalanceEmail
+ *   ProjectReadyEmail, RenderFailedEmail, LowBalanceEmail, FootageFailedEmail
  *
  * WHAT:  Barrel for the transactional email templates and the shared layout.
  * WHY:   Single import surface so the email service references templates by
@@ -36,3 +36,7 @@ export {
   LowBalanceEmail,
   type LowBalanceEmailProps,
 } from "./transactional/low-balance";
+export {
+  FootageFailedEmail,
+  type FootageFailedEmailProps,
+} from "./transactional/footage-failed";

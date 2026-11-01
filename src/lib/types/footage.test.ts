@@ -120,7 +120,46 @@ describe("a generation request", () => {
 
     expect(parsed.success).toBe(true);
     if (!parsed.success) return;
-    expect(parsed.data).toEqual(valid);
+    /* `regenerate` is the one field beyond the form's three, and it defaults —
+     * so the parsed value carries it. The assertion names it explicitly rather
+     * than loosening to a subset check, because the POINT of this test is that
+     * the accepted key set is closed and known: a model or aspect key arriving
+     * here would still fail it. */
+    expect(parsed.data).toEqual({ ...valid, regenerate: false });
+  });
+
+  it("defaults regenerate to false, so the cache is honoured unless asked", () => {
+    /**
+     * A_SECOND_TAKE_IS_A_SECOND_SPEND. `CACHE_BEFORE_SPEND` is what stops the
+     * most expensive call in the product being paid for twice, so the default
+     * has to be the cached answer — a caller that forgets the field must get
+     * the clip they already own, never a second charge.
+     */
+    const parsed = generateFootageSchema.safeParse(valid);
+
+    expect(parsed.success).toBe(true);
+    if (!parsed.success) return;
+    expect(parsed.data.regenerate).toBe(false);
+  });
+
+  it("accepts an explicit regenerate, which is how a second take is asked for", () => {
+    const parsed = generateFootageSchema.safeParse({
+      ...valid,
+      regenerate: true,
+    });
+
+    expect(parsed.success).toBe(true);
+    if (!parsed.success) return;
+    expect(parsed.data.regenerate).toBe(true);
+  });
+
+  it("refuses a regenerate that is not a boolean", () => {
+    /* A string "true" from a hand-built request must not read as consent to
+     * spend again — the flag is the only thing standing between a re-submit
+     * and a second charge. */
+    expect(
+      generateFootageSchema.safeParse({ ...valid, regenerate: "true" }).success,
+    ).toBe(false);
   });
 });
 

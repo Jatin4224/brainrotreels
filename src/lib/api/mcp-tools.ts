@@ -72,6 +72,7 @@ import {
 
 import { checkApiEntitlements, countApiUsage } from "./gates";
 import { mcpToolError, mcpToolResult } from "./mcp";
+import { firstIssueMessage } from "./validation";
 import {
   assignVoiceOperation,
   createProjectOperation,
@@ -90,7 +91,7 @@ import {
  * can hold in an array and look up by name. Everything type-dependent happened
  * inside `defineTool`.
  */
-interface BoundTool {
+export interface BoundTool {
   name: string;
   title: string;
   description: string;
@@ -98,6 +99,19 @@ interface BoundTool {
   inputSchema: Record<string, unknown>;
   /** The verb's own metered resource, when it has one. */
   resource: LimitResourceKey | undefined;
+  /**
+   * SOURCE OF TRUTH KEYWORDS: validate, THE_PURE_HALF_IS_THE_TESTED_HALF
+   *
+   * Whether these arguments are acceptable, and the one sentence to send back
+   * when they are not. Separated from `invoke` because it is the only part of
+   * a tool call that touches neither the database nor a provider — so it is
+   * the part a unit test can hold, and "a malformed tool call is answered
+   * rather than crashing" becomes a checkable promise instead of an
+   * inspectable one.
+   */
+  validate: (
+    args: Record<string, unknown>,
+  ) => { ok: true } | { ok: false; message: string };
   /**
    * Parses, runs, counts and summarises. Returns a finished MCP tool result,
    * including the `isError: true` kind — see
@@ -147,18 +161,19 @@ function defineTool<TInput, TOutput>(definition: {
     inputSchema,
     resource: definition.resource,
 
+    validate(args) {
+      const parsed = definition.schema.safeParse(args);
+      return parsed.success
+        ? { ok: true }
+        : /* ONE_VALIDATION_SENTENCE_EVERY_SURFACE — the same function the REST
+           * pipeline uses, so one mistake reads the same on both. */
+          { ok: false, message: firstIssueMessage(parsed.error) };
+    },
+
     async invoke(operation, args) {
       const parsed = definition.schema.safeParse(args);
       if (!parsed.success) {
-        const issue = parsed.error.issues[0];
-        const path = issue?.path.join(".");
-        return mcpToolError(
-          issue === undefined
-            ? "Those arguments could not be validated."
-            : path !== undefined && path.length > 0
-              ? `${path}: ${issue.message}`
-              : issue.message,
-        );
+        return mcpToolError(firstIssueMessage(parsed.error));
       }
 
       try {
@@ -343,6 +358,27 @@ function decodeCursor(cursor: string | undefined): number {
 }
 
 /**
+ * SOURCE OF TRUTH KEYWORDS: findMcpTool, AN_UNKNOWN_TOOL_IS_A_PROTOCOL_FAILURE,
+ *   THE_PURE_HALF_IS_THE_TESTED_HALF
+ *
+ * WHAT:  The tool with this name, or null.
+ * WHY:   The lookup `callMcpTool` makes, as a function of its own so the
+ *        unknown-tool decision — which the route turns into a JSON-RPC
+ *        `methodNotFound` rather than a tool error — can be asserted without
+ *        a database. Returns `null` rather than throwing because an unknown
+ *        name is a client working from a `tools/list` it never read, which is
+ *        a case to report, not an exception.
+ *
+ *        Exact match, never case-insensitive or fuzzy: a tool name is part of
+ *        a public contract and a near-miss that silently resolved would hide
+ *        a client's bug until the day it did not.
+ * WHERE: `callMcpTool`; the route's `tools/call` branch; `mcp.test.ts`.
+ */
+export function findMcpTool(name: string): BoundTool | null {
+  return MCP_TOOL_LIST.find((entry) => entry.name === name) ?? null;
+}
+
+/**
  * SOURCE OF TRUTH KEYWORDS: listMcpTools, THE_SCHEMA_IS_GENERATED
  *
  * WHAT:  The `tools/list` payload.
@@ -395,8 +431,8 @@ export async function callMcpTool(args: {
 }): Promise<
   { unknownTool: true } | { unknownTool: false; result: Record<string, unknown> }
 > {
-  const tool = MCP_TOOL_LIST.find((entry) => entry.name === args.name);
-  if (tool === undefined) return { unknownTool: true };
+  const tool = findMcpTool(args.name);
+  if (tool === null) return { unknownTool: true };
 
   /* ONE_GATE_ORDER_TWO_SURFACES — the same function the REST pipeline calls,
    * so the order and the messages cannot drift. */

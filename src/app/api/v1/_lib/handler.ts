@@ -45,6 +45,7 @@ import { checkApiEntitlements, countApiUsage } from "@/lib/api/gates";
 import { OperationError, isOperationError } from "@/lib/errors";
 import { resolveRequestId } from "@/lib/observability";
 import type { LimitResourceKey } from "@/lib/resources";
+import { firstIssueMessage } from "@/lib/api/validation";
 import { API_ERROR_CODES, type OperationContext } from "@/lib/types/api";
 
 import {
@@ -146,11 +147,13 @@ export async function runApiRoute<TInput, TOutput>(
     resource: config.resource,
   });
   if (!entitlements.allowed) {
+    /* A_429_CARRIES_ITS_RESET — the gate decided the reset, this renders it. */
     return apiFail(
       entitlements.refusal.code,
       entitlements.refusal.message,
       entitlements.refusal.status,
       requestId,
+      entitlements.refusal.headers,
     );
   }
 
@@ -301,17 +304,9 @@ function parseInput<TInput, TOutput>(
   const result = config.schema.safeParse(candidate);
   if (result.success) return { ok: true, value: result.data };
 
-  const issue = result.error.issues[0];
-  const path = issue?.path.join(".");
-  return {
-    ok: false,
-    message:
-      issue === undefined
-        ? "The request could not be validated."
-        : path !== undefined && path.length > 0
-          ? `${path}: ${issue.message}`
-          : issue.message,
-  };
+  /* ONE_VALIDATION_SENTENCE_EVERY_SURFACE — the same function the MCP tools
+   * use, so one mistake reads the same whichever surface reports it. */
+  return { ok: false, message: firstIssueMessage(result.error) };
 }
 
 /**

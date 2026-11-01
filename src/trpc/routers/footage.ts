@@ -4,7 +4,8 @@
 
 /**
  * SOURCE OF TRUTH KEYWORDS: footageRouter, aiFootage.generate, aiFootage.list,
- *   aiFootage.estimate, MODERATE_BEFORE_THE_MODEL, REFUSE_BEFORE_PAYING,
+ *   aiFootage.estimate, MODERATE_BEFORE_THE_MODEL, REFUSE_BEFORE_PAYING, regenerate,
+ *   REGENERATE_BYPASSES_THE_CACHE_NOT_THE_GATES, THE_KEY_IS_UNIQUE_PER_CLIP_NOT_PER_PROMPT,
  *   CACHE_BEFORE_SPEND, THE_GATE_IS_CALLED_NOT_INHERITED,
  *   GENERATION_STARTS_OUTSIDE_THE_REQUEST, COST_ON_THE_BUTTON
  *
@@ -206,15 +207,20 @@ export const footageRouter = createTRPCRouter({
       }
 
       /* [4] CACHE_BEFORE_SPEND — the same prompt at the same length is the
-       * clip they already have. */
+       * clip they already have. REGENERATE_BYPASSES_THE_CACHE_NOT_THE_GATES:
+       * this is the ONLY one of the five checks the flag skips, because a
+       * second take is a deliberate second spend on a prompt that has just
+       * been classified again. */
       const promptHash = footageService.footagePromptHash(input.prompt);
-      const cached = await footageService.findCachedFootage(ctx.db, {
-        organizationId: input.organizationId,
-        promptHash,
-        durationSec: input.durationSec,
-      });
-      if (cached !== null) {
-        return { assetId: cached.id, reused: true, cost: null };
+      if (!input.regenerate) {
+        const cached = await footageService.findCachedFootage(ctx.db, {
+          organizationId: input.organizationId,
+          promptHash,
+          durationSec: input.durationSec,
+        });
+        if (cached !== null) {
+          return { assetId: cached.id, reused: true, cost: null };
+        }
       }
 
       /* [5] REFUSE_BEFORE_PAYING, on the estimate and before the row. */
@@ -246,10 +252,18 @@ export const footageRouter = createTRPCRouter({
         durationSec: input.durationSec,
         filename: `${promptHash}.mp4`,
         /* A workspace-level key, not a project one: a generated clip belongs to
-         * the library and can be used in any project, or none. */
+         * the library and can be used in any project, or none.
+         *
+         * THE_KEY_IS_UNIQUE_PER_CLIP_NOT_PER_PROMPT. The segment is a random
+         * id, following the same pattern as `assets.createUploadUrl`, and NOT
+         * the prompt hash. A hash-derived key is stable across takes, so a
+         * regenerated clip would upload over the bytes of the clip it was
+         * meant to sit beside — two rows, one object, and the customer's first
+         * take silently replaced. A random segment cannot collide; the prompt
+         * hash stays on the row, where the cache reads it. */
         storageKey: uploadKey(
           input.organizationId,
-          `footage-${promptHash}`,
+          crypto.randomUUID().replace(/-/g, ""),
           "clip.mp4",
         ),
       });
@@ -262,6 +276,10 @@ export const footageRouter = createTRPCRouter({
           assetId: asset.id,
           prompt: input.prompt,
           durationSec: input.durationSec,
+          /* THE_RECIPIENT_IS_ON_THE_REQUEST — who to tell if this fails ten
+           * minutes from now, by which time nobody is watching the grid. An
+           * id, never an address; see the event schema. */
+          requestedByUserId: ctx.user.id,
         },
         /* Keyed on the asset, which is unique per request: a double-click
          * collapses onto one run, while a genuine second attempt at the same

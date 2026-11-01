@@ -43,7 +43,7 @@ import {
   negotiateProtocolVersion,
   parseJsonRpcRequest,
 } from "./mcp";
-import { MCP_TOOL_NAMES, listMcpTools } from "./mcp-tools";
+import { MCP_TOOL_NAMES, findMcpTool, listMcpTools } from "./mcp-tools";
 
 describe("parsing a JSON-RPC message", () => {
   it("accepts a well-formed request", () => {
@@ -310,5 +310,104 @@ describe("the tool catalogue", () => {
     /* THE_KEY_SUPPLIES_THE_TENANT — a tool argument for it would be a model
      * guessing at tenancy. */
     expect(JSON.stringify(tools)).not.toContain("organizationId");
+  });
+});
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: findMcpTool, validate,
+ *   AN_UNKNOWN_TOOL_IS_A_PROTOCOL_FAILURE,
+ *   A_TOOL_FAILURE_IS_NOT_A_PROTOCOL_FAILURE, THE_PURE_HALF_IS_THE_TESTED_HALF
+ *
+ * WHAT:  The dispatcher's two DB-free decisions: is this a tool we have, and
+ *        are these arguments acceptable.
+ *
+ * WHY:   THE_PURE_HALF_IS_THE_TESTED_HALF. `callMcpTool` reads the database
+ *        through the gates and runs an operation, so it cannot be asserted
+ *        here. What CAN be is everything it decides before touching either —
+ *        and those are the two decisions a client is most likely to provoke: a
+ *        stale tool name, and a model that invented an argument.
+ */
+describe("dispatching a tool call", () => {
+  it("resolves every advertised name", () => {
+    /* The list a client is given and the table a call is resolved against are
+     * the same table, so nothing can be advertised and then not exist. */
+    for (const name of MCP_TOOL_NAMES) {
+      expect(findMcpTool(name), name).not.toBeNull();
+    }
+  });
+
+  it("reports an unknown name rather than throwing", () => {
+    /* AN_UNKNOWN_TOOL_IS_A_PROTOCOL_FAILURE — the route turns this into a
+     * JSON-RPC methodNotFound, which it cannot do if the lookup throws. */
+    expect(findMcpTool("render_video")).toBeNull();
+    expect(findMcpTool("")).toBeNull();
+  });
+
+  it("does not resolve a near miss", () => {
+    /* A tool name is a public contract. A fuzzy match would hide a client's
+     * bug until the day it stopped being hidden. */
+    expect(findMcpTool("Create_Project")).toBeNull();
+    expect(findMcpTool("create_project ")).toBeNull();
+  });
+
+  it("refuses empty arguments on a tool that needs some", () => {
+    const tool = findMcpTool("create_project");
+    expect(tool).not.toBeNull();
+    if (tool === null) return;
+
+    const verdict = tool.validate({});
+    expect(verdict.ok).toBe(false);
+  });
+
+  it("names the field in the refusal, so a model can correct itself", () => {
+    /* THE_FIRST_ISSUE_IS_THE_MESSAGE. A model that is told only "invalid
+     * arguments" retries with the same arguments. */
+    const tool = findMcpTool("create_project");
+    if (tool === null) throw new Error("create_project is missing");
+
+    const verdict = tool.validate({ title: "" });
+    expect(verdict.ok).toBe(false);
+    if (verdict.ok) return;
+    expect(verdict.message).toContain("title");
+  });
+
+  it("accepts arguments that match the advertised schema", () => {
+    const tool = findMcpTool("create_project");
+    if (tool === null) throw new Error("create_project is missing");
+
+    expect(
+      tool.validate({ title: "My video", kind: "voiceover", aspect: "9:16" })
+        .ok,
+    ).toBe(true);
+  });
+
+  it("ignores an invented argument rather than refusing the call", () => {
+    /* Zod strips unknown keys, which is the right posture for a model that
+     * has added a plausible-looking extra field: the call still works and the
+     * field reaches nothing. Asserted so that stripping is a decision rather
+     * than an accident. */
+    const tool = findMcpTool("create_project");
+    if (tool === null) throw new Error("create_project is missing");
+
+    expect(
+      tool.validate({
+        title: "My video",
+        kind: "voiceover",
+        aspect: "9:16",
+        model: "something-else",
+      }).ok,
+    ).toBe(true);
+  });
+
+  it("meters only the tools that consume something", () => {
+    /* A read costs nothing beyond the apiCalls quota every request pays, so a
+     * catalogue tool declaring a metered resource would charge a model for
+     * looking. */
+    expect(findMcpTool("create_project")?.resource).toBe("projects");
+    expect(findMcpTool("start_render")?.resource).toBe("renders");
+    expect(findMcpTool("list_backgrounds")?.resource).toBeUndefined();
+    expect(findMcpTool("list_voices")?.resource).toBeUndefined();
+    expect(findMcpTool("get_render")?.resource).toBeUndefined();
+    expect(findMcpTool("fetch_output")?.resource).toBeUndefined();
   });
 });

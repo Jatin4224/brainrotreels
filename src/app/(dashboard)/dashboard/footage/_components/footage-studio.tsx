@@ -69,11 +69,13 @@ import { useActiveOrganizationId } from "@/hooks/use-active-organization";
 import {
   DEFAULT_FOOTAGE_DURATION,
   FOOTAGE_DURATIONS,
-  generateFootageSchema,
+  footageFormSchema,
   type FootageDuration,
-  type GenerateFootageValues,
+  type FootageFormValues,
 } from "@/lib/types/footage";
 import { trpc } from "@/trpc/react-provider";
+
+import { InsertClipDialog } from "./insert-clip-dialog";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: PROMPT_EXAMPLES, EXAMPLES_TEACH_THE_LIMITS
@@ -97,8 +99,14 @@ export function FootageStudio() {
   const [duration, setDuration] =
     React.useState<FootageDuration>(DEFAULT_FOOTAGE_DURATION);
 
-  const form = useForm<GenerateFootageValues>({
-    resolver: zodResolver(generateFootageSchema),
+  /* The clip whose "Use in project" dialog is open, or null. */
+  const [inserting, setInserting] = React.useState<{
+    id: string;
+    prompt: string;
+  } | null>(null);
+
+  const form = useForm<FootageFormValues>({
+    resolver: zodResolver(footageFormSchema),
     defaultValues: {
       organizationId: organizationId ?? "",
       prompt: "",
@@ -143,9 +151,49 @@ export function FootageStudio() {
     onError: (error) => toast.error(error.message),
   });
 
-  const onSubmit = (values: GenerateFootageValues) => {
+  const onSubmit = (values: FootageFormValues) => {
     if (organizationId === undefined) return;
-    generate.mutate({ ...values, organizationId, durationSec: duration });
+    generate.mutate({
+      ...values,
+      organizationId,
+      durationSec: duration,
+      regenerate: false,
+    });
+  };
+
+  /**
+   * SOURCE OF TRUTH KEYWORDS: regenerateClip, A_SECOND_TAKE_IS_A_SECOND_SPEND,
+   *   THE_PROMPT_GOES_BACK_IN_THE_BOX
+   *
+   * Asks for another take of a clip's prompt, bypassing the cache.
+   *
+   * THE_PROMPT_GOES_BACK_IN_THE_BOX as well as being submitted, so the
+   * customer can see what was sent and edit it for a third attempt without
+   * retyping it. The form is the record of what is being asked.
+   *
+   * A_SECOND_TAKE_IS_A_SECOND_SPEND — this is charged, so the toast says the
+   * price rather than letting the balance change silently.
+   */
+  const regenerateClip = (clip: { prompt: string; durationSec: number | null }) => {
+    if (organizationId === undefined) return;
+
+    /* A clip generated before this release, or one whose probe corrected the
+     * length to something off the closed set, falls back to the current
+     * choice rather than sending a duration the schema would refuse. */
+    const asked = FOOTAGE_DURATIONS.find(
+      (seconds) => seconds === clip.durationSec,
+    );
+    const next = asked ?? duration;
+
+    setDuration(next);
+    form.setValue("prompt", clip.prompt);
+
+    generate.mutate({
+      organizationId,
+      prompt: clip.prompt,
+      durationSec: next,
+      regenerate: true,
+    });
   };
 
   const unavailable = quote.data?.available === false;
@@ -328,12 +376,61 @@ export function FootageStudio() {
                       <Badge variant="outline">failed</Badge>
                     )}
                   </div>
+
+                  {/* The phase's step 6: regenerate, and insert into a
+                      project. Both are offered on a FAILED clip too —
+                      regenerating is the obvious next move after a failure,
+                      and the prompt is right there. A clip still processing
+                      has nothing to act on yet. */}
+                  {clip.status !== "processing" && (
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={
+                          generate.isPending ||
+                          organizationId === undefined ||
+                          unavailable ||
+                          disallowed ||
+                          !affordable
+                        }
+                        onClick={() => regenerateClip(clip)}
+                      >
+                        {cost === null
+                          ? "Regenerate"
+                          : `Regenerate · ${cost} credits`}
+                      </Button>
+
+                      {clip.status === "ready" && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() =>
+                            setInserting({ id: clip.id, prompt: clip.prompt })
+                          }
+                        >
+                          Use in project
+                        </Button>
+                      )}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
           )}
         </CardContent>
       </Card>
+
+      {inserting !== null && organizationId !== undefined && (
+        <InsertClipDialog
+          organizationId={organizationId}
+          assetId={inserting.id}
+          prompt={inserting.prompt}
+          onClose={() => setInserting(null)}
+        />
+      )}
     </div>
   );
 }
