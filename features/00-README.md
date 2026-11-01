@@ -34,6 +34,7 @@ Each phase file has: Goal · Depends on · Deliverables · Steps · Contracts ·
 | 17 | Safety, limits, observability, launch | **Public beta** |
 | 18 | Timeline editor | Manual editing |
 | 19 | Motion graphics studio | Premium format (largest phase) |
+| 19e | Product explainer pack | HUD, sections and 10 product primitives (see `19e-product-explainer-pack.md`) |
 | 20 | AI footage, REST API, MCP | Platform surface |
 
 ## Stack (fixed — do not substitute)

@@ -134,3 +134,9 @@ export interface SceneCheckResult { ok: boolean; errors: SceneError[] }
 ## Not in this phase
 
 Generated animation code, 3D, presenter characters.
+
+**The product explainer pack is Phase 18** (`docs/phases/18-product-explainer.md`) — the persistent
+HUD, the section model, the reserved zones and ten artifact primitives. The old plan had it as a
+fifth commit on this phase; it is its own phase here because this one is already built. It extends
+`TRACK_TYPES`, `SCENE_PRIMITIVES`, `BEAT_INTENTS` and `safeRectFor()`, all additively, so nothing in
+16a–16d needs changing first.

@@ -17,7 +17,7 @@ Phases 07, 10, 13.
 - Style token system
 - Storyboard, beat designer and quality checks
 
-**Work this phase in four commits: 19a layout engine, 19b primitives, 19c styles, 19d AI designer. Each is independently reviewable.**
+**Work this phase in five commits: 19a layout engine, 19b primitives, 19c styles, 19d AI designer, 19e product explainer pack. Each is independently reviewable. 19e is specified separately in `19e-product-explainer-pack.md` — it adds the persistent HUD, the section model and ten product-walkthrough primitives, and in this repository it is built as its own phase, `docs/phases/18-product-explainer.md`.**
 
 ## Steps
 ### 19a — Scene language and layout engine

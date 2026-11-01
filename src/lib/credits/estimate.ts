@@ -74,6 +74,10 @@ export const CREDIT_RATES = {
     tts: 1,
     alignment: 1,
     footage: 0,
+    /* Phase 17d. No flat fee: a clip costs what its LENGTH costs, and a
+     * base charge on top would make a two-second clip disproportionately
+     * expensive for no reason we could explain to a customer. */
+    aiFootage: 0,
   },
   /** Cost per second of output. Zero for kinds that have no duration. */
   perSecond: {
@@ -82,6 +86,24 @@ export const CREDIT_RATES = {
     tts: 0.05,
     alignment: 0.01,
     footage: 0,
+    /**
+     * SOURCE OF TRUTH KEYWORDS: THE_RATE_MUST_EXCEED_THE_COST
+     *
+     * Phase 17d, and the one number in this table an owner has to SET
+     * rather than inherit. Generative video is billed by the provider per
+     * second of output and is the most expensive call in this product by a
+     * wide margin — around two orders of magnitude above a render second.
+     *
+     * 8 credits a second is anchored to that shape rather than to a
+     * contract, because the contract does not exist yet: choosing the model
+     * is the open owner decision this phase was built against.
+     * THE_RATE_MUST_EXCEED_THE_COST is the only property that has to hold —
+     * whatever model is chosen, check its real per-second price against
+     * this before the feature is enabled on a paying plan. A rate below
+     * cost is a feature that loses money on every use and looks like
+     * success in every metric.
+     */
+    aiFootage: 8,
   },
   /** Multiplier applied to a render's per-second rate, by output size. */
   resolutionMultiplier: {
@@ -257,6 +279,7 @@ const LABELS: Readonly<Record<CreditableKind, string>> = {
   tts: "Narration",
   alignment: "Caption timing",
   footage: "Generated footage",
+  aiFootage: "AI video clip",
 };
 
 function formatSeconds(seconds: number): string {

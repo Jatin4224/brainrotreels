@@ -408,6 +408,34 @@ export const OPTIONAL_ENV: readonly OptionalEnvVar[] = [
       },
     ],
   },
+  /* Generated VIDEO. A fourth media row rather than part of the image one,
+   * because it is a different provider, a different price and a different
+   * decision: an operator may well want generated stills and not generated
+   * clips, and the terms that permit one do not necessarily permit the
+   * other. */
+  {
+    id: "video",
+    label: "AI footage",
+    purpose:
+      "Needed before anyone can generate video clips from a prompt. Everything else works without it — the footage screen says the feature is unavailable rather than failing — and no other part of the pipeline depends on it. This is the MOST EXPENSIVE call in the product: each clip SPENDS CREDITS on the customer's ledger and counts against the plan's monthly `aiFootage` allowance, which is zero below the pro plan.",
+    help:
+      "Set VIDEO_API_KEY to a key for the selected provider (VIDEO_PROVIDER, `replicate` by default; VIDEO_MODEL is an optional model override). The variable is named for the CAPABILITY rather than the vendor, as the image one is, because which model ships is an open owner decision: generated video is the most legally exposed thing this product does, and the terms have to be read before it is enabled on a paying plan. " +
+      "Every prompt is classified before the model is called, under the stricter `prompt` standard, and the check FAILS CLOSED — a classifier outage blocks generation rather than letting an unclassified prompt through. Each clip records its prompt and the model version that served it on the asset row, and an identical prompt in the same workspace reuses the existing clip instead of paying twice. " +
+      "Check the model's real per-second price against CREDIT_RATES.perSecond.aiFootage before enabling this — grep THE_RATE_MUST_EXCEED_THE_COST.",
+    icon: "Clapperboard",
+    link: {
+      label: "Replicate API tokens",
+      url: "https://replicate.com/account/api-tokens",
+    },
+    keys: [
+      { key: "VIDEO_API_KEY", label: "API key" },
+      {
+        key: "VIDEO_MODEL",
+        label: "Model override (blank uses the default)",
+        optional: true,
+      },
+    ],
+  },
   /* Cloud rendering. A third media row rather than part of the other two,
    * because it fails at a different point again and the fix is in a different
    * cloud: without R2 nothing can be uploaded, without ffmpeg nothing can be

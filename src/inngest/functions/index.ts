@@ -15,6 +15,7 @@
 
 import { assetIngestFunction } from "./asset-ingest";
 import { costAlertFunction } from "./cost-alert";
+import { footageGenerateFunction } from "./footage-generate";
 import { creditsReconcileFunction } from "./credits-reconcile";
 import { helloFunction } from "./hello";
 import { libraryIngestFunction } from "./library-ingest";
@@ -43,4 +44,5 @@ export const INNGEST_FUNCTIONS = [
   costAlertFunction,
   redditRetentionFunction,
   visualIngestFunction,
+  footageGenerateFunction,
 ];
