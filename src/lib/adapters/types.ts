@@ -253,11 +253,19 @@ export interface TenancyAdapter {
     inviterName: string;
     organizationName: string;
   }): Promise<AdapterInvitationResult>;
-  /** Withdraw a pending invitation. */
+  /**
+   * Withdraw a pending invitation. Resolves `true` when a row was actually
+   * removed and `false` when nothing matched.
+   *
+   * CANCEL_REPORTS_WHETHER_IT_DELETED: the caller releases the plan's member
+   * seat on the strength of this answer. A `void` return made every call look
+   * successful, so repeated cancels of an unknown id drove the seat counter to
+   * zero and bought unlimited invitations on a capped plan.
+   */
   cancelInvitation(params: {
     organizationId: string;
     invitationId: string;
-  }): Promise<void>;
+  }): Promise<boolean>;
   /**
    * Re-issue a pending invitation. Returns the invitation id, which MAY differ
    * from the original: a provider with no resend endpoint has to revoke and

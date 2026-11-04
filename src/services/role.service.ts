@@ -26,6 +26,40 @@ import {
   permissionsToStatement,
   statementToPermissions,
 } from "@/lib/permissions";
+import { isOwnerRoleName, permissionStringSchema } from "@/lib/types";
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: RoleEscalationError, UnknownPermissionError,
+ *   OWNER_IS_NEVER_ASSIGNABLE, PERMISSIONS_ARE_VALIDATED_NOT_TRUSTED
+ *
+ * WHAT:  The two ways an encoded role string can be refused.
+ * WHY:   Thrown from the decode seam rather than returned, because every caller
+ *        reaches it through the membership adapter and a sanitised-but-different
+ *        role is worse than a refusal: the caller would believe it assigned what
+ *        it asked for. Separate classes so the routers can map one to FORBIDDEN
+ *        (an escalation attempt) and the other to BAD_REQUEST (a malformed
+ *        payload) without inspecting a message string.
+ * WHERE: Thrown by processRole; mapped by member.update and invitation.create.
+ */
+export class RoleEscalationError extends Error {
+  readonly requestedRole: string;
+
+  constructor(requestedRole: string) {
+    super("The owner role cannot be assigned.");
+    this.name = "RoleEscalationError";
+    this.requestedRole = requestedRole;
+  }
+}
+
+export class UnknownPermissionError extends Error {
+  readonly unknownPermissions: readonly string[];
+
+  constructor(unknownPermissions: readonly string[]) {
+    super(`Unknown permission: ${unknownPermissions.join(", ")}.`);
+    this.name = "UnknownPermissionError";
+    this.unknownPermissions = unknownPermissions;
+  }
+}
 
 /* Normalizes a display name to a stable role key. */
 function normalizeRoleName(name: string): string {
@@ -74,22 +108,28 @@ export async function processRole(
   organizationId: string,
   role: string,
 ): Promise<string> {
-  if (role === "owner") return "owner";
+  /* OWNER_IS_NEVER_ASSIGNABLE. Checked on the RAW input as well as on every
+   * resolved name below, so neither `"owner"` nor `"Owner |||[…]"` (which
+   * normalizes to it) can reach Member.role. `hasFullAccess` is a role-string
+   * comparison, so one unchecked path here is a bypass of every gate. */
+  if (isOwnerRoleName(role)) throw new RoleEscalationError(role);
 
   /* Named role with embedded permissions: "<name>|||<JSON perms>". */
   if (role.includes("|||") && role.includes("[")) {
     const separatorIndex = role.indexOf("|||");
     const namePart = role.slice(0, separatorIndex);
     const permsPart = role.slice(separatorIndex + 3);
-    const permissions = safeParsePermissions(permsPart);
+    const permissions = parsePermissions(permsPart);
     const roleName = normalizeRoleName(namePart);
+    if (isOwnerRoleName(roleName)) throw new RoleEscalationError(role);
     await ensureRole(db, organizationId, roleName, permissions);
     return roleName;
   }
 
-  /* Bare permission array → per-member custom role. */
+  /* Bare permission array → per-member custom role. `custom-<hash>` can never
+   * collide with an owner name, so only the permissions need checking. */
   if (role.startsWith("[")) {
-    const permissions = safeParsePermissions(role);
+    const permissions = parsePermissions(role);
     const roleName = customRoleName(permissions);
     await ensureRole(db, organizationId, roleName, permissions);
     return roleName;
@@ -99,15 +139,40 @@ export async function processRole(
   return role;
 }
 
-function safeParsePermissions(json: string): string[] {
+/**
+ * SOURCE OF TRUTH KEYWORDS: parsePermissions,
+ *   PERMISSIONS_ARE_VALIDATED_NOT_TRUSTED, permissionStringSchema
+ *
+ * WHAT:  Decodes the JSON permission array carried inside an encoded role and
+ *        REFUSES any entry the registry does not define.
+ * WHY:   PERMISSIONS_ARE_VALIDATED_NOT_TRUSTED. This array arrives inside a
+ *        free-form string, so it never passed `updateMemberSchema`'s
+ *        `permissionStringSchema` validation — the previous version filtered on
+ *        `typeof === "string"` only, which let a caller mint a role carrying any
+ *        permission it could spell, including ones no plan or preset grants.
+ *        Validated against the SAME schema the input surface uses, so there is
+ *        one definition of a legal permission.
+ *
+ *        It throws rather than dropping unknown entries: silently storing a
+ *        smaller permission set would tell the caller it saved what it sent.
+ * WHERE: processRole's two permission-carrying branches.
+ */
+function parsePermissions(json: string): string[] {
+  let parsed: unknown;
   try {
-    const parsed: unknown = JSON.parse(json);
-    if (Array.isArray(parsed))
-      return parsed.filter((p): p is string => typeof p === "string");
+    parsed = JSON.parse(json);
   } catch {
-    /* fall through */
+    return [];
   }
-  return [];
+  if (!Array.isArray(parsed)) return [];
+
+  const candidates = parsed.filter((p): p is string => typeof p === "string");
+  const unknown = candidates.filter(
+    (p) => !permissionStringSchema.safeParse(p).success,
+  );
+  if (unknown.length > 0) throw new UnknownPermissionError(unknown);
+
+  return candidates;
 }
 
 /**

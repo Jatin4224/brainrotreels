@@ -31,12 +31,14 @@ import {
   inviteMemberSchema,
   cancelInvitationSchema,
   resendInvitationSchema,
+  isOwnerRoleName,
 } from "@/lib/types";
 import { z } from "zod";
 import { checkFeatureGate } from "@/lib/feature-gate";
 import { incrementUsage, decrementUsage } from "@/services/usage.service";
 import { ERROR_CODES } from "@/lib/errors";
 import { getAuthAdapter } from "@/lib/adapters";
+import { toRoleTRPCError } from "../role-error";
 
 export const invitationRouter = createTRPCRouter({
   /* Public — the accept page reads invitation details before the user signs
@@ -131,14 +133,27 @@ export const invitationRouter = createTRPCRouter({
       /* The adapter decodes the role, stores the invitation, and sends the
        * email — Better Auth through Resend with an app-hosted accept link; a
        * provider that owns invitations sends its own (hence a null link). */
-      const result = await adapter.tenancy.inviteMember({
-        organizationId: input.organizationId,
-        email,
-        role: input.role,
-        inviterUserId: ctx.user.id,
-        inviterName: ctx.user.name,
-        organizationName: ctx.organization.name,
-      });
+      /* The role is decoded by processRole inside the adapter, which refuses an
+       * owner-role request (OWNER_IS_NEVER_ASSIGNABLE) and any undefined
+       * permission. That refusal matters most HERE: `accept` copies
+       * Invitation.role verbatim into Member.role, so a stored `"owner"` would
+       * become full access the moment the invitee signed up — and
+       * `invitation:create` is in the admin preset. */
+      let result;
+      try {
+        result = await adapter.tenancy.inviteMember({
+          organizationId: input.organizationId,
+          email,
+          role: input.role,
+          inviterUserId: ctx.user.id,
+          inviterName: ctx.user.name,
+          organizationName: ctx.organization.name,
+        });
+      } catch (error) {
+        const mapped = toRoleTRPCError(error);
+        if (mapped) throw mapped;
+        throw error;
+      }
 
       /* Seat accounting stays app-owned under every provider — billing
        * providers offer no numeric quotas beyond their own seat counts. */
@@ -207,13 +222,28 @@ export const invitationRouter = createTRPCRouter({
         return { organizationId, slug: invitation.organization.slug };
       }
 
+      /* OWNER_IS_NEVER_ASSIGNABLE, enforced again at the point of use. `create`
+       * now refuses to STORE an owner role, but this row may predate that fix
+       * (or arrive from a provider that owns invitations), and accepting it
+       * writes Member.role directly — which is what `hasFullAccess` reads. A
+       * stored owner role is downgraded to `member` rather than refused,
+       * because the invitee is not the one who tampered and blocking them would
+       * strand a legitimate signup behind someone else's bad row. */
+      const grantedRole = invitation.role ?? "member";
+      const safeRole = isOwnerRoleName(grantedRole) ? "member" : grantedRole;
+      if (safeRole !== grantedRole) {
+        console.warn(
+          `[invitation.accept] Invitation ${invitation.id} carried role "${grantedRole}"; granting "member" instead.`,
+        );
+      }
+
       await ctx.prisma.$transaction(async (tx) => {
         await tx.member.create({
           data: {
             id: crypto.randomUUID(),
             organizationId,
             userId: ctx.user.id,
-            role: invitation.role ?? "member",
+            role: safeRole,
             createdAt: new Date(),
           },
         });
@@ -229,11 +259,24 @@ export const invitationRouter = createTRPCRouter({
     .input(cancelInvitationSchema)
     .mutation(async ({ ctx, input }) => {
       const adapter = await getAuthAdapter();
-      await adapter.tenancy.cancelInvitation({
+      const cancelled = await adapter.tenancy.cancelInvitation({
         organizationId: input.organizationId,
         invitationId: input.invitationId,
       });
-      /* Release the seat the pending invite was holding. */
+
+      /* CANCEL_REPORTS_WHETHER_IT_DELETED. The seat is released only when a row
+       * really went away. Decrementing unconditionally meant repeated cancels
+       * of an unknown or already-cancelled id walked the `member` counter down
+       * to zero, after which the seat gate on `create` passes forever — an
+       * unlimited-seat bypass on a capped plan. `member.delete` has always
+       * verified the row first; this is the same rule. */
+      if (!cancelled) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "That invitation is no longer pending",
+        });
+      }
+
       await decrementUsage(input.organizationId, "member", 1, ctx.db);
       return { id: input.invitationId };
     }),

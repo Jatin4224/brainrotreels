@@ -155,10 +155,15 @@ async function resendInvitation(params: {
 async function cancelInvitation(params: {
   organizationId: string;
   invitationId: string;
-}): Promise<void> {
-  await prisma.invitation.deleteMany({
+}): Promise<boolean> {
+  /* CANCEL_REPORTS_WHETHER_IT_DELETED. `deleteMany` cannot fail on a missing
+   * row, so the count is the only evidence anything happened — and the caller
+   * spends a member seat on it. Scoped by organizationId, so another
+   * workspace's invitation id reports false rather than being withdrawn. */
+  const result = await prisma.invitation.deleteMany({
     where: { id: params.invitationId, organizationId: params.organizationId },
   });
+  return result.count > 0;
 }
 
 async function updateMemberRole(params: {
