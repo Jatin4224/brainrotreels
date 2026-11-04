@@ -203,6 +203,8 @@ export {
   roleNameSchema,
   permissionStringSchema,
   RESERVED_ROLE_NAMES,
+  OWNER_ROLE_NAMES,
+  isOwnerRoleName,
   VALID_PERMISSION_STRINGS,
 } from "./team";
 export type {

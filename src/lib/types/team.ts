@@ -36,6 +36,33 @@ export const VALID_PERMISSION_STRINGS: readonly string[] = [
 /** Role names the role builder must never create — owner is static. */
 export const RESERVED_ROLE_NAMES: readonly string[] = ["owner"];
 
+/**
+ * SOURCE OF TRUTH KEYWORDS: OWNER_ROLE_NAMES, isOwnerRoleName,
+ *   OWNER_IS_NEVER_ASSIGNABLE, role escalation, hasFullAccess
+ *
+ * WHAT:  Every role name that confers organization ownership, and the predicate
+ *        that recognises one.
+ * WHY:   `hasFullAccess` is `role === "owner"`, which short-circuits EVERY
+ *        permission gate in the procedure factory — so "is this an owner role"
+ *        is a security decision, and a second copy of the list is a second
+ *        answer. It lived in two places before (the member router's local
+ *        `OWNER_ROLES` and the membership adapter's), which is exactly how the
+ *        role decoder came to accept `"owner"` from untrusted input.
+ *
+ *        OWNER_IS_NEVER_ASSIGNABLE: ownership is granted only where an
+ *        organization is created (organization.service, portal.service write
+ *        `role: "owner"` directly). Nothing reachable from a request may assign
+ *        it, so `processRole` refuses it rather than this list gating on a
+ *        caller's permissions.
+ * WHERE: processRole (role.service) refuses these; the member router uses them
+ *        to protect an owner's row from edit and removal.
+ */
+export const OWNER_ROLE_NAMES: readonly string[] = ["owner", "client-owner"];
+
+export function isOwnerRoleName(role: string): boolean {
+  return OWNER_ROLE_NAMES.includes(role.trim().toLowerCase());
+}
+
 export const permissionStringSchema = z
   .string()
   .refine((value) => VALID_PERMISSION_SET.has(value), "Unknown permission.");
@@ -72,6 +99,13 @@ export const inviteMemberSchema = z.object({
   role: encodedRoleSchema,
 });
 
+/* THE_ENCODED_ROLE_IS_AUTHORITATIVE. The member sheet sends the selected
+ * permissions twice: once inside `role` (the encoding processRole decodes) and
+ * once here. The server reads them from `role`, so this field is accepted for
+ * the sheet's convenience and is NOT the thing that gets stored — which is why
+ * processRole validates the decoded array against `permissionStringSchema`
+ * itself (PERMISSIONS_ARE_VALIDATED_NOT_TRUSTED) rather than relying on this
+ * line. Validating here and trusting the string was the gap. */
 export const updateMemberSchema = z.object({
   organizationId: organizationIdSchema,
   memberId: z.string().min(1),

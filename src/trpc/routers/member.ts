@@ -27,11 +27,18 @@ import { z } from "zod";
 import { createTRPCRouter } from "../init";
 import { protectedProcedure } from "../procedures";
 import { permissions } from "@/lib/permissions";
-import { updateMemberSchema, removeMemberSchema } from "@/lib/types";
+import {
+  updateMemberSchema,
+  removeMemberSchema,
+  OWNER_ROLE_NAMES,
+} from "@/lib/types";
 import { roleDisplayName, getRolePermissionMap } from "@/services/role.service";
 import { getAuthAdapter } from "@/lib/adapters";
+import { toRoleTRPCError } from "../role-error";
 
-const OWNER_ROLES = ["owner", "client-owner"];
+/* OWNER_ROLE_NAMES is the one definition (lib/types/team) — this router used to
+ * keep its own copy, and the decoder kept a third that happened to disagree. */
+const OWNER_ROLES = OWNER_ROLE_NAMES;
 
 export const memberRouter = createTRPCRouter({
   /* Members + pending invitations as one list; each carries isPending, the
@@ -105,11 +112,22 @@ export const memberRouter = createTRPCRouter({
         });
       }
 
-      await adapter.tenancy.updateMemberRole({
-        organizationId: input.organizationId,
-        memberId: member.id,
-        role: input.role,
-      });
+      /* The adapter decodes the encoded role through processRole, which refuses
+       * an owner-role request (OWNER_IS_NEVER_ASSIGNABLE) and any permission the
+       * registry does not define. The guard above only protects the TARGET's
+       * current role — it says nothing about what `input.role` asks for, which
+       * is why the refusal has to come from the decoder and be mapped here. */
+      try {
+        await adapter.tenancy.updateMemberRole({
+          organizationId: input.organizationId,
+          memberId: member.id,
+          role: input.role,
+        });
+      } catch (error) {
+        const mapped = toRoleTRPCError(error);
+        if (mapped) throw mapped;
+        throw error;
+      }
       return { id: member.id };
     }),
 
