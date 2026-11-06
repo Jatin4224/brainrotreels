@@ -51,6 +51,7 @@ import "server-only";
 
 import {
   getRenderProgress,
+  cancelRenderOnLambda,
   renderMediaOnLambda,
   renderStillOnLambda,
 } from "@remotion/lambda-client";
@@ -154,6 +155,23 @@ export const lambdaRenderAdapter: RenderAdapter = {
          * this URL for its whole life, which is what makes deploying a new
          * site safe while one is in flight — see VERSIONED_SITE_URL. */
         serveUrl: config.serveUrl,
+        /**
+         * SOURCE OF TRUTH KEYWORDS: forceBucketName, ONE_BUCKET_FOR_ALL_THREE
+         *
+         * The bucket the output lands in, stated rather than discovered. Left
+         * unset, the SDK resolves a `remotionlambda-*` bucket in the region on
+         * its own — while `getProgress` below is told `config.bucketName`, and
+         * `config.serveUrl` is BUILT from that same env value. Two of the three
+         * came from configuration and one did not.
+         *
+         * If they ever disagreed — a typo, a second bucket in the region, a
+         * bucket recreated after a redeploy — the render would succeed against
+         * the discovered bucket while the TIMEOUT-RECOVERY path, the one place
+         * that decides whether to throw away a finished and fully paid render,
+         * queried the configured one and found nothing. The row would be
+         * written `timedOut` for a video that exists.
+         */
+        forceBucketName: config.bucketName,
         composition: TIMELINE_COMPOSITION_ID,
         /* The composition's whole input. `watermark` is in here rather than in
          * the document because it is an entitlement, not a property of the
@@ -256,6 +274,37 @@ export const lambdaRenderAdapter: RenderAdapter = {
   },
 
   /**
+   * SOURCE OF TRUTH KEYWORDS: cancel, cancelRenderOnLambda,
+   *   A_TIMEOUT_MUST_STOP_THE_WORK
+   *
+   * Swallows its own failures, and that is the point rather than laziness.
+   * The only caller is the timeout path, which has already refunded the
+   * customer and written the row; a provider that refuses the cancellation —
+   * because the render just finished, or because the id is unknown to it —
+   * must not turn a settled timeout into a thrown step. The wasted compute is
+   * logged so it is attributable, and that is the whole remedy available here.
+   */
+  async cancel(providerRenderId: string): Promise<void> {
+    const config = lambdaRenderConfig();
+
+    try {
+      await cancelRenderOnLambda({
+        renderId: providerRenderId,
+        /* ONE_BUCKET_FOR_ALL_THREE — the same configured value `start` forces
+         * and `getProgress` reads, so a cancellation cannot miss a render
+         * because it looked in a bucket the render was never in. */
+        bucketName: config.bucketName,
+        region: toAwsRegion(config.region),
+      });
+    } catch (error) {
+      console.error(
+        `[render/lambda] Could not cancel provider render ${providerRenderId}; it may keep running and billing:`,
+        error,
+      );
+    }
+  },
+
+  /**
    * SOURCE OF TRUTH KEYWORDS: renderStill, renderStillOnLambda,
    *   A_STILL_IS_NOT_A_RENDER, STILLS_ARE_DELETED, PNG_FOR_JUDGING_TEXT
    *
@@ -296,6 +345,11 @@ export const lambdaRenderAdapter: RenderAdapter = {
         region: toAwsRegion(config.region),
         functionName: config.functionName,
         serveUrl: config.serveUrl,
+        /* ONE_BUCKET_FOR_ALL_THREE, as in `start` above. A still is read back
+         * from the returned URL immediately, so a mismatch here is a failed
+         * vision pass rather than a discarded render — but one call stating
+         * the bucket and its neighbour discovering it is how the two drift. */
+        forceBucketName: config.bucketName,
         composition: TIMELINE_COMPOSITION_ID,
         inputProps: {
           doc,

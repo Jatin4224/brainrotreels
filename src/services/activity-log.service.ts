@@ -20,7 +20,7 @@
 
 import "server-only";
 import { z } from "zod";
-import { prisma, type DbClient } from "@/lib/config";
+import { prisma, type DbClient } from "@/lib/config/prisma";
 import type { Prisma } from "@/generated/prisma";
 import type { ResourceKey } from "@/lib/resources";
 

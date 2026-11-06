@@ -54,9 +54,13 @@
 
 import "server-only";
 
-import type { Prisma } from "@/generated/prisma";
+/* A value import, not `import type`: `isUniqueViolation` needs
+ * `Prisma.PrismaClientKnownRequestError` at RUNTIME to narrow P2002, and the
+ * same namespace carries the types used below. */
+import { Prisma } from "@/generated/prisma";
 import { prisma, type DbClient } from "@/lib/config/prisma";
 import { settlementRows } from "@/lib/credits/settlement";
+import { allowancePeriodRef } from "@/lib/credits/allowance";
 import {
   SIGN_BY_KIND,
   type CreditLedgerKind,
@@ -146,6 +150,13 @@ async function appendLedgerRow(
     amount: number;
     refId?: string | null;
     holdId?: string | null;
+    /**
+     * The uniquely-indexed once-only key, for the rows that have such a rule:
+     * a purchase's payment intent, a welcome grant, a monthly allowance. Null
+     * on holds, commits and releases, whose once-only rule is
+     * `@@unique([holdId, kind])` instead.
+     */
+    idempotencyKey?: string | null;
     metadata?: Prisma.InputJsonValue | undefined;
   },
 ): Promise<CreditLedgerRow> {
@@ -159,6 +170,7 @@ async function appendLedgerRow(
       delta,
       ...(args.refId != null ? { refId: args.refId } : {}),
       ...(args.holdId != null ? { holdId: args.holdId } : {}),
+      ...(args.idempotencyKey != null ? { idempotencyKey: args.idempotencyKey } : {}),
       ...(args.metadata !== undefined ? { metadata: args.metadata } : {}),
     },
     select: LEDGER_LIST_SELECT,
@@ -353,17 +365,42 @@ export async function commit(
    * the work cost MORE than was held, which is charged in full rather than
    * silently absorbed.
    */
-  for (const row of settlementRows(held, actual)) {
-    await appendLedgerRow(db, {
-      organizationId: holdRow.organizationId,
-      kind: row.kind,
-      amount: row.amount,
-      refId: holdRow.refId,
-      holdId,
-      /* Only the commit carries the caller's metadata — it is the row that
-       * describes the work; the release is bookkeeping. */
-      ...(row.kind === "commit" && metadata !== undefined ? { metadata } : {}),
-    });
+  /**
+   * SOURCE OF TRUTH KEYWORDS: THE_DATABASE_IS_THE_GUARANTEE,
+   *   DOUBLE_COMMIT_REFUSED, THE_RELEASE_GOES_FIRST, P2002
+   *
+   * `isSettled` above is a fast path; `@@unique([holdId, kind])` is the
+   * guarantee. The scenario the phase names — a timeout racing a late success
+   * — IS two concurrent calls, and two reads that both see "unsettled" is
+   * exactly what the constraint exists to catch.
+   *
+   * Safe to let the exception land mid-loop ONLY because of
+   * THE_RELEASE_GOES_FIRST in src/lib/credits/settlement.ts: a hold that has
+   * been settled already has a release row, so the collision happens on the
+   * FIRST insert and nothing has been written. Reversing that order would
+   * leave a commit with no release against it, which overcharges. If the order
+   * ever changes, this loop needs a transaction instead.
+   */
+  try {
+    for (const row of settlementRows(held, actual)) {
+      await appendLedgerRow(db, {
+        organizationId: holdRow.organizationId,
+        kind: row.kind,
+        amount: row.amount,
+        refId: holdRow.refId,
+        holdId,
+        /* Only the commit carries the caller's metadata — it is the row that
+         * describes the work; the release is bookkeeping. */
+        ...(row.kind === "commit" && metadata !== undefined
+          ? { metadata }
+          : {}),
+      });
+    }
+  } catch (error) {
+    /* Another settlement won the race. `false` is the same answer the
+     * `isSettled` fast path gives, so every caller already handles it. */
+    if (isUniqueViolation(error)) return false;
+    throw error;
   }
 
   return true;
@@ -410,14 +447,22 @@ export async function release(
   const held = Math.abs(holdRow.delta);
   if (held === 0) return true;
 
-  await appendLedgerRow(db, {
-    organizationId: holdRow.organizationId,
-    kind: "release",
-    amount: held,
-    refId: holdRow.refId,
-    holdId,
-    ...(metadata !== undefined ? { metadata } : {}),
-  });
+  /* THE_DATABASE_IS_THE_GUARANTEE, as in `commit`. One row, so there is no
+   * partial-write window here at all — the constraint either admits it or
+   * refuses it. */
+  try {
+    await appendLedgerRow(db, {
+      organizationId: holdRow.organizationId,
+      kind: "release",
+      amount: held,
+      refId: holdRow.refId,
+      holdId,
+      ...(metadata !== undefined ? { metadata } : {}),
+    });
+  } catch (error) {
+    if (isUniqueViolation(error)) return false;
+    throw error;
+  }
 
   return true;
 }
@@ -432,6 +477,66 @@ export async function release(
  *        produces. Checking only for a commit would allow exactly that.
  * WHERE: commit and release, before they write anything.
  */
+/**
+ * SOURCE OF TRUTH KEYWORDS: organizationsAwaitingAllowance,
+ *   allowancePeriodRef, AN_ALLOWANCE_IS_GRANTED_ONCE_PER_PERIOD
+ *
+ * WHAT:  The organizations that have not yet been granted this period's
+ *        allowance.
+ *
+ * WHY:   The allowance workflow runs HOURLY (the same reasoning as
+ *        `usageResetFunction`: a monthly cron has exactly one chance to fire,
+ *        and an outage at that hour costs every customer a month). So the
+ *        twenty-three runs after the first must find nothing to do, cheaply,
+ *        without asking once per workspace.
+ *
+ *        That is what the SHARED `refId` is for: every allowance grant in one
+ *        month carries `allowance:<YYYY-MM>`, so "not yet granted" is one
+ *        indexed `none:` filter rather than a per-row lookup. The per-workspace
+ *        uniqueness is the idempotency key, which is what actually prevents a
+ *        double grant when two runs overlap — this query is only what keeps
+ *        the common case free.
+ * WHERE: The `credits.allowance` workflow.
+ */
+export async function organizationsAwaitingAllowance(
+  db: DbClient,
+  periodStart: Date,
+  limit: number,
+): Promise<{ id: string }[]> {
+  return db.organization.findMany({
+    where: {
+      creditLedger: {
+        none: { kind: "grant", refId: allowancePeriodRef(periodStart) },
+      },
+    },
+    select: { id: true },
+    /* Oldest first, so a workspace cannot be starved by newer ones when the
+     * batch is smaller than the number of workspaces. */
+    orderBy: { createdAt: "asc" },
+    take: limit,
+  });
+}
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: isUniqueViolation, P2002,
+ *   THE_DATABASE_IS_THE_GUARANTEE
+ *
+ * WHAT:  Whether an error is Postgres refusing a duplicate through a unique
+ *        index, surfaced by Prisma as P2002.
+ * WHY:   Every idempotency rule in this file is enforced by a constraint and
+ *        reported as this one code, so the three callers need the same test —
+ *        and matching on a message string is how that test comes to pass for
+ *        the wrong error. Narrowed by `code` on Prisma's own error class
+ *        rather than by a cast, so an unrelated failure still propagates.
+ * WHERE: `purchase`, `commit`, `release`.
+ */
+function isUniqueViolation(error: unknown): boolean {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === "P2002"
+  );
+}
+
 async function isSettled(db: DbClient, holdId: string): Promise<boolean> {
   const existing = await db.creditLedger.findFirst({
     where: { holdId, kind: { in: ["commit", "release"] } },
@@ -458,14 +563,37 @@ export async function grant(
   amount: number,
   reason: string,
   refId?: string,
-): Promise<CreditLedgerRow> {
-  return appendLedgerRow(db, {
-    organizationId,
-    kind: "grant",
-    amount,
-    ...(refId !== undefined ? { refId } : {}),
-    metadata: { reason },
-  });
+  /**
+   * SOURCE OF TRUTH KEYWORDS: GRANT_IS_IDEMPOTENT_WHEN_KEYED,
+   *   THE_DATABASE_IS_THE_GUARANTEE
+   *
+   * Pass one whenever the grant must happen exactly once — a welcome balance,
+   * a monthly allowance — and the unique index refuses the second attempt.
+   * This is not optional rigour for the recurring case: the allowance cron
+   * fires HOURLY, so without a key it would hand out a month's credits every
+   * hour, and two overlapping runs would do it even with a filter.
+   *
+   * Omit it for a genuine one-off, such as a support gesture from the portal,
+   * where granting twice is a decision somebody made twice.
+   */
+  idempotencyKey?: string,
+): Promise<CreditLedgerRow | null> {
+  try {
+    return await appendLedgerRow(db, {
+      organizationId,
+      kind: "grant",
+      amount,
+      ...(refId !== undefined ? { refId } : {}),
+      ...(idempotencyKey !== undefined ? { idempotencyKey } : {}),
+      metadata: { reason },
+    });
+  } catch (error) {
+    /* Already granted. `null` rather than a throw, so a caller that re-runs —
+     * the cron, a retried workspace creation — treats it as the no-op it is.
+     * Matches `purchase`, which answers the same way for the same reason. */
+    if (isUniqueViolation(error)) return null;
+    throw error;
+  }
 }
 
 /**
@@ -496,19 +624,44 @@ export async function purchase(
     packKey: CreditPackKey;
   },
 ): Promise<CreditLedgerRow | null> {
+  /* A FAST PATH, not the guarantee — see THE_DATABASE_IS_THE_GUARANTEE below.
+   * It saves an exception in the common replay, where the row is already
+   * committed and visible. */
   const existing = await db.creditLedger.findFirst({
-    where: { refId: args.paymentIntentId, kind: "purchase" },
+    where: { idempotencyKey: args.paymentIntentId },
     select: { id: true },
   });
   if (existing !== null) return null;
 
-  return appendLedgerRow(db, {
-    organizationId: args.organizationId,
-    kind: "purchase",
-    amount: args.amount,
-    refId: args.paymentIntentId,
-    metadata: { packKey: args.packKey },
-  });
+  /**
+   * SOURCE OF TRUTH KEYWORDS: THE_DATABASE_IS_THE_GUARANTEE,
+   *   REPLAY_SAFE_TOP_UP, idempotencyKey, P2002
+   *
+   * The read above cannot be the protection, and this is the one function
+   * where that matters most. `credits.purchase` writes inside the PROCEDURE's
+   * transaction; the Stripe `payment_intent.succeeded` webhook calls this on
+   * its own connection. Neither sees the other's uncommitted row, so both
+   * read "none" and both insert — and the pack is granted TWICE for one
+   * payment, which is money out with nothing to attribute it to.
+   *
+   * `idempotencyKey` is uniquely indexed, so the second insert is refused by
+   * Postgres rather than by a read that raced. Catching P2002 and returning
+   * `null` keeps this function's contract exactly as it was: null means "this
+   * payment was already granted", whichever path got there first.
+   */
+  try {
+    return await appendLedgerRow(db, {
+      organizationId: args.organizationId,
+      kind: "purchase",
+      amount: args.amount,
+      refId: args.paymentIntentId,
+      idempotencyKey: args.paymentIntentId,
+      metadata: { packKey: args.packKey },
+    });
+  } catch (error) {
+    if (isUniqueViolation(error)) return null;
+    throw error;
+  }
 }
 
 /**

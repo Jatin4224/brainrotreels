@@ -17,7 +17,7 @@
 import "server-only";
 
 import { cache } from "react";
-import { prisma } from "@/lib/config";
+import { prisma } from "@/lib/config/prisma";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: getUserMemberships

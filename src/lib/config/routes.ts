@@ -15,8 +15,9 @@
  *        ROUTES.dashboard. Feature pages keep their own path on the RESOURCES
  *        entry's `nav.href`, not here.
  * WHERE: Imported by src/app/(dashboard)/layout.tsx, the onboarding flow, the
- *        root page, and the ONBOARDING_INCOMPLETE handler in
- *        src/trpc/react-provider.tsx.
+ *        auth surface's post-success default (AuthScreen / AuthForm — see
+ *        POST_AUTH_TARGET_IS_THE_DASHBOARD), and the ONBOARDING_INCOMPLETE
+ *        handler in src/trpc/react-provider.tsx.
  */
 
 export const ROUTES = {

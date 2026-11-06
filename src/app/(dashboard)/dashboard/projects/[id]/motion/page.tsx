@@ -40,6 +40,7 @@
 import type { Metadata } from "next";
 
 import { ContentLayout } from "@/components/global/page-header";
+import { ProjectSteps } from "@/components/global/project-steps";
 import { BeatStrip } from "./_components/beat-strip";
 import { MotionGallery } from "./_components/motion-gallery";
 
@@ -56,6 +57,7 @@ export default async function ProjectMotionPage({
 
   return (
     <ContentLayout title="Motion" width="lg">
+      <ProjectSteps projectId={id} />
       <div className="flex flex-col gap-8">
         <BeatStrip projectId={id} />
         <MotionGallery />

@@ -32,13 +32,9 @@ import {
   upgradeSubscriptionSchema,
   paymentMethodIdSchema,
 } from "@/lib/types";
-import {
-  getStripeClient,
-  isStripeConfigured,
-  getPlanPriceId,
-  PLANS,
-  type PlanKey,
-} from "@/lib/config";
+import { getPlanPriceId, PLANS, type PlanKey } from "@/lib/config";
+/* THE_BARREL_IS_CLIENT_SAFE — see src/lib/config/index.ts. */
+import { getStripeClient, isStripeConfigured } from "@/lib/config/stripe";
 import { getDowngradeBlockers, getOrganizationTier } from "@/lib/feature-gate";
 import {
   ensureStripeCustomer,

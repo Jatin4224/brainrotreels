@@ -23,6 +23,7 @@
 import type { Metadata } from "next";
 
 import { ContentLayout } from "@/components/global/page-header";
+import { ProjectSteps } from "@/components/global/project-steps";
 import { ScriptEditor } from "./_components/script-editor";
 
 export const metadata: Metadata = {
@@ -38,6 +39,7 @@ export default async function ProjectScriptPage({
 
   return (
     <ContentLayout title="Script">
+      <ProjectSteps projectId={id} />
       <ScriptEditor projectId={id} />
     </ContentLayout>
   );

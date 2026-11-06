@@ -81,6 +81,13 @@ export interface RedditInputPanelProps {
   projectId: string;
   hasExistingScript: boolean;
   generating: boolean;
+  /**
+   * THE_SOURCE_SURVIVES_CREATE — the thread URL pasted on the create sheet,
+   * stored on `Project.sourceRef`. Prefills the URL field so nobody is asked
+   * for it twice. A default, not a binding: `reddit.start` overwrites
+   * `sourceRef` with whatever is actually submitted.
+   */
+  sourceRef: string | null;
   /** From `projects.get` — null until the project has a retention date. */
   retention: {
     expiresAt: string;
@@ -101,11 +108,14 @@ export function RedditInputPanel({
   hasExistingScript,
   generating,
   retention,
+  sourceRef,
 }: RedditInputPanelProps) {
   const utils = trpc.useUtils();
 
   const [mode, setMode] = React.useState<"url" | "text">("url");
-  const [url, setUrl] = React.useState("");
+  /* THE_SOURCE_SURVIVES_CREATE — see the prop's note. Initial state only, so
+   * editing it behaves exactly as it did before. */
+  const [url, setUrl] = React.useState(sourceRef?.trim() ?? "");
   const [text, setText] = React.useState("");
   const [condense, setCondense] = React.useState(true);
   const [confirming, setConfirming] = React.useState(false);

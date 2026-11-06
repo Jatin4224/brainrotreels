@@ -11,10 +11,19 @@
  * WHY:   Billing fails soft when unconfigured (callers check isStripeConfigured
  *        and surface a clean error) so the rest of the app runs locally without
  *        Stripe — mirrors the rate-limit / email fail-open posture.
+ *        `server-only` because this module reads STRIPE_SECRET_KEY. The client
+ *        is lazy, so nothing secret is evaluated at import — but a secret key
+ *        that is merely REACHABLE from a client bundle is one accidental eager
+ *        call away from being in it, and the guard costs nothing. The
+ *        publishable key has its own home in src/lib/stripe/* for exactly this
+ *        reason. Deliberately not in the config barrel, which is client-safe.
  * WHERE: Consumed by src/services/stripe.service.ts,
  *        src/services/payment.service.ts, the billing router, and the webhook
- *        route. Client-side keys live in src/lib/stripe/*.
+ *        route, each importing `@/lib/config/stripe` directly. Client-side keys
+ *        live in src/lib/stripe/*.
  */
+
+import "server-only";
 
 import Stripe from "stripe";
 

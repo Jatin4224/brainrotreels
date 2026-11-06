@@ -35,6 +35,7 @@
 import type { Metadata } from "next";
 
 import { ContentLayout } from "@/components/global/page-header";
+import { ProjectSteps } from "@/components/global/project-steps";
 import { TimelineEditor } from "./_components/timeline-editor";
 
 export const metadata: Metadata = {
@@ -50,6 +51,7 @@ export default async function ProjectEditPage({
 
   return (
     <ContentLayout title="Edit timeline" width="full">
+      <ProjectSteps projectId={id} />
       <TimelineEditor projectId={id} />
     </ContentLayout>
   );

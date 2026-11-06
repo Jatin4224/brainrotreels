@@ -36,8 +36,10 @@ import {
   ROUTES,
   PORTAL_PATH,
   isPortalOwnerEmail,
-  prisma,
 } from "@/lib/config";
+/* THE_BARREL_IS_CLIENT_SAFE — the singleton comes from its own server-only
+ * leaf, never the barrel. See src/lib/config/index.ts. */
+import { prisma } from "@/lib/config/prisma";
 import {
   ensurePersonalWorkspace,
   workspaceNameFor,

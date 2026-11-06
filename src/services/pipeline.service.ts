@@ -694,9 +694,22 @@ export async function generatorContextFor(
       projectId,
       words: readWords(projectId, alignment?.words),
       /* A line is only usable with both an asset and a measured duration —
-       * READY_LINES_ONLY, as in listAlignableLines. */
+       * READY_LINES_ONLY, as in listAlignableLines.
+       *
+       * A_ZERO_DURATION_IS_UNMEASURED. `<= 0` and not just `null`, and the two
+       * must stay in step with the `qa` stage's own count
+       * (`OR: [{ durationSec: null }, { durationSec: { lte: 0 } }]` in
+       * project-generate). That stage tells the customer "N recorded lines had
+       * no measurable audio and were left out" — and a zero-length line reached
+       * `layNarration` as an AudioItem with `duration: 0`, which the timeline
+       * validator rejects with BAD_DURATION. The run then died at
+       * `build-timeline` with "The video could not be assembled from these
+       * pieces", AFTER the narration had been paid for. Excluding it here is
+       * what makes the promise true. */
       lines: lines.flatMap((line) =>
-        line.audioAssetId === null || line.durationSec === null
+        line.audioAssetId === null ||
+        line.durationSec === null ||
+        line.durationSec <= 0
           ? []
           : [
               {

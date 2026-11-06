@@ -123,6 +123,33 @@ export async function createRenderOperation(
     );
   }
 
+  /**
+   * SOURCE OF TRUTH KEYWORDS: AN_EMPTY_TIMELINE_IS_REFUSED_HERE,
+   *   planComposition, preflightFactsSchema
+   *
+   * A document with no items — or whose every item is zero-length — has a
+   * length of 0, and nothing upstream rejects it: `timelineDocSchema` puts no
+   * `.min(1)` on `tracks` or `items`, and `validate`'s checks are all about
+   * items that DO exist. Deleting every clip in the Phase 15 editor produces
+   * exactly this.
+   *
+   * It was caught eventually, by `preflightFactsSchema` requiring a positive
+   * `durationInSeconds` — but that parse happens inside the workflow and
+   * OUTSIDE any `step.run`, so it threw a raw ZodError, burned both retries,
+   * and reached the customer as "Rendering this video did not finish. Please
+   * try again." Retrying an empty timeline produces the same nothing.
+   *
+   * Refused here instead, where the panel renders the message inline and no
+   * credits have moved. `precondition` rather than `unprocessable` because it
+   * is an instruction: add something to the timeline and this works.
+   */
+  if (planComposition(validated.doc).durationInSeconds <= 0) {
+    throw new OperationError(
+      "precondition",
+      "This timeline is empty — there is nothing to render yet.",
+    );
+  }
+
   /* WATERMARK_RESOLVED_ONCE — see the file header. */
   const watermarkFree = await checkBooleanFeature(
     ctx.organizationId,

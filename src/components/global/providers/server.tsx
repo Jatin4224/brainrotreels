@@ -31,6 +31,7 @@ import type * as React from "react";
 import type { Route } from "next";
 
 import type { AuthFormMode } from "@/lib/types";
+import { ROUTES } from "@/lib/config/routes";
 
 import {
   ActiveAuthBoundary,
@@ -78,6 +79,9 @@ export function UserMenu() {
  *        explicit undefined incompatible with an optional prop. Typed `Route`
  *        (TYPED_ROUTE_GUARANTEE) so a post-auth destination that does not exist
  *        fails at compile time instead of landing the user on a 404.
+ *        The default is ROUTES.dashboard, NOT "/": `/` is the public landing
+ *        page (HOME_IS_PUBLIC), so it is a sales page to a visitor and the
+ *        wrong room for somebody who has just signed in.
  * WHERE: Consumed by the (auth) route pages.
  */
 export interface AuthScreenProps {
@@ -86,7 +90,10 @@ export interface AuthScreenProps {
 }
 
 /** Sign-in / sign-up surface. */
-export function AuthScreen({ mode, callbackURL = "/" }: AuthScreenProps) {
+export function AuthScreen({
+  mode,
+  callbackURL = ROUTES.dashboard,
+}: AuthScreenProps) {
   return <ActiveAuthScreen mode={mode} callbackURL={callbackURL} />;
 }
 

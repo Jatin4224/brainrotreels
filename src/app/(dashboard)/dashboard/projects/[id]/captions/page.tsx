@@ -24,6 +24,7 @@
 import type { Metadata } from "next";
 
 import { ContentLayout } from "@/components/global/page-header";
+import { ProjectSteps } from "@/components/global/project-steps";
 import { CaptionStudio } from "./_components/caption-studio";
 
 export const metadata: Metadata = {
@@ -39,6 +40,7 @@ export default async function ProjectCaptionsPage({
 
   return (
     <ContentLayout title="Captions">
+      <ProjectSteps projectId={id} />
       <CaptionStudio projectId={id} />
     </ContentLayout>
   );

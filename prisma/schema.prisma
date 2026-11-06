@@ -748,6 +748,44 @@ model Render {
 /// the validated union lives in src/lib/types/credits.ts.
 ///
 /// SOURCE OF TRUTH KEYWORD: CreditLedger
+/// THE_DATABASE_IS_THE_GUARANTEE. Two invariants this table used to assert in
+/// comments and implement as a read followed by a write, in separate
+/// transactions, with nothing stopping the race in between:
+///
+///   REPLAY_SAFE_TOP_UP — one payment grants credits once. `credits.purchase`
+///   writes its row inside the PROCEDURE's transaction while the Stripe
+///   `payment_intent.succeeded` webhook calls `purchaseCredits` on its own
+///   connection. Neither can see the other's uncommitted row, so both read
+///   "no existing row" and both insert, and the customer is granted the pack
+///   twice for one payment. The `StripeEvent` primary key does not help: these
+///   are two different code paths, not two deliveries of one event.
+///
+///   DOUBLE_COMMIT_REFUSED — one hold settles once. `commit` and `release`
+///   both gate on an `isSettled` read, and the scenario the comment names — a
+///   timeout racing a late success — IS two concurrent calls. A hold that gets
+///   both refunds a render the customer received.
+///
+/// Both are now constraints, so the check and the guarantee are the same
+/// operation and the reads above them are only a fast path.
+///
+/// `idempotencyKey` rather than `@@unique([refId, kind])`, which looks like the
+/// obvious form and is wrong: a hold's `refId` is `tts:<projectId>`, and
+/// re-running a project legitimately takes a SECOND hold under that same ref,
+/// so that constraint would refuse every re-run. Postgres treats NULLs in a
+/// unique index as distinct — so a nullable unique column is a partial unique
+/// index that Prisma can actually express, with no raw SQL for `migrate dev` to
+/// later diff away.
+///
+/// One column serves every "this must happen once" rule, because the keys are
+/// namespaced and cannot collide: a Stripe payment intent (`pi_...`), a
+/// workspace's welcome grant (`signup:<orgId>`), and a plan's monthly
+/// allowance (`allowance:<YYYY-MM>:<orgId>`). Rows with no such rule — holds,
+/// commits, releases — leave it null.
+///
+/// `kind` is String, not a Prisma enum — this schema has zero enum blocks and
+/// the validated union lives in src/lib/types/credits.ts.
+///
+/// SOURCE OF TRUTH KEYWORD: CreditLedger
 model CreditLedger {
   id             String   @id @default(cuid())
   organizationId String
@@ -755,11 +793,16 @@ model CreditLedger {
   kind           String // purchase | grant | hold | commit | release
   refId          String? // renderId, jobId, stripe payment intent
   holdId         String? // links commit/release back to its hold
+  /// The once-only key for rows that must not be written twice — null on every
+  /// row without such a rule, which is what makes the unique index partial.
+  /// See the note above for the namespaces.
+  idempotencyKey String?  @unique
   metadata       Json?
   createdAt      DateTime @default(now())
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
+  @@unique([holdId, kind])
   @@index([organizationId])
   @@index([organizationId, createdAt])
   @@index([holdId])

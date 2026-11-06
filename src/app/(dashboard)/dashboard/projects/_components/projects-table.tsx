@@ -22,6 +22,7 @@
  * WHERE: Rendered by /dashboard/projects.
  */
 
+import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
 import type { inferRouterOutputs } from "@trpc/server";
 
@@ -71,9 +72,21 @@ const columns: readonly DataTableColumn<ProjectRow>[] = [
   {
     id: "title",
     header: "Project",
+    /* THE_TITLE_IS_THE_WAY_IN. Plain text before this, with an inert row
+     * behind it (DataTable's row click only toggles an expansion, and this
+     * table passes no `expandable`) — so the ONLY way into a project was the
+     * `⋯` menu. A titled row that does nothing when clicked reads as broken,
+     * and it made the pipeline feel like a dropdown rather than a flow. Points
+     * at `script`, the first step: a project with nothing in it yet has
+     * nothing to preview. */
     cell: (project) => (
       <div className="min-w-0">
-        <p className="truncate text-sm font-medium">{project.title}</p>
+        <Link
+          href={`/dashboard/projects/${project.id}/script`}
+          className="block truncate text-sm font-medium hover:underline"
+        >
+          {project.title}
+        </Link>
         <p className="truncate text-xs text-muted-foreground">
           {kindLabel(project.kind)}
           {project.parentId !== null ? " · copy" : ""}

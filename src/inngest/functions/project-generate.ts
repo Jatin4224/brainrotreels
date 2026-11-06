@@ -318,6 +318,19 @@ const visualsPlanSchema = z.object({
   onBackdrop: z.number().int().min(0),
 });
 
+/* STEP_RESULTS_ARE_JSON — both of these cross a step boundary and come back as
+ * JSON on a replay, so they are parsed rather than trusted, like every other
+ * step result in this file. `funded` is the one field the ingest loop branches
+ * on, which is exactly why it is not read off an unvalidated object. */
+const visualsHoldSchema = z.object({
+  held: z.number().min(0),
+  funded: z.boolean(),
+});
+
+const visualsDowngradeSchema = z.object({
+  blockIds: z.array(z.string().min(1)),
+});
+
 function visualsRef(projectId: string): string {
   return `visuals:${projectId}`;
 }
@@ -1309,8 +1322,13 @@ export const projectGenerateFunction = inngestClient.createFunction(
 
         const planned = visualsPlanSchema.parse(rawPlanned);
 
+        /* THE_INGEST_LOOP_ONLY_RUNS_WHAT_WAS_PAID_FOR. Reassigned by the
+         * downgrade step below when the images could not be funded — see there
+         * for why skipping the loop outright would be wrong. */
+        let blockIdsToIngest = planned.blockIds;
+
         if (planned.imagesPlanned > 0) {
-          await step.run("visuals-hold", async () => {
+          const rawHold = await step.run("visuals-hold", async () => {
             /* ONE_REF_PER_PROJECT, as every other sub-pipeline does: an
              * existing open hold means this step already ran and the run is
              * replaying, so it must not reserve twice. */
@@ -1318,7 +1336,8 @@ export const projectGenerateFunction = inngestClient.createFunction(
               prisma,
               visualsRef(projectId),
             );
-            if (existing !== null) return { held: Math.abs(existing.delta) };
+            if (existing !== null)
+              return { held: Math.abs(existing.delta), funded: true };
 
             const cost = estimateVisualsCost({
               aiImages: planned.imagesPlanned,
@@ -1335,20 +1354,103 @@ export const projectGenerateFunction = inngestClient.createFunction(
                   images: planned.imagesPlanned,
                 },
               );
-              return { held: cost.total };
+              return { held: cost.total, funded: true };
             } catch (error) {
               if (error instanceof InsufficientCreditsError) {
                 /* The balance moved between the budget read and here. Not a
                  * failure: the images are abandoned and the blocks fall back,
-                 * which is a plainer video rather than no video. */
+                 * which is a plainer video rather than no video. `funded:
+                 * false` is what makes that true — the downgrade step below
+                 * does the abandoning. */
                 console.warn(
                   `[project.generate] ${projectId}: not enough credits for ${planned.imagesPlanned} image(s); falling back.`,
                 );
-                return { held: 0 };
+                return { held: 0, funded: false };
               }
               throw error;
             }
           });
+
+          /**
+           * SOURCE OF TRUTH KEYWORDS: visuals-downgrade,
+           *   THE_INGEST_LOOP_ONLY_RUNS_WHAT_WAS_PAID_FOR,
+           *   IMAGES_ARE_ABANDONED_NOT_JUST_UNHELD, SETTLE_ON_WHAT_WAS_PRODUCED
+           *
+           * WHAT:  Turns every still-pending GENERATED block into a backdrop
+           *        block when the hold could not be taken.
+           *
+           * WHY:   The hold step said "the images are abandoned and the blocks
+           *        fall back" and nothing abandoned them. The ingest loop below
+           *        ran for every planned block regardless, `visual-ingest`
+           *        performs no credit check of its own, and `visuals-settle`
+           *        found no open hold and committed nothing — so the images
+           *        were generated, the provider billed us, and nobody was
+           *        charged. `incrementUsage("aiImages", …)` still fired, which
+           *        is how it would have shown up as success in the metrics.
+           *
+           *        The loop cannot simply be SKIPPED: `blockIds` is every
+           *        pending block, and the stock ones cost nothing and still
+           *        need ingesting. So the generated ones are rewritten to the
+           *        same `{ source: "background" }, status: "ready"` shape
+           *        `planProjectVisuals` produces when no provider is
+           *        configured — already `ready`, so they leave the loop by
+           *        being finished rather than by being special-cased.
+           *
+           *        Written to the project rather than held in memory, because
+           *        CHOICE_IS_RE_READ_NOT_REPLAYED: the generator reads the
+           *        stored choice, and a block left saying `generated` with no
+           *        asset would reach it as a block whose picture never arrived.
+           * WHERE: Only when `visuals-hold` reports `funded: false`.
+           */
+          const holdOutcome = visualsHoldSchema.parse(rawHold);
+
+          if (!holdOutcome.funded) {
+            const rawDowngrade = await step.run(
+              "visuals-downgrade",
+              async () => {
+                const stored = await readBlockVisuals(
+                  prisma,
+                  organizationId,
+                  projectId,
+                );
+                if (stored === null) return { blockIds: [] };
+
+                /* `ai_image` is the only source that costs money to fetch —
+                 * stock and upload blocks are free and keep their ingest. */
+                const blocks = stored.blocks.map((block) =>
+                  block.status === "pending" &&
+                  block.choice.source === "ai_image"
+                    ? {
+                        blockId: block.blockId,
+                        choice: { source: "background" as const },
+                        status: "ready" as const,
+                      }
+                    : block,
+                );
+
+                const written = await writeBlockVisuals(
+                  prisma,
+                  organizationId,
+                  projectId,
+                  { blocks, imagesGenerated: stored.imagesGenerated },
+                );
+                if (!written) {
+                  throw new NonRetriableError(
+                    `[project.generate] ${projectId} is no longer available.`,
+                  );
+                }
+
+                return {
+                  blockIds: blocks
+                    .filter((block) => block.status === "pending")
+                    .map((block) => block.blockId),
+                };
+              },
+            );
+
+            blockIdsToIngest =
+              visualsDowngradeSchema.parse(rawDowngrade).blockIds;
+          }
         }
 
         /* One run per block, each invoked so this stage WAITS for the asset to
@@ -1357,7 +1459,7 @@ export const projectGenerateFunction = inngestClient.createFunction(
          * rather than parallel: the ingests are serialised at one per workspace
          * anyway, and a `Promise.all` of step.invokes would make a single
          * block's permanent failure unwind the others' results. */
-        for (const blockId of planned.blockIds) {
+        for (const blockId of blockIdsToIngest) {
           try {
             await step.invoke(`visual-${blockId}`, {
               function: visualIngestFunction,

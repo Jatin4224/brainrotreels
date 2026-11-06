@@ -11,9 +11,26 @@
  * WHY:   Without the global cache, Next.js dev hot-reloads create a new client
  *        on every change and the connection pool blows up; in production a
  *        fresh instance is created exactly once at module init.
- * WHERE: Re-exported from src/lib/config/index.ts and used by auth.ts,
- *        every service, and the tRPC context.
+ *        THE_CLIENT_IS_NEVER_BUNDLED. `server-only` is what enforces that, and
+ *        it is load-bearing rather than decorative: the singleton is
+ *        constructed at MODULE SCOPE, so merely importing this file is enough
+ *        to pull the generated client in. It used to be re-exported from
+ *        `src/lib/config/index.ts`, which nineteen client components import for
+ *        `ROUTES`, `BRANDING` and `PLANS` — and the result was 291 KB of
+ *        generated Prisma, `PrismaClientKnownRequestError` and
+ *        `globalThis.__prisma ?? new PrismaClient` in the browser bundle of
+ *        every page. Nothing broke, because the browser build's constructor is
+ *        a Proxy that only throws on property access, so it was pure dead
+ *        weight on first paint with no symptom to notice.
+ *
+ *        With this import, a client component reaching for the database is a
+ *        BUILD error naming the file, which is the only version of this rule
+ *        that cannot quietly regress.
+ * WHERE: Imported directly as `@/lib/config/prisma` by auth.ts, every service
+ *        and the tRPC context. Deliberately NOT in the config barrel.
  */
+
+import "server-only";
 
 import { PrismaClient, type Prisma } from "@/generated/prisma";
 

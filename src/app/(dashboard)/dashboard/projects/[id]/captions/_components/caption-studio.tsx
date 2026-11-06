@@ -80,6 +80,17 @@ import { Switch } from "@/components/ui/switch";
 /** Two seconds, matching every other polled surface in this app. */
 const ALIGNING_POLL_MS = 2000;
 
+/**
+ * SOURCE OF TRUTH KEYWORDS: ALIGN_DEADLINE_MS, A_WAIT_MUST_HAVE_A_DEADLINE
+ *
+ * How long the screen waits for a requested alignment before calling it
+ * stalled. Generous on purpose: alignment is a provider round trip per line,
+ * so a long narration legitimately takes minutes, and a deadline that fires
+ * early would report a working run as broken. It exists to bound a wait that
+ * had no bound at all, not to predict one.
+ */
+const ALIGN_DEADLINE_MS = 10 * 60 * 1000;
+
 const FAMILY_ALL = "all";
 
 export function CaptionStudio({ projectId }: { projectId: string }) {
@@ -154,6 +165,10 @@ export function CaptionStudio({ projectId }: { projectId: string }) {
         upToDate={state.data?.upToDate === true}
         canAlign={canAlign}
         aligning={isAligning(alignRequestedAt, state.data?.alignment ?? null)}
+        stalled={alignHasStalled(
+          alignRequestedAt,
+          state.data?.alignment ?? null,
+        )}
         onAligning={() => setAlignRequestedAt(Date.now())}
       />
 
@@ -212,6 +227,7 @@ function AlignmentPanel({
   upToDate,
   canAlign,
   aligning,
+  stalled,
   onAligning,
 }: {
   organizationId: string;
@@ -226,6 +242,8 @@ function AlignmentPanel({
   upToDate: boolean;
   canAlign: boolean;
   aligning: boolean;
+  /** A_WAIT_MUST_HAVE_A_DEADLINE — the run never reported back. */
+  stalled: boolean;
   onAligning: () => void;
 }) {
   const align = trpc.captions.align.useMutation({
@@ -294,6 +312,22 @@ function AlignmentPanel({
               The timing service could not read the narration, so the words
               are spread evenly across it. The video still renders — try
               timing it again, and the captions will land on the words.
+            </AlertDescription>
+          </Alert>
+        ) : null}
+
+        {/* A_WAIT_MUST_HAVE_A_DEADLINE. The workflow has permanent failure
+            paths that never write an alignment row, so the absence of one is
+            the only signal this screen gets. Said plainly rather than letting
+            the button quietly re-enable, which would read as the click having
+            done nothing. */}
+        {stalled ? (
+          <Alert variant="destructive">
+            <AlertTitle>Timing did not finish</AlertTitle>
+            <AlertDescription>
+              The captions were not timed and the job stopped reporting back.
+              Try again — if it keeps happening, re-record the narration first,
+              since a withdrawn voice is the usual cause.
             </AlertDescription>
           </Alert>
         ) : null}
@@ -665,8 +699,48 @@ function wordsPerChunkOptions(): number[] {
 function isAligning(
   requestedAt: number | null,
   alignment: { updatedAt: Date } | null,
+  now: number = Date.now(),
 ): boolean {
   if (requestedAt === null) return false;
+  /* A_WAIT_MUST_HAVE_A_DEADLINE — see alignHasStalled. */
+  if (now - requestedAt > ALIGN_DEADLINE_MS) return false;
   if (alignment === null) return true;
   return new Date(alignment.updatedAt).getTime() <= requestedAt;
+}
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: alignHasStalled, A_WAIT_MUST_HAVE_A_DEADLINE,
+ *   isAligning, ALIGN_DEADLINE_MS
+ *
+ * WHAT:  Whether a requested alignment stopped reporting without ever landing.
+ *
+ * WHY:   A_WAIT_MUST_HAVE_A_DEADLINE. `isAligning` returned true for as long
+ *        as `alignment` was null, and the align workflow has three permanent
+ *        failure paths that throw BEFORE writing any alignment row — a voice
+ *        withdrawn mid-run, a narration that is no longer alignable, a
+ *        provider refusal. On any of them no row ever appears, so the button
+ *        stayed disabled on "Timing…" and the screen polled every two seconds
+ *        for the rest of the tab's life, showing no error at all.
+ *
+ *        The deadline is what ends that, and this predicate is what makes the
+ *        ending legible: without it the button would simply re-enable and the
+ *        customer would be left to guess whether anything had happened. The
+ *        workflow's own failure is recorded on its pipeline stage — a later
+ *        change could surface that directly, which would be better than a
+ *        clock — but a clock is what makes the screen honest today.
+ * WHERE: CaptionStudio, beside the poll.
+ */
+function alignHasStalled(
+  requestedAt: number | null,
+  alignment: { updatedAt: Date } | null,
+  now: number = Date.now(),
+): boolean {
+  if (requestedAt === null) return false;
+  if (now - requestedAt <= ALIGN_DEADLINE_MS) return false;
+  /* An alignment that landed after the deadline is a slow success, not a
+   * stall — only the absence of one is worth reporting. */
+  return (
+    alignment === null ||
+    new Date(alignment.updatedAt).getTime() <= requestedAt
+  );
 }

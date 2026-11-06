@@ -88,6 +88,27 @@ import { RedditInputPanel } from "./reddit-input-panel";
 /** Two seconds, matching the media table — live enough, not a request storm. */
 const GENERATING_POLL_MS = 2000;
 
+/**
+ * SOURCE OF TRUTH KEYWORDS: looksLikeUrl, THE_SOURCE_SURVIVES_CREATE
+ *
+ * WHAT:  Whether a stored `sourceRef` should prefill the form as a URL.
+ * WHY:   Only ever used to pick the DEFAULT tab — the real check is
+ *        `urlSourceArm`'s `.url()` at the resolver and the SSRF guard on the
+ *        server, so being wrong here costs a customer one click on the toggle
+ *        rather than a bad request. Deliberately `URL`-constructor based rather
+ *        than a regex, and restricted to http(s) so a `mailto:` or a bare
+ *        `data:` is treated as text.
+ * WHERE: GenerateScriptForm's defaultValues.
+ */
+function looksLikeUrl(value: string): boolean {
+  try {
+    const parsed = new URL(value.trim());
+    return parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
 const SECTION_LABEL: Readonly<Record<SectionType, string>> = {
   hook: "Hook",
   body: "Body",
@@ -102,9 +123,33 @@ export function ScriptEditor({ projectId }: { projectId: string }) {
   const canWrite = hasPermission(permissions.SCRIPTS_UPDATE);
   const canGenerate = hasPermission(permissions.SCRIPTS_CREATE);
 
+  /**
+   * SOURCE OF TRUTH KEYWORDS: POLL_WHILE_GENERATING,
+   *   A_POLL_MUST_HAVE_A_STOPPING_CONDITION, GENERATING_POLL_MS
+   *
+   * The project's own status drives the script poll below, so it has to stay
+   * fresh — but by the QUERY's interval, not a hand-rolled one.
+   *
+   * This used to be a `setInterval` in an effect whose dependency was
+   * `[project]`: the whole query-result object, whose identity changes on
+   * every re-render. The sibling `scripts.list` poll fires at exactly this
+   * same cadence and each of its fetches re-renders this component, so the
+   * timer was torn down and recreated just as it came due — and could be
+   * starved indefinitely. When the status never refreshed, the script poll
+   * (which reads it) never stopped either: the card sat on "Writing your
+   * script…" and the finished script never appeared.
+   *
+   * TanStack owns the timer now, so there is nothing to starve, and the
+   * predicate gives it the same stopping condition it always claimed to have.
+   */
   const project = trpc.projects.get.useQuery(
     { organizationId: organizationId ?? "", id: projectId },
-    { enabled, retry: false },
+    {
+      enabled,
+      retry: false,
+      refetchInterval: (query) =>
+        query.state.data?.status === "generating" ? GENERATING_POLL_MS : false,
+    },
   );
 
   const script = trpc.scripts.list.useQuery(
@@ -122,16 +167,24 @@ export function ScriptEditor({ projectId }: { projectId: string }) {
     },
   );
 
-  /* The project query has to poll too, or the status that drives the poll
-   * above never updates and the editor stays blank after a generation. */
-  React.useEffect(() => {
-    if (project.data?.status !== "generating") return;
-    const timer = setInterval(() => void project.refetch(), GENERATING_POLL_MS);
-    return () => clearInterval(timer);
-  }, [project]);
-
   if (!enabled || project.isPending) {
     return <Skeleton className="h-96 w-full rounded-xl" />;
+  }
+
+  /* AN_UNREADABLE_PROJECT_IS_NOT_AN_EMPTY_ONE. Gating only on `isPending` with
+   * `retry: false` meant a deleted, forbidden or mistyped id fell straight
+   * through: `project.data` was undefined, so `project.data?.kind` was too, and
+   * the screen rendered the generic "Write a script" form over the "No script
+   * yet" card — a normal-looking empty project. Submitting it then failed in a
+   * toast, which is the first the customer heard of it. Same shape
+   * ProjectPreview already uses. */
+  if (project.error !== null) {
+    return (
+      <Alert variant="destructive">
+        <AlertTitle>This project could not be opened</AlertTitle>
+        <AlertDescription>{project.error.message}</AlertDescription>
+      </Alert>
+    );
   }
 
   const generating = project.data?.status === "generating";
@@ -153,6 +206,9 @@ export function ScriptEditor({ projectId }: { projectId: string }) {
             hasExistingScript={blocks.length > 0}
             generating={generating}
             retention={project.data.reddit ?? null}
+            /* THE_SOURCE_SURVIVES_CREATE — the thread URL from the create
+               sheet, so it is not asked for twice. */
+            sourceRef={project.data.sourceRef ?? null}
           />
         ) : project.data?.kind === "quiz" ? (
           /* THE_INPUT_IS_PER_FORMAT — a quiz is started from a topic or a
@@ -164,6 +220,9 @@ export function ScriptEditor({ projectId }: { projectId: string }) {
             projectId={projectId}
             hasExistingScript={blocks.length > 0}
             generating={generating}
+            /* THE_SOURCE_SURVIVES_CREATE — the quiz topic from the create
+               sheet, so it is not asked for twice. */
+            sourceRef={project.data?.sourceRef ?? null}
           />
         ) : (
           <GenerateScriptForm
@@ -171,6 +230,8 @@ export function ScriptEditor({ projectId }: { projectId: string }) {
             projectId={projectId}
             hasExistingScript={blocks.length > 0}
             generating={generating}
+            /* THE_SOURCE_SURVIVES_CREATE — see the form's defaultValues. */
+            sourceRef={project.data?.sourceRef ?? null}
           />
         )
       ) : null}
@@ -234,11 +295,14 @@ function GenerateScriptForm({
   projectId,
   hasExistingScript,
   generating,
+  sourceRef,
 }: {
   organizationId: string;
   projectId: string;
   hasExistingScript: boolean;
   generating: boolean;
+  /** What the customer typed on the create sheet, if anything. */
+  sourceRef: string | null;
 }) {
   const utils = trpc.useUtils();
   const [confirming, setConfirming] = React.useState(false);
@@ -246,10 +310,26 @@ function GenerateScriptForm({
   const form = useForm<GenerateScriptValues>({
     resolver: zodResolver(generateScriptSchema),
     mode: "onTouched",
+    /**
+     * THE_SOURCE_SURVIVES_CREATE. The create sheet asks for a topic or an
+     * article URL per format and stores it on `Project.sourceRef` — and until
+     * now nothing in the UI ever read it back, so the first thing this screen
+     * did was ask for the same thing again with an empty box. The value was
+     * there the whole time; only `reddit.start` and `quizzes.start` were using
+     * it.
+     *
+     * The kind is inferred rather than asked for, because the create sheet's
+     * own field accepts either ("Topic or article URL") and the customer has
+     * already made that choice by what they typed. `url` would reject a bare
+     * topic at the resolver, so a non-URL falls back to `text`.
+     */
     defaultValues: {
       organizationId,
       projectId,
-      source: { kind: "text", value: "" },
+      source:
+        sourceRef !== null && sourceRef.trim().length > 0
+          ? { kind: looksLikeUrl(sourceRef) ? "url" : "text", value: sourceRef.trim() }
+          : { kind: "text", value: "" },
       tone: "casual",
       targetSeconds: 30,
     },

@@ -21,6 +21,11 @@ import "server-only";
 
 import { nanoid } from "nanoid";
 import type { DbClient } from "@/lib/config/prisma";
+import {
+  signupGrantFor,
+  signupIdempotencyKey,
+} from "@/lib/credits/allowance";
+import { grant } from "@/services/credits.service";
 
 export interface CreateOrganizationResult {
   organizationId: string;
@@ -98,6 +103,38 @@ export async function createOrganizationWithOwner(
       createdAt: now,
     },
   });
+
+  /**
+   * SOURCE OF TRUTH KEYWORDS: THE_WELCOME_GRANT, signupGrantFor,
+   *   signupIdempotencyKey, grant
+   *
+   * The workspace's opening balance, in the SAME transaction as the rows
+   * above. Before this, `grant` had no callers at all and the only way credits
+   * could reach a workspace was a real Stripe payment — so a new workspace
+   * started on zero and failed at the first pipeline stage, because `script`
+   * and `tts` each cost a base of 1 credit. The product could not be tried.
+   *
+   * A brand-new organization has no subscription, so it is on `free` by
+   * definition; resolving a tier here would ask a question whose answer is
+   * already known. When it later upgrades, the monthly allowance takes over.
+   *
+   * Keyed, so a retried creation cannot grant twice
+   * (GRANT_IS_IDEMPOTENT_WHEN_KEYED). The `null` return that signals "already
+   * granted" is ignored on purpose: it means the balance is already there,
+   * which is the outcome this line wants either way.
+   *
+   * Inside the transaction rather than after it, so a workspace can never
+   * exist without its balance — the alternative is an account that looks
+   * created and cannot generate anything.
+   */
+  await grant(
+    db,
+    organizationId,
+    signupGrantFor("free"),
+    "Welcome credits",
+    undefined,
+    signupIdempotencyKey(organizationId),
+  );
 
   return { organizationId, slug };
 }

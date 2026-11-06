@@ -24,6 +24,7 @@
  */
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2Icon } from "lucide-react";
@@ -32,7 +33,7 @@ import { toast } from "sonner";
 import { trpc } from "@/trpc/react-provider";
 import {
   ASPECT_RATIOS,
-  PROJECT_KINDS,
+  CREATABLE_PROJECT_KINDS,
   createProjectSchema,
   type CreateProjectValues,
   type ProjectKind,
@@ -113,6 +114,7 @@ export function CreateProjectSheetContent({
   organizationId: string;
   onClose: () => void;
 }) {
+  const router = useRouter();
   const utils = trpc.useUtils();
   const create = trpc.projects.create.useMutation();
   const [error, setError] = React.useState<string | null>(null);
@@ -157,6 +159,12 @@ export function CreateProjectSheetContent({
       await utils.usage.invalidate();
       toast.success(`"${project.title}" created`);
       onClose();
+      /* CREATE_LANDS_ON_THE_FIRST_STEP. The sheet used to close onto the list,
+       * leaving the customer to find the row they had just named and open its
+       * `⋯` menu to begin — which is also where the walkthrough reads as a
+       * dropdown rather than a flow. `script` is the first step because every
+       * later one depends on it. */
+      router.push(`/dashboard/projects/${project.id}/script`);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Could not create this project.",
@@ -218,8 +226,12 @@ export function CreateProjectSheetContent({
                       </SelectValue>
                     </SelectTrigger>
                   </FormControl>
+                  {/* A_FORMAT_NEEDS_A_WRITER — CREATABLE_PROJECT_KINDS, not
+                      PROJECT_KINDS. The full tuple includes `motion`, which has
+                      no script writer, so starting one took the credit hold and
+                      then failed at the `script` stage. */}
                   <SelectContent>
-                    {PROJECT_KINDS.map((option) => (
+                    {CREATABLE_PROJECT_KINDS.map((option) => (
                       <SelectItem key={option} value={option}>
                         {PROJECT_KIND_LABEL[option]}
                       </SelectItem>

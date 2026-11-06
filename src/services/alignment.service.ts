@@ -220,10 +220,16 @@ export async function listAlignableLines(
   let skipped = 0;
 
   for (const row of rows) {
+    /* A_ZERO_DURATION_IS_UNMEASURED, the same rule `generatorContextFor`
+     * applies. `<= 0` and not just `null`: a zero-length line is exactly the
+     * "run of zero-length words" this function's header says it exists to keep
+     * out of the document, and a duration of 0 is a measurement that failed
+     * rather than a line that is genuinely silent. */
     if (
       row.status !== "ready" ||
       row.audioAssetId === null ||
-      row.durationSec === null
+      row.durationSec === null ||
+      row.durationSec <= 0
     ) {
       skipped += 1;
       continue;
