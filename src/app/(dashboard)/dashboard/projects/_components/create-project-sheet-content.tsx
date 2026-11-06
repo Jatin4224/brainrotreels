@@ -32,7 +32,7 @@ import { toast } from "sonner";
 import { trpc } from "@/trpc/react-provider";
 import {
   ASPECT_RATIOS,
-  PROJECT_KINDS,
+  CREATABLE_PROJECT_KINDS,
   createProjectSchema,
   type CreateProjectValues,
   type ProjectKind,
@@ -218,8 +218,12 @@ export function CreateProjectSheetContent({
                       </SelectValue>
                     </SelectTrigger>
                   </FormControl>
+                  {/* A_FORMAT_NEEDS_A_WRITER — CREATABLE_PROJECT_KINDS, not
+                      PROJECT_KINDS. The full tuple includes `motion`, which has
+                      no script writer, so starting one took the credit hold and
+                      then failed at the `script` stage. */}
                   <SelectContent>
-                    {PROJECT_KINDS.map((option) => (
+                    {CREATABLE_PROJECT_KINDS.map((option) => (
                       <SelectItem key={option} value={option}>
                         {PROJECT_KIND_LABEL[option]}
                       </SelectItem>

@@ -220,6 +220,7 @@ export const scriptGenerateFunction = inngestClient.createFunction(
       }
       await failAndRelease(
         parsed.data.data.event.data.projectId,
+        parsed.data.data.event.data.organizationId,
         "Writing this script did not finish. Please try again.",
       );
     },
@@ -263,6 +264,7 @@ export const scriptGenerateFunction = inngestClient.createFunction(
       if (!parsed.success) {
         await failAndRelease(
           projectId,
+          organizationId,
           "The source text for this script could not be read. Please generate it again.",
         );
         throw new NonRetriableError(
@@ -283,7 +285,7 @@ export const scriptGenerateFunction = inngestClient.createFunction(
       const kind = projectKindSchema.safeParse(project.kind);
       if (!kind.success || !hasScriptWriter(kind.data)) {
         const reason = `${project.kind} scripts cannot be written yet.`;
-        await failAndRelease(projectId, reason);
+        await failAndRelease(projectId, organizationId, reason);
         throw new NonRetriableError(
           `[script.generate] ${projectId}: no writer for kind "${project.kind}".`,
         );
@@ -344,6 +346,7 @@ export const scriptGenerateFunction = inngestClient.createFunction(
            * in between — which a concurrent generation does routinely. */
           await failAndRelease(
             projectId,
+            organizationId,
             `This script needs ${error.required} credits and this workspace has ${error.available}. Top up and try again.`,
           );
           throw new NonRetriableError(
@@ -397,7 +400,7 @@ export const scriptGenerateFunction = inngestClient.createFunction(
           /* The kind was checked before the hold, so reaching here means a
            * writer withdrawn between that check and this call — a deploy mid
            * run. Permanent: it will not reappear on the second attempt. */
-          await failAndRelease(projectId, error.message);
+          await failAndRelease(projectId, organizationId, error.message);
           throw new NonRetriableError(error.message);
         }
         if (error instanceof LlmError) {
@@ -405,7 +408,7 @@ export const scriptGenerateFunction = inngestClient.createFunction(
           if (error.permanent) {
             /* A refusal, a malformed prompt, or output that failed the schema
              * twice. The adapter has already retried where retrying helps. */
-            await failAndRelease(projectId, error.message);
+            await failAndRelease(projectId, organizationId, error.message);
             throw new NonRetriableError(error.message);
           }
           /* Transient — thrown plainly so Inngest retries with backoff. The
@@ -485,15 +488,44 @@ export const scriptGenerateFunction = inngestClient.createFunction(
           }
         }
 
+        /**
+         * SOURCE OF TRUTH KEYWORDS: A_CHILD_DOES_NOT_FINISH_THE_PARENT,
+         *   script status write, project.generate, projects.cancel
+         *
+         * `ready` means "there is a finished video to look at", and that is
+         * true when this workflow runs ON ITS OWN (scripts.generate from the
+         * Script screen). It is NOT true when this workflow is the `script`
+         * stage of `project.generate`, which invokes it as a child and owns the
+         * project's status from `seed-stages` to `finalize`.
+         *
+         * Writing it unconditionally broke two things for the whole remainder
+         * of a pipeline run — TTS, align, visuals, QA and timeline, the longest
+         * and dearest part:
+         *   - `projects.cancel` returns `{cancelled: false}` for any status but
+         *     `generating`, so Cancel became a no-op and the child holds were
+         *     never released.
+         *   - `projects.generate` only short-circuits on `generating`, so a
+         *     second click started a SECOND concurrent pipeline on the same
+         *     project, racing the first on `replaceNarrationLines` (which
+         *     deletes first) and on the same hold refs.
+         *
+         * `status: { not: "generating" }` is the whole fix: the standalone run
+         * still reports `ready`, and the parent's run is left alone. The guard
+         * belongs here rather than in a flag the caller passes, because the
+         * status it must not clobber is already in the row.
+         *
+         * The model's title is deliberately NOT applied. `title` is required at
+         * create (projectTitleSchema), so there is no placeholder to improve on
+         * — only a name the customer chose, and overwriting that is worse than
+         * leaving a script-derived title unused.
+         */
         await tx.project.updateMany({
-          where: { id: projectId, organizationId },
-          data: {
-            status: "ready",
-            /* The model's title is a better name than "Untitled project", and
-             * this is the first moment one exists. It does not overwrite a
-             * title the customer chose — only the default. */
-            ...(draft.title.length > 0 ? {} : {}),
+          where: {
+            id: projectId,
+            organizationId,
+            status: { not: "generating" },
           },
+          data: { status: "ready" },
         });
 
         /* CHARGE_WHAT_IT_COST — re-estimated rather than reusing the held
@@ -584,10 +616,17 @@ function scriptRef(projectId: string): string {
  */
 async function failAndRelease(
   projectId: string,
+  organizationId: string,
   message: string,
 ): Promise<void> {
+  /* RECHECK_OWNERSHIP_IN_THE_WORKFLOW. Scoped by organizationId like every
+   * other project write in this pipeline — this was the one path that keyed on
+   * the id alone. The id comes off an event payload, and a workflow is not a
+   * request, so the scope is the only thing asserting that the row being failed
+   * belongs to the workspace the run was started for. `organizationId` was
+   * always on the event; it simply was not passed in. */
   await prisma.project.updateMany({
-    where: { id: projectId },
+    where: { id: projectId, organizationId },
     data: { status: "failed" },
   });
 

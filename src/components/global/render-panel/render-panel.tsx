@@ -206,14 +206,21 @@ export function RenderPanel({ projectId }: { projectId: string }) {
     },
   });
 
-  if (!enabled || plan === null)
-    return <Skeleton className="h-56 w-full rounded-xl" />;
-
   /* COST_ON_THE_BUTTON. The price comes from the SERVER, through the same
    * estimator the refusal and the hold use — a cost computed here would be a
    * second implementation of pricing, and the button would promise one number
    * while the handler charged another. Re-queried per resolution because that
-   * is exactly what changes it. */
+   * is exactly what changes it.
+   *
+   * EVERY_HOOK_BEFORE_THE_FIRST_RETURN. This sat BELOW the `plan === null`
+   * skeleton, so the render that resolved the plan called one more hook than
+   * the render before it and React threw "Rendered more hooks than during the
+   * previous render" — blanking the Export card, which is the only download
+   * path in the app. The dashboard layout usually prefetches the feature gates,
+   * which is why it hid: it only fires when that cache is cold (a direct load
+   * of the editor's export tab, an org switch, a hydration mismatch). The query
+   * already guards itself through `enabled`, so hoisting it changes no
+   * behaviour beyond keeping the hook order fixed. */
   const estimateQuery = trpc.renders.estimate.useQuery(
     {
       organizationId: organizationId ?? "",
@@ -222,6 +229,9 @@ export function RenderPanel({ projectId }: { projectId: string }) {
     },
     { enabled: enabled && resolution !== null, retry: false },
   );
+
+  if (!enabled || plan === null)
+    return <Skeleton className="h-56 w-full rounded-xl" />;
 
   const cost = estimateQuery.data?.cost ?? null;
   const affordable = estimateQuery.data?.affordable ?? true;

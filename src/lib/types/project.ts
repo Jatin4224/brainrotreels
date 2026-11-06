@@ -54,6 +54,37 @@ export const projectKindSchema = z.enum(PROJECT_KINDS);
 export type ProjectKind = z.infer<typeof projectKindSchema>;
 
 /**
+ * SOURCE OF TRUTH KEYWORDS: CREATABLE_PROJECT_KINDS, A_FORMAT_NEEDS_A_WRITER,
+ *   PROJECT_KINDS, SCRIPT_WRITERS, create-project form
+ *
+ * WHAT:  The formats a customer may START today — PROJECT_KINDS minus the ones
+ *        with no script writer behind them.
+ *
+ * WHY:   A_FORMAT_NEEDS_A_WRITER. `PROJECT_KINDS` is the set of kinds the
+ *        SYSTEM understands (a column value, a document `kind`, a generator
+ *        registry key); it is not the set a customer can pick. `motion` is the
+ *        difference: it has a generator and a studio, but `SCRIPT_WRITERS` has
+ *        no entry for it and `motionGenerator.skips` does not skip `script`, so
+ *        the `script` stage refuses the kind and the run fails — AFTER the
+ *        estimate was shown and the hold taken. Offering it in the create form
+ *        sold a format that cannot finish.
+ *
+ *        Deliberately a plain tuple here rather than `Object.keys(SCRIPT_WRITERS)`
+ *        at the callsite: the writer registry imports the LLM adapter, so a
+ *        client component reading it would pull the provider SDK into the
+ *        browser bundle. `project-kinds.test.ts` asserts this list against the
+ *        registry instead, so the two cannot drift without a red test.
+ *
+ *        Add a kind here in the same change that gives it a writer.
+ * WHERE: The create-project form's format select.
+ */
+export const CREATABLE_PROJECT_KINDS = [
+  "reddit-story",
+  "voiceover",
+  "quiz",
+] as const satisfies readonly ProjectKind[];
+
+/**
  * SOURCE OF TRUTH KEYWORDS: PROJECT_STATUSES, projectStatusSchema, ProjectStatus
  *
  * WHAT:  The lifecycle of a project row.
