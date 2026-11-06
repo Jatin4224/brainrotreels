@@ -98,7 +98,16 @@ export function GeneratePanel({ projectId }: { projectId: string }) {
 
   const project = trpc.projects.get.useQuery(
     { organizationId: organizationId ?? "", id: projectId },
-    { enabled, retry: false },
+    {
+      enabled,
+      retry: false,
+      /* A_POLL_MUST_HAVE_A_STOPPING_CONDITION. Followed only while a run is in
+       * flight, because this row's `status` is what tells the stage poll below
+       * that a run exists before its stages have been seeded. It stops itself
+       * the moment the status leaves `generating`. */
+      refetchInterval: (query) =>
+        query.state.data?.status === "generating" ? PIPELINE_POLL_MS : false,
+    },
   );
 
   /* FIRST_SUBSCRIPTION's client half. `enabled` is the org being resolved and
@@ -122,8 +131,33 @@ export function GeneratePanel({ projectId }: { projectId: string }) {
     enabled,
     retry: false,
     placeholderData: (previous) => previous,
-    /* FALLBACK_IS_AUTOMATIC — see the file header. */
-    refetchInterval: streaming ? false : PIPELINE_POLL_MS,
+    /**
+     * SOURCE OF TRUTH KEYWORDS: A_POLL_MUST_HAVE_A_STOPPING_CONDITION,
+     *   FALLBACK_IS_AUTOMATIC, PIPELINE_POLL_MS
+     *
+     * FALLBACK_IS_AUTOMATIC — see the file header. This is the poll that takes
+     * over when the stream is down, and the predicate is what gives it an end.
+     *
+     * It used to be `streaming ? false : PIPELINE_POLL_MS`, which never
+     * stopped: the server closes the stream once every stage is terminal AND
+     * after PROGRESS_STREAM_MAX_MS, and `stages.every(...)` over an EMPTY array
+     * is true — so opening this screen on a never-generated project, or
+     * leaving it open on a finished one, re-requested the stages every two
+     * seconds for as long as the tab lived, for a run that was not happening.
+     *
+     * The function form is evaluated per cycle against the latest data, so the
+     * poll is driven by the run rather than by the transport — the same shape
+     * the narration strip below already used.
+     */
+    refetchInterval: (query) => {
+      if (streaming) return false;
+      if (summarise(query.state.data ?? []).active) return PIPELINE_POLL_MS;
+      /* A run can be in flight before its stages exist: the parent seeds them
+       * in its first step. The project row knows, so the poll survives that
+       * window without being unbounded — this stops when the status does. */
+      if (project.data?.status === "generating") return PIPELINE_POLL_MS;
+      return false;
+    },
   });
 
   /* The stream wins when it has spoken, because it is strictly fresher. */

@@ -102,9 +102,33 @@ export function ScriptEditor({ projectId }: { projectId: string }) {
   const canWrite = hasPermission(permissions.SCRIPTS_UPDATE);
   const canGenerate = hasPermission(permissions.SCRIPTS_CREATE);
 
+  /**
+   * SOURCE OF TRUTH KEYWORDS: POLL_WHILE_GENERATING,
+   *   A_POLL_MUST_HAVE_A_STOPPING_CONDITION, GENERATING_POLL_MS
+   *
+   * The project's own status drives the script poll below, so it has to stay
+   * fresh — but by the QUERY's interval, not a hand-rolled one.
+   *
+   * This used to be a `setInterval` in an effect whose dependency was
+   * `[project]`: the whole query-result object, whose identity changes on
+   * every re-render. The sibling `scripts.list` poll fires at exactly this
+   * same cadence and each of its fetches re-renders this component, so the
+   * timer was torn down and recreated just as it came due — and could be
+   * starved indefinitely. When the status never refreshed, the script poll
+   * (which reads it) never stopped either: the card sat on "Writing your
+   * script…" and the finished script never appeared.
+   *
+   * TanStack owns the timer now, so there is nothing to starve, and the
+   * predicate gives it the same stopping condition it always claimed to have.
+   */
   const project = trpc.projects.get.useQuery(
     { organizationId: organizationId ?? "", id: projectId },
-    { enabled, retry: false },
+    {
+      enabled,
+      retry: false,
+      refetchInterval: (query) =>
+        query.state.data?.status === "generating" ? GENERATING_POLL_MS : false,
+    },
   );
 
   const script = trpc.scripts.list.useQuery(
@@ -121,14 +145,6 @@ export function ScriptEditor({ projectId }: { projectId: string }) {
         project.data?.status === "generating" ? GENERATING_POLL_MS : false,
     },
   );
-
-  /* The project query has to poll too, or the status that drives the poll
-   * above never updates and the editor stays blank after a generation. */
-  React.useEffect(() => {
-    if (project.data?.status !== "generating") return;
-    const timer = setInterval(() => void project.refetch(), GENERATING_POLL_MS);
-    return () => clearInterval(timer);
-  }, [project]);
 
   if (!enabled || project.isPending) {
     return <Skeleton className="h-96 w-full rounded-xl" />;
