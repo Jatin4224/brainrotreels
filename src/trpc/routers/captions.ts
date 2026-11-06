@@ -282,8 +282,19 @@ export const captionsRouter = createTRPCRouter({
         },
         /* Keyed on the project AND the audio, so a double-click produces one
          * run while a genuine re-run after a re-recorded line is a different
-         * key and is not swallowed as a duplicate. */
-        id: `align-${input.projectId}-${plan.audioHash}`,
+         * key and is not swallowed as a duplicate.
+         *
+         * FORCE_IS_PART_OF_THE_KEY. `force` was in the payload and NOT in the
+         * key, which broke the one recovery path this endpoint advertises:
+         * re-aligning a DEGRADED alignment over unchanged audio produces the
+         * same audio hash by definition, so the retry was always swallowed and
+         * the screen's "Re-align to try again" did nothing. The time bucket
+         * follows `pipelineIdempotencyKey`'s precedent — a forced re-align is a
+         * deliberate act, so two of them a second apart are two runs, while a
+         * double-click inside the same second is still one. */
+        id: `align-${input.projectId}-${plan.audioHash}${
+          input.force === true ? `-f${Math.floor(Date.now() / 1000)}` : ""
+        }`,
       });
 
       return { queued: true, upToDate: false };

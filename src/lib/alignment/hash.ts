@@ -24,10 +24,23 @@
  *        different narration, and an alignment keyed only on the set would be
  *        reused with every word at the wrong second.
  *
+ *        THE_ASSET_ID_IS_THE_AUDIOS_IDENTITY, and it is in the key because
+ *        the text hash is not enough on its own. TTS is NOT deterministic:
+ *        re-recording the same line with the same voice produces the same
+ *        `textHash` and a DIFFERENT recording, of a different length. Keyed on
+ *        the text alone, the editor's "re-record" reported a cache hit and
+ *        returned before touching anything — leaving every caption, quiz card
+ *        and motion anchor from that line onwards offset by the duration
+ *        delta, confidently wrong rather than visibly broken. If the new audio
+ *        was SHORTER, the last word's end exceeded the narration length and
+ *        `build-timeline` failed outright.
+ *
  *        It deliberately does NOT fold in the measured durations. They are
- *        derived from the same audio, so they add nothing a change of audio
- *        would not already change — and a float in a cache key is a cache
- *        that misses on a re-measurement that rounded differently.
+ *        derived from the same audio, so the asset id already changes whenever
+ *        they do — and a float in a cache key is a cache that misses on a
+ *        re-measurement that rounded differently. The asset id is a cuid: a
+ *        stable identifier for exactly one set of bytes, which is what the key
+ *        wanted from the durations without the float.
  *
  *        HASH_IS_PURE, FNV-1a, for the same reason as the narration and
  *        timeline hashes: `node:crypto` would make this module unimportable
@@ -61,12 +74,18 @@ const MASK_64 = 0xffffffffffffffffn;
  * WHERE: The alignment service, before and after every run.
  */
 export function alignmentAudioHash(
-  lines: readonly { position: number; textHash: string }[],
+  lines: readonly {
+    position: number;
+    textHash: string;
+    audioAssetId: string;
+  }[],
 ): string {
   const parts = lines
     .slice()
     .sort((a, b) => a.position - b.position)
-    .map((line) => `${line.position}:${line.textHash}`);
+    .map(
+      (line) => `${line.position}:${line.textHash}:${line.audioAssetId}`,
+    );
 
   return fnv1a64(parts.join("\u001f"));
 }

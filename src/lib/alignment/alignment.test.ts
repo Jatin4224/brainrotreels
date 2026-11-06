@@ -225,39 +225,72 @@ describe("concatAlignedLines", () => {
 describe("alignmentAudioHash", () => {
   it("is stable for the same lines in the same order", () => {
     const lines = [
-      { position: 0, textHash: "aaaa" },
-      { position: 1, textHash: "bbbb" },
+      { position: 0, textHash: "aaaa", audioAssetId: "ast_1" },
+      { position: 1, textHash: "bbbb", audioAssetId: "ast_2" },
     ];
     expect(alignmentAudioHash(lines)).toBe(alignmentAudioHash(lines));
   });
 
-  it("changes when one line is re-recorded", () => {
+  it("changes when one line's text is edited", () => {
     const before = alignmentAudioHash([
-      { position: 0, textHash: "aaaa" },
-      { position: 1, textHash: "bbbb" },
+      { position: 0, textHash: "aaaa", audioAssetId: "ast_1" },
+      { position: 1, textHash: "bbbb", audioAssetId: "ast_2" },
     ]);
     const after = alignmentAudioHash([
-      { position: 0, textHash: "aaaa" },
-      { position: 1, textHash: "cccc" },
+      { position: 0, textHash: "aaaa", audioAssetId: "ast_1" },
+      { position: 1, textHash: "cccc", audioAssetId: "ast_3" },
     ]);
     expect(after).not.toBe(before);
   });
 
+  /**
+   * THE_ASSET_ID_IS_THE_AUDIOS_IDENTITY — the case the key previously missed,
+   * and the reason `audioAssetId` is in it.
+   *
+   * The editor's plain "re-record" sends no new text, so `textHash` (which
+   * covers the text and the voice and nothing else) comes out IDENTICAL. TTS
+   * is not deterministic, so the recording and its length are not. Keyed on
+   * the text alone this returned a cache hit, the align run returned before
+   * touching anything, and every word timing from that line onwards stayed at
+   * the old audio's offsets — captions confidently wrong rather than visibly
+   * broken, and a hard `build-timeline` failure when the new take was shorter.
+   *
+   * The test that used to sit here was named "changes when one line is
+   * re-recorded" and changed the textHash, which is a text EDIT. It passed
+   * throughout, which is how this went unnoticed.
+   */
+  it("changes when a line is re-recorded with identical text", () => {
+    const before = alignmentAudioHash([
+      { position: 0, textHash: "aaaa", audioAssetId: "ast_1" },
+      { position: 1, textHash: "bbbb", audioAssetId: "ast_2" },
+    ]);
+    const afterRerecord = alignmentAudioHash([
+      { position: 0, textHash: "aaaa", audioAssetId: "ast_1" },
+      /* Same text, same voice, new recording. */
+      { position: 1, textHash: "bbbb", audioAssetId: "ast_99" },
+    ]);
+    expect(afterRerecord).not.toBe(before);
+  });
+
   it("changes when the same lines are re-ordered", () => {
     const forwards = alignmentAudioHash([
-      { position: 0, textHash: "aaaa" },
-      { position: 1, textHash: "bbbb" },
+      { position: 0, textHash: "aaaa", audioAssetId: "ast_1" },
+      { position: 1, textHash: "bbbb", audioAssetId: "ast_2" },
     ]);
     const backwards = alignmentAudioHash([
-      { position: 0, textHash: "bbbb" },
-      { position: 1, textHash: "aaaa" },
+      { position: 0, textHash: "bbbb", audioAssetId: "ast_2" },
+      { position: 1, textHash: "aaaa", audioAssetId: "ast_1" },
     ]);
     expect(backwards).not.toBe(forwards);
   });
 
   it("cannot be fooled by a concatenation that happens to line up", () => {
-    const a = alignmentAudioHash([{ position: 0, textHash: "ab" }]);
-    const b = alignmentAudioHash([{ position: 0, textHash: "a" }]);
+    const a = alignmentAudioHash([
+      { position: 0, textHash: "ab", audioAssetId: "ast_1" },
+    ]);
+    const b = alignmentAudioHash([
+      { position: 0, textHash: "a", audioAssetId: "bast_1" },
+    ]);
     expect(a).not.toBe(b);
   });
 
