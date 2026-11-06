@@ -42,7 +42,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { authClient } from "@/lib/better-auth/auth-client";
-import { AUTH_ROUTES, authRouteWithCallback } from "@/lib/config";
+import { AUTH_ROUTES, ROUTES, authRouteWithCallback } from "@/lib/config";
 /* By path, not through ./index: that barrel re-exports these very forms. */
 import { AuthError } from "@/components/global/auth/auth-error";
 import { useDevEmailToast } from "@/hooks/use-dev-email-toast";
@@ -58,7 +58,7 @@ import {
  * SOURCE OF TRUTH KEYWORDS: AuthFormProps
  *
  * WHAT:  Props for AuthForm — mode + optional post-success callback URL
- *        (defaults to "/").
+ *        (defaults to ROUTES.dashboard).
  * WHERE: Used by the (auth) route pages.
  */
 export interface AuthFormProps {
@@ -77,7 +77,15 @@ const GOOGLE_OAUTH_ENABLED = Boolean(
  * WHAT:  Selects the concrete form by `mode`.
  * WHERE: Rendered by sign-in/page.tsx and sign-up/page.tsx.
  */
-export function AuthForm({ mode, callbackURL = "/" }: AuthFormProps) {
+/* POST_AUTH_TARGET_IS_THE_DASHBOARD, not "/". `/` is a public landing page
+ * (HOME_IS_PUBLIC in src/app/(marketing)/page.tsx), so sending a user who just
+ * authenticated there would show them the sales pitch instead of their
+ * workspace. ROUTES.dashboard is the documented post-auth destination, and the
+ * dashboard layout still owns the no-org → onboarding hop from there. */
+export function AuthForm({
+  mode,
+  callbackURL = ROUTES.dashboard,
+}: AuthFormProps) {
   return mode === "sign-in" ? (
     <SignInForm callbackURL={callbackURL} />
   ) : (
@@ -88,8 +96,10 @@ export function AuthForm({ mode, callbackURL = "/" }: AuthFormProps) {
 /* ---------- Sign-in ---------- */
 
 function SignInForm({ callbackURL }: { callbackURL: Route }) {
-  /* '/' is the default, not a destination worth threading through the URL. */
-  const carriedCallback = callbackURL === "/" ? null : callbackURL;
+  /* The default destination is not worth threading through the URL — only an
+   * explicit one is. Compared against ROUTES.dashboard because that IS the
+   * default now (POST_AUTH_TARGET_IS_THE_DASHBOARD). */
+  const carriedCallback = callbackURL === ROUTES.dashboard ? null : callbackURL;
   const form = useForm<SignInValues>({
     resolver: zodResolver(signInSchema),
     defaultValues: { email: "", password: "" },
@@ -198,8 +208,10 @@ function SignInForm({ callbackURL }: { callbackURL: Route }) {
 /* ---------- Sign-up ---------- */
 
 function SignUpForm({ callbackURL }: { callbackURL: Route }) {
-  /* '/' is the default, not a destination worth threading through the URL. */
-  const carriedCallback = callbackURL === "/" ? null : callbackURL;
+  /* The default destination is not worth threading through the URL — only an
+   * explicit one is. Compared against ROUTES.dashboard because that IS the
+   * default now (POST_AUTH_TARGET_IS_THE_DASHBOARD). */
+  const carriedCallback = callbackURL === ROUTES.dashboard ? null : callbackURL;
   const [submittedEmail, setSubmittedEmail] = React.useState<string | null>(
     null,
   );

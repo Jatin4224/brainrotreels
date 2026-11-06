@@ -768,14 +768,19 @@ model Render {
 /// Both are now constraints, so the check and the guarantee are the same
 /// operation and the reads above them are only a fast path.
 ///
-/// `purchaseRef` rather than `@@unique([refId, kind])`, which looks like the
+/// `idempotencyKey` rather than `@@unique([refId, kind])`, which looks like the
 /// obvious form and is wrong: a hold's `refId` is `tts:<projectId>`, and
 /// re-running a project legitimately takes a SECOND hold under that same ref,
-/// so that constraint would refuse every re-run. Only a purchase has a
-/// naturally unique ref (the Stripe payment intent), and Postgres treats NULLs
-/// in a unique index as distinct — so a nullable unique column is a partial
-/// unique index that Prisma can actually express, with no raw SQL for
-/// `migrate dev` to later diff away.
+/// so that constraint would refuse every re-run. Postgres treats NULLs in a
+/// unique index as distinct — so a nullable unique column is a partial unique
+/// index that Prisma can actually express, with no raw SQL for `migrate dev` to
+/// later diff away.
+///
+/// One column serves every "this must happen once" rule, because the keys are
+/// namespaced and cannot collide: a Stripe payment intent (`pi_...`), a
+/// workspace's welcome grant (`signup:<orgId>`), and a plan's monthly
+/// allowance (`allowance:<YYYY-MM>:<orgId>`). Rows with no such rule — holds,
+/// commits, releases — leave it null.
 ///
 /// `kind` is String, not a Prisma enum — this schema has zero enum blocks and
 /// the validated union lives in src/lib/types/credits.ts.
@@ -788,9 +793,10 @@ model CreditLedger {
   kind           String // purchase | grant | hold | commit | release
   refId          String? // renderId, jobId, stripe payment intent
   holdId         String? // links commit/release back to its hold
-  /// The Stripe payment intent, on `purchase` rows ONLY — null everywhere
-  /// else, which is what makes the unique index partial. See the note above.
-  purchaseRef    String?  @unique
+  /// The once-only key for rows that must not be written twice — null on every
+  /// row without such a rule, which is what makes the unique index partial.
+  /// See the note above for the namespaces.
+  idempotencyKey String?  @unique
   metadata       Json?
   createdAt      DateTime @default(now())
 

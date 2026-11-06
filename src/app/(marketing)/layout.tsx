@@ -25,13 +25,16 @@
  *        The root layout still wraps this, so the theme, the fonts and the
  *        analytics provider all apply — which is why there is no `<html>` here
  *        and why a visitor's cookie choice is honoured on these pages too.
- * WHERE: Wraps src/app/(marketing)/pricing, src/app/(marketing)/legal and
+ * WHERE: Wraps src/app/(marketing)/page.tsx (the landing page),
+ *        src/app/(marketing)/pricing, src/app/(marketing)/legal and
  *        src/app/(marketing)/docs.
  */
 
 import Link from "next/link";
 
+import { AUTH_ROUTES } from "@/lib/config/auth-routes";
 import { APP_NAME } from "@/lib/config/branding";
+import { buttonVariants } from "@/components/ui/button";
 
 export default function MarketingLayout({
   children,
@@ -57,6 +60,25 @@ export default function MarketingLayout({
             </Link>
             <Link href="/legal" className="text-muted-foreground hover:text-foreground">
               Legal
+            </Link>
+            {/* The way IN to the product. `/` is a landing page rather than an
+                auth probe (HOME_IS_PUBLIC), so these two links are the only
+                thing that still sends a visitor at the app — kept in the shared
+                header so every public page offers them, not just the landing
+                one. Routes come from AUTH_ROUTES; when registration is closed
+                proxy.ts rewrites the sign-up hop to sign-in, so this stays
+                correct without reading the flag here. */}
+            <Link
+              href={AUTH_ROUTES.signIn}
+              className="text-muted-foreground hover:text-foreground"
+            >
+              Sign in
+            </Link>
+            <Link
+              href={AUTH_ROUTES.signUp}
+              className={buttonVariants({ size: "sm" })}
+            >
+              Get started
             </Link>
           </div>
         </nav>
