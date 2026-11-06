@@ -230,6 +230,19 @@ export function GeneratePanel({ projectId }: { projectId: string }) {
     return <Skeleton className="h-[34rem] w-full rounded-xl" />;
   }
 
+  /* AN_UNREADABLE_PROJECT_IS_NOT_AN_EMPTY_ONE. This screen was the worse of
+   * the two: a deleted or forbidden id rendered an empty StageProgress with an
+   * ENABLED Generate button, so the obvious next action was to start a run on
+   * a project that cannot be read. Same shape ProjectPreview already uses. */
+  if (project.error !== null) {
+    return (
+      <Alert variant="destructive">
+        <AlertTitle>This project could not be opened</AlertTitle>
+        <AlertDescription>{project.error.message}</AlertDescription>
+      </Alert>
+    );
+  }
+
   const busy = generate.isPending || cancel.isPending;
   const status = project.data?.status;
 

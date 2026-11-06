@@ -24,6 +24,7 @@
 import type { Metadata } from "next";
 
 import { ContentLayout } from "@/components/global/page-header";
+import { ProjectSteps } from "@/components/global/project-steps";
 import { GeneratePanel } from "./_components/generate-panel";
 
 export const metadata: Metadata = {
@@ -39,6 +40,7 @@ export default async function ProjectGeneratePage({
 
   return (
     <ContentLayout title="Generate">
+      <ProjectSteps projectId={id} />
       <GeneratePanel projectId={id} />
     </ContentLayout>
   );

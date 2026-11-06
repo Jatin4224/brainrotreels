@@ -30,6 +30,7 @@
 import type { Metadata } from "next";
 
 import { ContentLayout } from "@/components/global/page-header";
+import { ProjectSteps } from "@/components/global/project-steps";
 import { ProjectPreview } from "./_components/project-preview";
 import { RenderPanel } from "@/components/global/render-panel";
 
@@ -46,6 +47,7 @@ export default async function ProjectPreviewPage({
 
   return (
     <ContentLayout title="Preview">
+      <ProjectSteps projectId={id} />
       {/* The player and the export panel side by side on a wide screen and
           stacked on a phone. Two independent client components rather than one:
           the player mounts a Remotion tree and the panel polls a query, and

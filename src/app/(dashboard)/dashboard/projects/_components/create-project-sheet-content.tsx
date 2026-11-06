@@ -24,6 +24,7 @@
  */
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2Icon } from "lucide-react";
@@ -113,6 +114,7 @@ export function CreateProjectSheetContent({
   organizationId: string;
   onClose: () => void;
 }) {
+  const router = useRouter();
   const utils = trpc.useUtils();
   const create = trpc.projects.create.useMutation();
   const [error, setError] = React.useState<string | null>(null);
@@ -157,6 +159,12 @@ export function CreateProjectSheetContent({
       await utils.usage.invalidate();
       toast.success(`"${project.title}" created`);
       onClose();
+      /* CREATE_LANDS_ON_THE_FIRST_STEP. The sheet used to close onto the list,
+       * leaving the customer to find the row they had just named and open its
+       * `⋯` menu to begin — which is also where the walkthrough reads as a
+       * dropdown rather than a flow. `script` is the first step because every
+       * later one depends on it. */
+      router.push(`/dashboard/projects/${project.id}/script`);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Could not create this project.",

@@ -21,6 +21,7 @@
 import type { Metadata } from "next";
 
 import { ContentLayout } from "@/components/global/page-header";
+import { ProjectSteps } from "@/components/global/project-steps";
 import { VoiceCasting } from "./_components/voice-casting";
 
 export const metadata: Metadata = {
@@ -36,6 +37,7 @@ export default async function ProjectVoicesPage({
 
   return (
     <ContentLayout title="Voices">
+      <ProjectSteps projectId={id} />
       <VoiceCasting projectId={id} />
     </ContentLayout>
   );

@@ -141,6 +141,13 @@ export interface QuizInputPanelProps {
   projectId: string;
   hasExistingScript: boolean;
   generating: boolean;
+  /**
+   * THE_SOURCE_SURVIVES_CREATE — the quiz topic typed on the create sheet,
+   * stored on `Project.sourceRef`. Prefills the topic field so nobody is asked
+   * for it twice. `quizzes.start` overwrites `sourceRef` with whatever is
+   * actually submitted, so this is a default and not a binding.
+   */
+  sourceRef: string | null;
 }
 
 export function QuizInputPanel({
@@ -148,6 +155,7 @@ export function QuizInputPanel({
   projectId,
   hasExistingScript,
   generating,
+  sourceRef,
 }: QuizInputPanelProps) {
   const utils = trpc.useUtils();
   const [confirming, setConfirming] = React.useState(false);
@@ -162,7 +170,8 @@ export function QuizInputPanel({
       projectId,
       source: {
         kind: "topic",
-        value: "",
+        /* THE_SOURCE_SURVIVES_CREATE — see the prop's note. */
+        value: sourceRef?.trim() ?? "",
         questionCount: DEFAULT_TOPIC_QUESTION_COUNT,
       },
       countdownSec: QUIZ_COUNTDOWN_DEFAULT_SECONDS,
