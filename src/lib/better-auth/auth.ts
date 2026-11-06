@@ -27,7 +27,7 @@ import { nextCookies } from "better-auth/next-js";
 import { cache } from "react";
 import { headers } from "next/headers";
 
-import { prisma } from "@/lib/config";
+import { prisma } from "@/lib/config/prisma";
 import { ac, roles } from "@/lib/better-auth/access-control";
 import { APP_URL, APP_NAME, APP_DOMAIN } from "@/lib/config/branding";
 import { REGISTRATION_OPEN } from "@/lib/config/registration";

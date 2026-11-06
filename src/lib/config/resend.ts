@@ -11,9 +11,15 @@
  *        RESEND_API_KEY never throws during build/import — the email service
  *        guards on isResendConfigured() and no-ops in that case, mirroring the
  *        rate-limiter's fail-open posture so local dev runs without an account.
- * WHERE: Consumed by src/services/email.service.ts; re-exported from
- *        src/lib/config/index.ts.
+ *        `server-only` because this module reads RESEND_API_KEY, for the same
+ *        reason as src/lib/config/stripe.ts: a transactional-email credential
+ *        has no business being reachable from a browser bundle, lazily or
+ *        otherwise. Deliberately not in the config barrel, which is
+ *        client-safe.
+ * WHERE: Consumed by src/services/email.service.ts via `@/lib/config/resend`.
  */
+
+import "server-only";
 
 import { Resend } from "resend";
 import { APP_NAME } from "@/lib/config/branding";

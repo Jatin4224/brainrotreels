@@ -45,7 +45,7 @@ import { TRPCError } from "@trpc/server";
 import { createTRPCRouter } from "../init";
 import { protectedProcedure } from "../procedures";
 import { permissions } from "@/lib/permissions";
-import { getStripeClient, isStripeConfigured } from "@/lib/config";
+import { getStripeClient, isStripeConfigured } from "@/lib/config/stripe";
 import { ensureStripeCustomer } from "@/services/payment.service";
 import * as creditsService from "@/services/credits.service";
 import { trackFunnelEvent } from "@/lib/observability";
