@@ -255,6 +255,21 @@ export interface RenderAdapter {
   getProgress(providerRenderId: string): Promise<RenderProgressResult>;
 
   /**
+   * SOURCE OF TRUTH KEYWORDS: cancel, A_TIMEOUT_MUST_STOP_THE_WORK,
+   *   RENDER_TIMEOUT
+   *
+   * Stops a render we have given up on. Resolves either way — a render that
+   * already finished, or was never started, is not an error to cancel.
+   *
+   * A_TIMEOUT_MUST_STOP_THE_WORK. Writing `timedOut` on the row and refunding
+   * the customer settles OUR side; it does nothing to the provider, which
+   * keeps its fan-out running and keeps billing for frames of a video nobody
+   * will ever be handed. Abandoning paid work without stopping it is the one
+   * failure mode where the cost is invisible on every screen we have.
+   */
+  cancel(providerRenderId: string): Promise<void>;
+
+  /**
    * One frame, drawn and returned. Unlike `start`, this WAITS — a still
    * finishes in seconds. See A_STILL_IS_NOT_A_RENDER.
    */

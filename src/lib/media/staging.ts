@@ -36,9 +36,11 @@
 
 import "server-only";
 
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { createWriteStream } from "node:fs";
+import { mkdtemp, readFile, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { pipeline } from "node:stream/promises";
 
 import { getStorageAdapter } from "@/lib/adapters/storage";
 
@@ -123,11 +125,25 @@ export async function downloadToFile(
  *        different places, and a raw provider URL in the message is a long
  *        signed string that tells them neither.
  *
- *        Buffers the whole body, with the same bound and the same caveat as
- *        `downloadToFile`: a vertical render of a short-form video is tens of
- *        megabytes, which is well inside a worker's memory. If renders ever
- *        get long enough for that to stop being true, this is the line to
- *        change — and it will be the same change in one place for both.
+ *        STREAMED_NOT_BUFFERED. This used to read the whole body into memory
+ *        with `arrayBuffer()` — the line its own comment nominated as the one
+ *        to change when renders outgrew it. It is changed now, ahead of that,
+ *        because the failure mode was bad out of proportion to the saving: the
+ *        download, the R2 upload, the poster extraction and the row
+ *        transaction all sit inside ONE `step.run`, bounded by the serve
+ *        route's `maxDuration = 300`. A body large or slow enough to push that
+ *        step over the limit made Inngest retry the entire multi-hundred-
+ *        megabyte copy, and after two attempts `onFailure` marked a perfectly
+ *        good, fully paid render as failed.
+ *
+ *        Piping to disk removes the memory ceiling entirely and makes the step
+ *        bounded by bandwidth rather than by heap. Both callers get it, which
+ *        is why it was factored out here in the first place.
+ *
+ *        The size is read back with `stat` rather than counted while piping:
+ *        the bytes ON DISK are what the caller records on the AssetVariant
+ *        row, and that is the only number certainly true of the file the next
+ *        step will read.
  * WHERE: The finalize step of src/inngest/functions/project-render.ts.
  */
 export async function downloadUrlToFile(
@@ -142,9 +158,51 @@ export async function downloadUrlToFile(
     );
   }
 
-  const bytes = new Uint8Array(await response.arrayBuffer());
-  await writeFile(destinationPath, bytes);
-  return bytes.byteLength;
+  const body = response.body;
+  if (body === null) {
+    throw new Error(
+      `[media/staging] Could not download ${label}: the response had no body.`,
+    );
+  }
+
+  /* `pipeline` rather than `.pipe()`: it propagates an error from either end
+   * and destroys both, so a connection dropped mid-copy rejects here instead
+   * of leaving a truncated file that looks like a complete one. */
+  await pipeline(readChunks(body), createWriteStream(destinationPath));
+
+  const { size } = await stat(destinationPath);
+  return size;
+}
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: readChunks, STREAMED_NOT_BUFFERED
+ *
+ * WHAT:  A web `ReadableStream` as an async iterable of chunks.
+ * WHY:   `node:stream`'s `Readable.fromWeb` wants Node's OWN web-stream type,
+ *        and `fetch`'s body is typed as the DOM one — the two are structurally
+ *        different in TypeScript's lib even though they are the same object at
+ *        runtime, and bridging them with a cast is the kind of assertion that
+ *        is right until a lib update makes it silently wrong. Reading through
+ *        the standard reader interface needs no assertion at all, and
+ *        `pipeline` takes an async iterable directly.
+ *
+ *        The lock is released in a `finally` so an error mid-copy does not
+ *        leave the stream locked; `pipeline` destroys the destination itself.
+ * WHERE: downloadUrlToFile.
+ */
+async function* readChunks(
+  stream: ReadableStream<Uint8Array>,
+): AsyncGenerator<Uint8Array> {
+  const reader = stream.getReader();
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) return;
+      if (value !== undefined) yield value;
+    }
+  } finally {
+    reader.releaseLock();
+  }
 }
 
 /**

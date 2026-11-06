@@ -153,6 +153,12 @@ export async function POST(request: Request): Promise<NextResponse> {
       name: "render/finished",
       data: {
         renderId,
+        /* THE_ATTEMPT_IS_PART_OF_THE_MATCH. The provider's own id for THIS
+         * render, carried so the waiting workflow can tell a callback for the
+         * attempt it started from a late one belonging to a previous attempt
+         * of the same row. Without it both look identical and a stale error
+         * can fail a render that is still running. */
+        providerRenderId: payload.renderId,
         outcome: payload.type,
         outputUrl:
           payload.type === "success" ? (payload.outputUrl ?? null) : null,

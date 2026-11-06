@@ -172,7 +172,40 @@ const renderRequestedEventSchema = z.object({
  */
 const renderFinishedEventSchema = z.object({
   renderId: z.string().min(1),
+  /**
+   * SOURCE OF TRUTH KEYWORDS: providerRenderId, THE_ATTEMPT_IS_PART_OF_THE_MATCH
+   *
+   * Which ATTEMPT called back. A `Render` row can be retried, so one renderId
+   * covers several provider renders, and correlating on the row alone meant
+   * attempt 1's late callback resumed attempt 2's wait — reporting an error
+   * for a render that was still running and would later succeed. The row was
+   * written `failed` and refunded, the real callback was then correctly
+   * refused by `completeRender`'s terminal filter, and the finished MP4 was
+   * orphaned in the provider's bucket with the retry budget already spent.
+   *
+   * Nullable because a render started by an older deploy relays no such id;
+   * the matcher falls back to the row alone for those rather than hanging.
+   */
+  providerRenderId: z.string().min(1).nullable().optional(),
   outcome: z.enum(["success", "error", "timeout"]),
+  outputUrl: z.string().min(1).nullable(),
+  error: z.string().nullable(),
+});
+
+/* STEP_RESULTS_ARE_JSON — `start-render`'s return crosses a step boundary and
+ * comes back as JSON on a replay, and the wait's matcher is built from it, so
+ * it is parsed rather than trusted. */
+const startedRenderSchema = z.object({
+  providerRenderId: z.string().min(1),
+});
+
+/* STEP_RESULTS_ARE_JSON. The `catch-up` read decides whether the run waits at
+ * all, so its result is parsed like every other step result here. Mirrors
+ * RenderProgressResult rather than importing it, because that is an interface
+ * and this is the JSON that survived a step boundary. */
+const renderProgressStepSchema = z.object({
+  status: z.enum(["queued", "rendering", "completed", "failed"]),
+  progress: z.number(),
   outputUrl: z.string().min(1).nullable(),
   error: z.string().nullable(),
 });
@@ -357,7 +390,7 @@ export const projectRenderFunction = inngestClient.createFunction(
     //     soon as the render is accepted; see
     //     START_AND_AWAIT_ARE_DIFFERENT_STEPS.
     // ───────────────────────────────────────────────────────────────────────
-    await step.run("start-render", async () => {
+    const rawStarted = await step.run("start-render", async () => {
       const loaded = await loadRenderInputs(renderId);
 
       const secret = getRemotionWebhookSecret();
@@ -447,13 +480,101 @@ export const projectRenderFunction = inngestClient.createFunction(
     // [4] WAIT — WAIT_DONT_POLL. The run suspends here, costing nothing, until
     //     the webhook relays the provider's callback or the timeout elapses.
     // ───────────────────────────────────────────────────────────────────────
+    const started = startedRenderSchema.parse(rawStarted);
+
+    /**
+     * SOURCE OF TRUTH KEYWORDS: catch-up, THE_CALLBACK_CAN_BEAT_THE_WAITER,
+     *   PROGRESS_IS_FOR_THE_TIMEOUT_PATH, START_AND_AWAIT_ARE_DIFFERENT_STEPS
+     *
+     * WHAT:  One progress read between starting the render and waiting for it.
+     *
+     * WHY:   THE_CALLBACK_CAN_BEAT_THE_WAITER. `step.run("start-render")`
+     *        returns control to the engine, and `waitForEvent` is only
+     *        registered on the NEXT invocation — and `waitForEvent` matches
+     *        events that arrive AFTER it exists, never one already delivered.
+     *        A callback landing in that gap matches no waiter at all, and the
+     *        run then sits for the full 45-minute RENDER_TIMEOUT before the
+     *        timeout path recovers it. The output is correct and three quarters
+     *        of an hour late, with the row reading `rendering` throughout.
+     *
+     *        The realistic case is not a fast success but a fast FAILURE: a
+     *        render that dies on its first Lambda invocation sends its error
+     *        webhook within a second or two, comfortably inside the window.
+     *
+     *        This is a deliberate, documented exception to
+     *        PROGRESS_IS_FOR_THE_TIMEOUT_PATH — and it is still not a polling
+     *        loop. It is ONE read, in its own memoised step, that only acts on
+     *        a TERMINAL answer; `queued` and `rendering` fall through to the
+     *        wait, which remains how the happy path learns it is done.
+     * WHERE: Immediately before `await-render`.
+     */
+    const catchUp = renderProgressStepSchema.parse(
+      await step.run("catch-up", async () => {
+        const adapter = await getRenderAdapter();
+        const progress = await adapter.getProgress(started.providerRenderId);
+        return {
+          status: progress.status,
+          progress: progress.progress,
+          outputUrl: progress.outputUrl,
+          error: progress.error,
+        };
+      }),
+    );
+
+    /* Bound to a local so the null check narrows it for the closure below —
+     * a property access would widen back to `string | null` inside the step. */
+    const earlyOutputUrl = catchUp.outputUrl;
+    if (catchUp.status === "completed" && earlyOutputUrl !== null) {
+      console.warn(
+        `[project.render] ${renderId} had already finished before the wait was registered; ` +
+          "storing its output without waiting.",
+      );
+      return await step.run("finalize-early", () =>
+        storeRenderOutput(renderId, earlyOutputUrl, preflight),
+      );
+    }
+
+    if (catchUp.status === "failed") {
+      return await step.run("finalize-early-failure", async () => {
+        await failRenderAndRelease(
+          prisma,
+          renderId,
+          "failed",
+          catchUp.error ??
+            "This video could not be rendered. Please try again.",
+          catchUp.progress,
+        );
+        return { renderId, status: "failed" };
+      });
+    }
+
+    /**
+     * SOURCE OF TRUTH KEYWORDS: await-render, THE_ATTEMPT_IS_PART_OF_THE_MATCH,
+     *   WAIT_DONT_POLL
+     *
+     * Matched on the renderId so one waiting run cannot be resumed by another
+     * render's callback — without that, two concurrent renders in one workspace
+     * would race and each could finalize the other's output.
+     *
+     * AND on the provider's render id, which is the ATTEMPT. `renders.retry`
+     * reuses the row, so one renderId spans several provider renders: attempt
+     * 1 times out at 45 minutes and is written `timedOut`, the customer
+     * retries, and attempt 1's callback finally lands and matches attempt 2's
+     * wait. An `error` outcome there failed and refunded a render that was
+     * still running — and when its own callback arrived, `completeRender`'s
+     * terminal filter correctly refused it, so the finished video was orphaned
+     * in the provider's bucket and the retry budget was gone.
+     *
+     * The `providerRenderId == null` arm keeps a render started by an older
+     * deploy — whose relay sends no such field — from waiting out the full
+     * timeout for a callback it would never match.
+     */
     const finished = await step.waitForEvent("await-render", {
       event: "render/finished",
       timeout: RENDER_TIMEOUT,
-      /* Matched on the renderId so one waiting run cannot be resumed by
-       * another render's callback. Without this, two concurrent renders in one
-       * workspace would race and each could finalize the other's output. */
-      if: `async.data.renderId == "${renderId}"`,
+      if:
+        `async.data.renderId == "${renderId}" && ` +
+        `(async.data.providerRenderId == "${started.providerRenderId}" || async.data.providerRenderId == null)`,
     });
 
     // ───────────────────────────────────────────────────────────────────────
@@ -1024,6 +1145,16 @@ async function resolveTimedOutRender(
    * moved — which is the difference between "the renderer is slow" and "the
    * renderer is dead" for whoever reads this next. */
   await markRenderProgress(prisma, renderId, progress.progress);
+
+  /* A_TIMEOUT_MUST_STOP_THE_WORK. The customer's message says the render "was
+   * stopped", and until now nothing stopped it: the row was written, the
+   * credits refunded, and the provider's fan-out carried on rendering frames
+   * of a video that can never be delivered — billing us for all of them. The
+   * cancellation goes BEFORE the refund so the message is true by the time it
+   * is written; the adapter swallows its own failures, so this cannot turn a
+   * settled timeout back into a failed step. */
+  await adapter.cancel(render.providerRenderId);
+
   await failRenderAndRelease(
     prisma,
     renderId,
