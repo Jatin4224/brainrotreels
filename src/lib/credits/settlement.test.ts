@@ -86,6 +86,27 @@ describe("settlementRows", () => {
     expect(rows.find((row) => row.kind === "commit")?.amount).toBe(9);
   });
 
+  /**
+   * THE_RELEASE_GOES_FIRST, and this is the test that keeps it true.
+   *
+   * `CreditLedger` carries `@@unique([holdId, kind])` and `commit` in the
+   * credits service writes these rows ONE AT A TIME, so the first row is the
+   * one that collides when a hold is settled twice. Every settled hold with a
+   * reservation has a release row, so release-first means a duplicate
+   * settlement is refused by insert number one with nothing written.
+   *
+   * Reverse these two and the commit inserts, the release then violates the
+   * constraint, and the hold is left carrying a charge with no refund against
+   * it — an overcharge for work the customer already paid for once. That is
+   * strictly worse than having no constraint at all, which is why the order is
+   * asserted rather than assumed. If this ever has to change, the service's
+   * loop needs a transaction first.
+   */
+  it("puts the release BEFORE the commit, so a duplicate settlement collides on the first insert", () => {
+    const rows = settlementRows(12, 9);
+    expect(rows.map((row) => row.kind)).toEqual(["release", "commit"]);
+  });
+
   it("writes no commit row when the work cost nothing", () => {
     /* A zero-delta row is a row that says nothing; the release alone already
      * reads as "held, then settled at nothing". */

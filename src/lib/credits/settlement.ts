@@ -69,8 +69,28 @@ export function settlementRows(held: number, actual: number): SettlementRow[] {
 
   const rows: SettlementRow[] = [];
 
-  if (charged > 0) rows.push({ kind: "commit", amount: charged });
+  /**
+   * SOURCE OF TRUTH KEYWORDS: THE_RELEASE_GOES_FIRST, DOUBLE_COMMIT_REFUSED
+   *
+   * The ORDER is load-bearing, and it was not before. `CreditLedger` now
+   * carries `@@unique([holdId, kind])`, and the service writes these rows one
+   * at a time — so whichever row goes first is the one that collides when a
+   * hold is settled twice.
+   *
+   * The release has to be that row. Every settled hold with a reservation has
+   * a release row (a commit writes both; a release writes one), so putting it
+   * first means a duplicate settlement is refused by insert number one, with
+   * nothing written yet. The other way round, the commit would insert and THEN
+   * the release would conflict — leaving a charge with no refund against it,
+   * which overcharges for a render the customer already paid for once. A
+   * partial settlement is worse than either a clean refusal or no constraint
+   * at all, so this order is what makes the constraint safe to add.
+   *
+   * The net is unchanged: these are two rows applied together and the sum does
+   * not depend on their order. The tests assert by `kind`, not by position.
+   */
   if (reserved > 0) rows.push({ kind: "release", amount: reserved });
+  if (charged > 0) rows.push({ kind: "commit", amount: charged });
 
   return rows;
 }
