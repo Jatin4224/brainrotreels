@@ -49,6 +49,9 @@ export type {
   SignUpValues,
   AuthFormMode,
   AuthValuesByMode,
+  AuthScreenCopy,
+  AuthShowcaseCard,
+  AuthShowcaseTone,
   ForgotPasswordValues,
   ResetPasswordValues,
 } from "./auth";

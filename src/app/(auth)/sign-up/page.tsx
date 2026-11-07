@@ -3,18 +3,27 @@
  */
 
 /**
- * SOURCE OF TRUTH KEYWORDS: SignUpPage
+ * SOURCE OF TRUTH KEYWORDS: SignUpPage, AUTH_SURFACE, AuthHero, AuthShowcase,
+ *   AuthModeNav, RETURN_TO_AFTER_AUTH, OPEN_REDIRECT_GUARD
  *
- * WHAT:  /sign-up route — renders AuthShell + AuthForm in sign-up mode.
- *        Hidden behind the proxy.ts redirect when REGISTRATION_OPEN=false,
- *        so reaching this file implies registration is open.
- * WHY:   Mirrors sign-in/page.tsx; keeps every page in (auth) cookie-cutter.
+ * WHAT:  /sign-up route — the split auth screen in sign-up mode. Hidden
+ *        behind the proxy.ts redirect when REGISTRATION_OPEN=false, so
+ *        reaching this file implies registration is open.
+ * WHY:   Mirrors sign-in/page.tsx; keeps every page in (auth) cookie-cutter,
+ *        and keeps the provider-neutral chrome out of <AuthForm>.
  * WHERE: Bounced to /sign-in by src/proxy.ts when REGISTRATION_OPEN=false.
  */
 
 import type { Metadata } from "next";
 
-import { AuthForm, AuthShell } from "@/components/global/auth";
+import {
+  AuthForm,
+  AuthHero,
+  AuthModeNav,
+  AuthShell,
+  AuthShowcase,
+  AUTH_SHOWCASE_COPY,
+} from "@/components/global/auth";
 import { resolveAuthCallback } from "@/lib/config";
 
 export const metadata: Metadata = {
@@ -35,7 +44,12 @@ export default async function SignUpPage({
   const destination = resolveAuthCallback(callbackURL);
 
   return (
-    <AuthShell>
+    <AuthShell
+      headerTag={AUTH_SHOWCASE_COPY.renderedBadgeShort}
+      headerEnd={<AuthModeNav mode="sign-up" callbackURL={destination} />}
+      aside={<AuthShowcase />}
+    >
+      <AuthHero mode="sign-up" className="mb-8 lg:mb-10" />
       <AuthForm
         mode="sign-up"
         {...(destination ? { callbackURL: destination } : {})}

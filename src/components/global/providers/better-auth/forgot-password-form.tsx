@@ -5,13 +5,20 @@
 "use client";
 
 /**
- * SOURCE OF TRUTH KEYWORDS: ForgotPasswordForm
+ * SOURCE OF TRUTH KEYWORDS: ForgotPasswordForm, AUTH_SURFACE, AuthError,
+ *   AUTH_CTA_CLASS, AUTH_FIELD_CLASS, AUTH_LABEL_CLASS, AUTH_LINK_CLASS
  *
  * WHAT:  Requests a password-reset email. On success shows a
  *        "check your email" screen (shown regardless of whether the address
  *        exists — prevents email enumeration).
  * WHY:   Better Auth emails the reset link via the sendResetPassword hook in
  *        auth.ts; the link lands on AUTH_ROUTES.resetPassword with a token.
+ *        AUTH_SURFACE: it wears the SAME skins as sign-in and sign-up, from
+ *        @/components/global/auth/auth-styles, rather than its own classes.
+ *        This screen is reached mid-flow from the sign-in form, and the
+ *        regression that keeps happening is this one being left behind by a
+ *        restyle so the field under the same headline is suddenly a different
+ *        height. The error banner is <AuthError> for the same reason.
  * WHERE: Rendered by src/app/(auth)/forgot-password/page.tsx inside AuthShell.
  */
 
@@ -35,6 +42,14 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+/* By path, not through ./index: that barrel re-exports this very form. */
+import { AuthError } from "@/components/global/auth/auth-error";
+import {
+  AUTH_CTA_CLASS,
+  AUTH_FIELD_CLASS,
+  AUTH_LABEL_CLASS,
+  AUTH_LINK_CLASS,
+} from "@/components/global/auth/auth-styles";
 
 export function ForgotPasswordForm() {
   const [error, setError] = React.useState<string | null>(null);
@@ -64,20 +79,19 @@ export function ForgotPasswordForm() {
   if (sent) {
     return (
       <div className="flex flex-col items-center gap-6 text-center">
-        <div className="flex size-16 items-center justify-center rounded-full bg-primary/10">
-          <MailCheckIcon className="size-8 text-primary" />
+        <div className="brutal-shadow-lg flex size-28 -rotate-6 items-center justify-center rounded-[2rem] bg-brand-accent">
+          <MailCheckIcon className="size-12 rotate-6 text-brand-accent-foreground" />
         </div>
-        <div className="flex flex-col gap-2">
-          <h1 className="text-2xl font-bold">Check your email</h1>
-          <p className="text-balance text-sm text-muted-foreground">
+        <div className="flex flex-col gap-3">
+          <h1 className="font-display text-3xl font-extrabold tracking-tight">
+            Check your email
+          </h1>
+          <p className="text-balance text-base text-muted-foreground">
             If an account exists with that email address, we&apos;ve sent a link
             to reset your password. Check your inbox and spam folder.
           </p>
         </div>
-        <Link
-          href={AUTH_ROUTES.signIn}
-          className="text-sm underline underline-offset-4"
-        >
+        <Link href={AUTH_ROUTES.signIn} className={AUTH_LINK_CLASS}>
           Back to sign in
         </Link>
       </div>
@@ -89,20 +103,15 @@ export function ForgotPasswordForm() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col items-center gap-2 text-center">
-        <h1 className="text-2xl font-bold">Forgot your password?</h1>
-        <p className="text-balance text-sm text-muted-foreground">
+        <h1 className="font-display text-3xl font-extrabold tracking-tight">
+          Forgot your password?
+        </h1>
+        <p className="text-balance text-base text-muted-foreground">
           Enter your email address and we&apos;ll send you a link to reset your
           password.
         </p>
       </div>
-      {error ? (
-        <div
-          role="alert"
-          className="rounded-md border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive"
-        >
-          {error}
-        </div>
-      ) : null}
+      <AuthError error={error} />
       <Form {...form}>
         <form
           onSubmit={form.handleSubmit(onSubmit)}
@@ -114,13 +123,14 @@ export function ForgotPasswordForm() {
             name="email"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Email</FormLabel>
+                <FormLabel className={AUTH_LABEL_CLASS}>Email</FormLabel>
                 <FormControl>
                   <Input
                     type="email"
                     autoComplete="email"
-                    placeholder="m@example.com"
+                    placeholder="you@example.com"
                     disabled={isBusy}
+                    className={AUTH_FIELD_CLASS}
                     {...field}
                   />
                 </FormControl>
@@ -128,8 +138,16 @@ export function ForgotPasswordForm() {
               </FormItem>
             )}
           />
-          <Button type="submit" className="w-full" disabled={isBusy}>
-            {isBusy ? <Loader2Icon className="size-4 animate-spin" /> : null}
+          <Button
+            type="submit"
+            size="lg"
+            className={AUTH_CTA_CLASS}
+            disabled={isBusy}
+            aria-busy={isBusy}
+          >
+            {isBusy ? (
+              <Loader2Icon className="size-5 animate-spin" aria-hidden="true" />
+            ) : null}
             Send reset link
           </Button>
         </form>
