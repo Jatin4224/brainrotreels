@@ -20,7 +20,10 @@
 
 "use client";
 
+import { usePathname } from "next/navigation";
+
 import { trpc } from "@/trpc/react-provider";
+import { isUnauthenticatedSurface } from "@/lib/config/public-routes";
 import type { Permission } from "@/lib/permissions";
 import type { inferRouterOutputs } from "@trpc/server";
 import type { AppRouter } from "@/trpc/routers/_app";
@@ -50,6 +53,39 @@ const ACTIVE_ORG_QUERY_OPTIONS = {
 } as const;
 
 /**
+ * SOURCE OF TRUTH KEYWORDS: useHasOrganizationContext, DONT_ASK_WHERE_THERE_IS
+ *   _NO_ANSWER, isUnauthenticatedSurface, PUBLIC_MARKETING_SURFACE
+ *
+ * WHAT:  Whether asking "which organization is active?" makes sense on the page
+ *        currently rendered.
+ *
+ * WHY:   DONT_ASK_WHERE_THERE_IS_NO_ANSWER. `getActiveOrganization` is an
+ *        authProcedure, so on a sign-in form or a landing page the only possible
+ *        answer is UNAUTHORIZED — and the question gets asked there anyway,
+ *        because `<UpgradeModalProvider>` is mounted in the ROOT layout and
+ *        calls this hook. The result was a guaranteed-failing request plus a
+ *        red 401 in the console on every public page load, visible to any
+ *        visitor who opens devtools, and it was the trigger for the landing
+ *        page redirecting itself to sign-in.
+ *
+ *        The observer-side excuse (PUBLIC_MARKETING_SURFACE) stops the redirect;
+ *        this stops the pointless REQUEST, which is the other half. Both read
+ *        the same predicate, so "where is a signed-out visitor normal?" has one
+ *        answer and the two halves cannot drift.
+ *
+ *        Decided HERE rather than by each caller passing `enabled`: this hook is
+ *        the single place the question is asked, so every present and future
+ *        consumer gets the behaviour without knowing about it. A disabled query
+ *        reports `isLoading: false`, so a gate reading this hook renders its
+ *        signed-out state instead of spinning forever.
+ * WHERE: Both hooks below.
+ */
+function useHasOrganizationContext(): boolean {
+  const pathname = usePathname();
+  return !isUnauthenticatedSurface(pathname);
+}
+
+/**
  * SOURCE OF TRUTH KEYWORDS: useActiveOrganization
  *
  * WHAT:  Returns the active organization plus a hasPermission check and
@@ -59,11 +95,12 @@ const ACTIVE_ORG_QUERY_OPTIONS = {
  * WHERE: Used across dashboard pages and src/components/feature-gate.tsx.
  */
 export function useActiveOrganization(): ActiveOrganizationData {
+  const enabled = useHasOrganizationContext();
   const { data: activeOrganization, isLoading } =
-    trpc.organization.getActiveOrganization.useQuery(
-      undefined,
-      ACTIVE_ORG_QUERY_OPTIONS,
-    );
+    trpc.organization.getActiveOrganization.useQuery(undefined, {
+      ...ACTIVE_ORG_QUERY_OPTIONS,
+      enabled,
+    });
 
   /* Provider-neutral: normalized by the tenancy adapter, not a role literal. */
   const isOwner = activeOrganization?.hasFullAccess ?? false;
@@ -88,8 +125,10 @@ export function useActiveOrganization(): ActiveOrganizationData {
  * WHERE: Used by feature-gate UI and any component that only needs the id.
  */
 export function useActiveOrganizationId(): string | undefined {
+  const enabled = useHasOrganizationContext();
   const { data } = trpc.organization.getActiveOrganization.useQuery(undefined, {
     ...ACTIVE_ORG_QUERY_OPTIONS,
+    enabled,
     select: (org) => org?.id,
   });
   return data ?? undefined;

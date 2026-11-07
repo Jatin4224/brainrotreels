@@ -259,3 +259,150 @@ html:has([data-app-banner]) {
     @apply bg-background text-foreground;
   }
 }
+
+/* SOURCE OF TRUTH KEYWORDS: --brand, --brand-accent, MARKETING_DESIGN_LANGUAGE,
+ * brutal-border, brutal-shadow, brutal-hover, halo-brand, marketing-canvas,
+ * --font-display, SOFT_BRUTALISM
+ *
+ * WHAT:  The public marketing surface's design language — two pinned brand
+ *        colors, the "soft brutalism" border/shadow/hover utilities, the hero
+ *        halo and the page wash — as TOKENS and UTILITIES rather than values
+ *        typed into a component.
+ *
+ * WHY:   SOFT_BRUTALISM is the look design.md specifies for the landing page:
+ *        hairline borders, a 1px inset top highlight, deep soft shadows, a 1px
+ *        lift on hover, and two loud brand colors against a near-black page.
+ *        The app's own palette is deliberately MONOCHROME — a workspace where
+ *        the only colored thing is the thing you must act on — so the brand
+ *        pair lives in its own tokens instead of being pushed into --primary
+ *        and --accent, which would repaint every button, badge and gate screen
+ *        inside the product.
+ *
+ *        PINNED IN BOTH THEMES, for the same reason --success and
+ *        --alert-banner are: a brand color that inverts with the theme is not a
+ *        brand color. These are an identity, not a surface, and the foreground
+ *        pairs below clear contrast on either background.
+ *
+ *        TOKENS_NOT_HEX is the rule this exists to keep. Components reference
+ *        `bg-brand` / `text-brand-accent` / `brutal-shadow`, never a hex value
+ *        and never `text-white`, so re-skinning the marketing pages is an edit
+ *        to this block alone.
+ *
+ *        `.marketing-canvas` carries the two radial washes rather than `body`:
+ *        the washes belong to the PUBLIC pages, and putting them on `body`
+ *        would tint the dashboard, the editor's preview and every render
+ *        thumbnail the operator is colour-judging.
+ * WHERE: Consumed by src/app/(marketing)/layout.tsx, its _components, and
+ *        src/app/(marketing)/page.tsx. */
+:root,
+.dark {
+  --brand: oklch(0.654 0.196 37.7);
+  --brand-foreground: oklch(1 0 0);
+  --brand-accent: oklch(0.863 0.154 92.5);
+  --brand-accent-foreground: oklch(0.15 0.012 264);
+  /* The display face — big, tight, low-contrast headings. Falls back to the
+     app's sans so a blocked font request degrades to the UI face rather than
+     to a serif. `--font-dm-sans` is published by next/font in the root
+     layout. */
+  --font-display: var(--font-dm-sans), Geist, sans-serif;
+}
+
+@theme inline {
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-brand-accent: var(--brand-accent);
+  --color-brand-accent-foreground: var(--brand-accent-foreground);
+  --font-display: var(--font-display);
+}
+
+@layer components {
+  /* The page wash — two fixed radial washes, so scrolling moves content
+     THROUGH the light rather than dragging it along. */
+  .marketing-canvas {
+    background-image:
+      radial-gradient(
+        1200px 600px at 80% -10%,
+        color-mix(in oklab, var(--brand) 16%, transparent),
+        transparent 60%
+      ),
+      radial-gradient(
+        900px 500px at -10% 20%,
+        color-mix(in oklab, var(--brand-accent) 8%, transparent),
+        transparent 60%
+      );
+    background-attachment: fixed;
+  }
+
+  /* The blurred halo behind the hero headline. */
+  .halo-brand {
+    background-image: radial-gradient(
+      60% 60% at 50% 50%,
+      color-mix(in oklab, var(--brand) 35%, transparent) 0%,
+      transparent 70%
+    );
+  }
+
+  .brutal-border {
+    border: 1px solid color-mix(in oklab, var(--foreground) 10%, transparent);
+  }
+
+  .brutal-border-thin {
+    border: 1px solid color-mix(in oklab, var(--foreground) 7%, transparent);
+  }
+
+  /* The inset top highlight is the whole trick: it reads as a physical edge
+     catching light, which is what keeps a 1px border from looking flat. */
+  .brutal-shadow-sm {
+    box-shadow:
+      0 1px 0 0 color-mix(in oklab, var(--foreground) 6%, transparent) inset,
+      0 1px 2px 0 oklch(0 0 0 / 0.35);
+  }
+
+  .brutal-shadow {
+    box-shadow:
+      0 1px 0 0 color-mix(in oklab, var(--foreground) 6%, transparent) inset,
+      0 8px 24px -12px oklch(0 0 0 / 0.55),
+      0 2px 6px -2px oklch(0 0 0 / 0.35);
+  }
+
+  .brutal-shadow-lg {
+    box-shadow:
+      0 1px 0 0 color-mix(in oklab, var(--foreground) 8%, transparent) inset,
+      0 24px 60px -20px oklch(0 0 0 / 0.65),
+      0 6px 18px -6px oklch(0 0 0 / 0.4);
+  }
+
+  .brutal-shadow-brand {
+    box-shadow:
+      0 0 0 1px color-mix(in oklab, var(--brand) 50%, transparent),
+      0 12px 40px -10px color-mix(in oklab, var(--brand) 35%, transparent);
+  }
+
+  .brutal-hover {
+    transition:
+      transform 0.2s,
+      box-shadow 0.2s,
+      border-color 0.2s;
+  }
+
+  .brutal-hover:hover {
+    border-color: color-mix(in oklab, var(--foreground) 18%, transparent);
+    transform: translateY(-1px);
+  }
+
+  .brutal-hover:active {
+    transform: translateY(0);
+  }
+
+  /* REDUCED_MOTION_IS_NOT_OPTIONAL: the lift is decoration, so it is the first
+     thing to go when the visitor has asked for less movement. */
+  @media (prefers-reduced-motion: reduce) {
+    .brutal-hover {
+      transition: none;
+    }
+
+    .brutal-hover:hover {
+      transform: none;
+    }
+  }
+}

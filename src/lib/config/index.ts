@@ -10,6 +10,7 @@
  *   ROUTES, AppRouteKey, PLAN_ORDER, BillingInterval, getPlanPriceId,
  *   getPlanByPriceId, getNextPlan, isPaidPlan, portalConfig, isPortalEnabled,
  *   isPortalOwnerEmail, PORTAL_PATH, portalRoute,
+ *   PUBLIC_ROUTES, isPublicRoute, isUnauthenticatedSurface, PublicRouteKey,
  *   THE_BARREL_IS_CLIENT_SAFE
  *
  * WHAT:  Barrel re-export for the CLIENT-SAFE `src/lib/config/*` modules.
@@ -59,6 +60,14 @@ export {
 export type { AuthRouteKey } from "./auth-routes";
 export { ROUTES } from "./routes";
 export type { AppRouteKey } from "./routes";
+/* PUBLIC_MARKETING_SURFACE — the `(marketing)` group's paths and the one
+ * predicate the AuthRedirectObserver asks before bouncing anyone to sign-in. */
+export {
+  PUBLIC_ROUTES,
+  isPublicRoute,
+  isUnauthenticatedSurface,
+} from "./public-routes";
+export type { PublicRouteKey } from "./public-routes";
 export { REGISTRATION_OPEN } from "./registration";
 export {
   PLAN_KEYS,

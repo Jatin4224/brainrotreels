@@ -44,7 +44,11 @@ import {
   type LimitResourceKey,
 } from "@/lib/resources";
 import type { FeatureGatesData } from "@/components/feature-gate";
-import { AUTH_ROUTES, isAuthRoute } from "@/lib/config/auth-routes";
+import { AUTH_ROUTES } from "@/lib/config/auth-routes";
+/* PUBLIC_MARKETING_SURFACE: one predicate covers the auth screens AND the
+ * public marketing pages, so the landing page can no longer redirect itself —
+ * see src/lib/config/public-routes.ts. */
+import { isUnauthenticatedSurface } from "@/lib/config/public-routes";
 import { ROUTES } from "@/lib/config/routes";
 import { ERROR_CODES } from "@/lib/errors";
 
@@ -370,7 +374,8 @@ function FeatureGateMutationObserver({
  *        the sign-in route so background polls on that page can't trigger a
  *        loop.
  * WHERE: Mounted by TRPCReactProvider above. Reads AUTH_ROUTES from
- *        src/lib/config/auth-routes.ts. UNAUTHORIZED is thrown by
+ *        src/lib/config/auth-routes.ts and isUnauthenticatedSurface from
+ *        src/lib/config/public-routes.ts. UNAUTHORIZED is thrown by
  *        authProcedure / protectedProcedure in src/trpc/procedures/protected.ts.
  */
 function AuthRedirectObserver({ queryClient }: { queryClient: QueryClient }) {
@@ -410,14 +415,16 @@ function AuthRedirectObserver({ queryClient }: { queryClient: QueryClient }) {
     };
 
     const handleError = (error: unknown) => {
-      /* PUBLIC_AUTH_SURFACE: never redirect away from an auth screen. Those
-       * pages exist to serve someone who is not signed in, so an UNAUTHORIZED
-       * there is the expected state, not a reason to move them — and anything
-       * mounted in the root layout (an upgrade-modal provider, a future
-       * analytics probe) fires its queries on these pages too. Without this,
-       * one such component asking an authProcedure a question turns every auth
-       * page into an instant bounce to sign-in. */
-      if (isAuthRoute(pathnameRef.current)) return;
+      /* PUBLIC_AUTH_SURFACE + PUBLIC_MARKETING_SURFACE: never redirect away
+       * from a page whose whole audience is people who are NOT signed in —
+       * the auth screens and the public marketing pages (`/`, `/pricing`,
+       * `/docs`, `/legal`). An UNAUTHORIZED there is the expected state, not a
+       * reason to move anyone, and anything mounted in the root layout (the
+       * upgrade-modal provider, a future analytics probe) fires its queries on
+       * those pages too. Without this, <UpgradeModalProvider> calling
+       * useActiveOrganizationId() turned the LANDING PAGE into an instant
+       * bounce to sign-in — the visitor never clicked anything. */
+      if (isUnauthenticatedSurface(pathnameRef.current)) return;
 
       if (isUnauthorized(error)) {
         router.replace(AUTH_ROUTES.signIn);

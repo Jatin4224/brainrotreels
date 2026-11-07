@@ -20,6 +20,8 @@
  *   UPLOAD_BYTES_PER_PLAN, VARIANT_NAMES, ASSET_TABS,
  *   PIPELINE_STAGES, stageUpdateSchema, generateProjectSchema,
  *   cancelProjectSchema, projectStagesSchema,
+ *   FaqItem, MarketingFormat, MarketingLink, MarketingNavColumn,
+ *   MarketingPipelineRow, MarketingProofClip, MARKETING_CONTENT_IS_TYPED,
  *   applyOpsSchema, openTimelineSchema, restoreRevisionSchema,
  *   resynthLineSchema, ApplyOpsResult, TIMELINE_AUTOSAVE_MS
  *
@@ -427,3 +429,13 @@ export type {
   RestoreRevisionValues,
   ResynthLineValues,
 } from "./timeline";
+
+/* MARKETING_CONTENT_IS_TYPED — the public pages' hand-written content shapes. */
+export type {
+  FaqItem,
+  MarketingFormat,
+  MarketingLink,
+  MarketingNavColumn,
+  MarketingPipelineRow,
+  MarketingProofClip,
+} from "./marketing";

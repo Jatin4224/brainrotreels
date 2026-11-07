@@ -24,7 +24,7 @@
  */
 
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { DM_Sans, Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { BRANDING } from "@/lib/config";
 import {
@@ -56,6 +56,23 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+/* SOURCE OF TRUTH KEYWORDS: dmSans, --font-dm-sans, --font-display,
+ * MARKETING_DESIGN_LANGUAGE
+ *
+ * The DISPLAY face, used by the public marketing pages only (`font-display`,
+ * wired in globals.css). Loaded here rather than in the marketing layout
+ * because next/font must run in a module the layout tree can set a className
+ * from, and the <html> element is the one place a font variable reaches every
+ * subtree. It costs nothing inside the product: no app surface references
+ * `font-display`, so the face is only ever fetched by a page that paints with
+ * it. Variable weights 400–900 — design.md's headings are big and LIGHT, which
+ * only works with a face that has the range. */
+const dmSans = DM_Sans({
+  variable: "--font-dm-sans",
+  subsets: ["latin"],
+  weight: ["400", "500", "700", "800", "900"],
+});
+
 export const metadata: Metadata = {
   metadataBase: BRANDING.metadataBase,
   title: {
@@ -74,7 +91,12 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={cn("h-full", geistSans.variable, geistMono.variable)}
+      className={cn(
+        "h-full",
+        geistSans.variable,
+        geistMono.variable,
+        dmSans.variable,
+      )}
     >
       <body
         className="min-h-full flex flex-col antialiased"
