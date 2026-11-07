@@ -4,8 +4,9 @@
 
 /**
  * SOURCE OF TRUTH KEYWORDS: marketing _components barrel, MarketingHeader,
- *   MarketingFooter, ProofStrip, LANDING_FORMATS, LANDING_FAQ,
- *   LANDING_PROOF_CLIPS, LANDING_FEATURE_KEYS, HANDLED_FOR_YOU, STEP_BLURBS
+ *   MarketingFooter, HeroPromptCard, ProofStrip, LANDING_FORMATS, LANDING_FAQ,
+ *   LANDING_PROOF_CLIPS, LANDING_FEATURE_KEYS, HANDLED_FOR_YOU, STEP_BLURBS,
+ *   HERO_COPY
  *
  * WHAT:  Public surface of the `(marketing)` route group's own components and
  *        page-owned content.
@@ -21,9 +22,11 @@
 
 export { MarketingHeader } from "./marketing-header";
 export { MarketingFooter } from "./marketing-footer";
+export { HeroPromptCard } from "./hero-prompt-card";
 export { ProofStrip, type ProofStripProps } from "./proof-strip";
 export {
   HANDLED_FOR_YOU,
+  HERO_COPY,
   LANDING_FAQ,
   LANDING_FEATURE_KEYS,
   LANDING_FORMATS,

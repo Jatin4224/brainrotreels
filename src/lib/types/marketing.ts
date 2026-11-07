@@ -32,8 +32,88 @@
  */
 
 import type { Route } from "next";
+import { z } from "zod";
 
 import type { ProjectKind } from "./project";
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: HERO_INPUT_MODES, heroInputModeSchema,
+ *   HeroInputMode, heroPromptSchema, HeroPromptValues,
+ *   HERO_PROMPT_MAX_CHARS, HERO_URL_MAX_CHARS, EVERY_INPUT_IS_VALIDATED,
+ *   ONE_SHAPE_FOUR_MODES
+ *
+ * WHAT:  The hero's "what have you got?" field — the four ways a visitor can
+ *        describe what they want made, and the validation each one carries.
+ *
+ * WHY:   EVERY_INPUT_IS_VALIDATED. This is a field on a public page that
+ *        anybody on the internet can type into, so it gets a zod schema and a
+ *        React Hook Form resolver exactly like every other input in this app —
+ *        the fact that the landing page is "just marketing" is the reason an
+ *        unvalidated field would survive here longest, not a reason to skip it.
+ *
+ *        ONE_SHAPE_FOUR_MODES: one `{ mode, value }` object refined per mode,
+ *        rather than a discriminated union. The union is the better model of
+ *        the data and the WORSE model of the form — a single textarea whose
+ *        meaning changes with the selected tab is one control, and RHF would
+ *        have to re-register and drop what the visitor typed every time they
+ *        switched tabs. `superRefine` keeps the per-mode rules real (a URL must
+ *        parse; a script needs enough text to be a script) while the form stays
+ *        one shape. The mirror of this trade is `redditSourceSchema`, which IS
+ *        a union — because there the two arms arrive from different callers and
+ *        nothing is being typed.
+ *
+ *        The bounds are deliberate, not decorative: `HERO_URL_MAX_CHARS` is the
+ *        same 2,000 the Reddit source allows, and the prose cap is small enough
+ *        that the field cannot be used to post a payload at a static page.
+ * WHERE: The hero card in src/app/(marketing)/_components/hero-prompt-card.tsx.
+ */
+export const HERO_INPUT_MODES = ["idea", "script", "url", "document"] as const;
+
+export const heroInputModeSchema = z.enum(HERO_INPUT_MODES);
+
+export type HeroInputMode = z.infer<typeof heroInputModeSchema>;
+
+export const HERO_PROMPT_MAX_CHARS = 5_000;
+export const HERO_URL_MAX_CHARS = 2_000;
+
+export const heroPromptSchema = z
+  .object({
+    mode: heroInputModeSchema,
+    value: z.string().trim().min(1, "Tell it what to make.").max(
+      HERO_PROMPT_MAX_CHARS,
+      `Keep it under ${HERO_PROMPT_MAX_CHARS.toLocaleString()} characters.`,
+    ),
+  })
+  .superRefine((input, ctx) => {
+    if (input.mode === "url") {
+      const parsed = z
+        .string()
+        .url()
+        .max(HERO_URL_MAX_CHARS)
+        .safeParse(input.value);
+
+      if (!parsed.success) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["value"],
+          message: "That doesn't look like a link.",
+        });
+      }
+      return;
+    }
+
+    /* A one-word "script" or "document" is an idea, and generating from it
+     * wastes the visitor's first impression of the product. */
+    if (input.mode !== "idea" && input.value.length < 40) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["value"],
+        message: "Paste a bit more so there's something to work with.",
+      });
+    }
+  });
+
+export type HeroPromptValues = z.infer<typeof heroPromptSchema>;
 
 /**
  * SOURCE OF TRUTH KEYWORDS: MarketingLink, MarketingNavColumn,

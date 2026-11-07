@@ -20,7 +20,8 @@
  *   UPLOAD_BYTES_PER_PLAN, VARIANT_NAMES, ASSET_TABS,
  *   PIPELINE_STAGES, stageUpdateSchema, generateProjectSchema,
  *   cancelProjectSchema, projectStagesSchema,
- *   FaqItem, MarketingFormat, MarketingLink, MarketingNavColumn,
+ *   FaqItem, HeroInputMode, HeroPromptValues, heroPromptSchema,
+ *   HERO_INPUT_MODES, MarketingFormat, MarketingLink, MarketingNavColumn,
  *   MarketingPipelineRow, MarketingProofClip, MARKETING_CONTENT_IS_TYPED,
  *   applyOpsSchema, openTimelineSchema, restoreRevisionSchema,
  *   resynthLineSchema, ApplyOpsResult, TIMELINE_AUTOSAVE_MS
@@ -430,9 +431,19 @@ export type {
   ResynthLineValues,
 } from "./timeline";
 
-/* MARKETING_CONTENT_IS_TYPED — the public pages' hand-written content shapes. */
+/* MARKETING_CONTENT_IS_TYPED — the public pages' hand-written content shapes,
+ * plus the hero field's schema (EVERY_INPUT_IS_VALIDATED). */
+export {
+  HERO_INPUT_MODES,
+  HERO_PROMPT_MAX_CHARS,
+  HERO_URL_MAX_CHARS,
+  heroInputModeSchema,
+  heroPromptSchema,
+} from "./marketing";
 export type {
   FaqItem,
+  HeroInputMode,
+  HeroPromptValues,
   MarketingFormat,
   MarketingLink,
   MarketingNavColumn,

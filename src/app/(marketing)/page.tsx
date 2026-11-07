@@ -7,7 +7,8 @@
  *   AUTH_IS_A_CLICK_NOT_A_REDIRECT, COPY_IS_REGISTRY_DERIVED,
  *   PROJECT_FLOW_STEPS, RESOURCES, LANDING_FEATURE_KEYS, LANDING_FORMATS,
  *   LANDING_FAQ, HANDLED_FOR_YOU, PUBLIC_PAGE_NO_AUTH, SOFT_BRUTALISM,
- *   APP_DESCRIPTION, AUTH_ROUTES, METADATA_IS_INHERITED, SCROLL_MT_20
+ *   HERO_COPY, THE_LEAD_IS_NOT_THE_TAGLINE, AUTH_ROUTES,
+ *   METADATA_IS_INHERITED, SCROLL_MT_20
  *
  * WHAT:  `/` — the public landing page. Hero and proof strip, the four
  *        formats, the walkthrough beside what the pipeline handles, the
@@ -64,7 +65,7 @@
  */
 
 import Link from "next/link";
-import { ArrowRightIcon, CheckIcon, SparklesIcon } from "lucide-react";
+import { ArrowRightIcon, CheckIcon, PlayIcon } from "lucide-react";
 
 /* Leaf import, not the barrel: `@/components/global/project-steps` also
  * exports the ProjectSteps client component, and this page needs only the
@@ -73,13 +74,15 @@ import { PROJECT_FLOW_STEPS } from "@/components/global/project-steps/steps";
 import { FaqAccordion } from "@/components/global/faq-accordion";
 import { buttonVariants } from "@/components/ui/button";
 import { AUTH_ROUTES } from "@/lib/config/auth-routes";
-import { APP_DESCRIPTION, APP_NAME } from "@/lib/config/branding";
+import { APP_NAME } from "@/lib/config/branding";
 import { PLANS, PLAN_ORDER } from "@/lib/config/plans";
 import { RESOURCES } from "@/lib/resources";
 import { cn } from "@/lib/utils";
 
 import {
   HANDLED_FOR_YOU,
+  HERO_COPY,
+  HeroPromptCard,
   LANDING_FAQ,
   LANDING_FEATURE_KEYS,
   LANDING_FORMATS,
@@ -88,12 +91,11 @@ import {
   STEP_BLURBS,
 } from "./_components";
 
-/* The two CTA skins, written once. Both are LINKS — see
+/* The primary CTA skin, written once and shared with the hero card's submit
+ * button so the page has ONE loud orange action. It is a LINK here — see
  * AUTH_IS_A_CLICK_NOT_A_REDIRECT. */
 const PRIMARY_CTA =
   "brutal-shadow-brand h-12 rounded-xl bg-brand px-6 text-base font-bold text-brand-foreground hover:bg-brand/90";
-const SECONDARY_CTA =
-  "brutal-border brutal-shadow brutal-hover h-12 rounded-xl bg-card px-6 text-base font-bold text-foreground";
 
 export default function LandingPage() {
   /* `showPlan` is the registry's own switch for a tier that exists but is not
@@ -107,20 +109,25 @@ export default function LandingPage() {
       <section className="relative isolate overflow-hidden">
         <div
           aria-hidden="true"
-          className="halo-brand pointer-events-none absolute left-1/2 top-24 -z-10 h-[640px] w-[1000px] max-w-full -translate-x-1/2 opacity-40 blur-[60px]"
+          className="halo-brand pointer-events-none absolute left-1/2 top-24 -z-10 h-160 w-250 max-w-full -translate-x-1/2 opacity-40 blur-[60px]"
         />
 
         <div className="mx-auto max-w-7xl px-6 pb-20 pt-16 md:pt-24">
           <div className="mx-auto flex max-w-3xl flex-col items-center text-center">
             <span className="brutal-border brutal-shadow-sm mb-8 inline-flex items-center gap-2 rounded-full bg-brand-accent px-4 py-1.5 text-sm font-bold tracking-tight text-brand-accent-foreground">
-              <SparklesIcon className="size-4" aria-hidden="true" />
-              Short-form video, generated end to end
+              <PlayIcon
+                className="size-3.5 fill-current"
+                aria-hidden="true"
+              />
+              {HERO_COPY.eyebrow}
             </span>
 
             <h1 className="font-display text-5xl font-medium leading-[0.95] tracking-tight text-foreground md:text-6xl lg:text-7xl">
-              Post every day without{" "}
+              {HERO_COPY.headlineLead}{" "}
               <span className="relative inline-block">
-                <span className="relative z-10">editing a single frame</span>
+                <span className="relative z-10">
+                  {HERO_COPY.headlineHighlight}
+                </span>
                 {/* The highlighter bar — decoration, so it is hidden from
                     assistive tech and the phrase reads as one sentence. */}
                 <span
@@ -130,30 +137,24 @@ export default function LandingPage() {
               </span>
             </h1>
 
-            {/* The operator's own tagline — see METADATA_IS_INHERITED. */}
+            {/* THE_LEAD_IS_NOT_THE_TAGLINE — page-owned prose, because this
+                sentence names the four inputs and the six jobs, which is more
+                than APP_DESCRIPTION can carry as a <meta> description too.
+                Metadata still inherits APP_DESCRIPTION from the root layout. */}
             <p className="mt-6 max-w-2xl text-lg leading-relaxed text-muted-foreground md:text-xl">
-              {APP_DESCRIPTION}
+              {HERO_COPY.lead}
             </p>
 
-            <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
-              <Link
-                href={AUTH_ROUTES.signUp}
-                className={cn(buttonVariants({ size: "lg" }), PRIMARY_CTA)}
-              >
-                Get started
-                <ArrowRightIcon className="size-4" aria-hidden="true" />
-              </Link>
-              <Link
-                href="/pricing"
-                className={cn(
-                  buttonVariants({ variant: "outline", size: "lg" }),
-                  SECONDARY_CTA,
-                )}
-              >
-                See pricing
-              </Link>
-            </div>
+            {/* THE_FIELD_IS_THE_PITCH — the hero's primary action is the
+                control itself, so the secondary links sit under it rather
+                than competing with it. */}
+            <HeroPromptCard className="mt-9" />
 
+            {/* ONE_ACTION_PER_SCREENFUL: no second CTA row under the card.
+                The card IS the hero's action, the sticky header carries a
+                permanent "Get started", and a button pair here only competes
+                with the field for the same click. Pricing stays one tap away
+                in the header. */}
             <p className="mt-6 text-sm text-muted-foreground">
               Script, narration, captions and the render — one run, start to
               finish.
@@ -366,7 +367,7 @@ export default function LandingPage() {
                   )}
                 >
                   {isFeatured ? (
-                    <span className="brutal-shadow-brand absolute left-1/2 top-[-0.875rem] -translate-x-1/2 rounded-full bg-brand px-3.5 py-1 text-xs font-semibold text-brand-foreground">
+                    <span className="brutal-shadow-brand absolute left-1/2 -top-3.5 -translate-x-1/2 rounded-full bg-brand px-3.5 py-1 text-xs font-semibold text-brand-foreground">
                       Best value
                     </span>
                   ) : null}

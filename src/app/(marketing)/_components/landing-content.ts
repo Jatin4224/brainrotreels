@@ -4,7 +4,7 @@
 
 /**
  * SOURCE OF TRUTH KEYWORDS: LANDING_FORMATS, LANDING_FAQ, LANDING_PROOF_CLIPS,
- *   HANDLED_FOR_YOU, STEP_BLURBS,
+ *   HANDLED_FOR_YOU, STEP_BLURBS, HERO_COPY,
  *   LANDING_FEATURE_KEYS, PAGE_OWNED_COPY, COPY_IS_REGISTRY_DERIVED,
  *   MarketingFormat, FaqItem, MarketingProofClip, ResourceKey
  *
@@ -261,3 +261,35 @@ export const STEP_BLURBS: Readonly<Record<string, string>> = {
   preview: "Watch the finished cut in the browser before it leaves the workspace.",
   edit: "Move scenes, overlays and audio by hand when you want the last ten percent your way.",
 };
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: HERO_COPY, PAGE_OWNED_COPY, APP_DESCRIPTION,
+ *   METADATA_IS_INHERITED, THE_LEAD_IS_NOT_THE_TAGLINE
+ *
+ * WHAT:  The hero's words — the eyebrow pill, the headline split at the
+ *        highlighted phrase, and the lead paragraph under it.
+ *
+ * WHY:   THE_LEAD_IS_NOT_THE_TAGLINE, which is the change this constant
+ *        records. The lead used to render `APP_DESCRIPTION`, and that read
+ *        well until the hero had to do two jobs at once: name the four things
+ *        you can start from AND the six jobs it does for you. `APP_DESCRIPTION`
+ *        cannot carry that, because it is also the <meta name="description">
+ *        and the operator's one-line identity — a sentence long enough to sell
+ *        the hero is the wrong length for a search result. So metadata still
+ *        inherits `APP_DESCRIPTION` (METADATA_IS_INHERITED is untouched) and
+ *        the hero gets prose written for the hero.
+ *
+ *        The headline is stored SPLIT rather than as one string with markup in
+ *        it: the highlighter bar is a positioned element behind one phrase, so
+ *        the page needs to know where that phrase starts and ends. A single
+ *        string would push that decision into JSX and make rewording the
+ *        headline a code change instead of a copy change.
+ * WHERE: The hero of src/app/(marketing)/page.tsx.
+ */
+export const HERO_COPY = {
+  eyebrow: "Short-form video, generated end to end",
+  headlineLead: "Create content people",
+  /* The phrase the yellow bar sits behind. */
+  headlineHighlight: "actually want to watch",
+  lead: "Turn any idea, script, URL, or document into genuinely high-quality short-form video — with the visuals, motion, voice, sound, and editing handled for you.",
+} as const;
