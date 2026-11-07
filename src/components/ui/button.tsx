@@ -8,11 +8,28 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/80",
+        // TACTILE_UI: `bg-primary` stays as the flat fallback under the
+        // gradient `.tactile-primary` paints, so a browser without color-mix()
+        // still renders a solid primary button. Hover/active live in the
+        // utility, not here, because a `hover:bg-*` colour would sit UNDER the
+        // gradient image and never show.
+        // TACTILE_UI: `.tactile-primary` is a translucent wash, so `bg-primary`
+        // is the real fill and a caller passing its own `bg-*` (the landing
+        // page hands these `bg-brand`) keeps it and still gets lit from above.
+        // Hover/active live in the utility, not here: a `hover:bg-*` colour
+        // sits UNDER the wash, so the state change has to be part of it.
+        default: "tactile-primary bg-primary text-primary-foreground",
+        // `border-border` must stay a UTILITY — the base carries
+        // `border-transparent`, and Tailwind v4 orders utilities AFTER the
+        // components layer, so a border-color set inside `.tactile-surface`
+        // would lose to it and the edge would come out invisible.
         outline:
-          "border-border bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50",
+          "tactile-surface border-border bg-background text-foreground aria-expanded:text-foreground dark:border-input dark:bg-input/30",
+        // One step quieter than `outline`: the flat tinted fill keeps its own
+        // hover, and only the 1px inner top edge is borrowed from the tactile
+        // set — a gradient here would read as a second outline button.
         secondary:
-          "bg-secondary text-secondary-foreground hover:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_5%)] aria-expanded:bg-secondary aria-expanded:text-secondary-foreground",
+          "tactile-inlay bg-secondary text-secondary-foreground hover:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_5%)] aria-expanded:bg-secondary aria-expanded:text-secondary-foreground",
         ghost:
           "hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:hover:bg-muted/50",
         destructive:

@@ -73,7 +73,7 @@
   --font-sans: Geist, sans-serif;
   --font-serif: Georgia, serif;
   --font-mono: Geist Mono, monospace;
-  --radius: 0.5rem;
+  --radius: 0.75rem;
   --shadow-x: 0px;
   --shadow-y: 1px;
   --shadow-blur: 2px;
@@ -141,7 +141,7 @@
   --font-sans: Geist, sans-serif;
   --font-serif: Georgia, serif;
   --font-mono: Geist Mono, monospace;
-  --radius: 0.5rem;
+  --radius: 0.75rem;
   --shadow-x: 0px;
   --shadow-y: 1px;
   --shadow-blur: 2px;
@@ -257,5 +257,564 @@ html:has([data-app-banner]) {
   }
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+/* SOURCE OF TRUTH KEYWORDS: --brand, --brand-accent, MARKETING_DESIGN_LANGUAGE,
+ * brutal-border, brutal-shadow, brutal-hover, halo-brand, marketing-canvas,
+ * --font-display, SOFT_BRUTALISM
+ *
+ * WHAT:  The public marketing surface's design language — two pinned brand
+ *        colors, the "soft brutalism" border/shadow/hover utilities, the hero
+ *        halo and the page wash — as TOKENS and UTILITIES rather than values
+ *        typed into a component.
+ *
+ * WHY:   SOFT_BRUTALISM is the look design.md specifies for the landing page:
+ *        hairline borders, a 1px inset top highlight, deep soft shadows, a 1px
+ *        lift on hover, and two loud brand colors against a near-black page.
+ *        The app's own palette is deliberately MONOCHROME — a workspace where
+ *        the only colored thing is the thing you must act on — so the brand
+ *        pair lives in its own tokens instead of being pushed into --primary
+ *        and --accent, which would repaint every button, badge and gate screen
+ *        inside the product.
+ *
+ *        PINNED IN BOTH THEMES, for the same reason --success and
+ *        --alert-banner are: a brand color that inverts with the theme is not a
+ *        brand color. These are an identity, not a surface, and the foreground
+ *        pairs below clear contrast on either background.
+ *
+ *        TOKENS_NOT_HEX is the rule this exists to keep. Components reference
+ *        `bg-brand` / `text-brand-accent` / `brutal-shadow`, never a hex value
+ *        and never `text-white`, so re-skinning the marketing pages is an edit
+ *        to this block alone.
+ *
+ *        `.marketing-canvas` carries the two radial washes rather than `body`:
+ *        the washes belong to the PUBLIC pages, and putting them on `body`
+ *        would tint the dashboard, the editor's preview and every render
+ *        thumbnail the operator is colour-judging.
+ * WHERE: Consumed by src/app/(marketing)/layout.tsx, its _components, and
+ *        src/app/(marketing)/page.tsx. */
+:root,
+.dark {
+  --brand: oklch(0.654 0.196 37.7);
+  --brand-foreground: oklch(1 0 0);
+  --brand-accent: oklch(0.863 0.154 92.5);
+  --brand-accent-foreground: oklch(0.15 0.012 264);
+  /* The display face — big, tight, low-contrast headings. Falls back to the
+     app's sans so a blocked font request degrades to the UI face rather than
+     to a serif. `--font-dm-sans` is published by next/font in the root
+     layout. */
+  --font-display: var(--font-dm-sans), Geist, sans-serif;
+  /* One step ABOVE --card: the hero's input shell and the cards that sit on
+     top of another card. The app palette has no such step because the product
+     never stacks two surfaces; the landing page does, constantly. */
+  --surface-raised: oklch(0.213 0.009 265);
+}
+
+@theme inline {
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-brand-accent: var(--brand-accent);
+  --color-brand-accent-foreground: var(--brand-accent-foreground);
+  --color-surface-raised: var(--surface-raised);
+  --color-reel-like: var(--reel-like);
+  --font-display: var(--font-display);
+}
+
+@layer components {
+  /* The page wash — two fixed radial washes, so scrolling moves content
+     THROUGH the light rather than dragging it along.
+     It ALSO re-points the surface tokens for everything beneath it. The app's
+     palette is pure-black monochrome, deliberately: a workspace where the only
+     coloured thing is the thing you must act on. A landing page needs the
+     opposite — a blue-tinted near-black with two lighter surfaces stacked on
+     it, so a card reads as a card. Redefining the EXISTING token names (rather
+     than inventing `--marketing-bg` and friends) is what lets every component
+     underneath keep using plain `bg-card` / `border-border` / `text-muted-
+     foreground` and simply come out in the marketing palette — no component on
+     this page knows there are two palettes, and nothing in the product shifts
+     by a pixel. */
+  .marketing-canvas {
+    --background: oklch(0.141 0.012 266);
+    --foreground: oklch(0.968 0.002 85);
+    --card: oklch(0.181 0.009 266);
+    --card-foreground: oklch(0.968 0.002 85);
+    --muted: oklch(0.213 0.009 265);
+    --muted-foreground: oklch(0.654 0.008 70);
+    --secondary: oklch(0.213 0.009 265);
+    --border: oklch(0.226 0.009 265);
+    --input: oklch(0.226 0.009 265);
+    /* The filled-heart red on the phone mockups' action rail. A FIXED signal
+       colour like --alert-banner, not a themed one: it is part of a simulated
+       feed UI, and a like that changed colour with our theme would stop
+       reading as a like. */
+    --reel-like: oklch(0.628 0.247 25.9);
+    background-color: var(--background);
+    background-image:
+      radial-gradient(
+        1200px 600px at 80% -10%,
+        color-mix(in oklab, var(--brand) 16%, transparent),
+        transparent 60%
+      ),
+      radial-gradient(
+        900px 500px at -10% 20%,
+        color-mix(in oklab, var(--brand-accent) 8%, transparent),
+        transparent 60%
+      );
+    background-attachment: fixed;
+  }
+
+  /* SOURCE OF TRUTH KEYWORDS: brand-highlight, HIGHLIGHT_IS_A_BLOCK
+     The yellow block the hero sets one word of the headline into. A tilted
+     solid with a hard, un-blurred offset shadow — the shadow is what stops it
+     reading as a flat swatch and makes the word look stuck on. Sized from the
+     text it wraps (inset, not fixed), so rewording the headline cannot leave
+     the block the wrong width. */
+  .brand-highlight {
+    background-color: var(--brand-accent);
+    box-shadow: 6px 6px 0 0 color-mix(in oklab, var(--brand-accent) 30%, #000);
+    transform: rotate(-2deg);
+  }
+
+  /* The blurred halo behind the hero headline. */
+  .halo-brand {
+    background-image: radial-gradient(
+      60% 60% at 50% 50%,
+      color-mix(in oklab, var(--brand) 35%, transparent) 0%,
+      transparent 70%
+    );
+  }
+
+  /* SOURCE OF TRUTH KEYWORDS: reel-scrim-top, reel-scrim-bottom, SCRIM_IS_NOT_A_THEME_COLOR
+     The two black gradients that keep a feed overlay legible over arbitrary
+     footage. Deliberately NOT theme tokens and deliberately not inline rgba in
+     a component: a scrim is a function of the IMAGE underneath, not of the
+     page's palette — it has to be black whatever the theme does — and this is
+     the one place that decision is written down. */
+  .reel-scrim-top {
+    background-image: linear-gradient(
+      to bottom,
+      oklch(0 0 0 / 0.45),
+      transparent
+    );
+  }
+
+  .reel-scrim-bottom {
+    background-image: linear-gradient(
+      to top,
+      oklch(0 0 0 / 0.65),
+      transparent
+    );
+  }
+
+  .brutal-border {
+    border: 1px solid color-mix(in oklab, var(--foreground) 10%, transparent);
+  }
+
+  .brutal-border-thin {
+    border: 1px solid color-mix(in oklab, var(--foreground) 7%, transparent);
+  }
+
+  /* The inset top highlight is the whole trick: it reads as a physical edge
+     catching light, which is what keeps a 1px border from looking flat. */
+  .brutal-shadow-sm {
+    box-shadow:
+      0 1px 0 0 color-mix(in oklab, var(--foreground) 6%, transparent) inset,
+      0 1px 2px 0 oklch(0 0 0 / 0.35);
+  }
+
+  .brutal-shadow {
+    box-shadow:
+      0 1px 0 0 color-mix(in oklab, var(--foreground) 6%, transparent) inset,
+      0 8px 24px -12px oklch(0 0 0 / 0.55),
+      0 2px 6px -2px oklch(0 0 0 / 0.35);
+  }
+
+  .brutal-shadow-lg {
+    box-shadow:
+      0 1px 0 0 color-mix(in oklab, var(--foreground) 8%, transparent) inset,
+      0 24px 60px -20px oklch(0 0 0 / 0.65),
+      0 6px 18px -6px oklch(0 0 0 / 0.4);
+  }
+
+  .brutal-shadow-brand {
+    box-shadow:
+      0 0 0 1px color-mix(in oklab, var(--brand) 50%, transparent),
+      0 12px 40px -10px color-mix(in oklab, var(--brand) 35%, transparent);
+  }
+
+  .brutal-hover {
+    transition:
+      transform 0.2s,
+      box-shadow 0.2s,
+      border-color 0.2s;
+  }
+
+  .brutal-hover:hover {
+    border-color: color-mix(in oklab, var(--foreground) 18%, transparent);
+    transform: translateY(-1px);
+  }
+
+  .brutal-hover:active {
+    transform: translateY(0);
+  }
+
+  /* REDUCED_MOTION_IS_NOT_OPTIONAL: the lift is decoration, so it is the first
+     thing to go when the visitor has asked for less movement. */
+  @media (prefers-reduced-motion: reduce) {
+    .brutal-hover {
+      transition: none;
+    }
+
+    .brutal-hover:hover {
+      transform: none;
+    }
+  }
+}
+
+/* SOURCE OF TRUTH KEYWORDS: reel-feed, reel-hand, reel-touch, --hand-skin,
+ * THE_FEED_SCROLLS_ITSELF, HAND_IS_ILLUSTRATION, SHOW_THE_GESTURE
+ *
+ * WHAT:  The hero phone's self-scrolling feed, the illustrated thumb that
+ *        swipes it, and the tap halo under that thumb.
+ *
+ * WHY:   SHOW_THE_GESTURE. A still phone shows one video; a phone being
+ *        SWIPED shows what the product is for — a feed somebody keeps
+ *        scrolling. The two animations are deliberately on the same 9s/3s
+ *        cycle so the thumb's upstroke lands on the feed's transition rather
+ *        than drifting against it.
+ *
+ *        THE_FEED_SCROLLS_ITSELF in CSS, not JavaScript: no timers to leak, no
+ *        re-render per frame, and the browser can run it off the main thread.
+ *        The track holds the slides plus a REPEAT of the first one, so the
+ *        loop's last step lands on a copy of slide one and the restart is
+ *        invisible. Percentages are of the TRACK's height, and each slide is
+ *        the screen's full height, so -100% is exactly one slide.
+ *
+ *        HAND_IS_ILLUSTRATION: the skin tones are tokens, not hex buried in
+ *        the SVG, so the hand can be redrawn for a different brand without
+ *        touching the component. They are PINNED in both themes — a hand is a
+ *        hand whatever the page does around it.
+ *
+ *        Every animation stops under `prefers-reduced-motion`: the phone then
+ *        shows the first short, still, with the thumb resting. Nothing is
+ *        hidden, so the composition is unchanged. */
+:root,
+.dark {
+  --hand-skin: oklch(0.82 0.056 59);
+  --hand-skin-mid: oklch(0.79 0.062 55);
+  --hand-skin-shade: oklch(0.67 0.069 48);
+  --hand-skin-light: oklch(0.89 0.038 62);
+}
+
+@theme inline {
+  --color-hand-skin: var(--hand-skin);
+  --color-hand-skin-mid: var(--hand-skin-mid);
+  --color-hand-skin-shade: var(--hand-skin-shade);
+  --color-hand-skin-light: var(--hand-skin-light);
+}
+
+@keyframes reel-feed {
+  0%,
+  6.7% {
+    transform: translateY(0);
+    animation-timing-function: cubic-bezier(0.3, 0.7, 0.2, 1);
+  }
+  16.7%,
+  40% {
+    transform: translateY(-100%);
+    animation-timing-function: cubic-bezier(0.3, 0.7, 0.2, 1);
+  }
+  50%,
+  73.3% {
+    transform: translateY(-200%);
+    animation-timing-function: cubic-bezier(0.3, 0.7, 0.2, 1);
+  }
+  83.3%,
+  100% {
+    transform: translateY(-300%);
+  }
+}
+
+@keyframes reel-swipe {
+  0% {
+    transform: translate(70px, 40px) rotate(4deg);
+  }
+  16% {
+    transform: translate(0, 0) rotate(0deg) scale(1);
+    animation-timing-function: ease-out;
+  }
+  20% {
+    transform: translate(0, 0) scale(0.97);
+  }
+  50% {
+    transform: translate(-6px, -190px) rotate(-3deg) scale(0.97);
+    animation-timing-function: ease-out;
+  }
+  60% {
+    transform: translate(40px, -200px) rotate(-1deg) scale(1);
+  }
+  100% {
+    transform: translate(70px, 40px) rotate(4deg);
+  }
+}
+
+@keyframes reel-touch {
+  0%,
+  17% {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  20% {
+    opacity: 0.9;
+    transform: scale(1);
+  }
+  48% {
+    opacity: 0.7;
+    transform: scale(1);
+  }
+  54%,
+  100% {
+    opacity: 0;
+    transform: scale(1.4);
+  }
+}
+
+@layer components {
+  .reel-feed {
+    animation: reel-feed 9s infinite;
+  }
+
+  .reel-hand {
+    transform-origin: 30px 125px;
+    animation: reel-swipe 3s infinite;
+    filter: drop-shadow(-10px 18px 20px oklch(0 0 0 / 0.45));
+  }
+
+  .reel-touch {
+    animation: reel-touch 3s infinite;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .reel-feed,
+    .reel-hand,
+    .reel-touch {
+      animation: none;
+    }
+
+    .reel-touch {
+      opacity: 0;
+    }
+  }
+}
+
+/* SOURCE OF TRUTH KEYWORDS: TACTILE_UI, tactile-primary, tactile-surface,
+ * tactile-field, tactile-inlay, --tactile-sheen, --tactile-shade,
+ * --tactile-glow, --tactile-inset, SOFT_SKEUOMORPHISM, OVERLAY_NOT_COLOR,
+ * design-buttons.md
+ *
+ * WHAT:  The product surface depth language from design-buttons.md — a vertical
+ *        gradient, an edge one step darker than the fill, a 1px inner top
+ *        highlight and a soft shadow — as TOKENS plus four utilities that the
+ *        shared primitives opt into.
+ *
+ * WHY:   The marketing pages already own their own depth language
+ *        (SOFT_BRUTALISM, the brutal-* utilities above). The product needed the
+ *        same treatment without inheriting the landing page loud brand pair or
+ *        its near-black canvas, so this is a SECOND, parallel utility family
+ *        rather than an edit to that one: the two surfaces skin independently.
+ *
+ *        OVERLAY_NOT_COLOR is the rule that makes this safe, and it was learnt
+ *        the hard way. The first cut built the gradient out of --primary
+ *        (`color-mix(--primary, white 24%)` → --primary). That paints an opaque
+ *        colour, so every caller that hands <Button> its own fill — and the
+ *        landing page hands it `bg-brand` in half a dozen places — had its
+ *        orange CTA repainted white, label and all. These utilities are instead
+ *        a TRANSLUCENT WASH over whatever background-color is already there:
+ *        white at the top, clear through the middle, black at the foot. The fill
+ *        stays the caller's, and `bg-primary`, `bg-brand` and `bg-destructive`
+ *        all come out lit from the same angle.
+ *
+ *        It also removes the need to declare the gradient twice per theme. A
+ *        colour-derived lift has to know whether --primary is near-black (light
+ *        mode) or near-white (dark), or it lights the button from BELOW in one
+ *        of them; a wash is lighter on top of anything. Only the hover wash
+ *        still flips by theme — darkening a near-black surface reads as nothing
+ *        — so that is the one token the .dark block overrides.
+ *
+ *        THE_DARKER_EDGE_IS_AN_INSET_RING, not a border-color: the button base
+ *        carries `bg-clip-padding`, so the fill stops at the padding box and a
+ *        translucent border would show the PAGE through it rather than a darker
+ *        shade of the button. An inset 1px ring is drawn over the fill itself.
+ *
+ *        Outer shadows deliberately stop at TWO layers, per design-buttons.md
+ *        section 8. --tactile-glow is a token so a surface that wants the
+ *        colour-tinted glow of section 4.1 can set it locally; it defaults to
+ *        neutral because CSS cannot read the fill a caller passed in.
+ * WHERE: Consumed by the shared primitives in src/components/ui — button.tsx
+ *        (default/outline/secondary), input.tsx, textarea.tsx, select.tsx and
+ *        card.tsx. Available app-wide as plain utility classes. */
+:root {
+  /* How hard the wash lifts the top and shades the foot of a raised surface. */
+  --tactile-sheen: 22%;
+  --tactile-shade: 9%;
+  --tactile-sheen-soft: 55%;
+  --tactile-shade-soft: 4%;
+  /* The 1px lit top edge and the 1px darker ring around the fill. */
+  --tactile-edge-light: color-mix(in srgb, white 30%, transparent);
+  --tactile-edge-dark: color-mix(in srgb, black 12%, transparent);
+  --tactile-highlight-soft: inset 0 1px 0 oklch(1 0 0 / 0.9);
+  --tactile-primary-text-shadow: 0 1px 0 oklch(0 0 0 / 0.15);
+  --tactile-glow: 0 1px 2px 0 oklch(0 0 0 / 0.1),
+    0 4px 12px -2px oklch(0 0 0 / 0.12);
+  /* Hover darkens on a light canvas. Flipped in .dark — see the note there. */
+  --tactile-hover-wash: color-mix(in srgb, black 5%, transparent);
+  /* Recessed: a field reads as cut INTO the surface, the inverse of a button. */
+  --tactile-inset: inset 0 1px 2px oklch(0 0 0 / 0.05);
+
+  /* Softer two-layer, low-opacity shadows replacing the single harsh
+     0.18-black drop the theme shipped with (design-buttons.md section 9). */
+  --shadow-2xs: 0 1px 2px 0 oklch(0 0 0 / 0.04);
+  --shadow-xs: 0 1px 2px 0 oklch(0 0 0 / 0.05);
+  --shadow-sm: 0 1px 2px 0 oklch(0 0 0 / 0.04), 0 2px 6px 0 oklch(0 0 0 / 0.04);
+  --shadow: 0 1px 2px 0 oklch(0 0 0 / 0.04), 0 2px 6px 0 oklch(0 0 0 / 0.04);
+  --shadow-md: 0 2px 4px 0 oklch(0 0 0 / 0.04),
+    0 8px 24px 0 oklch(0 0 0 / 0.06);
+  --shadow-lg: 0 4px 8px 0 oklch(0 0 0 / 0.04),
+    0 16px 40px 0 oklch(0 0 0 / 0.08);
+  --shadow-xl: 0 8px 16px 0 oklch(0 0 0 / 0.04),
+    0 24px 56px 0 oklch(0 0 0 / 0.1);
+  --shadow-2xl: 0 12px 24px 0 oklch(0 0 0 / 0.06),
+    0 40px 80px 0 oklch(0 0 0 / 0.14);
+}
+
+/* MUST stay after :root — `.dark` and `:root` carry the same specificity and
+   both land on <html>, so source order is what decides the override. */
+.dark {
+  /* A wash is lighter-on-top whatever the fill, so the gradient itself needs no
+     flipping here — only its strength, and the HOVER, which has to lighten:
+     darkening a surface that is already near-black reads as nothing happening. */
+  --tactile-sheen: 14%;
+  --tactile-shade: 14%;
+  --tactile-sheen-soft: 7%;
+  --tactile-shade-soft: 8%;
+  --tactile-edge-light: color-mix(in srgb, white 22%, transparent);
+  --tactile-edge-dark: color-mix(in srgb, black 24%, transparent);
+  --tactile-highlight-soft: inset 0 1px 0 oklch(1 0 0 / 0.06);
+  --tactile-primary-text-shadow: 0 1px 0 oklch(0 0 0 / 0.12);
+  --tactile-glow: 0 1px 2px 0 oklch(0 0 0 / 0.4),
+    0 4px 12px -2px oklch(0 0 0 / 0.45);
+  --tactile-hover-wash: color-mix(in srgb, white 8%, transparent);
+  --tactile-inset: inset 0 1px 2px oklch(0 0 0 / 0.3);
+
+  --shadow-2xs: 0 1px 2px 0 oklch(0 0 0 / 0.3);
+  --shadow-xs: 0 1px 2px 0 oklch(0 0 0 / 0.4);
+  --shadow-sm: 0 1px 2px 0 oklch(0 0 0 / 0.4), 0 2px 6px 0 oklch(0 0 0 / 0.35);
+  --shadow: 0 1px 2px 0 oklch(0 0 0 / 0.4), 0 2px 6px 0 oklch(0 0 0 / 0.35);
+  --shadow-md: 0 2px 4px 0 oklch(0 0 0 / 0.4), 0 8px 24px 0 oklch(0 0 0 / 0.45);
+  --shadow-lg: 0 4px 8px 0 oklch(0 0 0 / 0.4), 0 16px 40px 0 oklch(0 0 0 / 0.55);
+  --shadow-xl: 0 8px 16px 0 oklch(0 0 0 / 0.45),
+    0 24px 56px 0 oklch(0 0 0 / 0.6);
+  --shadow-2xl: 0 12px 24px 0 oklch(0 0 0 / 0.5),
+    0 40px 80px 0 oklch(0 0 0 / 0.7);
+}
+
+@layer components {
+  /* The one primary action per view. Everything here is a wash over the
+     caller fill — see OVERLAY_NOT_COLOR above. */
+  .tactile-primary {
+    background-image: linear-gradient(
+      180deg,
+      color-mix(in srgb, white var(--tactile-sheen), transparent) 0%,
+      transparent 48%,
+      color-mix(in srgb, black var(--tactile-shade), transparent) 100%
+    );
+    box-shadow:
+      inset 0 1px 0 var(--tactile-edge-light),
+      inset 0 0 0 1px var(--tactile-edge-dark),
+      var(--tactile-glow);
+    text-shadow: var(--tactile-primary-text-shadow);
+  }
+
+  .tactile-primary:hover:not(:disabled) {
+    background-image:
+      linear-gradient(var(--tactile-hover-wash), var(--tactile-hover-wash)),
+      linear-gradient(
+        180deg,
+        color-mix(in srgb, white var(--tactile-sheen), transparent) 0%,
+        transparent 48%,
+        color-mix(in srgb, black var(--tactile-shade), transparent) 100%
+      );
+  }
+
+  /* Pressed = the wash flips and the depth turns inward. Pairs with the
+     active:translate-y-px the button base already carries. */
+  .tactile-primary:active:not(:disabled) {
+    background-image: linear-gradient(
+      180deg,
+      color-mix(in srgb, black var(--tactile-shade), transparent) 0%,
+      transparent 60%
+    );
+    box-shadow:
+      inset 0 0 0 1px var(--tactile-edge-dark),
+      inset 0 1px 3px oklch(0 0 0 / 0.22);
+  }
+
+  /* The neutral raised control: a lighter wash, and a real border, because
+     unlike the primary it has no fill of its own to read an edge against. */
+  .tactile-surface {
+    background-image: linear-gradient(
+      180deg,
+      color-mix(in srgb, white var(--tactile-sheen-soft), transparent) 0%,
+      transparent 55%,
+      color-mix(in srgb, black var(--tactile-shade-soft), transparent) 100%
+    );
+    box-shadow: var(--tactile-highlight-soft), var(--shadow-xs);
+  }
+
+  .tactile-surface:hover:not(:disabled) {
+    background-image:
+      linear-gradient(var(--tactile-hover-wash), var(--tactile-hover-wash)),
+      linear-gradient(
+        180deg,
+        color-mix(in srgb, white var(--tactile-sheen-soft), transparent) 0%,
+        transparent 55%,
+        color-mix(in srgb, black var(--tactile-shade-soft), transparent) 100%
+      );
+  }
+
+  /* A trigger holding its popup open stays visibly pressed. Matched here and
+     not with an `aria-expanded:bg-*` utility, because a background-COLOUR sits
+     UNDER this wash and an inverted wash is what actually reads as pressed. */
+  .tactile-surface:active:not(:disabled),
+  .tactile-surface[aria-expanded="true"],
+  .tactile-surface[data-popup-open] {
+    background-image: linear-gradient(
+      180deg,
+      color-mix(in srgb, black var(--tactile-shade), transparent) 0%,
+      transparent 60%
+    );
+    box-shadow: inset 0 1px 2px oklch(0 0 0 / 0.07);
+  }
+
+  /* SOURCE OF TRUTH KEYWORDS: tactile-inlay, SHADOW_ARBITRARY_IS_A_COLOR
+     Just the 1px lit top edge, for a flat tinted fill that should read as
+     tactile without becoming a second raised button (the `secondary` variant).
+     A real class rather than `shadow-[var(--tactile-highlight-soft)]`: Tailwind
+     v4 parses a bare var() in `shadow-[…]` as a COLOR, so that utility is
+     silently never generated and the edge just does not appear. */
+  .tactile-inlay {
+    box-shadow: var(--tactile-highlight-soft);
+  }
+
+  /* Fields only. Held in its own utility so the focus ring the primitives
+     already declare is free to take the box-shadow back on :focus-visible. */
+  .tactile-field {
+    box-shadow: var(--tactile-inset);
+  }
+
+  .tactile-field:focus-visible,
+  .tactile-field:focus-within {
+    box-shadow: none;
   }
 }

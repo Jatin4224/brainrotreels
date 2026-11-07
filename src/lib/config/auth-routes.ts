@@ -64,7 +64,12 @@ export type AuthRouteKey = keyof typeof AUTH_ROUTES;
  *        just signed in has no organization YET, and yanking them to onboarding
  *        to create their own is the opposite of accepting the invitation that
  *        brought them.
- * WHERE: src/trpc/react-provider.tsx (AuthRedirectObserver).
+ *        The marketing pages need the identical excuse, so this predicate is
+ *        no longer read directly by the observer: `isUnauthenticatedSurface`
+ *        in ./public-routes.ts composes the two sets and the observer asks
+ *        that one question. See PUBLIC_MARKETING_SURFACE.
+ * WHERE: Composed by isUnauthenticatedSurface in src/lib/config/public-routes.ts,
+ *        which the AuthRedirectObserver in src/trpc/react-provider.tsx reads.
  */
 export function isAuthRoute(pathname: string): boolean {
   return Object.values(AUTH_ROUTES).some(

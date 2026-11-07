@@ -4,10 +4,11 @@
 
 /**
  * SOURCE OF TRUTH KEYWORDS: MarketingLayout, PUBLIC_ROUTE_GROUP,
- *   NO_AUTH_IN_THIS_GROUP
+ *   NO_AUTH_IN_THIS_GROUP, PUBLIC_MARKETING_SURFACE, marketing-canvas,
+ *   MarketingHeader, MarketingFooter, AUTH_IS_A_CLICK_NOT_A_REDIRECT
  *
- * WHAT:  The shell for every public, unauthenticated page — pricing and the
- *        legal documents.
+ * WHAT:  The shell for every public, unauthenticated page — the landing page,
+ *        pricing, the API reference and the legal documents.
  *
  * WHY:   PUBLIC_ROUTE_GROUP. A route group of its own, parallel to `(auth)`,
  *        `(dashboard)` and `(portal)`, because these pages differ from all
@@ -22,6 +23,24 @@
  *        page needs. A single auth read anywhere beneath here would silently
  *        opt the whole group out of that.
  *
+ *        PUBLIC_MARKETING_SURFACE is the OTHER half of that promise, and the
+ *        half this group could not keep on its own: `<UpgradeModalProvider>` in
+ *        the ROOT layout asks an authProcedure for the active organization, the
+ *        answer for a visitor is UNAUTHORIZED, and the global
+ *        AuthRedirectObserver used to turn that into a redirect — so the
+ *        landing page sent anonymous visitors to /sign-in without them
+ *        clicking anything. The observer now excuses these paths; see
+ *        `isUnauthenticatedSurface` in src/lib/config/public-routes.ts.
+ *        AUTH_IS_A_CLICK_NOT_A_REDIRECT: the header and the page CTAs are the
+ *        only route to an auth screen from here.
+ *
+ *        The header and footer are their own components rather than markup in
+ *        this file — see the headers in ./_components for why each exists. The
+ *        `marketing-canvas` wash is applied HERE, to the group's root element,
+ *        rather than to `body`: the brand gradients belong to the public pages
+ *        and would otherwise tint the dashboard and every render thumbnail an
+ *        operator is colour-judging (MARKETING_DESIGN_LANGUAGE in globals.css).
+ *
  *        The root layout still wraps this, so the theme, the fonts and the
  *        analytics provider all apply — which is why there is no `<html>` here
  *        and why a visitor's cookie choice is honoured on these pages too.
@@ -30,11 +49,7 @@
  *        src/app/(marketing)/docs.
  */
 
-import Link from "next/link";
-
-import { AUTH_ROUTES } from "@/lib/config/auth-routes";
-import { APP_NAME } from "@/lib/config/branding";
-import { buttonVariants } from "@/components/ui/button";
+import { MarketingFooter, MarketingHeader } from "./_components";
 
 export default function MarketingLayout({
   children,
@@ -42,74 +57,10 @@ export default function MarketingLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex min-h-screen flex-col bg-background">
-      <header className="border-b">
-        <nav className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-4">
-          <Link href="/" className="text-sm font-semibold">
-            {APP_NAME}
-          </Link>
-          <div className="flex items-center gap-4 text-sm">
-            <Link href="/pricing" className="text-muted-foreground hover:text-foreground">
-              Pricing
-            </Link>
-            {/* The API reference is a reason to choose the product, not a
-                support page — so it sits in the header beside pricing rather
-                than only in the footer. */}
-            <Link href="/docs/api" className="text-muted-foreground hover:text-foreground">
-              API
-            </Link>
-            <Link href="/legal" className="text-muted-foreground hover:text-foreground">
-              Legal
-            </Link>
-            {/* The way IN to the product. `/` is a landing page rather than an
-                auth probe (HOME_IS_PUBLIC), so these two links are the only
-                thing that still sends a visitor at the app — kept in the shared
-                header so every public page offers them, not just the landing
-                one. Routes come from AUTH_ROUTES; when registration is closed
-                proxy.ts rewrites the sign-up hop to sign-in, so this stays
-                correct without reading the flag here. */}
-            <Link
-              href={AUTH_ROUTES.signIn}
-              className="text-muted-foreground hover:text-foreground"
-            >
-              Sign in
-            </Link>
-            <Link
-              href={AUTH_ROUTES.signUp}
-              className={buttonVariants({ size: "sm" })}
-            >
-              Get started
-            </Link>
-          </div>
-        </nav>
-      </header>
-
+    <div className="marketing-canvas flex min-h-screen flex-col bg-background">
+      <MarketingHeader />
       <main className="flex-1">{children}</main>
-
-      <footer className="border-t">
-        <div className="mx-auto flex max-w-5xl flex-col gap-2 px-4 py-6 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-          <p>
-            © {new Date().getFullYear()} {APP_NAME}
-          </p>
-          <div className="flex gap-4">
-            <Link href="/docs/api" className="hover:text-foreground">
-              API
-            </Link>
-            <Link href="/legal/terms" className="hover:text-foreground">
-              Terms
-            </Link>
-            <Link href="/legal/privacy" className="hover:text-foreground">
-              Privacy
-            </Link>
-            <Link href="/legal/refunds" className="hover:text-foreground">
-              Refunds
-            </Link>
-            <Link href="/legal/takedown" className="hover:text-foreground">
-              Report content
-            </Link>
-          </div>
-        </div>
-      </footer>
+      <MarketingFooter />
     </div>
   );
 }
