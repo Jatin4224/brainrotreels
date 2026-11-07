@@ -292,8 +292,17 @@ html:has([data-app-banner]) {
  *        the washes belong to the PUBLIC pages, and putting them on `body`
  *        would tint the dashboard, the editor's preview and every render
  *        thumbnail the operator is colour-judging.
- * WHERE: Consumed by src/app/(marketing)/layout.tsx, its _components, and
- *        src/app/(marketing)/page.tsx. */
+ *
+ *        AUTH_WEARS_THE_BRAND: the `(auth)` screens are public pages too, and
+ *        they apply this same class (in AuthShell) rather than owning a second
+ *        palette. Pressing "Get started" on a black-and-orange landing page
+ *        used to drop the visitor onto a plain monochrome form — a change of
+ *        identity at the narrowest point of the funnel. The class is NOT
+ *        marketing-only despite the name; renaming it is a safe follow-up, but
+ *        a duplicate under another name is not.
+ * WHERE: Consumed by src/app/(marketing)/layout.tsx, its _components,
+ *        src/app/(marketing)/page.tsx, and
+ *        src/components/global/auth/auth-shell.tsx. */
 :root,
 .dark {
   --brand: oklch(0.654 0.196 37.7);

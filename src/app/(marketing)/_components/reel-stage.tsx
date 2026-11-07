@@ -67,13 +67,46 @@ export function ReelStage({
      * does not change layout size, so without the paired heights a shrunk
      * stage would leave dead space beneath it. The steps are measured against
      * the column the stage lands in; full size needs 1240px. */
+    /* BLEEDS INTO THE PAGE GUTTER, and this is the one place on the landing
+     * page that escapes the 1240px container every other section obeys. On a
+     * wide screen that container leaves a few hundred pixels of empty page to
+     * the right of the arm, so the composition reads as stranded mid-page no
+     * matter how it is anchored inside its column — the column itself is the
+     * limit. The translate is exactly half the leftover width, so the arm
+     * reaches for the viewport edge instead, and it is self-limiting:
+     * `max(0px, …)` is zero at 1240px and below, where there is no gutter to
+     * bleed into. The text column still lines up with the sections beneath,
+     * because only the stage moves.
+     *
+     * THE 758px IS DERIVED, NOT TASTE. The stage's right edge already sits at
+     * `50vw - 734px` from the viewport edge once the container's margin, its
+     * 24px padding, the 40px grid gap, the 1.05fr/1fr split and the 700px box
+     * are added up; 24px more keeps the arm off the edge. Translating by that
+     * exact distance lands the composition's right edge 24px inside the
+     * viewport at every width, and the `max(0px, …)` makes it a no-op as soon
+     * as the stage is already overflowing — which it is at 1440px and below.
+     * Moving by the WHOLE gutter instead, the obvious first guess, overshot by
+     * ~130px at 1900px and cut the sleeve and the yellow pill in half. */
     <div
       className={cn(
         "relative h-[356px] min-[900px]:h-[409px] min-[1024px]:h-[462px] min-[1240px]:h-[561px] min-[1440px]:h-[660px]",
+        "min-[1240px]:translate-x-[calc(max(0px,50vw-758px))]",
         className,
       )}
     >
-      <div className="absolute left-1/2 top-0 h-[660px] w-[700px] origin-top -translate-x-1/2 scale-[0.54] min-[900px]:scale-[0.62] min-[1024px]:scale-[0.7] min-[1240px]:scale-[0.85] min-[1440px]:scale-100">
+      {/* CENTRED ON ONE COLUMN, LEFT-ANCHORED ON TWO — and left-anchored is
+          what puts it in the CORNER, which reads backwards until you look at
+          where the parts sit inside the box. The phone is at x=80 and the arm
+          runs to x=692, so anchoring the box LEFT pushes the phone up against
+          the text and throws the sleeve out past the column toward the page
+          edge, which is the composition. Anchoring it right does the
+          opposite: it pins the SLEEVE and drags the phone back inward, which
+          is what centring was already doing to a lesser degree.
+
+          The overhang is deliberate and safe — the hero section clips it, so
+          nothing can push a horizontal scrollbar onto the page. Below 900px
+          there is one column and no corner to sit in, so it centres. */}
+      <div className="absolute left-1/2 top-0 h-[660px] w-[700px] origin-top -translate-x-1/2 scale-[0.54] min-[900px]:left-0 min-[900px]:origin-top-left min-[900px]:translate-x-0 min-[900px]:scale-[0.62] min-[1024px]:scale-[0.7] min-[1240px]:scale-[0.85] min-[1440px]:scale-100">
         <span className="brutal-shadow absolute left-0 top-[120px] z-[4] inline-flex -rotate-[5deg] items-center gap-2 rounded-full bg-foreground px-4 py-2 text-sm font-medium text-background">
           <span aria-hidden="true" className="size-1.5 rounded-full bg-brand" />
           {badge}

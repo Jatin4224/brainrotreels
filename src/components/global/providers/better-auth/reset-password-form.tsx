@@ -5,13 +5,17 @@
 "use client";
 
 /**
- * SOURCE OF TRUTH KEYWORDS: ResetPasswordForm
+ * SOURCE OF TRUTH KEYWORDS: ResetPasswordForm, AUTH_SURFACE, AuthError,
+ *   AUTH_CTA_CLASS, AUTH_FIELD_CLASS, AUTH_LABEL_CLASS, AUTH_LINK_CLASS
  *
  * WHAT:  Sets a new password using the token from the reset-link email. Reads
  *        the token from the URL (Better Auth appends ?token=...). Handles the
  *        missing-token case with an "invalid link" screen and confirms success.
  * WHY:   Calls Better Auth resetPassword with the token; the shared
  *        resetPasswordSchema enforces the length + confirm-match rule.
+ *        AUTH_SURFACE: wears the SAME skins as sign-in and sign-up, from
+ *        @/components/global/auth/auth-styles, so a restyle of the auth flow
+ *        cannot leave the last screen of it looking like the old product.
  * WHERE: Rendered by src/app/(auth)/reset-password/page.tsx (inside Suspense,
  *        since it reads searchParams) within AuthShell.
  */
@@ -36,6 +40,14 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+/* By path, not through ./index: that barrel re-exports this very form. */
+import { AuthError } from "@/components/global/auth/auth-error";
+import {
+  AUTH_CTA_CLASS,
+  AUTH_FIELD_CLASS,
+  AUTH_LABEL_CLASS,
+  AUTH_LINK_CLASS,
+} from "@/components/global/auth/auth-styles";
 
 export function ResetPasswordForm() {
   const searchParams = useSearchParams();
@@ -69,14 +81,13 @@ export function ResetPasswordForm() {
   if (!token) {
     return (
       <div className="flex flex-col items-center gap-4 text-center">
-        <h1 className="text-2xl font-bold">Invalid reset link</h1>
-        <p className="text-balance text-sm text-muted-foreground">
+        <h1 className="font-display text-3xl font-extrabold tracking-tight">
+          Invalid reset link
+        </h1>
+        <p className="text-balance text-base text-muted-foreground">
           This password reset link is invalid or has expired. Request a new one.
         </p>
-        <Link
-          href={AUTH_ROUTES.forgotPassword}
-          className="text-sm underline underline-offset-4"
-        >
+        <Link href={AUTH_ROUTES.forgotPassword} className={AUTH_LINK_CLASS}>
           Request a new link
         </Link>
       </div>
@@ -86,19 +97,18 @@ export function ResetPasswordForm() {
   if (done) {
     return (
       <div className="flex flex-col items-center gap-6 text-center">
-        <div className="flex size-16 items-center justify-center rounded-full bg-primary/10">
-          <CheckCircle2Icon className="size-8 text-primary" />
+        <div className="brutal-shadow-lg flex size-28 -rotate-6 items-center justify-center rounded-[2rem] bg-brand-accent">
+          <CheckCircle2Icon className="size-12 rotate-6 text-brand-accent-foreground" />
         </div>
-        <div className="flex flex-col gap-2">
-          <h1 className="text-2xl font-bold">Password reset</h1>
-          <p className="text-balance text-sm text-muted-foreground">
+        <div className="flex flex-col gap-3">
+          <h1 className="font-display text-3xl font-extrabold tracking-tight">
+            Password reset
+          </h1>
+          <p className="text-balance text-base text-muted-foreground">
             Your password has been updated. Sign in with your new password.
           </p>
         </div>
-        <Link
-          href={AUTH_ROUTES.signIn}
-          className="text-sm underline underline-offset-4"
-        >
+        <Link href={AUTH_ROUTES.signIn} className={AUTH_LINK_CLASS}>
           Back to sign in
         </Link>
       </div>
@@ -110,19 +120,14 @@ export function ResetPasswordForm() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col items-center gap-2 text-center">
-        <h1 className="text-2xl font-bold">Reset your password</h1>
-        <p className="text-balance text-sm text-muted-foreground">
+        <h1 className="font-display text-3xl font-extrabold tracking-tight">
+          Reset your password
+        </h1>
+        <p className="text-balance text-base text-muted-foreground">
           Enter a new password for your account.
         </p>
       </div>
-      {error ? (
-        <div
-          role="alert"
-          className="rounded-md border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive"
-        >
-          {error}
-        </div>
-      ) : null}
+      <AuthError error={error} />
       <Form {...form}>
         <form
           onSubmit={form.handleSubmit(onSubmit)}
@@ -134,13 +139,14 @@ export function ResetPasswordForm() {
             name="password"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>New password</FormLabel>
+                <FormLabel className={AUTH_LABEL_CLASS}>New password</FormLabel>
                 <FormControl>
                   <Input
                     type="password"
                     autoComplete="new-password"
-                    placeholder="Enter your new password"
+                    placeholder="At least 8 characters"
                     disabled={isBusy}
+                    className={AUTH_FIELD_CLASS}
                     {...field}
                   />
                 </FormControl>
@@ -153,13 +159,16 @@ export function ResetPasswordForm() {
             name="confirmPassword"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Confirm password</FormLabel>
+                <FormLabel className={AUTH_LABEL_CLASS}>
+                  Confirm password
+                </FormLabel>
                 <FormControl>
                   <Input
                     type="password"
                     autoComplete="new-password"
-                    placeholder="Confirm your new password"
+                    placeholder="Type it once more"
                     disabled={isBusy}
+                    className={AUTH_FIELD_CLASS}
                     {...field}
                   />
                 </FormControl>
@@ -167,20 +176,25 @@ export function ResetPasswordForm() {
               </FormItem>
             )}
           />
-          <Button type="submit" className="w-full" disabled={isBusy}>
-            {isBusy ? <Loader2Icon className="size-4 animate-spin" /> : null}
+          <Button
+            type="submit"
+            size="lg"
+            className={AUTH_CTA_CLASS}
+            disabled={isBusy}
+            aria-busy={isBusy}
+          >
+            {isBusy ? (
+              <Loader2Icon className="size-5 animate-spin" aria-hidden="true" />
+            ) : null}
             Reset password
           </Button>
         </form>
       </Form>
-      <div className="text-center text-sm">
-        <Link
-          href={AUTH_ROUTES.signIn}
-          className="underline underline-offset-4"
-        >
+      <p className="text-center text-base text-muted-foreground">
+        <Link href={AUTH_ROUTES.signIn} className={AUTH_LINK_CLASS}>
           Back to sign in
         </Link>
-      </div>
+      </p>
     </div>
   );
 }

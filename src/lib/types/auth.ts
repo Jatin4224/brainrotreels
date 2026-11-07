@@ -151,3 +151,78 @@ export const resetPasswordSchema = z
   });
 
 export type ResetPasswordValues = z.infer<typeof resetPasswordSchema>;
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: AuthShowcaseTone, AuthShowcaseCard,
+ *   AUTH_SHOWCASE_PANEL, ReelShowcaseItem, PRODUCT_AS_PROOF
+ *
+ * WHAT:  One of the three fanned 9:16 example cards in the desktop auth
+ *        screen's showcase panel — its tag, its hook line, and which of the
+ *        three brand surfaces it is painted in.
+ * WHY:   AUTH_SHOWCASE_PANEL is DECOR, not proof, which is exactly why it has
+ *        its own type instead of borrowing `ReelShowcaseItem`. That type
+ *        carries a poster image, a username and five engagement counts because
+ *        the landing page's phone is a simulated feed; the auth panel is three
+ *        flat colour blocks with a line of text on each, and typing it as a
+ *        reel would oblige every caller to invent a poster and a like count
+ *        that nothing renders.
+ *        `tone` is a closed union rather than a class name so the card cannot
+ *        smuggle a raw colour in — the component maps each tone to the theme
+ *        tokens, which is what keeps TOKENS_NOT_HEX true for this panel.
+ * WHERE: `AUTH_SHOWCASE_CARDS` in
+ *        src/components/global/auth/auth-content.ts, rendered by
+ *        src/components/global/auth/auth-showcase.tsx.
+ */
+export type AuthShowcaseTone = "surface" | "accent" | "brand";
+
+export interface AuthShowcaseCard {
+  /** Stable React key. */
+  id: string;
+  /** The small pill at the card's top-left, e.g. "Science". */
+  tag: string;
+  /** The hook line across the card's lower half. */
+  title: string;
+  tone: AuthShowcaseTone;
+  /** Shows the thin progress bar under the title — the centre card only. */
+  playing?: boolean;
+}
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: AuthScreenCopy, AUTH_SCREEN_COPY, AuthFormMode,
+ *   PAGE_OWNED_COPY, THE_HEADLINE_IS_SPLIT
+ *
+ * WHAT:  Everything the sign-in and sign-up screens say that is NOT a field
+ *        label — the badge, the split headline, the lead, the top-bar prompt
+ *        and the submit label.
+ * WHY:   PAGE_OWNED_COPY, the same discipline `HERO_COPY` keeps on the landing
+ *        page. Both modes render ONE component, so the words are the only
+ *        thing that differs between them; holding them in a
+ *        `Record<AuthFormMode, AuthScreenCopy>` means adding a third mode
+ *        fails the typecheck here until it has been given words, rather than
+ *        rendering a screen with a blank headline.
+ *        THE_HEADLINE_IS_SPLIT for the same reason the hero's is: the yellow
+ *        block is a positioned element BEHIND one phrase, so the screen has to
+ *        know where that phrase starts and ends. One string with markup in it
+ *        would make rewording the headline a code change.
+ * WHERE: `AUTH_SCREEN_COPY` in src/components/global/auth/auth-content.ts,
+ *        read by src/components/global/auth/auth-hero.tsx and the top bar
+ *        built in src/app/(auth)/sign-in|sign-up/page.tsx.
+ */
+export interface AuthScreenCopy {
+  /** The yellow pill above the headline. */
+  badge: string;
+  headlineBefore: string;
+  /** The one phrase the tilted block sits behind. */
+  headlineHighlight: string;
+  headlineAfter: string;
+  lead: string;
+  /** Top bar, left of the pill: "New here?" / "Already creating?". */
+  navPrompt: string;
+  /** Top bar pill label — always the OPPOSITE mode. */
+  navCta: string;
+  /** The primary button's label. */
+  submitLabel: string;
+  /** The footer line under the mobile CTA, left of the cross-link. */
+  footerPrompt: string;
+  footerCta: string;
+}
