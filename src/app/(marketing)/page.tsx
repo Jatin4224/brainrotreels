@@ -190,6 +190,7 @@ export default function LandingPage() {
             <ReelStage
               items={LANDING_REELS}
               badge={HERO_COPY.renderedBadge}
+              footnote={HERO_COPY.showcaseFootnote}
             />
           </div>
 

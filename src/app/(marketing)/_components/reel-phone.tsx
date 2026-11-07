@@ -4,409 +4,307 @@
 
 /**
  * SOURCE OF TRUTH KEYWORDS: ReelPhone, ReelPhoneProps, ReelShowcaseItem,
- *   POSTER_IS_THE_FLOOR, PAUSE_WHEN_OFFSCREEN, REDUCED_MOTION_MEANS_STILL,
- *   OVERLAY_IS_DECORATION, NO_LAYOUT_SHIFT, FEED_LABEL_IS_CONFIGURABLE
+ *   THE_FEED_SCROLLS_ITSELF, CHROME_IS_SHARED, OVERLAY_IS_DECORATION,
+ *   NO_LAYOUT_SHIFT, FEED_LABEL_IS_CONFIGURABLE, reel-feed
  *
- * WHAT:  One phone mockup — a fixed-size frame holding a looping short with a
- *        short-video feed overlay drawn on top of it: status bar, header,
- *        action rail, caption block and bottom nav.
+ * WHAT:  The hero's phone — a fixed-size handset frame whose screen scrolls
+ *        itself through the example shorts, with a short-video feed overlay
+ *        drawn on top: status bar, header, per-short action rail and caption
+ *        block, bottom nav and home indicator.
  *
- * WHY:   POSTER_IS_THE_FLOOR. The poster is required and the video is not, so
- *        the phone is finished at first paint and stays finished in every case
- *        that would otherwise leave a hole: no clip encoded yet, a visitor who
- *        asked for reduced motion, a slow network, a codec the browser
- *        refuses. The video layers OVER the poster rather than replacing it,
- *        which is also NO_LAYOUT_SHIFT — the frame is a fixed px size and the
- *        poster fills it immediately, so nothing in the hero moves as media
- *        arrives.
+ * WHY:   THE_FEED_SCROLLS_ITSELF, in CSS (see `reel-feed` in globals.css). One
+ *        phone showing a FEED beats three phones showing stills, because the
+ *        scroll is the product: a visitor watches the thing they are being
+ *        sold somebody else doing. No JavaScript timer, so nothing to leak and
+ *        nothing to re-render per frame.
  *
- *        PAUSE_WHEN_OFFSCREEN. Three autoplaying videos that keep decoding
- *        after the visitor has scrolled to the pricing table cost battery for
- *        nothing, so an IntersectionObserver plays and pauses them. The side
- *        phones also load lazily: they are the two a visitor looks at least.
+ *        CHROME_IS_SHARED. The status bar, header, nav and home indicator
+ *        belong to the PHONE and are drawn once outside the scrolling track;
+ *        only the scrim, the rail and the caption belong to the SHORT and
+ *        repeat per slide. Drawing the chrome per slide would scroll the
+ *        status bar off the top of the screen, which no phone does.
  *
- *        REDUCED_MOTION_MEANS_STILL — not "slower". A looping video is motion
- *        the visitor did not ask for, so under the preference the `<video>` is
- *        never mounted at all rather than mounted and paused; there is nothing
- *        to decode and nothing to start.
+ *        The track repeats the first short at the end so the loop's last step
+ *        lands on a copy of slide one and the restart cannot be seen.
+ *
+ *        NO_LAYOUT_SHIFT: the frame is a fixed pixel size and every slide is a
+ *        poster that fills it, so the hero reserves its space before any media
+ *        arrives. `contain` letterboxes a source that is not 9:16 rather than
+ *        cropping it, because the crop would cut off the burned-in caption —
+ *        the part of the short worth showing.
  *
  *        OVERLAY_IS_DECORATION. The whole chrome — counts, buttons, nav — is
  *        `aria-hidden` and `pointer-events-none`. None of it does anything,
  *        because there is nothing to like on a landing page, and a screen
  *        reader announcing "92K remixes, button" about a picture is worse than
- *        silence. The frame itself carries one honest label naming whose short
- *        it is.
+ *        silence. The frame carries one honest label instead.
  *
  *        FEED_LABEL_IS_CONFIGURABLE: the header word is a prop with a default,
- *        not a literal, so the mockup can be relabelled in one place without
- *        touching this file. No platform logo or wordmark is drawn anywhere —
- *        every icon here is our own inline outline SVG.
+ *        not a literal, so the mockup can be relabelled in one place. No
+ *        platform logo or wordmark is drawn anywhere — every icon here is our
+ *        own inline outline SVG.
  *
  *        Theme tokens only. The overlay reads as white because `--foreground`
  *        in the marketing palette IS near-white; the scrims are utilities (a
  *        scrim is a function of the footage, not the palette) and the filled
  *        heart is the fixed `--reel-like` signal colour.
- * WHERE: Rendered three times by ./reel-stage.tsx from `LANDING_REELS`.
+ * WHERE: Rendered by ./reel-stage.tsx from `LANDING_REELS`.
  */
-
-"use client";
-
-import { useEffect, useRef, useState } from "react";
 
 import type { ReelShowcaseItem } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 export interface ReelPhoneProps {
-  item: ReelShowcaseItem;
-  /** Bigger, upright, on top. The centre of the fan. */
-  featured?: boolean | undefined;
+  items: readonly ReelShowcaseItem[];
   /** The word in the feed header. Defaults to "Reels". */
   feedLabel?: string | undefined;
   className?: string | undefined;
 }
 
-/* Shared geometry. The nav bar sits BELOW the video rather than over it, so
- * the video area is the frame minus this. */
-const NAV_HEIGHT_PX = 38;
-
-const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
+const NAV_HEIGHT_PX = 48;
+const RAIL_ICON = "size-[27px] fill-none stroke-current stroke-2";
 
 export function ReelPhone({
-  item,
-  featured = false,
+  items,
   feedLabel = "Reels",
   className,
 }: ReelPhoneProps) {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const frameRef = useRef<HTMLDivElement>(null);
-  /* The meta block fades in once the media is up, so a half-loaded phone
-   * never shows a caption floating over an empty frame. */
-  const [metaVisible, setMetaVisible] = useState(false);
-
-  const hasVideo = item.videoSrc !== undefined;
-
-  /* PLAYBACK IS DRIVEN ENTIRELY FROM HERE, and the `<video>` carries no
-   * `autoPlay` attribute. Two bugs that buys:
-   *
-   * 1. No hydration mismatch. Reading the motion preference during render
-   *    would have the server say "reduced" and the client say otherwise, so
-   *    the two renders would disagree about whether a `<video>` exists. The
-   *    markup is now identical on both and only BEHAVIOUR differs.
-   * 2. No flash of motion. An `autoPlay` attribute is honoured by the browser
-   *    the instant the element parses — before any of our JavaScript can
-   *    decide the visitor asked for less of it. Starting playback ourselves
-   *    means a reduced-motion visitor sees the poster and nothing else, ever.
-   *
-   * The same effect handles PAUSE_WHEN_OFFSCREEN: 25% visible is enough to be
-   * worth decoding; below that the visitor has moved on and three decoding
-   * videos are just battery. */
-  useEffect(() => {
-    if (!hasVideo) {
-      const timer = window.setTimeout(() => setMetaVisible(true), 150);
-      return () => window.clearTimeout(timer);
-    }
-
-    const frame = frameRef.current;
-    if (frame === null) return undefined;
-
-    const motionQuery = window.matchMedia(REDUCED_MOTION_QUERY);
-    let onScreen = false;
-
-    const sync = () => {
-      const video = videoRef.current;
-      if (video === null) return;
-
-      if (motionQuery.matches || !onScreen) {
-        video.pause();
-        return;
-      }
-
-      void video.play().catch(() => {
-        /* Autoplay refused (a policy, a codec, a battery saver). The poster
-         * is still painted, so there is nothing to recover. */
-      });
-    };
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) onScreen = entry.isIntersecting;
-        sync();
-      },
-      { threshold: 0.25 },
-    );
-
-    observer.observe(frame);
-    /* Honour the preference being flipped mid-session rather than only at
-     * load — the visitor who turns it on is the one who most wants it. */
-    motionQuery.addEventListener("change", sync);
-
-    return () => {
-      observer.disconnect();
-      motionQuery.removeEventListener("change", sync);
-    };
-  }, [hasVideo]);
-
-  const strokeIcon = "size-[19px] stroke-[2px]" as const;
+  /* The repeat of slide one that hides the loop's restart. Read through a
+   * named first element rather than indexing inline: under
+   * `noUncheckedIndexedAccess` a bare `items[0]` widens the whole track to
+   * include `undefined`, and every field read below would then need a guard. */
+  const first = items[0];
+  const slides: readonly ReelShowcaseItem[] =
+    first === undefined ? [] : [...items, first];
 
   return (
     <div
-      ref={frameRef}
-      aria-label={`Example short by @${item.username}`}
+      aria-label="A phone scrolling through example shorts made with the app"
       className={cn(
-        "relative shrink-0 overflow-hidden rounded-[30px] border-[5px] border-surface-raised bg-background shadow-[0_30px_60px_-20px_oklch(0_0_0/0.75)]",
-        featured ? "h-[484px] w-60" : "h-[460px] w-[228px]",
+        "relative h-[620px] w-[300px] overflow-hidden rounded-[44px] border-[7px] border-surface-raised bg-background shadow-[0_0_0_1px_var(--border),0_40px_80px_oklch(0_0_0/0.5)]",
         className,
       )}
     >
-      {/* ── Media ─────────────────────────────────────────────────────── */}
+      {/* ── The scrolling screen ──────────────────────────────────────── */}
       <div
-        className="absolute inset-x-0 top-0 overflow-hidden bg-background"
+        className="absolute inset-x-0 top-0 overflow-hidden"
         style={{ bottom: `${NAV_HEIGHT_PX}px` }}
       >
-        {/* eslint-disable-next-line @next/next/no-img-element -- Poster frames
-            are operator-supplied and may be off-domain; next/image would need
-            a remotePatterns entry per deployment. Fixed frame + eager featured
-            poster is what NO_LAYOUT_SHIFT needs, which is the cost the rule is
-            really about. */}
-        <img
-          src={item.posterSrc}
-          alt={item.posterAlt}
-          loading={featured ? "eager" : "lazy"}
-          decoding="async"
-          className="absolute inset-0 size-full object-cover"
-        />
+        <div className="reel-feed absolute inset-0">
+          {slides.map((item, index) => (
+            <div
+              /* The repeat shares its item's id, so the index disambiguates. */
+              key={`${item.id}-${index}`}
+              className="relative h-full w-full overflow-hidden bg-background"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element -- Frames
+                  are operator-supplied and may be off-domain; next/image would
+                  need a remotePatterns entry per deployment. The fixed frame
+                  and an eager first slide are what NO_LAYOUT_SHIFT needs,
+                  which is the cost this rule is really about. */}
+              <img
+                src={item.posterSrc}
+                alt={item.posterAlt}
+                loading={index === 0 ? "eager" : "lazy"}
+                decoding="async"
+                className={cn(
+                  "absolute inset-0 size-full",
+                  item.contain === true ? "object-contain" : "object-cover",
+                )}
+              />
 
-        {hasVideo ? (
-          /* No `autoPlay` — see the effect above. `muted` and `playsInline`
-             are still required: without them a browser refuses to start a
-             video programmatically at all, and iOS takes it fullscreen. */
-          <video
-            ref={videoRef}
-            src={item.videoSrc}
-            poster={item.posterSrc}
-            muted
-            loop
-            playsInline
-            preload={featured ? "metadata" : "none"}
-            onPlaying={() => setMetaVisible(true)}
-            className="absolute inset-0 size-full object-cover"
-          />
-        ) : null}
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 font-sans text-foreground"
+              >
+                <div className="reel-scrim-bottom absolute inset-x-0 bottom-0 h-[150px]" />
+
+                {/* Action rail */}
+                <div className="absolute bottom-[18px] right-2.5 flex flex-col items-center gap-[15px] text-[11.5px] font-semibold">
+                  <span className="flex flex-col items-center gap-[3px]">
+                    <svg
+                      viewBox="0 0 24 24"
+                      className={cn(
+                        "size-7 stroke-2",
+                        item.liked === true
+                          ? "fill-reel-like stroke-reel-like"
+                          : "fill-none stroke-current",
+                      )}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M12 20.5s-7.5-4.4-9.3-9.2C1.4 7.8 3.6 4.5 7 4.5c2.1 0 3.6 1.2 5 3 1.4-1.8 2.9-3 5-3 3.4 0 5.6 3.3 4.3 6.8-1.8 4.8-9.3 9.2-9.3 9.2z" />
+                    </svg>
+                    {item.likes}
+                  </span>
+
+                  <span className="flex flex-col items-center gap-[3px]">
+                    <svg
+                      viewBox="0 0 24 24"
+                      className={RAIL_ICON}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M20.5 12a8.5 8.5 0 1 1-3.4-6.8A8.4 8.4 0 0 1 20.5 12zM20.5 21l-1.6-4.3" />
+                    </svg>
+                    {item.comments}
+                  </span>
+
+                  <span className="flex flex-col items-center gap-[3px]">
+                    <svg
+                      viewBox="0 0 24 24"
+                      className={RAIL_ICON}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M4 11V9a3 3 0 0 1 3-3h13m-3-3 3 3-3 3M20 13v2a3 3 0 0 1-3 3H4m3 3-3-3 3-3" />
+                    </svg>
+                    {item.remixes}
+                  </span>
+
+                  <span className="flex flex-col items-center gap-[3px]">
+                    <svg
+                      viewBox="0 0 24 24"
+                      className={RAIL_ICON}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M22 3 9.2 10.1M22 3l-7 18-4.5-8.6L2 8z" />
+                    </svg>
+                    {item.shares}
+                  </span>
+
+                  <svg viewBox="0 0 24 24" className="size-[22px] fill-current">
+                    <circle cx="5" cy="12" r="2" />
+                    <circle cx="12" cy="12" r="2" />
+                    <circle cx="19" cy="12" r="2" />
+                  </svg>
+
+                  <span className="size-[26px] rounded-[7px] border-2 border-foreground bg-brand-accent" />
+                </div>
+
+                {/* Caption block */}
+                <div className="absolute bottom-4 left-3.5 right-14 text-[13px] leading-[1.38]">
+                  <span className="mb-1.5 flex items-center gap-2 font-semibold">
+                    <span className="size-7 shrink-0 rounded-full border-2 border-foreground bg-brand-accent" />
+                    {item.username}
+                    <span className="rounded-[7px] border border-foreground/80 px-2.5 py-[3px] text-xs">
+                      Follow
+                    </span>
+                  </span>
+
+                  <span className="block truncate">
+                    {item.caption}{" "}
+                    <span className="opacity-70">{item.hashtags}</span>
+                  </span>
+
+                  <span className="mt-[5px] flex items-center gap-[5px] text-xs">
+                    <svg viewBox="0 0 24 24" className="size-3 fill-current">
+                      <path d="M9 18a3 3 0 1 1-2-2.8V4l12-2v13a3 3 0 1 1-2-2.8V6.3L9 7.7z" />
+                    </svg>
+                    {item.username} · Original audio
+                  </span>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
 
-      {/* ── Feed overlay (decoration only) ────────────────────────────── */}
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 font-sans text-foreground"
-      >
-        <div className="reel-scrim-top absolute inset-x-0 top-0 h-[70px]" />
+      {/* ── The phone's own chrome, drawn once over the feed ───────────── */}
+      <div aria-hidden="true" className="pointer-events-none">
+        <span className="absolute left-1/2 top-[9px] z-[6] h-6 w-[86px] -translate-x-1/2 rounded-[14px] bg-background" />
+
+        <div className="reel-scrim-top absolute inset-x-0 top-0 z-[4] h-24" />
 
         {/* Status bar */}
-        <div className="absolute inset-x-0 top-[7px] flex items-center justify-between px-4 text-[10px] font-semibold">
+        <div className="absolute left-[26px] right-[22px] top-[13px] z-[5] flex justify-between text-xs font-semibold text-foreground">
           <span>9:41</span>
           <span className="flex items-center gap-1">
-            {/* Signal bars */}
-            <svg viewBox="0 0 16 10" className="h-2.5 w-4 fill-current">
-              <rect x="0" y="6" width="2.5" height="4" rx="0.8" />
-              <rect x="4" y="4" width="2.5" height="6" rx="0.8" />
-              <rect x="8" y="2" width="2.5" height="8" rx="0.8" />
-              <rect x="12" y="0" width="2.5" height="10" rx="0.8" />
+            <svg viewBox="0 0 18 12" className="h-[11px] w-[17px] fill-current">
+              <rect x="0" y="8" width="3" height="4" rx="1" />
+              <rect x="5" y="5" width="3" height="7" rx="1" />
+              <rect x="10" y="2.5" width="3" height="9.5" rx="1" />
+              <rect x="15" y="0" width="3" height="12" rx="1" />
             </svg>
-            {/* Battery */}
-            <svg viewBox="0 0 26 12" className="h-3 w-6">
+            <svg viewBox="0 0 26 12" className="h-3 w-[25px]">
               <rect
-                x="0.75"
-                y="0.75"
-                width="21"
-                height="10.5"
+                x=".5"
+                y=".5"
+                width="22"
+                height="11"
                 rx="3"
-                className="fill-none stroke-current"
-                strokeWidth="1.5"
+                className="fill-none stroke-current opacity-60"
               />
               <rect
-                x="2.75"
-                y="2.75"
-                width="14"
-                height="6.5"
+                x="2"
+                y="2"
+                width="16"
+                height="8"
                 rx="1.5"
                 className="fill-current"
               />
-              <path
-                d="M23.5 4.5v3a2 2 0 0 0 0-3Z"
-                className="fill-current"
+              <rect
+                x="23.5"
+                y="4"
+                width="2"
+                height="4"
+                rx="1"
+                className="fill-current opacity-60"
               />
             </svg>
           </span>
         </div>
 
         {/* Header */}
-        <div className="absolute inset-x-0 top-[26px] flex items-center justify-between px-4">
-          <span className="flex items-center gap-1 text-[15px] font-bold">
+        <div className="absolute inset-x-4 top-[44px] z-[5] flex items-center justify-between text-[19px] font-bold text-foreground">
+          <span className="flex items-center gap-1">
             {feedLabel}
             <svg
               viewBox="0 0 24 24"
-              className="size-3 fill-none stroke-current stroke-[2.5px]"
+              className="size-3.5 fill-none stroke-current stroke-[2.5px]"
               strokeLinecap="round"
               strokeLinejoin="round"
             >
               <path d="m6 9 6 6 6-6" />
             </svg>
           </span>
-          {/* Camera */}
           <svg
             viewBox="0 0 24 24"
-            className="size-5 fill-none stroke-current stroke-[2px]"
+            className="size-[25px] fill-none stroke-current stroke-2 text-foreground"
             strokeLinecap="round"
             strokeLinejoin="round"
           >
-            <path d="M14.5 4h-5L8 6.5H4.5A1.5 1.5 0 0 0 3 8v10a1.5 1.5 0 0 0 1.5 1.5h15A1.5 1.5 0 0 0 21 18V8a1.5 1.5 0 0 0-1.5-1.5H16Z" />
-            <circle cx="12" cy="12.5" r="3.5" />
+            <path d="M3 8a2 2 0 0 1 2-2h2.5l1.5-2h6l1.5 2H19a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+            <circle cx="12" cy="13" r="3.5" />
           </svg>
-        </div>
-
-        <div
-          className="reel-scrim-bottom absolute inset-x-0 h-[120px]"
-          style={{ bottom: `${NAV_HEIGHT_PX}px` }}
-        />
-
-        {/* Action rail */}
-        <div
-          className={cn(
-            "absolute right-2 flex flex-col items-center gap-[11px] text-[9.5px] font-semibold transition-opacity duration-300 motion-reduce:transition-none",
-            metaVisible ? "opacity-100" : "opacity-0",
-          )}
-          style={{ bottom: `${NAV_HEIGHT_PX + 24}px` }}
-        >
-          <span className="flex flex-col items-center gap-0.5">
-            <svg
-              viewBox="0 0 24 24"
-              className={cn(
-                "size-[21px] stroke-[2px]",
-                item.liked === true
-                  ? "fill-reel-like stroke-reel-like"
-                  : "fill-none stroke-current",
-              )}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M12 20.5 3.9 12.6a4.9 4.9 0 0 1 0-6.9 4.9 4.9 0 0 1 6.9 0l1.2 1.2 1.2-1.2a4.9 4.9 0 0 1 6.9 0 4.9 4.9 0 0 1 0 6.9Z" />
-            </svg>
-            {item.likes}
-          </span>
-
-          <span className="flex flex-col items-center gap-0.5">
-            <svg
-              viewBox="0 0 24 24"
-              className={cn(strokeIcon, "fill-none stroke-current")}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 9.5 9.5 0 0 1-3.6-.7L3 21l1.9-5A8.1 8.1 0 0 1 4 11.5 8.4 8.4 0 0 1 12.5 3 8.4 8.4 0 0 1 21 11.5Z" />
-            </svg>
-            {item.comments}
-          </span>
-
-          <span className="flex flex-col items-center gap-0.5">
-            <svg
-              viewBox="0 0 24 24"
-              className={cn(strokeIcon, "fill-none stroke-current")}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="m17 2 4 4-4 4" />
-              <path d="M3 11V9a3 3 0 0 1 3-3h15" />
-              <path d="m7 22-4-4 4-4" />
-              <path d="M21 13v2a3 3 0 0 1-3 3H3" />
-            </svg>
-            {item.remixes}
-          </span>
-
-          <span className="flex flex-col items-center gap-0.5">
-            <svg
-              viewBox="0 0 24 24"
-              className={cn(strokeIcon, "fill-none stroke-current")}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M21.5 2.5 11 13" />
-              <path d="M21.5 2.5 15 21.5l-4-8.5-8.5-4Z" />
-            </svg>
-            {item.shares}
-          </span>
-
-          <svg
-            viewBox="0 0 24 24"
-            className={cn(strokeIcon, "fill-current")}
-          >
-            <circle cx="5" cy="12" r="1.8" />
-            <circle cx="12" cy="12" r="1.8" />
-            <circle cx="19" cy="12" r="1.8" />
-          </svg>
-
-          <span className="size-5 rounded-md border-2 border-foreground bg-brand-accent" />
-        </div>
-
-        {/* Meta block */}
-        <div
-          className={cn(
-            "absolute left-2.5 flex flex-col gap-1 text-[10.5px] transition-opacity duration-300 motion-reduce:transition-none",
-            metaVisible ? "opacity-100" : "opacity-0",
-          )}
-          style={{ right: "42px", bottom: `${NAV_HEIGHT_PX + 10}px` }}
-        >
-          <span className="flex items-center gap-1.5">
-            <span className="size-[22px] rounded-full border-[1.5px] border-foreground bg-brand-accent" />
-            <span className="font-semibold">{item.username}</span>
-            <span className="rounded-md border border-foreground/80 px-1.5 py-px text-[9.5px]">
-              Follow
-            </span>
-          </span>
-
-          <span className="truncate">
-            {item.caption}{" "}
-            <span className="opacity-70">{item.hashtags}</span>
-          </span>
-
-          <span className="flex items-center gap-1 text-[9.5px]">
-            <svg
-              viewBox="0 0 24 24"
-              className="size-2.5 fill-none stroke-current stroke-[2px]"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M9 18V5l12-2v13" />
-              <circle cx="6" cy="18" r="3" />
-              <circle cx="18" cy="16" r="3" />
-            </svg>
-            {item.username} · Original audio
-          </span>
         </div>
 
         {/* Bottom nav */}
         <div
-          className="absolute inset-x-0 bottom-0 flex items-center justify-around bg-background px-3"
+          className="absolute inset-x-0 bottom-0 z-[5] flex items-center justify-around bg-background pb-2 text-foreground"
           style={{ height: `${NAV_HEIGHT_PX}px` }}
         >
           <svg
             viewBox="0 0 24 24"
-            className={cn(strokeIcon, "fill-none stroke-current")}
+            className="size-6 fill-none stroke-current stroke-2"
             strokeLinecap="round"
             strokeLinejoin="round"
           >
-            <path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1Z" />
+            <path d="M3 10.5 12 3l9 7.5V21h-6v-6H9v6H3z" />
           </svg>
           <svg
             viewBox="0 0 24 24"
-            className={cn(strokeIcon, "fill-none stroke-current")}
+            className="size-6 fill-none stroke-current stroke-2"
             strokeLinecap="round"
             strokeLinejoin="round"
           >
-            <circle cx="11" cy="11" r="7" />
-            <path d="m20 20-3.5-3.5" />
+            <circle cx="10.5" cy="10.5" r="7" />
+            <path d="m21 21-5.5-5.5" />
           </svg>
           <svg
             viewBox="0 0 24 24"
-            className={cn(strokeIcon, "fill-none stroke-current")}
+            className="size-6 fill-none stroke-current stroke-2"
             strokeLinecap="round"
             strokeLinejoin="round"
           >
@@ -415,18 +313,18 @@ export function ReelPhone({
           </svg>
           <svg
             viewBox="0 0 24 24"
-            className={cn(strokeIcon, "fill-none stroke-current")}
+            className="size-6 fill-none stroke-current stroke-2"
             strokeLinecap="round"
             strokeLinejoin="round"
           >
             <rect x="3" y="3" width="18" height="18" rx="5" />
-            <path d="m10 9 5 3-5 3Z" />
+            <path d="M3 8.5h18M8.5 3l3 5.5M14.5 3l3 5.5" />
+            <path d="M10 12v6l5-3z" className="fill-current" />
           </svg>
-          <span className="size-[17px] rounded-full border border-foreground bg-brand" />
+          <span className="size-[22px] rounded-full border-2 border-foreground bg-brand" />
         </div>
 
-        {/* Home indicator */}
-        <span className="absolute bottom-[3px] left-1/2 h-[3px] w-[70px] -translate-x-1/2 rounded-full bg-foreground" />
+        <span className="absolute bottom-[5px] left-1/2 z-[6] h-1 w-[100px] -translate-x-1/2 rounded-sm bg-foreground" />
       </div>
     </div>
   );

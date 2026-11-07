@@ -252,12 +252,14 @@ export interface MarketingProofClip {
  *        at it has to be a content edit, and copy-pasted phone markup is how a
  *        mockup ends up with the wrong username on the wrong card.
  *
- *        `videoSrc` is OPTIONAL and the poster is not. A poster always paints;
- *        a video may not exist yet, may be blocked by reduced-motion, or may
- *        still be loading, and in every one of those cases the phone has to
- *        look finished rather than empty. That is also what keeps the hero
- *        free of layout shift: the frame is a fixed size and the poster fills
- *        it from the first paint.
+ *        STILLS, NOT VIDEO. The phone scrolls through FRAMES, and the sense
+ *        of a live feed comes from the scroll and the swiping thumb rather
+ *        than from playback. That buys a hero of a few hundred KB instead of
+ *        several MB, with nothing to autoplay — so nothing a browser policy
+ *        or a motion preference can refuse — and nothing that can shift the
+ *        layout as it loads. If real clips are wanted later, the honest place
+ *        for them is the examples section, where a visitor has chosen to
+ *        watch.
  *
  *        COUNTS_ARE_PRE_FORMATTED — `likes` is the string "1.2M", not the
  *        number 1_200_000. These are display copy on a mockup, not metrics
@@ -269,10 +271,14 @@ export interface MarketingProofClip {
  */
 export interface ReelShowcaseItem {
   id: string;
-  /** Looping clip. Absent until the deployment has one — the poster shows. */
-  videoSrc?: string | undefined;
-  /** Always set: the still the phone paints before and instead of the video. */
+  /** The frame the phone paints. */
   posterSrc: string;
+  /**
+   * Letterbox this frame instead of cropping it. For a source that is not
+   * 9:16 — cropping one of those cuts the burned-in caption off, which is the
+   * part of the short worth showing.
+   */
+  contain?: boolean | undefined;
   /** Alt text for the poster — what the short actually shows. */
   posterAlt: string;
   username: string;

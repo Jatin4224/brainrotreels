@@ -73,7 +73,7 @@
   --font-sans: Geist, sans-serif;
   --font-serif: Georgia, serif;
   --font-mono: Geist Mono, monospace;
-  --radius: 0.5rem;
+  --radius: 0.75rem;
   --shadow-x: 0px;
   --shadow-y: 1px;
   --shadow-blur: 2px;
@@ -141,7 +141,7 @@
   --font-sans: Geist, sans-serif;
   --font-serif: Georgia, serif;
   --font-mono: Geist Mono, monospace;
-  --radius: 0.5rem;
+  --radius: 0.75rem;
   --shadow-x: 0px;
   --shadow-y: 1px;
   --shadow-blur: 2px;
@@ -469,5 +469,352 @@ html:has([data-app-banner]) {
     .brutal-hover:hover {
       transform: none;
     }
+  }
+}
+
+/* SOURCE OF TRUTH KEYWORDS: reel-feed, reel-hand, reel-touch, --hand-skin,
+ * THE_FEED_SCROLLS_ITSELF, HAND_IS_ILLUSTRATION, SHOW_THE_GESTURE
+ *
+ * WHAT:  The hero phone's self-scrolling feed, the illustrated thumb that
+ *        swipes it, and the tap halo under that thumb.
+ *
+ * WHY:   SHOW_THE_GESTURE. A still phone shows one video; a phone being
+ *        SWIPED shows what the product is for — a feed somebody keeps
+ *        scrolling. The two animations are deliberately on the same 9s/3s
+ *        cycle so the thumb's upstroke lands on the feed's transition rather
+ *        than drifting against it.
+ *
+ *        THE_FEED_SCROLLS_ITSELF in CSS, not JavaScript: no timers to leak, no
+ *        re-render per frame, and the browser can run it off the main thread.
+ *        The track holds the slides plus a REPEAT of the first one, so the
+ *        loop's last step lands on a copy of slide one and the restart is
+ *        invisible. Percentages are of the TRACK's height, and each slide is
+ *        the screen's full height, so -100% is exactly one slide.
+ *
+ *        HAND_IS_ILLUSTRATION: the skin tones are tokens, not hex buried in
+ *        the SVG, so the hand can be redrawn for a different brand without
+ *        touching the component. They are PINNED in both themes — a hand is a
+ *        hand whatever the page does around it.
+ *
+ *        Every animation stops under `prefers-reduced-motion`: the phone then
+ *        shows the first short, still, with the thumb resting. Nothing is
+ *        hidden, so the composition is unchanged. */
+:root,
+.dark {
+  --hand-skin: oklch(0.82 0.056 59);
+  --hand-skin-mid: oklch(0.79 0.062 55);
+  --hand-skin-shade: oklch(0.67 0.069 48);
+  --hand-skin-light: oklch(0.89 0.038 62);
+}
+
+@theme inline {
+  --color-hand-skin: var(--hand-skin);
+  --color-hand-skin-mid: var(--hand-skin-mid);
+  --color-hand-skin-shade: var(--hand-skin-shade);
+  --color-hand-skin-light: var(--hand-skin-light);
+}
+
+@keyframes reel-feed {
+  0%,
+  6.7% {
+    transform: translateY(0);
+    animation-timing-function: cubic-bezier(0.3, 0.7, 0.2, 1);
+  }
+  16.7%,
+  40% {
+    transform: translateY(-100%);
+    animation-timing-function: cubic-bezier(0.3, 0.7, 0.2, 1);
+  }
+  50%,
+  73.3% {
+    transform: translateY(-200%);
+    animation-timing-function: cubic-bezier(0.3, 0.7, 0.2, 1);
+  }
+  83.3%,
+  100% {
+    transform: translateY(-300%);
+  }
+}
+
+@keyframes reel-swipe {
+  0% {
+    transform: translate(70px, 40px) rotate(4deg);
+  }
+  16% {
+    transform: translate(0, 0) rotate(0deg) scale(1);
+    animation-timing-function: ease-out;
+  }
+  20% {
+    transform: translate(0, 0) scale(0.97);
+  }
+  50% {
+    transform: translate(-6px, -190px) rotate(-3deg) scale(0.97);
+    animation-timing-function: ease-out;
+  }
+  60% {
+    transform: translate(40px, -200px) rotate(-1deg) scale(1);
+  }
+  100% {
+    transform: translate(70px, 40px) rotate(4deg);
+  }
+}
+
+@keyframes reel-touch {
+  0%,
+  17% {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  20% {
+    opacity: 0.9;
+    transform: scale(1);
+  }
+  48% {
+    opacity: 0.7;
+    transform: scale(1);
+  }
+  54%,
+  100% {
+    opacity: 0;
+    transform: scale(1.4);
+  }
+}
+
+@layer components {
+  .reel-feed {
+    animation: reel-feed 9s infinite;
+  }
+
+  .reel-hand {
+    transform-origin: 30px 125px;
+    animation: reel-swipe 3s infinite;
+    filter: drop-shadow(-10px 18px 20px oklch(0 0 0 / 0.45));
+  }
+
+  .reel-touch {
+    animation: reel-touch 3s infinite;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .reel-feed,
+    .reel-hand,
+    .reel-touch {
+      animation: none;
+    }
+
+    .reel-touch {
+      opacity: 0;
+    }
+  }
+}
+
+/* SOURCE OF TRUTH KEYWORDS: TACTILE_UI, tactile-primary, tactile-surface,
+ * tactile-field, tactile-inlay, --tactile-sheen, --tactile-shade,
+ * --tactile-glow, --tactile-inset, SOFT_SKEUOMORPHISM, OVERLAY_NOT_COLOR,
+ * design-buttons.md
+ *
+ * WHAT:  The product surface depth language from design-buttons.md — a vertical
+ *        gradient, an edge one step darker than the fill, a 1px inner top
+ *        highlight and a soft shadow — as TOKENS plus four utilities that the
+ *        shared primitives opt into.
+ *
+ * WHY:   The marketing pages already own their own depth language
+ *        (SOFT_BRUTALISM, the brutal-* utilities above). The product needed the
+ *        same treatment without inheriting the landing page loud brand pair or
+ *        its near-black canvas, so this is a SECOND, parallel utility family
+ *        rather than an edit to that one: the two surfaces skin independently.
+ *
+ *        OVERLAY_NOT_COLOR is the rule that makes this safe, and it was learnt
+ *        the hard way. The first cut built the gradient out of --primary
+ *        (`color-mix(--primary, white 24%)` → --primary). That paints an opaque
+ *        colour, so every caller that hands <Button> its own fill — and the
+ *        landing page hands it `bg-brand` in half a dozen places — had its
+ *        orange CTA repainted white, label and all. These utilities are instead
+ *        a TRANSLUCENT WASH over whatever background-color is already there:
+ *        white at the top, clear through the middle, black at the foot. The fill
+ *        stays the caller's, and `bg-primary`, `bg-brand` and `bg-destructive`
+ *        all come out lit from the same angle.
+ *
+ *        It also removes the need to declare the gradient twice per theme. A
+ *        colour-derived lift has to know whether --primary is near-black (light
+ *        mode) or near-white (dark), or it lights the button from BELOW in one
+ *        of them; a wash is lighter on top of anything. Only the hover wash
+ *        still flips by theme — darkening a near-black surface reads as nothing
+ *        — so that is the one token the .dark block overrides.
+ *
+ *        THE_DARKER_EDGE_IS_AN_INSET_RING, not a border-color: the button base
+ *        carries `bg-clip-padding`, so the fill stops at the padding box and a
+ *        translucent border would show the PAGE through it rather than a darker
+ *        shade of the button. An inset 1px ring is drawn over the fill itself.
+ *
+ *        Outer shadows deliberately stop at TWO layers, per design-buttons.md
+ *        section 8. --tactile-glow is a token so a surface that wants the
+ *        colour-tinted glow of section 4.1 can set it locally; it defaults to
+ *        neutral because CSS cannot read the fill a caller passed in.
+ * WHERE: Consumed by the shared primitives in src/components/ui — button.tsx
+ *        (default/outline/secondary), input.tsx, textarea.tsx, select.tsx and
+ *        card.tsx. Available app-wide as plain utility classes. */
+:root {
+  /* How hard the wash lifts the top and shades the foot of a raised surface. */
+  --tactile-sheen: 22%;
+  --tactile-shade: 9%;
+  --tactile-sheen-soft: 55%;
+  --tactile-shade-soft: 4%;
+  /* The 1px lit top edge and the 1px darker ring around the fill. */
+  --tactile-edge-light: color-mix(in srgb, white 30%, transparent);
+  --tactile-edge-dark: color-mix(in srgb, black 12%, transparent);
+  --tactile-highlight-soft: inset 0 1px 0 oklch(1 0 0 / 0.9);
+  --tactile-primary-text-shadow: 0 1px 0 oklch(0 0 0 / 0.15);
+  --tactile-glow: 0 1px 2px 0 oklch(0 0 0 / 0.1),
+    0 4px 12px -2px oklch(0 0 0 / 0.12);
+  /* Hover darkens on a light canvas. Flipped in .dark — see the note there. */
+  --tactile-hover-wash: color-mix(in srgb, black 5%, transparent);
+  /* Recessed: a field reads as cut INTO the surface, the inverse of a button. */
+  --tactile-inset: inset 0 1px 2px oklch(0 0 0 / 0.05);
+
+  /* Softer two-layer, low-opacity shadows replacing the single harsh
+     0.18-black drop the theme shipped with (design-buttons.md section 9). */
+  --shadow-2xs: 0 1px 2px 0 oklch(0 0 0 / 0.04);
+  --shadow-xs: 0 1px 2px 0 oklch(0 0 0 / 0.05);
+  --shadow-sm: 0 1px 2px 0 oklch(0 0 0 / 0.04), 0 2px 6px 0 oklch(0 0 0 / 0.04);
+  --shadow: 0 1px 2px 0 oklch(0 0 0 / 0.04), 0 2px 6px 0 oklch(0 0 0 / 0.04);
+  --shadow-md: 0 2px 4px 0 oklch(0 0 0 / 0.04),
+    0 8px 24px 0 oklch(0 0 0 / 0.06);
+  --shadow-lg: 0 4px 8px 0 oklch(0 0 0 / 0.04),
+    0 16px 40px 0 oklch(0 0 0 / 0.08);
+  --shadow-xl: 0 8px 16px 0 oklch(0 0 0 / 0.04),
+    0 24px 56px 0 oklch(0 0 0 / 0.1);
+  --shadow-2xl: 0 12px 24px 0 oklch(0 0 0 / 0.06),
+    0 40px 80px 0 oklch(0 0 0 / 0.14);
+}
+
+/* MUST stay after :root — `.dark` and `:root` carry the same specificity and
+   both land on <html>, so source order is what decides the override. */
+.dark {
+  /* A wash is lighter-on-top whatever the fill, so the gradient itself needs no
+     flipping here — only its strength, and the HOVER, which has to lighten:
+     darkening a surface that is already near-black reads as nothing happening. */
+  --tactile-sheen: 14%;
+  --tactile-shade: 14%;
+  --tactile-sheen-soft: 7%;
+  --tactile-shade-soft: 8%;
+  --tactile-edge-light: color-mix(in srgb, white 22%, transparent);
+  --tactile-edge-dark: color-mix(in srgb, black 24%, transparent);
+  --tactile-highlight-soft: inset 0 1px 0 oklch(1 0 0 / 0.06);
+  --tactile-primary-text-shadow: 0 1px 0 oklch(0 0 0 / 0.12);
+  --tactile-glow: 0 1px 2px 0 oklch(0 0 0 / 0.4),
+    0 4px 12px -2px oklch(0 0 0 / 0.45);
+  --tactile-hover-wash: color-mix(in srgb, white 8%, transparent);
+  --tactile-inset: inset 0 1px 2px oklch(0 0 0 / 0.3);
+
+  --shadow-2xs: 0 1px 2px 0 oklch(0 0 0 / 0.3);
+  --shadow-xs: 0 1px 2px 0 oklch(0 0 0 / 0.4);
+  --shadow-sm: 0 1px 2px 0 oklch(0 0 0 / 0.4), 0 2px 6px 0 oklch(0 0 0 / 0.35);
+  --shadow: 0 1px 2px 0 oklch(0 0 0 / 0.4), 0 2px 6px 0 oklch(0 0 0 / 0.35);
+  --shadow-md: 0 2px 4px 0 oklch(0 0 0 / 0.4), 0 8px 24px 0 oklch(0 0 0 / 0.45);
+  --shadow-lg: 0 4px 8px 0 oklch(0 0 0 / 0.4), 0 16px 40px 0 oklch(0 0 0 / 0.55);
+  --shadow-xl: 0 8px 16px 0 oklch(0 0 0 / 0.45),
+    0 24px 56px 0 oklch(0 0 0 / 0.6);
+  --shadow-2xl: 0 12px 24px 0 oklch(0 0 0 / 0.5),
+    0 40px 80px 0 oklch(0 0 0 / 0.7);
+}
+
+@layer components {
+  /* The one primary action per view. Everything here is a wash over the
+     caller fill — see OVERLAY_NOT_COLOR above. */
+  .tactile-primary {
+    background-image: linear-gradient(
+      180deg,
+      color-mix(in srgb, white var(--tactile-sheen), transparent) 0%,
+      transparent 48%,
+      color-mix(in srgb, black var(--tactile-shade), transparent) 100%
+    );
+    box-shadow:
+      inset 0 1px 0 var(--tactile-edge-light),
+      inset 0 0 0 1px var(--tactile-edge-dark),
+      var(--tactile-glow);
+    text-shadow: var(--tactile-primary-text-shadow);
+  }
+
+  .tactile-primary:hover:not(:disabled) {
+    background-image:
+      linear-gradient(var(--tactile-hover-wash), var(--tactile-hover-wash)),
+      linear-gradient(
+        180deg,
+        color-mix(in srgb, white var(--tactile-sheen), transparent) 0%,
+        transparent 48%,
+        color-mix(in srgb, black var(--tactile-shade), transparent) 100%
+      );
+  }
+
+  /* Pressed = the wash flips and the depth turns inward. Pairs with the
+     active:translate-y-px the button base already carries. */
+  .tactile-primary:active:not(:disabled) {
+    background-image: linear-gradient(
+      180deg,
+      color-mix(in srgb, black var(--tactile-shade), transparent) 0%,
+      transparent 60%
+    );
+    box-shadow:
+      inset 0 0 0 1px var(--tactile-edge-dark),
+      inset 0 1px 3px oklch(0 0 0 / 0.22);
+  }
+
+  /* The neutral raised control: a lighter wash, and a real border, because
+     unlike the primary it has no fill of its own to read an edge against. */
+  .tactile-surface {
+    background-image: linear-gradient(
+      180deg,
+      color-mix(in srgb, white var(--tactile-sheen-soft), transparent) 0%,
+      transparent 55%,
+      color-mix(in srgb, black var(--tactile-shade-soft), transparent) 100%
+    );
+    box-shadow: var(--tactile-highlight-soft), var(--shadow-xs);
+  }
+
+  .tactile-surface:hover:not(:disabled) {
+    background-image:
+      linear-gradient(var(--tactile-hover-wash), var(--tactile-hover-wash)),
+      linear-gradient(
+        180deg,
+        color-mix(in srgb, white var(--tactile-sheen-soft), transparent) 0%,
+        transparent 55%,
+        color-mix(in srgb, black var(--tactile-shade-soft), transparent) 100%
+      );
+  }
+
+  /* A trigger holding its popup open stays visibly pressed. Matched here and
+     not with an `aria-expanded:bg-*` utility, because a background-COLOUR sits
+     UNDER this wash and an inverted wash is what actually reads as pressed. */
+  .tactile-surface:active:not(:disabled),
+  .tactile-surface[aria-expanded="true"],
+  .tactile-surface[data-popup-open] {
+    background-image: linear-gradient(
+      180deg,
+      color-mix(in srgb, black var(--tactile-shade), transparent) 0%,
+      transparent 60%
+    );
+    box-shadow: inset 0 1px 2px oklch(0 0 0 / 0.07);
+  }
+
+  /* SOURCE OF TRUTH KEYWORDS: tactile-inlay, SHADOW_ARBITRARY_IS_A_COLOR
+     Just the 1px lit top edge, for a flat tinted fill that should read as
+     tactile without becoming a second raised button (the `secondary` variant).
+     A real class rather than `shadow-[var(--tactile-highlight-soft)]`: Tailwind
+     v4 parses a bare var() in `shadow-[…]` as a COLOR, so that utility is
+     silently never generated and the edge just does not appear. */
+  .tactile-inlay {
+    box-shadow: var(--tactile-highlight-soft);
+  }
+
+  /* Fields only. Held in its own utility so the focus ring the primitives
+     already declare is free to take the box-shadow back on :focus-visible. */
+  .tactile-field {
+    box-shadow: var(--tactile-inset);
+  }
+
+  .tactile-field:focus-visible,
+  .tactile-field:focus-within {
+    box-shadow: none;
   }
 }

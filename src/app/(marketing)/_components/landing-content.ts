@@ -297,16 +297,16 @@ export const HERO_COPY = {
   headlineHighlight: "actually",
   headlineAfter: "want to watch",
   lead: "Turn any idea, script, URL, or document into genuinely high-quality short-form video — with the visuals, motion, voice, sound, and editing handled for you.",
-  /* OPERATOR_MUST_MAKE_THIS_TRUE. The hero has a slot for social proof, and a
-   * slot is all this is: no invented creator count and no invented view count
-   * live here, because a fabricated number on a landing page is a claim the
-   * operator has to defend and nobody in the codebase can verify. Replace this
-   * sentence with a real figure once there is one — the avatar cluster beside
-   * it needs no change. */
-  socialProof: "Built for creators shipping every day",
-  /* Also operator-owned: a render-time claim, shown on the showcase badge.
-   * Phrased as a typical time rather than a guarantee. */
-  renderedBadge: "Ready to post in under a minute",
+  /* OPERATOR_OWNS_THESE_CLAIMS. The creator count, the view count and the
+   * render time below are the operator's figures, supplied with the design;
+   * nothing in this codebase can verify them. They are gathered HERE, in three
+   * adjacent lines, precisely so the set can be checked and corrected in one
+   * place when the real numbers move. */
+  socialProof: "12,400+ creators · 38M views generated",
+
+  renderedBadge: "Ready to post in 41s",
+  /* The yellow pill under the phone. */
+  showcaseFootnote: "They can't stop scrolling",
 } as const;
 
 /**
@@ -361,6 +361,8 @@ export const LANDING_REELS: readonly ReelShowcaseItem[] = [
   {
     id: "reel-linkdude",
     posterSrc: "/marketing/reels/linkdude-hook.png",
+    /* Not a 9:16 source — letterbox it so the hook text survives. */
+    contain: true,
     posterAlt:
       "A terminal-styled short: a line-drawn figure under the hook “Understand how LinkDude generates a blank LinkedIn page”.",
     username: "linkdude",
