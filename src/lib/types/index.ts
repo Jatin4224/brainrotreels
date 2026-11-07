@@ -22,7 +22,8 @@
  *   cancelProjectSchema, projectStagesSchema,
  *   FaqItem, HeroInputMode, HeroPromptValues, heroPromptSchema,
  *   HERO_INPUT_MODES, MarketingFormat, MarketingLink, MarketingNavColumn,
- *   MarketingPipelineRow, MarketingProofClip, MARKETING_CONTENT_IS_TYPED,
+ *   MarketingPipelineRow, MarketingProofClip, ReelShowcaseItem,
+ *   MARKETING_CONTENT_IS_TYPED,
  *   applyOpsSchema, openTimelineSchema, restoreRevisionSchema,
  *   resynthLineSchema, ApplyOpsResult, TIMELINE_AUTOSAVE_MS
  *
@@ -449,4 +450,5 @@ export type {
   MarketingNavColumn,
   MarketingPipelineRow,
   MarketingProofClip,
+  ReelShowcaseItem,
 } from "./marketing";

@@ -50,14 +50,7 @@
 import { useRouter } from "next/navigation";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import {
-  ArrowRightIcon,
-  FileTextIcon,
-  LightbulbIcon,
-  LinkIcon,
-  PencilLineIcon,
-  type LucideIcon,
-} from "lucide-react";
+import { ArrowRightIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -84,7 +77,7 @@ import { cn } from "@/lib/utils";
 /**
  * SOURCE OF TRUTH KEYWORDS: HERO_MODE_TABS, HeroInputMode
  *
- * WHAT:  How each input mode is labelled, iconed and prompted.
+ * WHAT:  How each input mode is labelled and prompted.
  * WHY:   A `Record<HeroInputMode, …>` rather than a list, so adding a mode to
  *        `HERO_INPUT_MODES` fails the typecheck here until the tab knows what
  *        to call it — a new mode cannot reach the page as a blank button. The
@@ -94,26 +87,22 @@ import { cn } from "@/lib/utils";
  */
 const HERO_MODE_TABS: Record<
   HeroInputMode,
-  { label: string; icon: LucideIcon; placeholder: string }
+  { label: string; placeholder: string }
 > = {
   idea: {
     label: "Idea",
-    icon: LightbulbIcon,
-    placeholder: "How does a rocket booster land standing up?",
+    placeholder: "Why octopuses have three hearts…",
   },
   script: {
     label: "Script",
-    icon: PencilLineIcon,
     placeholder: "Paste the script you already wrote…",
   },
   url: {
     label: "URL",
-    icon: LinkIcon,
     placeholder: "https://reddit.com/r/… or any article link",
   },
   document: {
     label: "Document",
-    icon: FileTextIcon,
     placeholder: "Paste the text of your doc, deck or newsletter…",
   },
 };
@@ -144,7 +133,7 @@ export function HeroPromptCard({ className }: { className?: string }) {
       <form
         onSubmit={form.handleSubmit(onSubmit)}
         className={cn(
-          "brutal-border brutal-shadow-lg mx-auto w-full max-w-2xl rounded-2xl bg-card p-2 text-left",
+          "brutal-border brutal-shadow-lg w-full max-w-xl rounded-2xl bg-card p-2.5 text-left",
           className,
         )}
       >
@@ -156,11 +145,10 @@ export function HeroPromptCard({ className }: { className?: string }) {
               <div
                 role="radiogroup"
                 aria-label="What are you starting from?"
-                className="grid grid-cols-4 gap-1"
+                className="flex flex-wrap items-center gap-1"
               >
                 {HERO_INPUT_MODES.map((option) => {
                   const tab = HERO_MODE_TABS[option];
-                  const Icon = tab.icon;
                   const isActive = field.value === option;
 
                   return (
@@ -171,13 +159,12 @@ export function HeroPromptCard({ className }: { className?: string }) {
                       aria-checked={isActive}
                       onClick={() => field.onChange(option)}
                       className={cn(
-                        "flex h-11 items-center justify-center gap-2 rounded-xl text-sm font-bold transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50 motion-reduce:transition-none",
+                        "h-9 rounded-lg px-4 text-sm font-semibold transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50 motion-reduce:transition-none",
                         isActive
-                          ? "bg-brand-accent text-brand-accent-foreground"
+                          ? "bg-brand-accent font-bold text-brand-accent-foreground"
                           : "text-muted-foreground hover:text-foreground",
                       )}
                     >
-                      <Icon className="size-4" aria-hidden="true" />
                       {tab.label}
                     </button>
                   );
@@ -191,28 +178,39 @@ export function HeroPromptCard({ className }: { className?: string }) {
           control={form.control}
           name="value"
           render={({ field }) => (
-            <FormItem className="mt-2">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+            <FormItem className="mt-1">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                 <FormControl>
+                  {/* A ROWS-1 TEXTAREA, not an <input>: it looks like the
+                      single-line field the design asks for, but Script and
+                      Document mean pasting several paragraphs, and an <input>
+                      silently makes that miserable. Enter submits (below), so
+                      it behaves like the input it resembles. */}
                   <Textarea
                     {...field}
-                    rows={3}
+                    rows={1}
                     aria-label={`${activeTab.label} input`}
                     placeholder={activeTab.placeholder}
-                    className="brutal-border min-h-22 flex-1 resize-none rounded-xl bg-background px-4 py-3 text-base text-foreground placeholder:text-muted-foreground"
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" && !event.shiftKey) {
+                        event.preventDefault();
+                        void form.handleSubmit(onSubmit)();
+                      }
+                    }}
+                    className="min-h-11 flex-1 resize-none border-0 bg-transparent px-3 py-2.5 text-base text-foreground shadow-none placeholder:text-muted-foreground focus-visible:ring-0"
                   />
                 </FormControl>
 
                 <Button
                   type="submit"
                   size="lg"
-                  className="brutal-shadow-brand h-12 shrink-0 rounded-xl bg-brand px-6 text-base font-bold text-brand-foreground hover:bg-brand/90"
+                  className="brutal-shadow-brand h-11 shrink-0 rounded-xl bg-brand px-5 text-sm font-bold text-brand-foreground hover:bg-brand/90"
                 >
-                  Make my video
+                  Generate
                   <ArrowRightIcon className="size-4" aria-hidden="true" />
                 </Button>
               </div>
-              <FormMessage className="px-1" />
+              <FormMessage className="px-3 pb-1" />
             </FormItem>
           )}
         />

@@ -4,7 +4,7 @@
 
 /**
  * SOURCE OF TRUTH KEYWORDS: LANDING_FORMATS, LANDING_FAQ, LANDING_PROOF_CLIPS,
- *   HANDLED_FOR_YOU, STEP_BLURBS, HERO_COPY,
+ *   HANDLED_FOR_YOU, STEP_BLURBS, HERO_COPY, LANDING_REELS,
  *   LANDING_FEATURE_KEYS, PAGE_OWNED_COPY, COPY_IS_REGISTRY_DERIVED,
  *   MarketingFormat, FaqItem, MarketingProofClip, ResourceKey
  *
@@ -34,6 +34,7 @@
 
 import type {
   FaqItem,
+  ReelShowcaseItem,
   MarketingFormat,
   MarketingPipelineRow,
   MarketingProofClip,
@@ -122,18 +123,21 @@ export const LANDING_PROOF_CLIPS: readonly MarketingProofClip[] = [
     title: "The one where nobody told the new hire",
     kind: "reddit-story",
     duration: "0:48",
+    handle: "@deepfacts",
   },
   {
     id: "proof-voiceover",
     title: "Why planes still have ashtrays",
     kind: "voiceover",
     duration: "0:36",
+    handle: "@mindrot",
   },
   {
     id: "proof-quiz",
     title: "Guess the capital in 3 seconds",
     kind: "quiz",
     duration: "0:31",
+    handle: "@quizloop",
   },
   {
     id: "proof-motion",
@@ -287,9 +291,84 @@ export const STEP_BLURBS: Readonly<Record<string, string>> = {
  * WHERE: The hero of src/app/(marketing)/page.tsx.
  */
 export const HERO_COPY = {
-  eyebrow: "Short-form video, generated end to end",
-  headlineLead: "Create content people",
-  /* The phrase the yellow bar sits behind. */
-  headlineHighlight: "actually want to watch",
+  eyebrow: "AI video creation, without the AI look",
+  headlineBefore: "Create content people",
+  /* The one word the yellow block sits behind. */
+  headlineHighlight: "actually",
+  headlineAfter: "want to watch",
   lead: "Turn any idea, script, URL, or document into genuinely high-quality short-form video — with the visuals, motion, voice, sound, and editing handled for you.",
+  /* OPERATOR_MUST_MAKE_THIS_TRUE. The hero has a slot for social proof, and a
+   * slot is all this is: no invented creator count and no invented view count
+   * live here, because a fabricated number on a landing page is a claim the
+   * operator has to defend and nobody in the codebase can verify. Replace this
+   * sentence with a real figure once there is one — the avatar cluster beside
+   * it needs no change. */
+  socialProof: "Built for creators shipping every day",
+  /* Also operator-owned: a render-time claim, shown on the showcase badge.
+   * Phrased as a typical time rather than a guarantee. */
+  renderedBadge: "Ready to post in under a minute",
 } as const;
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: LANDING_REELS, ReelShowcaseItem, ReelStage,
+ *   PHONE_MOCKUP_IS_DATA, PRODUCT_AS_PROOF, OPERATOR_SWAPS_THE_MEDIA
+ *
+ * WHAT:  The three shorts the hero's phone mockups display, left to right.
+ *        Index 1 is the centre phone — the one a visitor reads.
+ *
+ * WHY:   PRODUCT_AS_PROOF: these are frames the product actually produced, in
+ *        three deliberately different looks (3D character, flat 2D explainer,
+ *        terminal-style hook) so the hero shows RANGE rather than three
+ *        variations of one template. The posters ship from `public/marketing/
+ *        reels/`, so the hero renders on a fresh deployment with no upload
+ *        step and no external request.
+ *
+ *        OPERATOR_SWAPS_THE_MEDIA: `videoSrc` is absent on all three today and
+ *        the phones are complete without it — adding a looping mp4 beside each
+ *        poster and naming it here is the whole change, no component edit. The
+ *        counts are display copy on a mockup, not metrics (see
+ *        COUNTS_ARE_PRE_FORMATTED on the type).
+ * WHERE: Passed to <ReelStage> by src/app/(marketing)/page.tsx.
+ */
+export const LANDING_REELS: readonly ReelShowcaseItem[] = [
+  {
+    id: "reel-deepfacts",
+    posterSrc: "/marketing/reels/deepfacts-harness.png",
+    posterAlt:
+      "A 3D-rendered short: two clay-style characters beside a cart, captioned “better harness”.",
+    username: "deepfacts",
+    caption: "the ending got me 💀",
+    hashtags: "#science",
+    likes: "128K",
+    comments: "2,431",
+    remixes: "8,902",
+    shares: "14.2K",
+  },
+  {
+    id: "reel-mindrot",
+    posterSrc: "/marketing/reels/mindrot-great-agent.png",
+    posterAlt:
+      "A flat 2D explainer short: a scientist and a boy cheering in a field, captioned “great agent!”.",
+    username: "mindrot",
+    caption: "he finally built it 😭",
+    hashtags: "#ai #agents",
+    likes: "1.2M",
+    comments: "18.7K",
+    remixes: "92K",
+    shares: "210K",
+    liked: true,
+  },
+  {
+    id: "reel-linkdude",
+    posterSrc: "/marketing/reels/linkdude-hook.png",
+    posterAlt:
+      "A terminal-styled short: a line-drawn figure under the hook “Understand how LinkDude generates a blank LinkedIn page”.",
+    username: "linkdude",
+    caption: "how LinkDude actually works",
+    hashtags: "#linkedin",
+    likes: "46.9K",
+    comments: "903",
+    remixes: "2,118",
+    shares: "5,630",
+  },
+];

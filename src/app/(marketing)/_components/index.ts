@@ -4,7 +4,8 @@
 
 /**
  * SOURCE OF TRUTH KEYWORDS: marketing _components barrel, MarketingHeader,
- *   MarketingFooter, HeroPromptCard, ProofStrip, LANDING_FORMATS, LANDING_FAQ,
+ *   MarketingFooter, HeroPromptCard, ReelPhone, ReelStage, ProofStrip,
+ *   LANDING_FORMATS, LANDING_FAQ,
  *   LANDING_PROOF_CLIPS, LANDING_FEATURE_KEYS, HANDLED_FOR_YOU, STEP_BLURBS,
  *   HERO_COPY
  *
@@ -23,6 +24,8 @@
 export { MarketingHeader } from "./marketing-header";
 export { MarketingFooter } from "./marketing-footer";
 export { HeroPromptCard } from "./hero-prompt-card";
+export { ReelPhone, type ReelPhoneProps } from "./reel-phone";
+export { ReelStage, type ReelStageProps } from "./reel-stage";
 export { ProofStrip, type ProofStripProps } from "./proof-strip";
 export {
   HANDLED_FOR_YOU,
@@ -31,5 +34,6 @@ export {
   LANDING_FEATURE_KEYS,
   LANDING_FORMATS,
   LANDING_PROOF_CLIPS,
+  LANDING_REELS,
   STEP_BLURBS,
 } from "./landing-content";

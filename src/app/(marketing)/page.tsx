@@ -87,7 +87,9 @@ import {
   LANDING_FEATURE_KEYS,
   LANDING_FORMATS,
   LANDING_PROOF_CLIPS,
+  LANDING_REELS,
   ProofStrip,
+  ReelStage,
   STEP_BLURBS,
 } from "./_components";
 
@@ -112,56 +114,86 @@ export default function LandingPage() {
           className="halo-brand pointer-events-none absolute left-1/2 top-24 -z-10 h-160 w-250 max-w-full -translate-x-1/2 opacity-40 blur-[60px]"
         />
 
-        <div className="mx-auto max-w-7xl px-6 pb-20 pt-16 md:pt-24">
-          <div className="mx-auto flex max-w-3xl flex-col items-center text-center">
-            <span className="brutal-border brutal-shadow-sm mb-8 inline-flex items-center gap-2 rounded-full bg-brand-accent px-4 py-1.5 text-sm font-bold tracking-tight text-brand-accent-foreground">
-              <PlayIcon
-                className="size-3.5 fill-current"
-                aria-hidden="true"
-              />
-              {HERO_COPY.eyebrow}
-            </span>
-
-            <h1 className="font-display text-5xl font-medium leading-[0.95] tracking-tight text-foreground md:text-6xl lg:text-7xl">
-              {HERO_COPY.headlineLead}{" "}
-              <span className="relative inline-block">
-                <span className="relative z-10">
-                  {HERO_COPY.headlineHighlight}
-                </span>
-                {/* The highlighter bar — decoration, so it is hidden from
-                    assistive tech and the phrase reads as one sentence. */}
-                <span
+        {/* HERO_IS_A_SPLIT: the pitch on the left, the output on the right.
+            Centred text with the proof below it made a visitor scroll before
+            seeing a single frame of what the product makes; side by side, the
+            claim and the evidence land in the same glance. One column below
+            `lg`, where there is no room for two and the showcase follows the
+            words rather than fighting them. */}
+        <div className="mx-auto max-w-[1240px] px-6 pb-20 pt-16 md:pt-24">
+          {/* 1.05fr / 1fr at 900px and up — the text column is given the extra
+              fraction because it carries the headline, the field and the
+              proof line, while the stage is a fixed-size object that does not
+              benefit from more room. Below 900px the phones stack under the
+              words: there is no width at which two columns of this fit. */}
+          <div className="grid items-center gap-10 min-[900px]:grid-cols-[1.05fr_1fr]">
+            <div className="flex flex-col items-start text-left">
+              <span className="brutal-border brutal-shadow-sm mb-8 inline-flex items-center gap-2 rounded-full bg-brand-accent px-4 py-1.5 text-sm font-bold tracking-tight text-brand-accent-foreground">
+                <PlayIcon
+                  className="size-3.5 fill-current"
                   aria-hidden="true"
-                  className="absolute -bottom-1 left-0 h-4 w-full -rotate-1 rounded-sm bg-brand-accent"
                 />
+                {HERO_COPY.eyebrow}
               </span>
-            </h1>
 
-            {/* THE_LEAD_IS_NOT_THE_TAGLINE — page-owned prose, because this
-                sentence names the four inputs and the six jobs, which is more
-                than APP_DESCRIPTION can carry as a <meta> description too.
-                Metadata still inherits APP_DESCRIPTION from the root layout. */}
-            <p className="mt-6 max-w-2xl text-lg leading-relaxed text-muted-foreground md:text-xl">
-              {HERO_COPY.lead}
-            </p>
+              {/* Extrabold, not the light display weight the rest of the page
+                  uses. This is the one place the headline has to out-shout a
+                  full-colour illustration beside it, and a 400-weight face at
+                  this size loses that fight. */}
+              <h1 className="font-display text-5xl font-extrabold leading-[0.95] tracking-tight text-foreground md:text-6xl">
+                {HERO_COPY.headlineBefore}{" "}
+                <span className="relative inline-block px-3 py-0.5">
+                  {/* HIGHLIGHT_IS_A_BLOCK — a tilted yellow solid behind one
+                      word, sized from the word so a rewrite cannot leave it
+                      the wrong width. Decoration, hidden from assistive tech;
+                      the sentence still reads as one sentence. */}
+                  <span
+                    aria-hidden="true"
+                    className="brand-highlight absolute inset-0 rounded-md"
+                  />
+                  <span className="relative text-brand-accent-foreground">
+                    {HERO_COPY.headlineHighlight}
+                  </span>
+                </span>{" "}
+                {HERO_COPY.headlineAfter}
+              </h1>
 
-            {/* THE_FIELD_IS_THE_PITCH — the hero's primary action is the
-                control itself, so the secondary links sit under it rather
-                than competing with it. */}
-            <HeroPromptCard className="mt-9" />
+              {/* THE_LEAD_IS_NOT_THE_TAGLINE — page-owned prose, because this
+                  sentence names the four inputs and the six jobs, which is
+                  more than APP_DESCRIPTION can carry as a <meta> description
+                  too. Metadata still inherits APP_DESCRIPTION. */}
+              <p className="mt-6 max-w-xl text-lg leading-relaxed text-muted-foreground">
+                {HERO_COPY.lead}
+              </p>
 
-            {/* ONE_ACTION_PER_SCREENFUL: no second CTA row under the card.
-                The card IS the hero's action, the sticky header carries a
-                permanent "Get started", and a button pair here only competes
-                with the field for the same click. Pricing stays one tap away
-                in the header. */}
-            <p className="mt-6 text-sm text-muted-foreground">
-              Script, narration, captions and the render — one run, start to
-              finish.
-            </p>
+              {/* THE_FIELD_IS_THE_PITCH — the hero's action is the control
+                  itself. ONE_ACTION_PER_SCREENFUL: no competing button row;
+                  the sticky header carries a permanent "Get started". */}
+              <HeroPromptCard className="mt-8" />
+
+              <div className="mt-6 flex items-center gap-3">
+                {/* Three stacked discs in the brand colours — a crowd, drawn
+                    rather than photographed, because stock headshots of people
+                    who are not customers are the oldest lie on a landing
+                    page. */}
+                <span aria-hidden="true" className="flex items-center">
+                  <span className="size-7 rounded-full border-2 border-background bg-brand-accent" />
+                  <span className="-ml-2.5 size-7 rounded-full border-2 border-background bg-brand" />
+                  <span className="-ml-2.5 size-7 rounded-full border-2 border-background bg-foreground" />
+                </span>
+                <p className="text-sm font-semibold text-muted-foreground">
+                  {HERO_COPY.socialProof}
+                </p>
+              </div>
+            </div>
+
+            <ReelStage
+              items={LANDING_REELS}
+              badge={HERO_COPY.renderedBadge}
+            />
           </div>
 
-          <ProofStrip clips={LANDING_PROOF_CLIPS} className="mt-16" />
+          <ProofStrip clips={LANDING_PROOF_CLIPS} className="mt-20" />
         </div>
       </section>
 

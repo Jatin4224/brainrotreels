@@ -5,6 +5,7 @@
 /**
  * SOURCE OF TRUTH KEYWORDS: FaqItem, MarketingFormat, MarketingLink,
  *   MarketingNavColumn, MarketingPipelineRow, MarketingProofClip,
+ *   ReelShowcaseItem,
  *   MARKETING_CONTENT_IS_TYPED, FaqAccordion, landing page content
  *
  * WHAT:  The shapes the public marketing pages render their hand-written
@@ -230,4 +231,58 @@ export interface MarketingProofClip {
   duration: string;
   /** Poster image URL, when the deployment has one to show. */
   poster?: string | undefined;
+  /**
+   * The channel the clip was posted to, shown under the caption in the hero
+   * showcase. Optional because the proof STRIP does not show it — the same
+   * clip feeds both surfaces and only one of them has room.
+   */
+  handle?: string | undefined;
+}
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: ReelShowcaseItem, ReelStage, ReelPhone,
+ *   PHONE_MOCKUP_IS_DATA, PRODUCT_AS_PROOF, COUNTS_ARE_PRE_FORMATTED
+ *
+ * WHAT:  One short as the hero's phone mockups present it — the media, who
+ *        posted it, the caption, and the engagement counts drawn on the rail.
+ *
+ * WHY:   PHONE_MOCKUP_IS_DATA. The three phones are one component rendered
+ *        three times from this array, not three slabs of markup: swapping the
+ *        middle short, adding a fourth, or pointing an operator's own renders
+ *        at it has to be a content edit, and copy-pasted phone markup is how a
+ *        mockup ends up with the wrong username on the wrong card.
+ *
+ *        `videoSrc` is OPTIONAL and the poster is not. A poster always paints;
+ *        a video may not exist yet, may be blocked by reduced-motion, or may
+ *        still be loading, and in every one of those cases the phone has to
+ *        look finished rather than empty. That is also what keeps the hero
+ *        free of layout shift: the frame is a fixed size and the poster fills
+ *        it from the first paint.
+ *
+ *        COUNTS_ARE_PRE_FORMATTED — `likes` is the string "1.2M", not the
+ *        number 1_200_000. These are display copy on a mockup, not metrics
+ *        from anywhere, so a formatter would be inventing precision the data
+ *        does not have; writing them as they should READ keeps that honest and
+ *        keeps the component free of an i18n decision it cannot make.
+ * WHERE: `LANDING_REELS` in src/app/(marketing)/_components/landing-content.ts,
+ *        rendered by ./reel-stage.tsx and ./reel-phone.tsx.
+ */
+export interface ReelShowcaseItem {
+  id: string;
+  /** Looping clip. Absent until the deployment has one — the poster shows. */
+  videoSrc?: string | undefined;
+  /** Always set: the still the phone paints before and instead of the video. */
+  posterSrc: string;
+  /** Alt text for the poster — what the short actually shows. */
+  posterAlt: string;
+  username: string;
+  caption: string;
+  /** Rendered after the caption at reduced opacity, e.g. "#ai #agents". */
+  hashtags: string;
+  likes: string;
+  comments: string;
+  remixes: string;
+  shares: string;
+  /** Draws the heart filled and in the like colour. */
+  liked?: boolean | undefined;
 }

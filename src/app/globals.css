@@ -305,6 +305,10 @@ html:has([data-app-banner]) {
      to a serif. `--font-dm-sans` is published by next/font in the root
      layout. */
   --font-display: var(--font-dm-sans), Geist, sans-serif;
+  /* One step ABOVE --card: the hero's input shell and the cards that sit on
+     top of another card. The app palette has no such step because the product
+     never stacks two surfaces; the landing page does, constantly. */
+  --surface-raised: oklch(0.213 0.009 265);
 }
 
 @theme inline {
@@ -312,13 +316,40 @@ html:has([data-app-banner]) {
   --color-brand-foreground: var(--brand-foreground);
   --color-brand-accent: var(--brand-accent);
   --color-brand-accent-foreground: var(--brand-accent-foreground);
+  --color-surface-raised: var(--surface-raised);
+  --color-reel-like: var(--reel-like);
   --font-display: var(--font-display);
 }
 
 @layer components {
   /* The page wash — two fixed radial washes, so scrolling moves content
-     THROUGH the light rather than dragging it along. */
+     THROUGH the light rather than dragging it along.
+     It ALSO re-points the surface tokens for everything beneath it. The app's
+     palette is pure-black monochrome, deliberately: a workspace where the only
+     coloured thing is the thing you must act on. A landing page needs the
+     opposite — a blue-tinted near-black with two lighter surfaces stacked on
+     it, so a card reads as a card. Redefining the EXISTING token names (rather
+     than inventing `--marketing-bg` and friends) is what lets every component
+     underneath keep using plain `bg-card` / `border-border` / `text-muted-
+     foreground` and simply come out in the marketing palette — no component on
+     this page knows there are two palettes, and nothing in the product shifts
+     by a pixel. */
   .marketing-canvas {
+    --background: oklch(0.141 0.012 266);
+    --foreground: oklch(0.968 0.002 85);
+    --card: oklch(0.181 0.009 266);
+    --card-foreground: oklch(0.968 0.002 85);
+    --muted: oklch(0.213 0.009 265);
+    --muted-foreground: oklch(0.654 0.008 70);
+    --secondary: oklch(0.213 0.009 265);
+    --border: oklch(0.226 0.009 265);
+    --input: oklch(0.226 0.009 265);
+    /* The filled-heart red on the phone mockups' action rail. A FIXED signal
+       colour like --alert-banner, not a themed one: it is part of a simulated
+       feed UI, and a like that changed colour with our theme would stop
+       reading as a like. */
+    --reel-like: oklch(0.628 0.247 25.9);
+    background-color: var(--background);
     background-image:
       radial-gradient(
         1200px 600px at 80% -10%,
@@ -333,12 +364,46 @@ html:has([data-app-banner]) {
     background-attachment: fixed;
   }
 
+  /* SOURCE OF TRUTH KEYWORDS: brand-highlight, HIGHLIGHT_IS_A_BLOCK
+     The yellow block the hero sets one word of the headline into. A tilted
+     solid with a hard, un-blurred offset shadow — the shadow is what stops it
+     reading as a flat swatch and makes the word look stuck on. Sized from the
+     text it wraps (inset, not fixed), so rewording the headline cannot leave
+     the block the wrong width. */
+  .brand-highlight {
+    background-color: var(--brand-accent);
+    box-shadow: 6px 6px 0 0 color-mix(in oklab, var(--brand-accent) 30%, #000);
+    transform: rotate(-2deg);
+  }
+
   /* The blurred halo behind the hero headline. */
   .halo-brand {
     background-image: radial-gradient(
       60% 60% at 50% 50%,
       color-mix(in oklab, var(--brand) 35%, transparent) 0%,
       transparent 70%
+    );
+  }
+
+  /* SOURCE OF TRUTH KEYWORDS: reel-scrim-top, reel-scrim-bottom, SCRIM_IS_NOT_A_THEME_COLOR
+     The two black gradients that keep a feed overlay legible over arbitrary
+     footage. Deliberately NOT theme tokens and deliberately not inline rgba in
+     a component: a scrim is a function of the IMAGE underneath, not of the
+     page's palette — it has to be black whatever the theme does — and this is
+     the one place that decision is written down. */
+  .reel-scrim-top {
+    background-image: linear-gradient(
+      to bottom,
+      oklch(0 0 0 / 0.45),
+      transparent
+    );
+  }
+
+  .reel-scrim-bottom {
+    background-image: linear-gradient(
+      to top,
+      oklch(0 0 0 / 0.65),
+      transparent
     );
   }
 
