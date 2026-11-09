@@ -5,10 +5,29 @@
 "use client";
 
 /**
- * SOURCE OF TRUTH KEYWORDS: AppSidebar, SECTION_LABELS, SidebarUpgradeNudge
+ * SOURCE OF TRUTH KEYWORDS: AppSidebar, SECTION_LABELS, SidebarUpgradeNudge,
+ *   SidebarSearch, SidebarRecentProjects, SidebarPlanMeter, SIDEBAR_BLOCK_ORDER,
+ *   WORDMARK_THEN_SWITCHER
  *
- * WHAT:  The dashboard sidebar. Renders a fixed Dashboard home link plus the
- *        registry-derived nav (getSidebarNav), grouped by section.
+ * WHAT:  The dashboard sidebar. Wordmark, the search row, a fixed Dashboard
+ *        home link plus the registry-derived nav (getSidebarNav) grouped by
+ *        section, the three most recent projects, then the plan meter, the
+ *        upgrade nudge and the account row.
+ *
+ *        SIDEBAR_BLOCK_ORDER follows 00-dashboard-foundations.md section 2 top
+ *        to bottom. The order is the argument: the things you do many times a
+ *        day are at the top under your thumb, the things you do once a month
+ *        (plan, billing, account) are pinned to the bottom, and "Recent" sits
+ *        between them because it is navigation that happens to be data.
+ *
+ *        WORDMARK_THEN_SWITCHER: the spec draws a plain wordmark where this
+ *        app has an organization switcher, and both are right. A workspace is
+ *        the product's name to somebody who only has one, so the wordmark is
+ *        always shown and the switcher appears UNDER it only once there is a
+ *        second organization to switch to. Dropping the switcher to match the
+ *        drawing would have made every multi-workspace account unable to
+ *        change workspace; showing it to a solo creator is a control that can
+ *        only ever confirm what it already says.
  * WHY:   Items come straight from RESOURCES — permission gating reuses
  *        useActiveOrganization().hasPermission (owners always pass) and
  *        flag-gated items are hidden when the plan doesn't include them
@@ -42,7 +61,11 @@ import {
 } from "@/hooks/use-active-organization";
 import { trpc } from "@/trpc/react-provider";
 import { ROUTES } from "@/lib/config";
+import { APP_NAME } from "@/lib/config/branding";
 import { getNavIcon } from "./nav-icons";
+import { SidebarPlanMeter } from "./plan-meter";
+import { SidebarRecentProjects } from "./recent-projects";
+import { SidebarSearch } from "./sidebar-search";
 import { SidebarUpgradeNudge } from "./upgrade-nudge";
 
 /* Human labels for the known section keys. */
@@ -77,6 +100,15 @@ export function AppSidebar({
   const { hasPermission, isLoading } = useActiveOrganization();
   const organizationId = useActiveOrganizationId();
 
+  /* WORDMARK_THEN_SWITCHER — the switcher is only a control when there is
+   * something to switch to. Already prefetched and hydrated by the dashboard
+   * layout, so this resolves on the first paint rather than popping in. */
+  const { data: organizations } =
+    trpc.organization.getUserOrganizations.useQuery(undefined, {
+      staleTime: 5 * 60 * 1000,
+    });
+  const hasMultipleOrganizations = (organizations?.length ?? 0) > 1;
+
   /* One read of the full gate map; used to hide flag-locked items. */
   const { data: gateData } = trpc.usage.getFeatureGates.useQuery(
     { organizationId: organizationId ?? "" },
@@ -98,7 +130,19 @@ export function AppSidebar({
 
   return (
     <Sidebar collapsible="icon" variant="inset" {...props}>
-      <SidebarHeader>{orgSwitcher}</SidebarHeader>
+      <SidebarHeader>
+        {/* The wordmark, 15/700 per the spec. A link, because a logo in the
+            top-left that does not go home is the one piece of chrome everyone
+            tries to click. Hidden at icon width, where the switcher below (or
+            the rail itself) is the only thing that fits. */}
+        <Link
+          href={ROUTES.dashboard}
+          className="flex h-10 items-center px-2 text-[0.9375rem] font-bold tracking-tight text-sidebar-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/50 group-data-[collapsible=icon]:hidden"
+        >
+          {APP_NAME}
+        </Link>
+        {hasMultipleOrganizations ? orgSwitcher : null}
+      </SidebarHeader>
 
       <SidebarContent>
         <SidebarGroup>
@@ -114,6 +158,10 @@ export function AppSidebar({
                 <span>Dashboard</span>
               </SidebarMenuButton>
             </SidebarMenuItem>
+
+            {/* Second row, directly under home, exactly where the spec puts
+                it — and where ⌘K is reachable before the eye has to scan. */}
+            <SidebarSearch isVisible={isVisible} />
 
             {!isLoading &&
               (NAV_SECTIONS.find((s) => s.section === "main")?.items ?? [])
@@ -135,6 +183,10 @@ export function AppSidebar({
                 })}
           </SidebarMenu>
         </SidebarGroup>
+
+        {/* Between the nav and the settings sections: navigation that happens
+            to be data. Renders nothing until there is a project to list. */}
+        <SidebarRecentProjects />
 
         {NAV_SECTIONS.filter((s) => s.section !== "main").map((section) => {
           const visibleItems = isLoading ? [] : section.items.filter(isVisible);
@@ -167,6 +219,10 @@ export function AppSidebar({
       </SidebarContent>
 
       <SidebarFooter>
+        {/* What the workspace is on, and what it can still spend. Above the
+            nudge because the nudge is the ANSWER to it — seeing the number
+            first is what makes "Upgrade" mean anything. */}
+        <SidebarPlanMeter />
         {/* AMBIENT_NOT_INTERRUPTIVE — directly above the profile, where the eye
             already lands, and self-removing once there is nothing to sell. */}
         <SidebarUpgradeNudge />

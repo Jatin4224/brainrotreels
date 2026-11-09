@@ -827,3 +827,129 @@ html:has([data-app-banner]) {
     box-shadow: none;
   }
 }
+
+/* SOURCE OF TRUTH KEYWORDS: app-canvas, APP_DESIGN_LANGUAGE, DASHBOARD_PALETTE,
+ * --border-strong, --foreground-2, --muted-foreground-2, --cat-explain,
+ * --cat-market, --cat-entertain, --cat-music, --badge-new, --pro,
+ * --primary-soft, TOKENS_NOT_HEX, ONE_PRODUCT_ONE_ORANGE
+ *
+ * WHAT:  The authenticated app's surface palette — the blue-tinted near-black
+ *        page, its four stacked surfaces, two border weights, four text
+ *        weights, the orange action colour and the category accents — from
+ *        00-dashboard-foundations.md §1.
+ *
+ * WHY:   It REDEFINES THE EXISTING TOKEN NAMES rather than inventing
+ *        `--app-bg` and friends, exactly as `.marketing-canvas` above does.
+ *        That is the whole trick: every component beneath keeps using plain
+ *        `bg-card` / `border-border` / `text-muted-foreground` / `bg-primary`
+ *        and simply comes out in the dashboard palette, so the spec is
+ *        delivered without editing a single Card, Button, Input or Table.
+ *        Scoped to a CLASS and not to `.dark`, so the marketing pages, the
+ *        auth screens and the render previews are untouched — the app had
+ *        exactly one palette before this, and the two must not fight.
+ *
+ *        ONE_PRODUCT_ONE_ORANGE. The spec samples the CTA at #E8603C and notes
+ *        it against auth's #FA5F29; its own header says to snap to the auth
+ *        tokens where they differ, so `--primary` here IS `--brand` — the
+ *        colour the landing page and the sign-in button already use. Two
+ *        oranges three pixels apart, one on the page you sign in from and one
+ *        on the page you land on, is a difference nobody can name and
+ *        everybody can feel.
+ *
+ *        THIS INVERTS AN EARLIER DECISION, deliberately. `--primary` was white
+ *        app-wide (MARKETING_DESIGN_LANGUAGE calls the product "deliberately
+ *        MONOCHROME — a workspace where the only coloured thing is the thing
+ *        you must act on"). The dashboard spec asks for an orange primary, and
+ *        the rule survives the change: the action colour is still reserved for
+ *        actions, and the four category accents below are the only other
+ *        colours, each carrying a meaning.
+ *
+ *        Values are oklch conversions of the spec's sampled hex. The spec
+ *        itself states ±3 tolerance (sampled from compressed video), so these
+ *        are matched by eye rather than by round trip.
+ *
+ * WHERE: Applied by src/app/(dashboard)/layout.tsx to the shell wrapper.
+ *        Colour values come from 00-dashboard-foundations.md §1. */
+.app-canvas {
+  /* Surfaces, darkest to lightest: page → sidebar → fields → cards → raised. */
+  --background: oklch(0.169 0.006 266);
+  --sidebar: oklch(0.192 0.006 272);
+  --input: oklch(0.21 0.006 272);
+  --muted: oklch(0.21 0.006 272);
+  --card: oklch(0.225 0.01 280);
+  --popover: oklch(0.225 0.01 280);
+  --secondary: oklch(0.265 0.006 272);
+  --accent: oklch(0.265 0.006 272);
+  --surface-raised: oklch(0.265 0.006 272);
+
+  /* Two border weights. `--border-strong` is the heavier one the spec puts on
+     inputs and pills, and the one a card moves to on hover (§4). */
+  --border: oklch(0.274 0.008 275);
+  --sidebar-border: oklch(0.274 0.008 275);
+  --border-strong: oklch(0.331 0.009 277);
+
+  /* Four text weights. `--foreground-2` sits between body and muted — it is
+     the spec's `--fg-2`, used for card body, suggestion chips and recent
+     items, and the app had no step there. */
+  --foreground: oklch(0.964 0.001 286);
+  --card-foreground: oklch(0.964 0.001 286);
+  --popover-foreground: oklch(0.964 0.001 286);
+  --secondary-foreground: oklch(0.964 0.001 286);
+  --accent-foreground: oklch(0.964 0.001 286);
+  --sidebar-foreground: oklch(0.964 0.001 286);
+  --foreground-2: oklch(0.776 0.003 286);
+  --muted-foreground: oklch(0.636 0.007 286);
+  --muted-foreground-2: oklch(0.487 0.008 285);
+
+  /* The action colour, and the focus ring that has to be visible against it.
+     ⚠ CONTRAST_DEBT, stated here because this is where it is created. White on
+     this orange is about 3.1:1, which clears WCAG AA for LARGE text only
+     (>=18.66px bold / >=24px). The auth CTA is safe because it is pinned at
+     18px/700 (CTA_IS_LARGE_TEXT in auth-styles.ts); the app's default <Button>
+     is 14px, so every primary button in the dashboard is now below AA for its
+     label. 00-dashboard-foundations.md section 3 specifies exactly this pairing
+     (15/600 white on --act), so it is the SPEC's trade-off and not an accident
+     — but it is a real one. The two ways out, neither taken here because both
+     change the look the spec asked for: darken --primary to roughly #C2410C so
+     white clears 4.5:1, or set --primary-foreground to a near-black (about
+     6:1 on this orange, the same move --brand-accent-foreground makes on the
+     yellow). Decide it deliberately rather than by drift. */
+  --primary: var(--brand);
+  --primary-foreground: var(--brand-foreground);
+  --sidebar-primary: var(--brand);
+  --sidebar-primary-foreground: var(--brand-foreground);
+  --ring: var(--brand);
+  /* The spec's `--act-soft`: the "Beta" pill fill and the selected-plan glow.
+     A mix rather than a fourth literal, so it tracks --primary by definition. */
+  --primary-soft: color-mix(in oklab, var(--brand) 14%, transparent);
+
+  /* Category accents. These carry MEANING — a dot, an eyebrow and an avatar
+     all read as "this is Explain" — which is why they are four named tokens
+     and not a generic chart ramp. */
+  --cat-explain: oklch(0.768 0.095 183);
+  --cat-market: oklch(0.703 0.183 305);
+  --cat-entertain: oklch(0.671 0.146 274);
+  --cat-music: oklch(0.82 0.182 152);
+
+  /* Stickers. `--pro` deliberately equals `--cat-market`: "Best for" on the
+     top tier and the Marketing category are the same violet in the recording,
+     and naming it twice is what lets either move without the other. */
+  --badge-new: oklch(0.78 0.122 227);
+  --pro: oklch(0.703 0.183 305);
+
+  background-color: var(--background);
+  color: var(--foreground);
+}
+
+@theme inline {
+  --color-border-strong: var(--border-strong);
+  --color-foreground-2: var(--foreground-2);
+  --color-muted-foreground-2: var(--muted-foreground-2);
+  --color-primary-soft: var(--primary-soft);
+  --color-cat-explain: var(--cat-explain);
+  --color-cat-market: var(--cat-market);
+  --color-cat-entertain: var(--cat-entertain);
+  --color-cat-music: var(--cat-music);
+  --color-badge-new: var(--badge-new);
+  --color-pro: var(--pro);
+}

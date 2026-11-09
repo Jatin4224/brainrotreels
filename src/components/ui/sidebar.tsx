@@ -27,7 +27,10 @@ import { PanelLeftIcon } from "lucide-react"
 
 const SIDEBAR_COOKIE_NAME = "sidebar_state"
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7
-const SIDEBAR_WIDTH = "16rem"
+// SIDEBAR_IS_248PX, per 00-dashboard-foundations.md section 2. 15.5rem = 248px:
+// wide enough for the plan meter row ("Free" + "220 credits" on one line)
+// and a recent project title before it ellipses, which 16rem was not.
+const SIDEBAR_WIDTH = "15.5rem"
 const SIDEBAR_WIDTH_MOBILE = "18rem"
 const SIDEBAR_WIDTH_ICON = "3rem"
 const SIDEBAR_KEYBOARD_SHORTCUT = "b"

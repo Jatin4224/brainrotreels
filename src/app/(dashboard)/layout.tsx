@@ -204,7 +204,15 @@ export default async function DashboardLayout({
           page content, so it spans the sidebar too and pushes the app down
           rather than scrolling away inside one column. */}
       <PlanOverageBanner />
-      <SidebarProvider>
+      {/* APP_DESIGN_LANGUAGE — `.app-canvas` (globals.css) re-points the
+          surface, border, text and action tokens to the dashboard palette from
+          00-dashboard-foundations.md for everything beneath it. Applied to the
+          shell wrapper rather than to `body` for the same reason
+          `.marketing-canvas` is: the public pages, the auth screens and every
+          render preview must keep their own colours. Every component inside
+          still uses plain `bg-card` / `border-border` / `bg-primary` and
+          simply comes out in this palette. */}
+      <SidebarProvider className="app-canvas">
         <AppSidebar orgSwitcher={<OrgSwitcher />} userMenu={<UserMenu />} />
         <SidebarInset>{children}</SidebarInset>
       </SidebarProvider>
