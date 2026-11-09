@@ -43,6 +43,7 @@ export {
   authSchemaFor,
   forgotPasswordSchema,
   resetPasswordSchema,
+  SOCIAL_PROVIDER_IDS,
 } from "./auth";
 export type {
   SignInValues,
@@ -50,8 +51,8 @@ export type {
   AuthFormMode,
   AuthValuesByMode,
   AuthScreenCopy,
-  AuthShowcaseCard,
-  AuthShowcaseTone,
+  AuthPanelCopy,
+  SocialProviderId,
   ForgotPasswordValues,
   ResetPasswordValues,
 } from "./auth";

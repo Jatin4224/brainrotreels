@@ -55,28 +55,86 @@ function resolveAuthSecret(): string {
   return "dev-only-secret-change-me";
 }
 
-function resolveGoogleProvider():
-  | {
-      socialProviders: {
-        google: {
-          clientId: string;
-          clientSecret: string;
-          disableImplicitSignUp: true;
-        };
-      };
-    }
+/**
+ * SOURCE OF TRUTH KEYWORDS: resolveSocialProviders, resolveGoogleProvider,
+ *   resolveAppleProvider, SOCIAL_PROVIDERS_ARE_OPT_IN, NEXT_PUBLIC_APPLE_CLIENT_ID
+ *
+ * WHAT:  Merges every configured OAuth provider into one `socialProviders`
+ *        object, or returns nothing when none are configured.
+ * WHY:   SOCIAL_PROVIDERS_ARE_OPT_IN, and the merge has to happen in ONE
+ *        place: spreading two resolvers that each return their own
+ *        `{ socialProviders: … }` into the options object makes the second
+ *        one REPLACE the first, so wiring Apple would have silently switched
+ *        Google off. Building the inner record and wrapping it once is what
+ *        makes a third provider a two-line change rather than a bug.
+ *        Each provider is keyed on its own env pair, so a deployment that has
+ *        not bought an Apple developer account simply does not render the
+ *        button — the UI reads the same public ids (see AuthSocialRow).
+ * WHERE: Spread into the betterAuth() options below.
+ */
+function resolveSocialProviders():
+  | { socialProviders: Record<string, unknown> }
   | Record<string, never> {
+  const providers = {
+    ...resolveGoogleProvider(),
+    ...resolveAppleProvider(),
+  };
+  if (Object.keys(providers).length === 0) return {};
+  return { socialProviders: providers };
+}
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: resolveAppleProvider, NEXT_PUBLIC_APPLE_CLIENT_ID,
+ *   APPLE_CLIENT_SECRET, SOCIAL_PROVIDERS_ARE_OPT_IN
+ *
+ * WHAT:  Apple's entry in `socialProviders`, or nothing.
+ * WHY:   Mirrors the Google resolver exactly, including the half-configured
+ *        warning — the failure it prevents is a deployment that sets the
+ *        public client id (so the BUTTON renders) without the secret (so the
+ *        round trip fails), which looks to a user like Apple sign-in being
+ *        broken rather than unconfigured. Apple's secret is a signed JWT that
+ *        EXPIRES, at most six months out, which is why it is read from the
+ *        environment on every boot rather than baked in anywhere.
+ *        `appBundleIdentifier` is optional and only needed for native apps,
+ *        so it is passed through when present and omitted otherwise.
+ * WHERE: resolveSocialProviders above.
+ */
+function resolveAppleProvider(): Record<string, unknown> {
+  const clientId = process.env["NEXT_PUBLIC_APPLE_CLIENT_ID"];
+  const clientSecret = process.env["APPLE_CLIENT_SECRET"];
+  const appBundleIdentifier = process.env["APPLE_APP_BUNDLE_IDENTIFIER"];
+
+  if (clientId && clientSecret) {
+    return {
+      apple: {
+        clientId,
+        clientSecret,
+        disableImplicitSignUp: true,
+        ...(appBundleIdentifier ? { appBundleIdentifier } : {}),
+      },
+    };
+  }
+
+  if (clientId !== clientSecret) {
+    console.warn(
+      "[auth] Apple OAuth needs BOTH NEXT_PUBLIC_APPLE_CLIENT_ID and " +
+        "APPLE_CLIENT_SECRET. It is DISABLED until both are configured.",
+    );
+  }
+
+  return {};
+}
+
+function resolveGoogleProvider(): Record<string, unknown> {
   const clientId = process.env["NEXT_PUBLIC_GOOGLE_CLIENT_ID"];
   const clientSecret = process.env["GOOGLE_CLIENT_SECRET"];
 
   if (clientId && clientSecret) {
     return {
-      socialProviders: {
-        google: {
-          clientId,
-          clientSecret,
-          disableImplicitSignUp: true,
-        },
+      google: {
+        clientId,
+        clientSecret,
+        disableImplicitSignUp: true,
       },
     };
   }
@@ -197,7 +255,7 @@ export const auth = betterAuth({
     nextCookies(),
   ],
 
-  ...resolveGoogleProvider(),
+  ...resolveSocialProviders(),
 
   advanced: {
     crossSubDomainCookies,

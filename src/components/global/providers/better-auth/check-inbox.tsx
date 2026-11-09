@@ -136,7 +136,10 @@ export function CheckInbox({
   const countdown = `0:${String(secondsLeft).padStart(2, "0")}`;
 
   return (
-    <div className="flex flex-1 flex-col lg:flex-none lg:brutal-border lg:brutal-shadow lg:rounded-[1.375rem] lg:bg-card lg:p-8">
+    /* Bare at every width, like the forms it replaces — AUTH_SURFACE in
+       auth-shell.tsx. The message panel beside it is the only bordered thing
+       on the screen. */
+    <div className="flex flex-1 flex-col lg:flex-none">
       <button
         type="button"
         onClick={onChangeEmail}

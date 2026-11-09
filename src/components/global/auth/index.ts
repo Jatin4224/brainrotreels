@@ -4,10 +4,10 @@
 
 /**
  * SOURCE OF TRUTH KEYWORDS: AuthForm, AuthShell, AuthError, AuthHero,
- *   AuthShowcase, AuthModeNav, AuthModeTabs, ForgotPasswordForm,
+ *   AuthShowcase, AuthModeTabs, ForgotPasswordForm,
  *   ResetPasswordForm, AuthFormProps, AuthShellProps, AuthErrorProps,
  *   AuthHeroProps, AuthShowcaseProps, AuthModeSwitchProps, AUTH_SCREEN_COPY,
- *   AUTH_SHOWCASE_COPY
+ *   AUTH_PANEL_COPY, AUTH_MOBILE_TAG
  *
  * WHAT:  Barrel export for the global auth UI primitives — the chrome
  *        (shell, hero, showcase, mode switch, error banner), the
@@ -28,8 +28,12 @@ export { AuthShell } from "./auth-shell";
 export { AuthError } from "./auth-error";
 export { AuthHero } from "./auth-hero";
 export { AuthShowcase } from "./auth-showcase";
-export { AuthModeNav, AuthModeTabs } from "./auth-mode-switch";
-export { AUTH_SCREEN_COPY, AUTH_SHOWCASE_COPY } from "./auth-content";
+export { AuthModeTabs } from "./auth-mode-switch";
+export {
+  AUTH_SCREEN_COPY,
+  AUTH_PANEL_COPY,
+  AUTH_MOBILE_TAG,
+} from "./auth-content";
 export type { AuthErrorProps } from "./auth-error";
 export type { AuthShellProps } from "./auth-shell";
 export type { AuthHeroProps } from "./auth-hero";

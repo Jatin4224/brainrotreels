@@ -3,14 +3,13 @@
  */
 
 /**
- * SOURCE OF TRUTH KEYWORDS: AUTH_SCREEN_COPY, AUTH_SHOWCASE_CARDS,
- *   AUTH_SHOWCASE_COPY, AuthScreenCopy, AuthShowcaseCard, AuthFormMode,
- *   PAGE_OWNED_COPY, AUTH_SURFACE, OPERATOR_OWNS_THESE_CLAIMS
+ * SOURCE OF TRUTH KEYWORDS: AUTH_SCREEN_COPY, AUTH_PANEL_COPY,
+ *   AUTH_MOBILE_TAG, AuthScreenCopy, AuthPanelCopy, AuthFormMode,
+ *   PAGE_OWNED_COPY, AUTH_SURFACE, OPERATOR_OWNS_THESE_CLAIMS, HERO_COPY
  *
  * WHAT:  Every word the sign-in and sign-up screens say that is not a field
- *        label — the two modes' badges, split headlines, leads, top-bar
- *        prompts and button labels — plus the decor copy of the desktop
- *        showcase panel.
+ *        label — each mode's two headings, lead, button and cross-link — plus
+ *        the pitch on the panel beside the desktop form.
  *
  * WHY:   PAGE_OWNED_COPY, held apart from the components that render it for
  *        the same reason `landing-content.ts` is: a copy change becomes a diff
@@ -22,60 +21,51 @@
  *        A `Record<AuthFormMode, …>` and not two loose constants: the mode
  *        union is the source of truth for how many auth screens exist, so a
  *        third mode fails the typecheck HERE until somebody writes its words,
- *        instead of shipping a screen with an empty headline.
+ *        instead of shipping a screen with an empty heading.
  *
  *        Plain data, no "use client" — the pages are Server Components and
  *        only the form beneath them is interactive, so none of this is sent to
  *        the browser twice.
  *
- *        OPERATOR_OWNS_THESE_CLAIMS: the creator and view counts in
- *        `AUTH_SHOWCASE_COPY` are the operator's figures, supplied with the
- *        design and unverifiable from this codebase. They deliberately MIRROR
- *        `HERO_COPY.socialProof` on the landing page — a visitor who clicks
- *        "Get started" sees the same claim twice, and two different numbers
- *        across one click is the failure. Correct both together.
- *
- * WHERE: Read by ./auth-hero.tsx, ./auth-showcase.tsx and the top bar built in
- *        src/app/(auth)/sign-in/page.tsx and sign-up/page.tsx. The landing
- *        page's own copy stays in
+ * WHERE: Read by ./auth-hero.tsx and ./auth-showcase.tsx. The landing page's
+ *        own copy stays in
  *        src/app/(marketing)/_components/landing-content.ts.
  */
 
 import type {
   AuthFormMode,
+  AuthPanelCopy,
   AuthScreenCopy,
-  AuthShowcaseCard,
 } from "@/lib/types";
 
 /**
- * SOURCE OF TRUTH KEYWORDS: AUTH_SCREEN_COPY, AuthScreenCopy, AuthFormMode
+ * SOURCE OF TRUTH KEYWORDS: AUTH_SCREEN_COPY, AuthScreenCopy, AuthFormMode,
+ *   TWO_HEADINGS_ONE_SCREEN
  *
  * WHAT:  The words for each auth mode, keyed by mode.
- * WHY:   `navPrompt`/`navCta` always name the OPPOSITE mode, because the top
- *        bar's job is to offer the screen the visitor did not land on.
- * WHERE: ./auth-hero.tsx and the (auth) pages' top bars.
+ * WHY:   Two headings per mode on purpose — see TWO_HEADINGS_ONE_SCREEN on
+ *        `AuthScreenCopy`. The compact `title`/`lead` pair is what the form
+ *        column says once the panel on the right is carrying the pitch; the
+ *        `mobileHeadline*` trio is what it says when there is no panel.
+ * WHERE: ./auth-hero.tsx.
  */
 export const AUTH_SCREEN_COPY: Record<AuthFormMode, AuthScreenCopy> = {
   "sign-in": {
-    badge: "Welcome back, creator",
-    headlineBefore: "Your feed missed",
-    headlineHighlight: "you",
-    headlineAfter: "",
-    lead: "Sign in to pick up your drafts and keep shipping shorts.",
-    navPrompt: "New here?",
-    navCta: "Create account",
+    title: "Welcome back",
+    lead: "Sign in to pick up your drafts.",
+    mobileHeadlineBefore: "Your feed missed",
+    mobileHeadlineHighlight: "you",
+    mobileHeadlineAfter: "",
     submitLabel: "Sign in",
     footerPrompt: "New here?",
     footerCta: "Create account",
   },
   "sign-up": {
-    badge: "Your first short is on us",
-    headlineBefore: "Make shorts people",
-    headlineHighlight: "actually",
-    headlineAfter: "watch",
-    lead: "Create an account and turn any idea into a finished short.",
-    navPrompt: "Already creating?",
-    navCta: "Sign in",
+    title: "Create your account",
+    lead: "Your first short is on us.",
+    mobileHeadlineBefore: "Make shorts people",
+    mobileHeadlineHighlight: "actually",
+    mobileHeadlineAfter: "watch",
     submitLabel: "Create account",
     footerPrompt: "Already creating?",
     footerCta: "Sign in",
@@ -83,61 +73,40 @@ export const AUTH_SCREEN_COPY: Record<AuthFormMode, AuthScreenCopy> = {
 };
 
 /**
- * SOURCE OF TRUTH KEYWORDS: AUTH_SHOWCASE_CARDS, AuthShowcaseCard,
- *   AUTH_SHOWCASE_PANEL
+ * SOURCE OF TRUTH KEYWORDS: AUTH_PANEL_COPY, AuthPanelCopy, HERO_COPY,
+ *   AUTH_MESSAGE_PANEL, OPERATOR_OWNS_THESE_CLAIMS
  *
- * WHAT:  The three fanned 9:16 cards in the desktop showcase panel, left to
- *        right. Index 1 is the centre card — the one a visitor reads.
- * WHY:   Three deliberately different subjects and three different surfaces,
- *        so the panel shows RANGE rather than one template three times. They
- *        are flat colour blocks and not posters on purpose: the landing page
- *        already carries real rendered frames (PRODUCT_AS_PROOF), and an auth
- *        screen that waits on three images before it paints is an auth screen
- *        that feels slow at the exact moment somebody is typing a password.
+ * WHAT:  The pitch on the panel beside the desktop form.
+ *
+ * WHY:   ⚠ THESE WORDS MIRROR `HERO_COPY` in
+ *        src/app/(marketing)/_components/landing-content.ts, deliberately: a
+ *        visitor presses "Get started" on the landing page and lands here, so
+ *        the two must say the same thing. They are duplicated rather than
+ *        imported because `HERO_COPY` is route-local and a global component
+ *        reaching into a route's private `_components` is the wrong
+ *        direction. CHANGE BOTH TOGETHER.
+ *
+ *        OPERATOR_OWNS_THESE_CLAIMS: `socialProof` is the operator's figures,
+ *        supplied with the design and unverifiable from this codebase. It is
+ *        the line most likely to go stale, and the one a visitor sees twice
+ *        inside a single click.
  * WHERE: ./auth-showcase.tsx.
  */
-export const AUTH_SHOWCASE_CARDS: readonly AuthShowcaseCard[] = [
-  {
-    id: "auth-card-history",
-    tag: "History",
-    title: "The city that vanished overnight",
-    tone: "surface",
-  },
-  {
-    id: "auth-card-science",
-    tag: "Science",
-    title: "3 hearts. 1 octopus.",
-    tone: "accent",
-    playing: true,
-  },
-  {
-    id: "auth-card-what-if",
-    tag: "What if",
-    title: "What if the Moon disappeared?",
-    tone: "brand",
-  },
-];
+export const AUTH_PANEL_COPY: AuthPanelCopy = {
+  headlineBefore: "Create content people",
+  headlineHighlight: "actually",
+  headlineAfter: "want to watch",
+  lead: "Turn any idea, script, URL or document into a finished short with visuals, voice, sound and editing handled for you.",
+  socialProof: "12,400+ creators · 38M views generated",
+};
 
 /**
- * SOURCE OF TRUTH KEYWORDS: AUTH_SHOWCASE_COPY, OPERATOR_OWNS_THESE_CLAIMS,
- *   HERO_COPY
+ * SOURCE OF TRUTH KEYWORDS: AUTH_MOBILE_TAG, HERO_COPY
  *
- * WHAT:  The panel's two tilted pills, its decorative prompt line, and the
- *        social-proof sentence beneath it.
- * WHY:   Gathered in four adjacent lines, like `HERO_COPY`, so the operator's
- *        unverifiable numbers can be checked and corrected in one place. See
- *        the file header: these MUST stay in step with `HERO_COPY`.
- * WHERE: ./auth-showcase.tsx, and `renderedBadge` again as the mobile top-bar
- *        tag passed to <AuthShell headerTag>.
+ * WHAT:  The small tilted pill beside the wordmark on mobile.
+ * WHY:   The short form of the landing hero's "Ready to post in 41s". Mobile
+ *        only: at `lg` the same claim would compete with the panel's headline
+ *        for the same glance, and the panel wins.
+ * WHERE: Passed as <AuthShell headerTag> by the (auth) pages.
  */
-export const AUTH_SHOWCASE_COPY = {
-  /** The pale pill, top-left of the panel. Mobile shows the short form. */
-  renderedBadge: "Ready to post in 41s",
-  renderedBadgeShort: "41s to post",
-  /** The yellow pill, top-right of the panel. */
-  footnote: "They can't stop scrolling",
-  /** Decoration only — a picture of the hero's field, not a working one. */
-  promptPlaceholder: "Why octopuses have three hearts…",
-  promptAction: "Generate",
-  socialProof: "12,400+ creators · 38M views generated",
-} as const;
+export const AUTH_MOBILE_TAG = "41s to post";

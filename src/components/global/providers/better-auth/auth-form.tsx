@@ -46,7 +46,7 @@ import * as React from "react";
 import type { Route } from "next";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRightIcon, EyeIcon, EyeOffIcon, Loader2Icon } from "lucide-react";
+import { ArrowRightIcon, Loader2Icon } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 
@@ -78,6 +78,7 @@ import {
   signInSchema,
   signUpSchema,
   type AuthFormMode,
+  type SocialProviderId,
   type SignInValues,
   type SignUpValues,
 } from "@/lib/types";
@@ -97,18 +98,26 @@ export interface AuthFormProps {
   callbackURL?: Route;
 }
 
-/* Mirrors auth.ts: Google is only wired when the public client ID is set. */
+/* SOCIAL_PROVIDERS_ARE_OPT_IN, mirroring resolveSocialProviders() in
+ * src/lib/better-auth/auth.ts: a provider is wired only when its PUBLIC
+ * client id is set, and the server refuses it without the matching secret.
+ * Read at module scope — Next inlines a NEXT_PUBLIC_* read at build time
+ * only when it is a literal member access, so these are what make a dead
+ * provider drop out of the bundle instead of being decided at runtime. */
 const GOOGLE_OAUTH_ENABLED = Boolean(
   process.env["NEXT_PUBLIC_GOOGLE_CLIENT_ID"],
 );
+const APPLE_OAUTH_ENABLED = Boolean(
+  process.env["NEXT_PUBLIC_APPLE_CLIENT_ID"],
+);
 
-/* The shell of the form column at both widths. Below `lg` it is bare on the
- * page background and grows to fill the viewport so the CTA can pin to the
- * bottom; at `lg` it collapses into the card the desktop artboard draws.
- * AUTH_SURFACE lives in auth-shell.tsx and still holds — the CARD IS A
- * DESKTOP-ONLY TREATMENT owned here, not a container each screen invents. */
-const AUTH_CARD_CLASS =
-  "flex flex-1 flex-col gap-5 lg:flex-none lg:brutal-border lg:brutal-shadow lg:rounded-[1.375rem] lg:bg-card lg:p-6";
+/* The form column at both widths. AUTH_SURFACE (auth-shell.tsx): the form is
+ * BARE on the page background at every width — no card, no border, no second
+ * surface. Below `lg` it also grows to fill the viewport, which is what lets
+ * the CTA pin to the bottom; at `lg` the message panel beside it is the only
+ * bordered thing on screen, and a card around the fields as well would make
+ * the page read as two competing panels instead of one pitch and one form. */
+const AUTH_CARD_CLASS = "flex flex-1 flex-col gap-5 lg:flex-none";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: AuthForm
@@ -144,9 +153,9 @@ function SignInForm({ callbackURL }: { callbackURL: Route }) {
     defaultValues: { email: "", password: "" },
     mode: "onTouched",
   });
-  const { error, setError, google } = useAuthEffects();
+  const { error, setError, social } = useAuthEffects();
   const isSubmitting = form.formState.isSubmitting;
-  const isBusy = isSubmitting || google.isPending;
+  const isBusy = isSubmitting || social.pendingProvider !== null;
 
   async function onSubmit(values: SignInValues) {
     setError(null);
@@ -178,8 +187,8 @@ function SignInForm({ callbackURL }: { callbackURL: Route }) {
         />
 
         <AuthSocialRow
-          onGoogle={() => google.run(callbackURL, setError)}
-          isPending={google.isPending}
+          onSelect={(provider) => social.run(provider, callbackURL, setError)}
+          pendingProvider={social.pendingProvider}
           isBusy={isBusy}
         />
 
@@ -266,11 +275,11 @@ function SignUpForm({ callbackURL }: { callbackURL: Route }) {
     defaultValues: { name: "", email: "", password: "" },
     mode: "onTouched",
   });
-  const { error, setError, google } = useAuthEffects();
+  const { error, setError, social } = useAuthEffects();
   const notifyDevEmail = useDevEmailToast();
   const router = useRouter();
   const isSubmitting = form.formState.isSubmitting;
-  const isBusy = isSubmitting || google.isPending;
+  const isBusy = isSubmitting || social.pendingProvider !== null;
 
   async function onSubmit(values: SignUpValues) {
     setError(null);
@@ -331,8 +340,8 @@ function SignUpForm({ callbackURL }: { callbackURL: Route }) {
         />
 
         <AuthSocialRow
-          onGoogle={() => google.run(callbackURL, setError)}
-          isPending={google.isPending}
+          onSelect={(provider) => social.run(provider, callbackURL, setError)}
+          pendingProvider={social.pendingProvider}
           isBusy={isBusy}
         />
 
@@ -418,7 +427,6 @@ function SignUpForm({ callbackURL }: { callbackURL: Route }) {
             ctaLabel="Sign in"
             ctaHref={authRouteWithCallback(AUTH_ROUTES.signIn, carriedCallback)}
           />
-          <AuthLegalLine />
         </div>
       </form>
     </Form>
@@ -470,8 +478,8 @@ function AuthSubmit({
  * WHY:   SHOW_HIDE_IS_A_BUTTON — a real <button type="button"> with an
  *        `aria-label` that says what pressing it will DO, so it neither
  *        submits the form nor reads as "Show" with no object. The field keeps
- *        70px of right padding so a long password never runs under the
- *        toggle, and the toggle is 44px wide for the touch target.
+ *        80px of right padding so a long password never runs under the
+ *        toggle, and the toggle is at least 44px wide for the touch target.
  *        `tabIndex={-1}`: Tab from the password should reach the submit
  *        button, which is where somebody typing is going; the toggle is
  *        reachable by Shift+Tab and by touch, and sighted keyboard users have
@@ -489,7 +497,7 @@ const AuthPasswordField = React.forwardRef<
       <Input
         ref={ref}
         type={visible ? "text" : "password"}
-        className={cn(AUTH_FIELD_CLASS, "pr-[4.375rem]", className)}
+        className={cn(AUTH_FIELD_CLASS, "pr-20", className)}
         {...props}
       />
       <button
@@ -498,68 +506,107 @@ const AuthPasswordField = React.forwardRef<
         onClick={() => setVisible((current) => !current)}
         aria-label={visible ? "Hide password" : "Show password"}
         aria-pressed={visible}
-        className="absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-r-xl text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 motion-reduce:transition-none"
+        className="absolute inset-y-0 right-0 flex min-w-11 items-center justify-center rounded-r-xl px-4 text-base font-medium text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 motion-reduce:transition-none"
       >
-        {visible ? (
-          <EyeOffIcon className="size-5" aria-hidden="true" />
-        ) : (
-          <EyeIcon className="size-5" aria-hidden="true" />
-        )}
+        {/* A WORD, NOT AN ICON. The artboard spells it out, and it is the
+            right call: a crossed-out eye is read as both "it is hidden" and
+            "press to hide" depending on who is looking, while "Show" can only
+            mean one thing. The `aria-label` still carries the verb for a
+            screen reader, since the visible word alone flips meaning the
+            moment the field is revealed. */}
+        {visible ? "Hide" : "Show"}
       </button>
     </div>
   );
 });
 
 /**
- * SOURCE OF TRUTH KEYWORDS: AuthSocialRow, GOOGLE_OAUTH_ENABLED,
- *   ONE_PROVIDER_IS_FULL_WIDTH
+ * SOURCE OF TRUTH KEYWORDS: AuthSocialRow, SOCIAL_PROVIDERS, SocialProviderId,
+ *   GOOGLE_OAUTH_ENABLED, APPLE_OAUTH_ENABLED, SOCIAL_PROVIDERS_ARE_OPT_IN,
+ *   NO_DEAD_PROVIDER_BUTTONS
  *
- * WHAT:  The OAuth buttons above the "or with email" rule, or nothing when no
- *        provider is configured.
- * WHY:   ONE_PROVIDER_IS_FULL_WIDTH. auth-design.md draws a two-column row
- *        (Google and Apple), but this deployment wires Google only — Apple is
- *        not in `socialProviders` in src/lib/better-auth/auth.ts — and half a
- *        row of buttons reads as a missing one. A single provider therefore
- *        takes the full width; the grid is `sm:grid-cols-2` ready for the day
- *        a second one is added, and adding it is an entry in the list below
- *        plus the server config, not a layout change.
+ * WHAT:  The OAuth buttons above the "or with email" rule — Google, Apple, or
+ *        nothing when neither is configured.
+ *
+ * WHY:   NO_DEAD_PROVIDER_BUTTONS, which is the rule the list below exists to
+ *        keep. A provider renders only when its PUBLIC client id is present,
+ *        mirroring `resolveSocialProviders` in src/lib/better-auth/auth.ts
+ *        exactly — the server refuses a provider it has no secret for, and a
+ *        button that opens a round trip ending in "unsupported provider"
+ *        reads to a user as the product being broken rather than the provider
+ *        being switched off. The envs are the two halves of one switch.
+ *
+ *        A LIST, not two hand-written buttons: the row's column count is
+ *        derived from how many are enabled, so one provider is full width and
+ *        two split the row, with no layout branch to get wrong. Adding a
+ *        third is an entry here plus a resolver on the server.
+ *
  *        The whole block disappears when nothing is configured, rule and all:
- *        an "or with email" divider with nothing above it is the oldest bug in
- *        this pattern.
- * WHERE: Both forms above.
+ *        an "or with email" divider with nothing above it is the oldest bug
+ *        in this pattern.
+ *
+ * WHERE: Both forms above. `onSelect` is given the provider id and routes it
+ *        to authClient.signIn.social.
  */
+const SOCIAL_PROVIDERS = [
+  {
+    id: "google",
+    label: "Google",
+    enabled: GOOGLE_OAUTH_ENABLED,
+    Glyph: GoogleGlyph,
+  },
+  {
+    id: "apple",
+    label: "Apple",
+    enabled: APPLE_OAUTH_ENABLED,
+    Glyph: AppleGlyph,
+  },
+] as const satisfies readonly {
+  id: SocialProviderId;
+  label: string;
+  enabled: boolean;
+  Glyph: () => React.JSX.Element;
+}[];
+
 function AuthSocialRow({
-  onGoogle,
-  isPending,
+  onSelect,
+  pendingProvider,
   isBusy,
 }: {
-  onGoogle: () => void;
-  isPending: boolean;
+  onSelect: (provider: SocialProviderId) => void;
+  pendingProvider: SocialProviderId | null;
   isBusy: boolean;
 }) {
-  if (!GOOGLE_OAUTH_ENABLED) return null;
+  const providers = SOCIAL_PROVIDERS.filter((provider) => provider.enabled);
+  if (providers.length === 0) return null;
 
   return (
     <>
-      {/* A grid of one today. It stays a grid because adding Apple is then a
-          second <Button> and a `sm:grid-cols-2`, not a rewrite of the row. */}
-      <div className="grid gap-3">
-        <Button
-          variant="outline"
-          type="button"
-          size="lg"
-          className={AUTH_SOCIAL_BUTTON_CLASS}
-          onClick={onGoogle}
-          disabled={isBusy}
-          aria-busy={isPending}
-        >
-          {isPending ? (
-            <Loader2Icon className="size-5 animate-spin" aria-hidden="true" />
-          ) : (
-            <GoogleGlyph />
-          )}
-          Google
-        </Button>
+      <div
+        className={cn(
+          "grid gap-3",
+          providers.length > 1 ? "grid-cols-2" : "grid-cols-1",
+        )}
+      >
+        {providers.map((provider) => (
+          <Button
+            key={provider.id}
+            variant="outline"
+            type="button"
+            size="lg"
+            className={AUTH_SOCIAL_BUTTON_CLASS}
+            onClick={() => onSelect(provider.id)}
+            disabled={isBusy}
+            aria-busy={pendingProvider === provider.id}
+          >
+            {pendingProvider === provider.id ? (
+              <Loader2Icon className="size-5 animate-spin" aria-hidden="true" />
+            ) : (
+              <provider.Glyph />
+            )}
+            {provider.label}
+          </Button>
+        ))}
       </div>
       <div className={AUTH_DIVIDER_CLASS}>or with email</div>
     </>
@@ -577,8 +624,11 @@ function AuthFooter({
    * tree, so a renamed auth page cannot ship as a dead footer link. */
   ctaHref: Route;
 }) {
+  /* MOBILE ONLY. At `lg` the segmented tabs sit directly above the fields and
+     offer the same move; the artboard carries this line only where those tabs
+     are hidden. */
   return (
-    <p className="text-center text-base text-muted-foreground">
+    <p className="text-center text-base text-muted-foreground lg:hidden">
       {prompt}{" "}
       <Link href={ctaHref} className={AUTH_LINK_CLASS}>
         {ctaLabel}
@@ -588,58 +638,64 @@ function AuthFooter({
 }
 
 /**
- * SOURCE OF TRUTH KEYWORDS: AuthLegalLine, CONSENT_IS_ON_THE_BUTTON
+ * SOURCE OF TRUTH KEYWORDS: useAuthEffects, pendingProvider, SocialProviderId
  *
- * WHAT:  The "By continuing you agree to…" line under the sign-up CTA.
- * WHY:   CONSENT_IS_ON_THE_BUTTON — stated at the point of agreement rather
- *        than as a checkbox, which is the pattern the rest of the public
- *        surface uses (see the marketing footer's links to the same two
- *        documents). Sign-up only: signing in again is not a new agreement.
- *        The hrefs are literals rather than a config constant because
- *        `AUTH_ROUTES` covers the auth screens and the legal pages have no
- *        registry of their own yet — the marketing footer hard-codes the same
- *        two, and both are typed routes, so a rename fails the build in both
- *        places at once.
- * WHERE: The sign-up form above.
+ * WHAT:  Shared error state plus the OAuth handler for both forms.
+ * WHY:   `pendingProvider` is the id of the provider being used, not a
+ *        boolean: with two buttons in the row, a single `isPending` would
+ *        spin BOTH of them on one click. It doubles as the re-entrancy guard
+ *        the boolean was — a non-null value means a redirect is already in
+ *        flight. The provider id goes into the failure message so "Apple
+ *        sign-in failed" names the thing that actually failed.
+ * WHERE: SignInForm and SignUpForm above.
  */
-function AuthLegalLine() {
-  return (
-    <p className="text-center text-sm leading-relaxed text-muted-foreground">
-      By continuing you agree to our{" "}
-      <Link href="/legal/terms" className={AUTH_LINK_CLASS}>
-        Terms
-      </Link>{" "}
-      and{" "}
-      <Link href="/legal/privacy" className={AUTH_LINK_CLASS}>
-        Privacy Policy
-      </Link>
-      .
-    </p>
-  );
-}
-
-/* Shared error state + Google handler. */
 function useAuthEffects() {
   const [error, setError] = React.useState<string | null>(null);
-  const [isPending, setIsPending] = React.useState(false);
+  const [pendingProvider, setPendingProvider] =
+    React.useState<SocialProviderId | null>(null);
 
-  async function run(callbackURL: Route, setErr: (v: string | null) => void) {
-    if (isPending) return;
+  async function run(
+    provider: SocialProviderId,
+    callbackURL: Route,
+    setErr: (v: string | null) => void,
+  ) {
+    if (pendingProvider !== null) return;
     setErr(null);
-    setIsPending(true);
+    setPendingProvider(provider);
     try {
       const { error: authError } = await authClient.signIn.social({
-        provider: "google",
+        provider,
         callbackURL,
       });
-      if (authError)
-        setErr(authError.message ?? "Google sign-in failed. Try again.");
+      if (authError) {
+        const label = provider === "apple" ? "Apple" : "Google";
+        setErr(authError.message ?? `${label} sign-in failed. Try again.`);
+      }
     } finally {
-      setIsPending(false);
+      setPendingProvider(null);
     }
   }
 
-  return { error, setError, google: { isPending, run } };
+  return { error, setError, social: { pendingProvider, run } };
+}
+
+/* Inline Apple mark. Apple's brand guidelines require their own logo on a
+ * "Sign in with Apple" control; this is the glyph alone, which is what the
+ * artboard draws. Swap in the official asset before shipping to production. */
+function AppleGlyph() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      className="size-5"
+      aria-hidden="true"
+    >
+      <path
+        d="M17.05 12.54c-.03-2.6 2.12-3.85 2.22-3.91-1.21-1.77-3.09-2.01-3.76-2.04-1.6-.16-3.12.94-3.93.94-.81 0-2.06-.92-3.39-.9-1.74.03-3.35 1.01-4.25 2.57-1.81 3.14-.46 7.79 1.3 10.34.86 1.25 1.89 2.65 3.24 2.6 1.3-.05 1.79-.84 3.36-.84 1.57 0 2.01.84 3.38.81 1.4-.02 2.28-1.27 3.13-2.53.99-1.45 1.4-2.86 1.42-2.93-.03-.01-2.72-1.04-2.75-4.12M14.5 4.76c.71-.87 1.19-2.07 1.06-3.27-1.02.04-2.26.68-3 1.54-.66.77-1.24 2-1.08 3.17 1.14.09 2.3-.58 3.02-1.44"
+        fill="currentColor"
+      />
+    </svg>
+  );
 }
 
 /* Inline Google "G" mark. */

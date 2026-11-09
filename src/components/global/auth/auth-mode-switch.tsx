@@ -3,13 +3,11 @@
  */
 
 /**
- * SOURCE OF TRUTH KEYWORDS: AuthModeTabs, AuthModeNav, AuthModeSwitchProps,
- *   MODE_SWITCH_IS_A_ROUTE, AUTH_SCREEN_COPY, authRouteWithCallback,
+ * SOURCE OF TRUTH KEYWORDS: AuthModeTabs, AuthModeSwitchProps,
+ *   MODE_SWITCH_IS_A_ROUTE, authRouteWithCallback,
  *   RETURN_TO_AFTER_AUTH, AUTH_SURFACE, TYPED_ROUTE_GUARANTEE
  *
- * WHAT:  The two ways to get from one auth mode to the other — the segmented
- *        tab pair at the top of the form card, and the prompt + outline pill
- *        in the desktop top bar.
+ * WHAT:  The segmented tab pair that gets from one auth mode to the other.
  *
  * WHY:   MODE_SWITCH_IS_A_ROUTE. auth-design.md asks that toggling update the
  *        URL so each mode can be linked directly; this app already HAS two
@@ -37,9 +35,12 @@
  *        and not inside the Better Auth form: which modes exist and what the
  *        app calls them is not a fact about the auth provider.
  *
- * WHERE: <AuthModeTabs> is rendered at the top of the Better Auth form card;
- *        <AuthModeNav> is passed as the `headerEnd` of <AuthShell> by the
- *        (auth) sign-in and sign-up pages.
+ *        THE TOP BAR CARRIES NO SECOND SWITCH. An earlier version put a
+ *        "New here? → Create account" pill in the header beside these tabs;
+ *        two controls offering the same move, a hundred pixels apart, is a
+ *        question asked twice. The tabs sit directly above the fields they
+ *        change, so they are the ones that stayed.
+ * WHERE: Rendered at the top of the Better Auth sign-in / sign-up form.
  */
 
 import type { Route } from "next";
@@ -49,7 +50,6 @@ import { AUTH_ROUTES, authRouteWithCallback } from "@/lib/config";
 import type { AuthFormMode } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-import { AUTH_SCREEN_COPY } from "./auth-content";
 
 export interface AuthModeSwitchProps {
   /** The mode currently on screen. The link always targets the other one. */
@@ -127,35 +127,3 @@ export function AuthModeTabs({
   );
 }
 
-/**
- * SOURCE OF TRUTH KEYWORDS: AuthModeNav
- *
- * WHAT:  The desktop top bar's "New here? → Create account" pair.
- * WHY:   Hidden below `lg`: the mobile artboards carry the cross-link once,
- *        under the CTA where a thumb already is, and the same offer twice on a
- *        390px screen is noise.
- * WHERE: The `headerEnd` slot of <AuthShell>.
- */
-export function AuthModeNav({
-  mode,
-  callbackURL = null,
-  className,
-}: AuthModeSwitchProps) {
-  const copy = AUTH_SCREEN_COPY[mode];
-  const target =
-    mode === "sign-in" ? AUTH_ROUTES.signUp : AUTH_ROUTES.signIn;
-
-  return (
-    <div className={cn("hidden items-center gap-4 lg:flex", className)}>
-      <span className="text-sm font-medium text-muted-foreground">
-        {copy.navPrompt}
-      </span>
-      <Link
-        href={authRouteWithCallback(target, callbackURL ?? null)}
-        className="brutal-border brutal-hover inline-flex h-11 items-center rounded-full bg-transparent px-6 text-base font-bold text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-      >
-        {copy.navCta}
-      </Link>
-    </div>
-  );
-}
