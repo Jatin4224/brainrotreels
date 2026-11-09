@@ -85,6 +85,21 @@ export const CREATABLE_PROJECT_KINDS = [
 ] as const satisfies readonly ProjectKind[];
 
 /**
+ * SOURCE OF TRUTH KEYWORDS: CreatableProjectKind, CREATABLE_PROJECT_KINDS
+ *
+ * WHAT:  The narrowed union of kinds a new project may be created as.
+ * WHY:   DERIVED, never written out a second time — it is the element type of
+ *        the array above, so the two cannot drift. It exists because callers
+ *        that hand a kind to the create form (the dashboard's format picker)
+ *        need the compiler to stop them passing one the form cannot accept;
+ *        before this they could only check at runtime and then widen with an
+ *        assertion, which is the check being skipped in all but name.
+ * WHERE: `initialKind` on CreateProjectSheetContent, and the `isStartableFormat`
+ *        type predicate in src/lib/config/formats.ts.
+ */
+export type CreatableProjectKind = (typeof CREATABLE_PROJECT_KINDS)[number];
+
+/**
  * SOURCE OF TRUTH KEYWORDS: PROJECT_STATUSES, projectStatusSchema, ProjectStatus
  *
  * WHAT:  The lifecycle of a project row.

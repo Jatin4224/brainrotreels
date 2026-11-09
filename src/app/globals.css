@@ -317,7 +317,7 @@ html:has([data-app-banner]) {
   /* One step ABOVE --card: the hero's input shell and the cards that sit on
      top of another card. The app palette has no such step because the product
      never stacks two surfaces; the landing page does, constantly. */
-  --surface-raised: oklch(0.213 0.009 265);
+  --surface-raised: oklch(0.244 0.0159 269);
 }
 
 @theme inline {
@@ -344,14 +344,14 @@ html:has([data-app-banner]) {
      this page knows there are two palettes, and nothing in the product shifts
      by a pixel. */
   .marketing-canvas {
-    --background: oklch(0.141 0.012 266);
-    --foreground: oklch(0.968 0.002 85);
-    --card: oklch(0.181 0.009 266);
-    --card-foreground: oklch(0.968 0.002 85);
-    --muted: oklch(0.213 0.009 265);
+    --background: oklch(0.1598 0.0132 270.5);
+    --foreground: oklch(0.9693 0.004 106.5);
+    --card: oklch(0.2052 0.0123 270.8);
+    --card-foreground: oklch(0.9693 0.004 106.5);
+    --muted: oklch(0.244 0.0159 269);
     --muted-foreground: oklch(0.654 0.008 70);
-    --secondary: oklch(0.213 0.009 265);
-    --border: oklch(0.226 0.009 265);
+    --secondary: oklch(0.244 0.0159 269);
+    --border: oklch(0.2524 0.0158 269);
     --input: oklch(0.226 0.009 265);
     /* The filled-heart red on the phone mockups' action rail. A FIXED signal
        colour like --alert-banner, not a themed one: it is part of a simulated
@@ -864,42 +864,71 @@ html:has([data-app-banner]) {
  *        actions, and the four category accents below are the only other
  *        colours, each carrying a meaning.
  *
- *        Values are oklch conversions of the spec's sampled hex. The spec
- *        itself states ±3 tolerance (sampled from compressed video), so these
- *        are matched by eye rather than by round trip.
+ *        VALUES COME FROM THE DESIGN EXPORT, NOT FROM THE SAMPLED SPEC. An
+ *        earlier pass used the hex in 00-dashboard-foundations.md section 1,
+ *        which was eyedropped off a compressed screen recording and is stated
+ *        there as plus-or-minus 3. The Dash-Home export then arrived with the
+ *        real values, and they are the AUTH tokens exactly — #0B0D13,
+ *        #15171D, #1D2028, #1F222A, #2A2D36, #F5F5F2, #9B9891, #F2CF3B,
+ *        #FA5F29. The recording was a lossy copy of the auth palette all
+ *        along, which is what 00-foundations predicted when it said to snap
+ *        to the auth tokens. So these are no longer conversions of anything:
+ *        the surfaces below ARE the auth palette, and sign-in and the app are
+ *        one product by construction rather than by resemblance.
  *
  * WHERE: Applied by src/app/(dashboard)/layout.tsx to the shell wrapper.
- *        Colour values come from 00-dashboard-foundations.md §1. */
+ *        Colour values come from the Dash-Home / DashSidebar design export,
+ *        cross-checked against auth-design.md section 2. */
 .app-canvas {
-  /* Surfaces, darkest to lightest: page → sidebar → fields → cards → raised. */
-  --background: oklch(0.169 0.006 266);
-  --sidebar: oklch(0.192 0.006 272);
-  --input: oklch(0.21 0.006 272);
-  --muted: oklch(0.21 0.006 272);
-  --card: oklch(0.225 0.01 280);
-  --popover: oklch(0.225 0.01 280);
-  --secondary: oklch(0.265 0.006 272);
-  --accent: oklch(0.265 0.006 272);
-  --surface-raised: oklch(0.265 0.006 272);
+  /* Surfaces, darkest to lightest: page → sidebar → cards/fields → raised.
+     The design has FEWER steps than the sampled spec did: one card colour
+     (#15171D) and one raised colour (#1D2028), not four. Collapsing them is
+     deliberate — the extra steps in the recording were compression.
 
-  /* Two border weights. `--border-strong` is the heavier one the spec puts on
-     inputs and pills, and the one a card moves to on hover (§4). */
-  --border: oklch(0.274 0.008 275);
-  --sidebar-border: oklch(0.274 0.008 275);
-  --border-strong: oklch(0.331 0.009 277);
+     ⚠ EVERY VALUE IS AN EXACT CONVERSION OF THE HEX BESIDE IT, computed
+     through the Oklab matrix — not matched by eye, and NOT copied from
+     `.marketing-canvas`. Two earlier attempts got this wrong in opposite
+     directions: hand-estimating the oklch put the greys 3-5 light, and then
+     borrowing the marketing values put them 5-7 dark, because the marketing
+     canvas is its OWN ramp (a deeper blue-black tuned for a page with
+     radial washes over it) and not the auth palette it resembles. The
+     dashboard, the auth screens and this design export all want the same
+     surfaces, so the hex in the comments is the contract — re-derive from
+     those, never from the other canvas. */
+  --background: oklch(0.1598 0.0132 270.5); /* #0B0D13 */
+  /* The one step the marketing palette has no name for: the sidebar sits
+     between the page and a card, so the nav reads as a panel the content
+     floats on rather than as more page. */
+  --sidebar: oklch(0.1783 0.0128 270.6); /* #0F1117 */
+  --card: oklch(0.2052 0.0123 270.8); /* #15171D */
+  --popover: oklch(0.2052 0.0123 270.8);
+  --input: oklch(0.2052 0.0123 270.8);
+  --muted: oklch(0.244 0.0159 269); /* #1D2028 */
+  --secondary: oklch(0.244 0.0159 269);
+  --accent: oklch(0.244 0.0159 269);
+  --surface-raised: oklch(0.244 0.0159 269);
 
-  /* Four text weights. `--foreground-2` sits between body and muted — it is
-     the spec's `--fg-2`, used for card body, suggestion chips and recent
-     items, and the app had no step there. */
-  --foreground: oklch(0.964 0.001 286);
-  --card-foreground: oklch(0.964 0.001 286);
-  --popover-foreground: oklch(0.964 0.001 286);
-  --secondary-foreground: oklch(0.964 0.001 286);
-  --accent-foreground: oklch(0.964 0.001 286);
-  --sidebar-foreground: oklch(0.964 0.001 286);
-  --foreground-2: oklch(0.776 0.003 286);
-  --muted-foreground: oklch(0.636 0.007 286);
-  --muted-foreground-2: oklch(0.487 0.008 285);
+  /* Two border weights, exactly as auth has them: `--line` for card edges and
+     dividers, `--line-2` for inputs, pills and a card's hover state. */
+  --border: oklch(0.2524 0.0158 269); /* #1F222A */
+  --sidebar-border: oklch(0.2524 0.0158 269);
+  --border-strong: oklch(0.2979 0.0169 270.8); /* #2A2D36 */
+
+  /* Four text weights, auth's `--fg / --fg-2 / --mut / --ph`.
+     `--foreground-2` sits between body and muted — card body, filter chips,
+     recent items — and the app had no step there before this. */
+  --foreground: oklch(0.9693 0.004 106.5); /* #F5F5F2 */
+  --card-foreground: oklch(0.9693 0.004 106.5);
+  --popover-foreground: oklch(0.9693 0.004 106.5);
+  --secondary-foreground: oklch(0.9693 0.004 106.5);
+  --accent-foreground: oklch(0.9693 0.004 106.5);
+  --sidebar-foreground: oklch(0.9693 0.004 106.5);
+  /* The two steps the marketing palette has no name for, on the same hue and
+     chroma as the ones above so they read as the same family: card body and
+     filter chips (#D6D4CE), and placeholder text (#6F6D68). */
+  --foreground-2: oklch(0.8698 0.0085 91.5); /* #D6D4CE */
+  --muted-foreground: oklch(0.6801 0.0107 87.5); /* #9B9891 */
+  --muted-foreground-2: oklch(0.535 0.0081 88.7); /* #6F6D68 */
 
   /* The action colour, and the focus ring that has to be visible against it.
      ⚠ CONTRAST_DEBT, stated here because this is where it is created. White on
@@ -907,9 +936,10 @@ html:has([data-app-banner]) {
      (>=18.66px bold / >=24px). The auth CTA is safe because it is pinned at
      18px/700 (CTA_IS_LARGE_TEXT in auth-styles.ts); the app's default <Button>
      is 14px, so every primary button in the dashboard is now below AA for its
-     label. 00-dashboard-foundations.md section 3 specifies exactly this pairing
-     (15/600 white on --act), so it is the SPEC's trade-off and not an accident
-     — but it is a real one. The two ways out, neither taken here because both
+     label. The design does this too, and MOSTLY gets away
+     with it: the featured CTA in Dash-Home is 18px/700, which IS large text
+     and passes. The ones that do not are the small white-on-orange labels,
+     notably the sidebar Upgrade button at 14px/700. The two ways out, neither taken here because both
      change the look the spec asked for: darken --primary to roughly #C2410C so
      white clears 4.5:1, or set --primary-foreground to a near-black (about
      6:1 on this orange, the same move --brand-accent-foreground makes on the
@@ -926,16 +956,16 @@ html:has([data-app-banner]) {
   /* Category accents. These carry MEANING — a dot, an eyebrow and an avatar
      all read as "this is Explain" — which is why they are four named tokens
      and not a generic chart ramp. */
-  --cat-explain: oklch(0.768 0.095 183);
-  --cat-market: oklch(0.703 0.183 305);
-  --cat-entertain: oklch(0.671 0.146 274);
-  --cat-music: oklch(0.82 0.182 152);
+  --cat-explain: oklch(0.7555 0.0978 183.5); /* #5EC4B6 */
+  --cat-market: oklch(0.7217 0.1767 305.5); /* #C084FC */
+  --cat-entertain: oklch(0.7044 0.1566 278.4); /* #8B93FF */
+  --cat-music: oklch(0.8003 0.1821 151.7); /* #4ADE80 */
 
   /* Stickers. `--pro` deliberately equals `--cat-market`: "Best for" on the
      top tier and the Marketing category are the same violet in the recording,
      and naming it twice is what lets either move without the other. */
-  --badge-new: oklch(0.78 0.122 227);
-  --pro: oklch(0.703 0.183 305);
+  --badge-new: oklch(0.7726 0.1268 231.1);
+  --pro: oklch(0.7217 0.1767 305.5);
 
   background-color: var(--background);
   color: var(--foreground);

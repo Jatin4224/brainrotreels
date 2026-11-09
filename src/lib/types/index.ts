@@ -83,6 +83,7 @@ export {
 } from "./project";
 export type {
   ProjectKind,
+  CreatableProjectKind,
   ProjectStatus,
   AspectRatio,
   CreateProjectValues,

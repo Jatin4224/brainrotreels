@@ -60,6 +60,14 @@ export {
 export type { AuthRouteKey } from "./auth-routes";
 export { ROUTES } from "./routes";
 export type { AppRouteKey } from "./routes";
+export {
+  FORMATS,
+  FORMAT_CATEGORIES,
+  FEATURED_FORMAT_KIND,
+  formatsByCategory,
+  isStartableFormat,
+} from "./formats";
+export type { FormatCategoryKey, FormatDefinition } from "./formats";
 /* PUBLIC_MARKETING_SURFACE — the `(marketing)` group's paths and the one
  * predicate the AuthRedirectObserver asks before bouncing anyone to sign-in. */
 export {

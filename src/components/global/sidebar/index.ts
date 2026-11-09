@@ -14,6 +14,7 @@
 export { AppSidebar } from "./app-sidebar";
 export type { AppSidebarProps } from "./app-sidebar";
 export { SidebarUpgradeNudge } from "./upgrade-nudge";
+export { SidebarNewVideoButton } from "./new-video-button";
 export { SidebarPlanMeter } from "./plan-meter";
 export { SidebarRecentProjects } from "./recent-projects";
 export { SidebarSearch } from "./sidebar-search";

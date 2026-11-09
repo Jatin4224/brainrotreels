@@ -7,6 +7,7 @@
 /**
  * SOURCE OF TRUTH KEYWORDS: AppSidebar, SECTION_LABELS, SidebarUpgradeNudge,
  *   SidebarSearch, SidebarRecentProjects, SidebarPlanMeter, SIDEBAR_BLOCK_ORDER,
+ *   SidebarNewVideoButton,
  *   WORDMARK_THEN_SWITCHER
  *
  * WHAT:  The dashboard sidebar. Wordmark, the search row, a fixed Dashboard
@@ -63,6 +64,7 @@ import { trpc } from "@/trpc/react-provider";
 import { ROUTES } from "@/lib/config";
 import { APP_NAME } from "@/lib/config/branding";
 import { getNavIcon } from "./nav-icons";
+import { SidebarNewVideoButton } from "./new-video-button";
 import { SidebarPlanMeter } from "./plan-meter";
 import { SidebarRecentProjects } from "./recent-projects";
 import { SidebarSearch } from "./sidebar-search";
@@ -142,6 +144,8 @@ export function AppSidebar({
           {APP_NAME}
         </Link>
         {hasMultipleOrganizations ? orgSwitcher : null}
+        {/* NEW_VIDEO_IS_THE_ONE_ACTION — above the nav, not in it. */}
+        <SidebarNewVideoButton />
       </SidebarHeader>
 
       <SidebarContent>
