@@ -300,7 +300,9 @@ export function ComposerScreen({ kind }: ComposerScreenProps) {
           />
           <span className="relative text-brand-accent-foreground">about</span>
         </span>
-        ?
+        {/* Clears the highlight's 6px offset shadow — see the note on
+            .brand-highlight in globals.css. */}
+        <span className="ml-3">?</span>
       </h1>
 
       <Form {...form}>

@@ -170,7 +170,9 @@ export function DashboardHomeScreen() {
               making
             </span>
           </span>
-          ?
+          {/* Clears the highlight's 6px offset shadow — see the note on
+              .brand-highlight in globals.css. */}
+          <span className="ml-3">?</span>
         </h1>
         <p className="mt-3 max-w-2xl text-base leading-relaxed text-muted-foreground">
           Pick by what you&apos;re starting from. Every format writes its own
