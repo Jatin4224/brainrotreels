@@ -143,7 +143,7 @@ export function DashboardHomeScreen() {
    * the query, where /dashboard/new validates it. */
   function handleStart(kind: ProjectKind) {
     if (!isStartableFormat(kind)) return;
-    router.push(`/dashboard/new?kind=`);
+    router.push(`/dashboard/new?kind=${kind}`);
   }
 
   const visibleKinds = PROJECT_KINDS.filter(

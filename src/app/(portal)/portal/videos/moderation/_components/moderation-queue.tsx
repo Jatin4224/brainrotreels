@@ -61,6 +61,12 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 
+/* SOURCE OF TRUTH KEYWORDS: MODERATION_PAGE_SIZE, PORTAL_PAGE_SIZE
+ * Mirrors PORTAL_PAGE_SIZE in src/trpc/routers/portal.ts. listModeration
+ * returns `{ items, total }` with no `totalPages`, so the bound is derived
+ * here and the two constants have to agree. */
+const PAGE_SIZE = 25;
+
 export function ModerationQueue() {
   /* FLAGGED_FIRST — the only status with work attached. */
   const [status, setStatus] = React.useState<ModerationVerdictStatus>("flagged");
@@ -94,6 +100,10 @@ export function ModerationQueue() {
 
   const items = queue.data?.items ?? [];
   const total = queue.data?.total ?? 0;
+  /* PAGER_NEEDS_A_CEILING — `items.length === 0` as the Next guard only
+   * notices the end AFTER landing on an empty page, and a last page that
+   * happens to be full never trips it at all. */
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   return (
     <div className="flex flex-col gap-4">
@@ -159,17 +169,21 @@ export function ModerationQueue() {
         <Button
           variant="outline"
           size="sm"
-          disabled={page <= 1}
+          disabled={page <= 1 || queue.isFetching}
           onClick={() => setPage((current) => Math.max(1, current - 1))}
         >
           Previous
         </Button>
-        <span className="text-xs text-muted-foreground">Page {page}</span>
+        <span className="text-xs text-muted-foreground">
+          Page {page} of {totalPages}
+        </span>
         <Button
           variant="outline"
           size="sm"
-          disabled={items.length === 0}
-          onClick={() => setPage((current) => current + 1)}
+          disabled={page >= totalPages || queue.isFetching}
+          onClick={() =>
+            setPage((current) => Math.min(totalPages, current + 1))
+          }
         >
           Next
         </Button>
