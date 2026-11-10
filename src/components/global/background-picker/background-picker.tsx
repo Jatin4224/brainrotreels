@@ -72,6 +72,7 @@ import {
   maxUploadBytesForPlan,
   type LibraryAssetKind,
 } from "@/lib/types";
+import { useRovingRadioGroup } from "@/hooks/use-roving-radiogroup";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -177,82 +178,14 @@ export function BackgroundPicker({
 
   const selectedId = data?.selectedAssetId ?? NO_FOOTAGE;
 
-  /**
-   * SOURCE OF TRUTH KEYWORDS: ROVING_TABINDEX, ACTIVE_FOLLOWS_SELECTION
-   *
-   * The tile the arrow keys are on. DERIVED rather than synchronised: until
-   * somebody moves within the group, the tabbable tile is whichever one is
-   * checked — so tabbing in lands on the current choice, and the server
-   * changing the selection (a successful apply, another tab's write) moves the
-   * tab stop with it. An effect mirroring `selectedId` into state would do the
-   * same thing one render later and for the price of a cascading render.
-   */
-  const [movedTo, setMovedTo] = React.useState<string | null>(null);
-  const activeId =
-    movedTo !== null && options.some((option) => option.id === movedTo)
-      ? movedTo
-      : selectedId;
-
-  const tileRefs = React.useRef(new Map<string, HTMLButtonElement>());
-
-  function focusTile(id: string) {
-    setMovedTo(id);
-    tileRefs.current.get(id)?.focus();
-  }
-
-  /**
-   * SOURCE OF TRUTH KEYWORDS: columnCount, ROVING_TABINDEX
-   *
-   * How many tiles are on a row, measured from the laid-out elements. The grid
-   * is responsive, so this cannot be a constant — and `offsetTop` is the one
-   * thing that knows where the browser actually put them. Falls back to 1,
-   * which makes Up and Down behave like Left and Right rather than doing
-   * nothing.
-   */
-  function columnCount(): number {
-    const first = options[0];
-    const firstEl =
-      first === undefined ? undefined : tileRefs.current.get(first.id);
-    if (firstEl === undefined) return 1;
-
-    for (const [index, option] of options.entries()) {
-      const element = tileRefs.current.get(option.id);
-      if (element !== undefined && element.offsetTop !== firstEl.offsetTop) {
-        return Math.max(1, index);
-      }
-    }
-    return Math.max(1, options.length);
-  }
-
-  function handleKeyDown(event: React.KeyboardEvent) {
-    const index = options.findIndex((option) => option.id === activeId);
-    if (index < 0) return;
-
-    const columns = columnCount();
-    const moves: Readonly<Record<string, number>> = {
-      ArrowRight: 1,
-      ArrowLeft: -1,
-      ArrowDown: columns,
-      ArrowUp: -columns,
-    };
-
-    if (event.key === "Home" || event.key === "End") {
-      event.preventDefault();
-      const target = options[event.key === "Home" ? 0 : options.length - 1];
-      if (target !== undefined) focusTile(target.id);
-      return;
-    }
-
-    const delta = moves[event.key];
-    if (delta === undefined) return;
-
-    event.preventDefault();
-    /* Clamped rather than wrapped: wrapping from the last tile of a row to the
-     * first of the next is what a LIST does, and this is a grid — a customer
-     * pressing Right at the edge expects to stay put, not to jump a row. */
-    const next = options[Math.min(options.length - 1, Math.max(0, index + delta))];
-    if (next !== undefined) focusTile(next.id);
-  }
+  /* ROVING_TABINDEX + ACTIVE_FOLLOWS_SELECTION, and the measured column count
+   * the arrow keys need, now live in the shared hook — the pricing grid needed
+   * the identical behaviour, so it was extracted rather than copied.
+   * See src/hooks/use-roving-radiogroup.ts. */
+  const roving = useRovingRadioGroup({
+    ids: React.useMemo(() => options.map((option) => option.id), [options]),
+    selectedId,
+  });
 
   function choose(id: string, locked: boolean) {
     if (disabled) return;
@@ -327,19 +260,16 @@ export function BackgroundPicker({
         <div
           role="radiogroup"
           aria-label="Background"
-          onKeyDown={handleKeyDown}
+          onKeyDown={roving.handleKeyDown}
           className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4"
         >
           {options.map((option) => (
             <BackgroundTileButton
               key={option.id}
-              ref={(element) => {
-                if (element === null) tileRefs.current.delete(option.id);
-                else tileRefs.current.set(option.id, element);
-              }}
+              ref={roving.registerRef(option.id)}
               tile={option.tile}
               checked={option.id === selectedId}
-              tabbable={option.id === activeId}
+              tabbable={option.id === roving.activeId}
               busy={busy}
               onChoose={() =>
                 choose(option.id, option.tile?.locked ?? false)

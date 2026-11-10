@@ -71,6 +71,7 @@ import {
   AddPaymentMethodDialog,
   PaymentMethodOption,
 } from "@/components/global/billing";
+import { useRovingRadioGroup } from "@/hooks/use-roving-radiogroup";
 import { UsageLimitList } from "@/components/global/usage-limit-list";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -236,6 +237,13 @@ export function UpgradeContent({
     return next ?? sellable[sellable.length - 1] ?? null;
   }, [currentTier, isCurrentlyOnTrial]);
   const selectedPlan = planOverride ?? defaultPlan;
+
+  /* ROVING_TABINDEX for the plan grid — one tab stop, arrow keys between
+   * cards. See src/hooks/use-roving-radiogroup.ts. */
+  const planRoving = useRovingRadioGroup({
+    ids: React.useMemo(() => plans.map((plan) => plan.key), [plans]),
+    selectedId: selectedPlan,
+  });
 
   /* Charge the card the customer already pays with unless they pick another. */
   const paymentMethodId =
@@ -511,6 +519,12 @@ export function UpgradeContent({
 
                     <PricingGridFrame columns={plans.length}>
                       <div
+                        /* RADIOGROUP_NOT_A_LIST_OF_BUTTONS — the plans are one
+                           choice, so the group names itself and owns the arrow
+                           keys while each card owns its own checked state. */
+                        role="radiogroup"
+                        aria-label="Choose a plan"
+                        onKeyDown={planRoving.handleKeyDown}
                         className={cn(
                           "grid w-full grid-cols-1 gap-0 sm:grid-cols-2",
                           /* Wrapping to a second row is the correct answer on a
@@ -541,6 +555,8 @@ export function UpgradeContent({
                               )}
                               billingInterval={billingInterval}
                               savings={calculateSavings(plan)}
+                              tabbable={planRoving.activeId === plan.key}
+                              registerRef={planRoving.registerRef(plan.key)}
                               onSelect={() => setPlanOverride(plan.key)}
                               onProceed={() => {
                                 setPlanOverride(plan.key);

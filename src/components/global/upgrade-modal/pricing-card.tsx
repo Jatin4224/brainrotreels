@@ -65,6 +65,10 @@ export interface PricingCardProps {
   onSelect: () => void;
   /** Selects it AND moves to the payment step. */
   onProceed: () => void;
+  /** ROVING_TABINDEX — true for the one card that owns the group's tab stop. */
+  tabbable: boolean;
+  /** Ref callback from useRovingRadioGroup, so arrow keys can focus this card. */
+  registerRef: (element: HTMLElement | null) => void;
 }
 
 export function PricingCard({
@@ -80,6 +84,8 @@ export function PricingCard({
   savings,
   onSelect,
   onProceed,
+  tabbable,
+  registerRef,
 }: PricingCardProps) {
   const hasTrial = plan.trialDays > 0;
   /* The free tier is never bought, and the plan you already pay for is not a
@@ -87,9 +93,39 @@ export function PricingCard({
   const canProceed = !plan.isFree && !(isCurrentPlan && !isCurrentlyOnTrial);
 
   return (
+    /**
+     * SOURCE OF TRUTH KEYWORDS: CARD_IS_A_RADIO, ROVING_TABINDEX,
+     *   RADIO_WITH_ONE_ACTION
+     *
+     * The card was a bare `<div onClick>`: no role, no tab stop, no key
+     * handler and no focus ring, so the plan grid — the app's checkout — could
+     * not be operated from a keyboard at all. It is a single choice among
+     * several, so it is a `radio` in the grid's `radiogroup` rather than a
+     * button, which is what makes a screen reader announce "2 of 4" and the
+     * arrow keys move between plans.
+     *
+     * RADIO_WITH_ONE_ACTION, stated because it is a known imperfection: a
+     * radio should not contain focusable descendants, and this one holds its
+     * CTA. The alternatives are worse — a visually-hidden <input> + <label>
+     * needs the CTA lifted out of the card's middle, which is a redesign — and
+     * the CTA already stops propagation so the two never fire together. Zero
+     * keyboard access was the larger defect.
+     */
     <div
+      ref={registerRef}
+      role="radio"
+      aria-checked={isSelected}
+      aria-label={`${plan.name} plan`}
+      tabIndex={tabbable ? 0 : -1}
       onClick={onSelect}
-      className="relative flex h-full cursor-pointer flex-col"
+      onKeyDown={(event) => {
+        /* Enter and Space select. Arrow keys belong to the GROUP, which owns
+         * the roving tab stop, so they are deliberately not handled here. */
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        onSelect();
+      }}
+      className="relative flex h-full cursor-pointer flex-col outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
     >
       {isSelected ? (
         <>

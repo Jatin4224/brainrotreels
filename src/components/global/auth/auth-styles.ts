@@ -28,11 +28,19 @@
  *        `.marketing-canvas`, applied by AuthShell, so re-skinning every auth
  *        screen is still one edit in globals.css.
  *
- *        CTA_IS_LARGE_TEXT, and the reason the label is pinned at 18px/700
+ *        CTA_IS_LARGE_TEXT, and the reason the label is pinned at 19px/700
  *        rather than left to taste: white on the brand orange is about 3.1:1,
  *        which clears WCAG for LARGE text only (>=18.66px bold). Shrink this
  *        label and the button silently stops passing. auth-design.md §4 says
  *        the same thing; this is where it is enforced.
+ *
+ *        WHY 19 AND NOT `text-lg`. This was `text-lg` — 18px — for as long
+ *        as the rule above has been written down, which means it MISSED the
+ *        threshold it claims to meet, by 0.66px, on every auth screen. Nobody
+ *        caught it because 18 and "18.66" read as the same number. 19px
+ *        (1.1875rem) is the smallest step over the line that Tailwind's scale
+ *        cannot express, which is why this is an arbitrary value and must stay
+ *        one: swapping it back to a named size silently fails the audit again.
  *
  *        SIXTEEN_PX_STOPS_IOS_ZOOM: the field is `text-base` (16px) at every
  *        width, not `md:text-sm` like the product's default <Input>. Safari
@@ -52,7 +60,7 @@
  * label — see CTA_IS_LARGE_TEXT before changing the type size.
  */
 export const AUTH_CTA_CLASS =
-  "brutal-shadow-brand h-14 w-full gap-3 rounded-2xl bg-brand text-lg font-bold text-brand-foreground hover:bg-brand/90";
+  "brutal-shadow-brand h-14 w-full gap-3 rounded-2xl bg-brand text-[1.1875rem] font-bold text-brand-foreground hover:bg-brand/90";
 
 /** A text, email or password field. 50px tall, 16px text. */
 export const AUTH_FIELD_CLASS =

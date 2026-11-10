@@ -230,9 +230,41 @@ export function DataTable<TRow>({
                     <TableRow
                       {...(detail !== null
                         ? {
+                            /* SOURCE OF TRUTH KEYWORDS: ROW_EXPANDS_BY_KEYBOARD,
+                               aria-expanded, EXPANDABLE_ROW_IS_NOT_A_BUTTON
+                               The row was click-only: no tab stop, no key
+                               handler and no announced state, so the audit-log
+                               detail panel — the whole reason `expandedRow`
+                               exists — could not be opened from a keyboard.
+
+                               It takes a tab stop and `aria-expanded` rather
+                               than `role="button"`: a button role would
+                               REPLACE the row semantics and a screen reader
+                               would stop reading it as a row of cells. A row
+                               that is also a disclosure is precisely what
+                               `aria-expanded` is for. */
                             "data-expandable": true,
+                            tabIndex: 0,
+                            "aria-expanded": isOpen,
+                            ...(isOpen
+                              ? { "aria-controls": `${id}-detail` }
+                              : {}),
                             onClick: () => setExpanded(isOpen ? null : id),
-                            className: "cursor-pointer",
+                            onKeyDown: (event: React.KeyboardEvent) => {
+                              /* Space scrolls the page by default and Enter
+                                 does nothing on a <tr>, so both have to be
+                                 taken over for the row to act as a disclosure. */
+                              if (event.key !== "Enter" && event.key !== " ") {
+                                return;
+                              }
+                              /* A key pressed inside a row action belongs to
+                                 that control, not to the row. */
+                              if (event.target !== event.currentTarget) return;
+                              event.preventDefault();
+                              setExpanded(isOpen ? null : id);
+                            },
+                            className:
+                              "cursor-pointer outline-none focus-visible:ring-3 focus-visible:ring-inset focus-visible:ring-ring/50",
                           }
                         : {})}
                     >
@@ -260,6 +292,7 @@ export function DataTable<TRow>({
 
                     {detail !== null && isOpen && (
                       <TableRow
+                        id={`${id}-detail`}
                         data-slot="data-table-detail"
                         className="hover:bg-transparent"
                       >
