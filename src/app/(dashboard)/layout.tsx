@@ -47,6 +47,7 @@ import {
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/global/sidebar";
 import { PlanOverageBanner } from "@/components/global/plan-overage-banner";
+import { AppCanvasBodyClass } from "@/components/global/app-canvas";
 import { OrgSwitcher, UserMenu } from "@/components/global/providers/server";
 
 export default async function DashboardLayout({
@@ -204,6 +205,12 @@ export default async function DashboardLayout({
           page content, so it spans the sidebar too and pushes the app down
           rather than scrolling away inside one column. */}
       <PlanOverageBanner />
+      {/* PORTALS_ESCAPE_THE_CANVAS — the class below styles the React tree,
+          but every dialog, dropdown, select and sheet renders through a
+          portal into <body>, outside it, and loses the whole palette. This
+          puts the same class on <body> for as long as a dashboard route is
+          mounted so those surfaces inherit it too. */}
+      <AppCanvasBodyClass />
       {/* APP_DESIGN_LANGUAGE — `.app-canvas` (globals.css) re-points the
           surface, border, text and action tokens to the dashboard palette from
           00-dashboard-foundations.md for everything beneath it. Applied to the

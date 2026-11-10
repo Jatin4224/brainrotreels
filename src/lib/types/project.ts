@@ -32,6 +32,11 @@
 import { z } from "zod";
 
 import { jsonObjectSchema } from "./json";
+import {
+  SCRIPT_TARGET_SECONDS_MAX,
+  SOURCE_TEXT_MAX_CHARS,
+  scriptToneSchema,
+} from "./script";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: PROJECT_KINDS, projectKindSchema, ProjectKind
@@ -291,3 +296,58 @@ export const duplicateProjectSchema = z.object({
 });
 
 export type DuplicateProjectValues = z.infer<typeof duplicateProjectSchema>;
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: COMPOSER_LENGTHS, ComposerLength, COMPOSER_TONES,
+ *   composerSchema, ComposerValues, SCRIPT_TARGET_SECONDS_MAX, SCRIPT_TONES,
+ *   THE_COMPOSER_IS_ONE_FIELD
+ *
+ * WHAT:  The contract of the "What's your video about?" composer — the pasted
+ *        text or idea, how long the finished video should run, and the tone to
+ *        write it in.
+ *
+ * WHY:   THE_COMPOSER_IS_ONE_FIELD, and the two pills beside it are the only
+ *        other decisions it asks for. Everything else the design shows on that
+ *        screen (the voice, the look, the quality) is chosen on the editor
+ *        screen afterwards, where there is room to show what each option does.
+ *
+ *        `targetSeconds` is a CLOSED SET rather than a free number, even
+ *        though `generateScriptSchema` accepts any integer in range. A
+ *        dropdown of four durations is the control the design draws, and
+ *        offering "137 seconds" would be a worse product and a worse prompt.
+ *        The maximum is pinned to `SCRIPT_TARGET_SECONDS_MAX` so this list can
+ *        never drift past what the generator will accept — raise the cap there
+ *        and this stays valid; lower it and the typecheck does not catch it,
+ *        which is why the longest option is written as the constant itself
+ *        rather than as the literal 180.
+ *
+ *        `tone` reuses `scriptToneSchema` directly rather than restating the
+ *        four tones, so the composer cannot offer a tone the generator would
+ *        reject. The user-facing LABELS live with the component; the values
+ *        live here.
+ *
+ * WHERE: The composer at /dashboard/new. Fed to projects.create and then to
+ *        scripts.generate.
+ */
+export const COMPOSER_LENGTHS = [30, 60, 90, SCRIPT_TARGET_SECONDS_MAX] as const;
+
+export type ComposerLength = (typeof COMPOSER_LENGTHS)[number];
+
+export const composerSchema = z.object({
+  /* Bounded by the generator's own source limit — the same text goes on to be
+   * `{ kind: 'text', value }`, so accepting more here would only fail later. */
+  prompt: z
+    .string()
+    .trim()
+    .min(1, "Say what the video is about.")
+    .max(SOURCE_TEXT_MAX_CHARS, "That is longer than one video can carry."),
+  targetSeconds: z.union([
+    z.literal(30),
+    z.literal(60),
+    z.literal(90),
+    z.literal(SCRIPT_TARGET_SECONDS_MAX),
+  ]),
+  tone: scriptToneSchema,
+});
+
+export type ComposerValues = z.infer<typeof composerSchema>;

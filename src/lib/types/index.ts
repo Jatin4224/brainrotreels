@@ -61,6 +61,8 @@ export type { JsonValue, JsonObject } from "./json";
 export {
   PROJECT_KINDS,
   CREATABLE_PROJECT_KINDS,
+  COMPOSER_LENGTHS,
+  composerSchema,
   PROJECT_STATUSES,
   ASPECT_RATIOS,
   CANVAS_BY_ASPECT,
@@ -84,6 +86,8 @@ export {
 export type {
   ProjectKind,
   CreatableProjectKind,
+  ComposerLength,
+  ComposerValues,
   ProjectStatus,
   AspectRatio,
   CreateProjectValues,

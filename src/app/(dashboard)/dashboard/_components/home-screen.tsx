@@ -6,7 +6,7 @@
 
 /**
  * SOURCE OF TRUTH KEYWORDS: DashboardHomeScreen, HOME_IS_A_FORMAT_PICKER,
- *   FORMATS, FORMAT_CATEGORIES, FEATURED_FORMAT_KIND, CreateProjectSheetContent,
+ *   FORMATS, FORMAT_CATEGORIES, FEATURED_FORMAT_KIND, COMPOSER_ROUTE,
  *   FeatureGate, GREETING_IS_LOCAL, FILTER_IS_CLIENT_STATE
  *
  * WHAT:  The dashboard home screen — a greeting and credit balance, the
@@ -52,6 +52,7 @@
  */
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import { ArrowRightIcon, ZapIcon } from "lucide-react";
 
 import {
@@ -65,7 +66,6 @@ import {
 import { permissions } from "@/lib/permissions";
 import {
   PROJECT_KINDS,
-  type CreatableProjectKind,
   type ProjectKind,
 } from "@/lib/types";
 import {
@@ -74,10 +74,8 @@ import {
 } from "@/hooks/use-active-organization";
 import { trpc } from "@/trpc/react-provider";
 import { FeatureGate } from "@/components/feature-gate";
-import { Sheet } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-import { CreateProjectSheetContent } from "../projects/_components/create-project-sheet-content";
 
 import { FormatCard } from "./format-card";
 import { CATEGORY_CLASSES } from "./format-tokens";
@@ -119,15 +117,7 @@ function serverGreeting(): string | null {
 
 export function DashboardHomeScreen() {
   const [filter, setFilter] = React.useState<Filter>("all");
-  const [sheetOpen, setSheetOpen] = React.useState(false);
-  const [invocation, setInvocation] = React.useState(0);
-  /* Typed to the CREATABLE union, not to ProjectKind: the sheet cannot accept
-     a format the create mutation would refuse, and holding that in the state
-     type means `handleStart`'s guard below is the only place it is checked. */
-  const [startKind, setStartKind] =
-    React.useState<CreatableProjectKind>("reddit-story");
-
-  const organizationId = useActiveOrganizationId();
+  const router = useRouter();
   const { hasPermission } = useActiveOrganization();
   const canCreate = hasPermission(permissions.PROJECTS_CREATE);
 
@@ -146,92 +136,83 @@ export function DashboardHomeScreen() {
     serverGreeting,
   );
 
-  /* `invocation` remounts the sheet body so each open starts on a clean form,
-   * but stays stable while CLOSING so Base UI can finish its close sequence —
-   * the same reason <CreateProjectButton> does it. */
+  /* THE PICKER NAVIGATES, it does not open a form in place. Describing a
+   * video is the start of real work, so it gets its own URL
+   * (COMPOSER_ROUTE) that can be linked, bookmarked and backed out of — none
+   * of which a sheet over this screen could offer. The format rides along in
+   * the query, where /dashboard/new validates it. */
   function handleStart(kind: ProjectKind) {
     if (!isStartableFormat(kind)) return;
-    setStartKind(kind);
-    setInvocation((n) => n + 1);
-    setSheetOpen(true);
+    router.push(`/dashboard/new?kind=`);
   }
 
   const visibleKinds = PROJECT_KINDS.filter(
     (kind) => filter === "all" || FORMATS[kind].category === filter,
   );
   const featuredVisible = visibleKinds.includes(FEATURED_FORMAT_KIND);
-  const gridKinds = visibleKinds.filter((kind) => kind !== FEATURED_FORMAT_KIND);
+  const gridKinds = visibleKinds.filter(
+    (kind) => kind !== FEATURED_FORMAT_KIND,
+  );
 
   return (
-    <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-      <div className="flex flex-col gap-7">
-        <HomeHeader greeting={greeting} name={profile?.name ?? null} />
+    <div className="flex flex-col gap-7">
+      <HomeHeader greeting={greeting} name={profile?.name ?? null} />
 
-        <div>
-          <h1 className="font-display text-[2.75rem] font-extrabold leading-none tracking-tight text-foreground lg:text-[3.25rem]">
-            What are you{" "}
-            <span className="relative inline-block px-3 py-0.5">
-              <span
-                aria-hidden="true"
-                className="brand-highlight absolute inset-0 rounded-xl"
-              />
-              <span className="relative text-brand-accent-foreground">
-                making
-              </span>
+      <div>
+        <h1 className="font-display text-[2.75rem] font-extrabold leading-none tracking-tight text-foreground lg:text-[3.25rem]">
+          What are you{" "}
+          <span className="relative inline-block px-3 py-0.5">
+            <span
+              aria-hidden="true"
+              className="brand-highlight absolute inset-0 rounded-xl"
+            />
+            <span className="relative text-brand-accent-foreground">
+              making
             </span>
-            ?
-          </h1>
-          <p className="mt-3 max-w-2xl text-base leading-relaxed text-muted-foreground">
-            Pick by what you&apos;re starting from. Every format writes its own
-            script, casts a voice and captions itself.
-          </p>
-        </div>
-
-        <CategoryChips value={filter} onChange={setFilter} />
-
-        {featuredVisible ? (
-          <FeaturedFormat
-            kind={FEATURED_FORMAT_KIND}
-            canCreate={canCreate}
-            onStart={handleStart}
-          />
-        ) : null}
-
-        {CATEGORY_ORDER.map((category) => {
-          const kinds = formatsByCategory(category).filter((kind) =>
-            gridKinds.includes(kind),
-          );
-          if (kinds.length === 0) return null;
-          const classes = CATEGORY_CLASSES[category];
-
-          return (
-            <section key={category} className="flex flex-col gap-3.5">
-              <h2 className="mt-2 flex items-center gap-2.5 text-lg font-bold text-foreground">
-                <span
-                  aria-hidden="true"
-                  className={cn("size-2.5 rounded-[3px]", classes.dot)}
-                />
-                {FORMAT_CATEGORIES[category].label}
-              </h2>
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                {kinds.map((kind) => (
-                  <FormatCard key={kind} kind={kind} onStart={handleStart} />
-                ))}
-              </div>
-            </section>
-          );
-        })}
+          </span>
+          ?
+        </h1>
+        <p className="mt-3 max-w-2xl text-base leading-relaxed text-muted-foreground">
+          Pick by what you&apos;re starting from. Every format writes its own
+          script, casts a voice and captions itself.
+        </p>
       </div>
 
-      {organizationId ? (
-        <CreateProjectSheetContent
-          key={invocation}
-          organizationId={organizationId}
-          initialKind={startKind}
-          onClose={() => setSheetOpen(false)}
+      <CategoryChips value={filter} onChange={setFilter} />
+
+      {featuredVisible ? (
+        <FeaturedFormat
+          kind={FEATURED_FORMAT_KIND}
+          canCreate={canCreate}
+          onStart={handleStart}
         />
       ) : null}
-    </Sheet>
+
+      {CATEGORY_ORDER.map((category) => {
+        const kinds = formatsByCategory(category).filter((kind) =>
+          gridKinds.includes(kind),
+        );
+        if (kinds.length === 0) return null;
+        const classes = CATEGORY_CLASSES[category];
+
+        return (
+          <section key={category} className="flex flex-col gap-3.5">
+            <h2 className="mt-2 flex items-center gap-2.5 text-lg font-bold text-foreground">
+              <span
+                aria-hidden="true"
+                className={cn("size-2.5 rounded-[3px]", classes.dot)}
+              />
+              {FORMAT_CATEGORIES[category].label}
+            </h2>
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {kinds.map((kind) => (
+                <FormatCard key={kind} kind={kind} onStart={handleStart} />
+              ))}
+            </div>
+          </section>
+        );
+      })}
+    </div>
   );
 }
 
@@ -286,10 +267,7 @@ function HomeHeader({
       {canReadCredits ? (
         credits ? (
           <span className="inline-flex h-11 items-center gap-2 rounded-xl border border-border bg-card px-3.5 text-sm font-medium text-foreground">
-            <ZapIcon
-              className="size-4 text-brand-accent"
-              aria-hidden="true"
-            />
+            <ZapIcon className="size-4 text-brand-accent" aria-hidden="true" />
             {credits.balance.toLocaleString()} credits
           </span>
         ) : (
@@ -333,11 +311,14 @@ function CategoryChips({
   ];
 
   return (
-    <div role="radiogroup" aria-label="Filter formats" className="flex flex-wrap gap-2">
+    <div
+      role="radiogroup"
+      aria-label="Filter formats"
+      className="flex flex-wrap gap-2"
+    >
       {chips.map((chip) => {
         const active = chip.id === value;
-        const dot =
-          chip.id === "all" ? null : CATEGORY_CLASSES[chip.id].dot;
+        const dot = chip.id === "all" ? null : CATEGORY_CLASSES[chip.id].dot;
 
         return (
           <button
