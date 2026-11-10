@@ -170,7 +170,7 @@ function VideoTile({
       href={href}
       className="group/tile flex flex-col gap-3 outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
     >
-      <span className="brutal-hover relative flex h-60 flex-col justify-between overflow-hidden rounded-xl border border-border bg-card p-4">
+      <span className="brutal-hover tactile-raised relative flex h-60 flex-col justify-between overflow-hidden rounded-xl border border-border bg-card p-4">
         {words.length > 0 ? (
           <>
             <span className="text-sm leading-relaxed text-foreground-2">

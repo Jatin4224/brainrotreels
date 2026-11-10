@@ -630,7 +630,7 @@ function StyleGallery({
                   onSelect(style.id);
                 }}
                 className={[
-                  "flex flex-col gap-2 rounded-xl border p-2 text-left transition",
+                  "tactile-control flex flex-col gap-2 rounded-xl border p-2 text-left transition",
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                   style.id === selectedId
                     ? "border-primary bg-accent"

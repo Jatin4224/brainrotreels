@@ -453,7 +453,7 @@ const BackgroundTileButton = React.forwardRef<
          there is nothing to discover about a write already in flight. */
       disabled={busy}
       className={cn(
-        "flex flex-col gap-2 rounded-xl border p-2 text-left transition",
+        "tactile-control flex flex-col gap-2 rounded-xl border p-2 text-left transition",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
         checked ? "border-primary bg-accent" : "border-border hover:bg-accent/50",
         busy && "opacity-60",

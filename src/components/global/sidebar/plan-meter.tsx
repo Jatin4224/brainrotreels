@@ -117,7 +117,7 @@ export function SidebarPlanMeter() {
       {balance !== null ? (
         <span
           aria-hidden="true"
-          className="block h-1 w-full overflow-hidden rounded-full bg-secondary"
+          className="tactile-track block h-1 w-full overflow-hidden rounded-full bg-secondary"
         >
           <span
             className="block h-full rounded-full bg-foreground-2 transition-[width] duration-300 motion-reduce:transition-none"

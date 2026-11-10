@@ -101,7 +101,11 @@ export function SidebarUpgradeNudge() {
  *        treatment is the same one the SELECTED pricing card uses in the upgrade
  *        modal: a primary-tinted wash over the card colour, one lit edge, and a
  *        small shadow. That deliberate echo means the surface that sells the
- *        upgrade looks the same in both places.
+ *        upgrade looks the same in both places — and it is now literally the
+ *        same CSS, because the lit edge and the contact shadow are
+ *        `.tactile-raised` on both. The hand-rolled hairline <div> this used to
+ *        stack on top came out with it: a second copy of a shared utility is a
+ *        second thing to forget.
  *        Every layer is a token at low opacity — no literal colour, nothing that
  *        stops following the theme, and nothing loud enough to compete with the
  *        nav it sits under.
@@ -115,7 +119,7 @@ function UpgradeCard({
   onUpgrade: () => void;
 }) {
   return (
-    <div className="relative overflow-hidden rounded-xl border border-border/70 bg-card shadow-sm">
+    <div className="tactile-raised relative overflow-hidden rounded-xl border border-border/70 bg-card">
       {/* Two flat layers over the card colour, both derived from --primary so
           they invert with the theme instead of painting a fixed tint. Kept
           under 10% opacity: the point is that the surface reads as considered,
@@ -124,13 +128,6 @@ function UpgradeCard({
         aria-hidden="true"
         className="pointer-events-none absolute inset-0 bg-linear-to-br from-primary/8 via-transparent to-primary/5"
       />
-      {/* Hairline along the top edge, brightest in the middle — the detail that
-          makes a flat rectangle read as a lit surface rather than a hole. */}
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-foreground/20 to-transparent"
-      />
-
       <div className="relative p-3">
         <div className="flex items-center gap-2.5">
           <div className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-border/60 bg-primary/10">
@@ -153,7 +150,7 @@ function UpgradeCard({
         <Button
           size="sm"
           onClick={onUpgrade}
-          className="mt-3 w-full gap-1.5 shadow-sm"
+          className="mt-3 w-full gap-1.5"
         >
           <ZapIcon className="size-3.5" />
           {nudge.ctaLabel}

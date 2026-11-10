@@ -378,7 +378,7 @@ export function RenderPanel({ projectId }: { projectId: string }) {
                 {/* A plain bar rather than a component import — this is the one
                     progress indicator in the app, and a shared component for a
                     single caller is the duplication rule applied backwards. */}
-                <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                <div className="tactile-track h-1.5 w-full overflow-hidden rounded-full bg-muted">
                   <div
                     className="h-full rounded-full bg-primary transition-all"
                     style={{ width: `${Math.round(latest.progress * 100)}%` }}

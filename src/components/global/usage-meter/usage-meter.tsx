@@ -87,7 +87,7 @@ export function UsageMeter({
       {/* UNLIMITED_HAS_NO_BAR — see the file header. */}
       {gate.isUnlimited || gate.limit === null ? null : (
         <div
-          className="h-1.5 w-full overflow-hidden rounded-full bg-muted"
+          className="tactile-track h-1.5 w-full overflow-hidden rounded-full bg-muted"
           role="progressbar"
           aria-valuenow={Math.round(ratio * 100)}
           aria-valuemin={0}

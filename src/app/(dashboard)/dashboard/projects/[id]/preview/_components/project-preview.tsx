@@ -125,7 +125,7 @@ export function ProjectPreview({ projectId }: { projectId: string }) {
          * reaches it. */
         loop
         acknowledgeRemotionLicense
-        className="overflow-hidden rounded-xl border border-border bg-card"
+        className="tactile-raised overflow-hidden rounded-xl border border-border bg-card"
         style={{
           width: "100%",
           maxWidth: 360,

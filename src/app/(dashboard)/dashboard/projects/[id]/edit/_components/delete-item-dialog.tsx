@@ -145,7 +145,7 @@ export function DeleteItemDialog({
                 aria-checked={policy === option}
                 onClick={() => setPolicy(option)}
                 className={cn(
-                  "rounded-lg border border-border p-3 text-left",
+                  "tactile-control rounded-lg border border-border p-3 text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
                   policy === option && "border-primary bg-primary/5",
                 )}
               >

@@ -74,7 +74,7 @@ export function BillingIntervalToggle({
             type="button"
             onClick={() => onIntervalChange(value)}
             className={cn(
-              "rounded-lg border-2 border-muted p-3 text-sm font-semibold capitalize transition-all hover:bg-muted/50",
+              "tactile-control rounded-lg border-2 border-muted p-3 text-sm font-semibold capitalize transition-all hover:bg-muted/50 outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
               selected && "border-primary",
             )}
           >
@@ -119,7 +119,7 @@ export function PlanSelector({
             type="button"
             onClick={() => onPlanChange(plan)}
             className={cn(
-              "relative flex items-center gap-4 rounded-lg border-2 border-muted p-4 text-left transition-all hover:bg-muted/50",
+              "tactile-control relative flex items-center gap-4 rounded-lg border-2 border-muted p-4 text-left transition-all hover:bg-muted/50 outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
               isSelected && "border-border bg-muted",
             )}
           >

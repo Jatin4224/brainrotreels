@@ -266,7 +266,7 @@ function HomeHeader({
 
       {canReadCredits ? (
         credits ? (
-          <span className="inline-flex h-11 items-center gap-2 rounded-xl border border-border bg-card px-3.5 text-sm font-medium text-foreground">
+          <span className="tactile-raised inline-flex h-11 items-center gap-2 rounded-xl border border-border bg-card px-3.5 text-sm font-medium text-foreground">
             <ZapIcon className="size-4 text-brand-accent" aria-hidden="true" />
             {credits.balance.toLocaleString()} credits
           </span>
@@ -328,7 +328,7 @@ function CategoryChips({
             aria-checked={active}
             onClick={() => onChange(chip.id)}
             className={cn(
-              "inline-flex min-h-10 items-center gap-2 rounded-full border px-4 text-sm font-medium outline-none transition-colors focus-visible:ring-3 focus-visible:ring-ring/50 motion-reduce:transition-none",
+              "tactile-control inline-flex min-h-10 items-center gap-2 rounded-full border px-4 text-sm font-medium outline-none transition-colors focus-visible:ring-3 focus-visible:ring-ring/50 motion-reduce:transition-none",
               active
                 ? "border-foreground bg-foreground text-background"
                 : "border-border-strong bg-transparent text-foreground-2 hover:text-foreground",
@@ -376,7 +376,7 @@ function FeaturedFormat({
   return (
     <section
       aria-labelledby="featured-format"
-      className="flex flex-wrap items-center gap-8 rounded-[26px] border border-border bg-card p-8"
+      className="tactile-raised flex flex-wrap items-center gap-8 rounded-[26px] border border-border bg-card p-8"
     >
       <div className="flex min-w-0 flex-1 basis-[360px] flex-col gap-3.5">
         <div className="flex flex-wrap gap-2">
@@ -436,7 +436,7 @@ function FeaturedFormat({
         aria-hidden="true"
         className="hidden shrink-0 items-end gap-3.5 lg:flex"
       >
-        <div className="flex h-[266px] w-[150px] -rotate-6 translate-y-2.5 flex-col justify-between rounded-[20px] border border-border-strong bg-secondary p-4">
+        <div className="tactile-raised flex h-[266px] w-[150px] -rotate-6 translate-y-2.5 flex-col justify-between rounded-[20px] border border-border-strong bg-secondary p-4">
           <div className="flex flex-col gap-1.5">
             <span className="h-2 w-[70%] rounded-sm bg-border-strong" />
             <span className="h-2 w-[45%] rounded-sm bg-border-strong" />

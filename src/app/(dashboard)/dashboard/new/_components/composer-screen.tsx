@@ -306,7 +306,7 @@ export function ComposerScreen({ kind }: ComposerScreenProps) {
       <Form {...form}>
         <form className="flex flex-col gap-5">
           {/* ── The composer card ────────────────────────────────────── */}
-          <div className="rounded-[22px] border border-border bg-card p-5">
+          <div className="tactile-raised rounded-[22px] border border-border bg-card p-5">
             <FormField
               control={form.control}
               name="prompt"

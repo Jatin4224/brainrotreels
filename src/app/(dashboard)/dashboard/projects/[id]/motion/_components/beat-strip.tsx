@@ -193,7 +193,7 @@ export function BeatStrip({ projectId }: { projectId: string }) {
               type="button"
               onClick={() => setSelected(position)}
               aria-current={beat.index === current.index}
-              className={`flex shrink-0 flex-col gap-1 rounded-md border p-1 text-left transition-colors ${
+              className={`tactile-control flex shrink-0 flex-col gap-1 rounded-md border p-1 text-left transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50 ${
                 beat.index === current.index
                   ? "border-primary bg-accent"
                   : "hover:bg-accent/50"

@@ -103,7 +103,7 @@ export function FormatCard({ kind, onStart, className }: FormatCardProps) {
   );
 
   const shell =
-    "flex min-h-[180px] overflow-hidden rounded-[20px] border border-border bg-card";
+    "tactile-raised flex min-h-[180px] overflow-hidden rounded-[20px] border border-border bg-card";
 
   if (!startable) {
     return <div className={cn(shell, className)}>{body}</div>;

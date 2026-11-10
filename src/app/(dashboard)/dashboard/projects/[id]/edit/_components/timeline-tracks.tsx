@@ -318,7 +318,7 @@ export function TimelineTracks({
         </div>
       </header>
 
-      <div className="overflow-x-auto rounded-lg border border-border bg-card">
+      <div className="tactile-raised overflow-x-auto rounded-lg border border-border bg-card">
         <div style={{ width, minWidth: "100%" }} className="relative">
           <TimelineRuler
             length={length}
@@ -551,7 +551,7 @@ function ClipBlock({
         onClick={() => onSelect(item.id)}
         onPointerDown={begin("move")}
         className={cn(
-          "h-full w-full overflow-hidden rounded border px-1 text-left text-[10px] leading-tight",
+          "h-full w-full overflow-hidden rounded border px-1 text-left text-[10px] leading-tight outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
           LANE_TONE[track.type],
           timed ? "cursor-grab" : "cursor-pointer",
           selected && "ring-2 ring-ring",
@@ -596,7 +596,7 @@ function UnresolvedBlock({
       onClick={() => onSelect(item.id)}
       style={{ height: LANE_HEIGHT_PX - 28 }}
       className={cn(
-        "absolute left-1 top-6 rounded border border-destructive bg-destructive/15 px-1 text-[10px] text-foreground",
+        "absolute left-1 top-6 rounded border border-destructive bg-destructive/15 px-1 text-[10px] text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
         selected && "ring-2 ring-ring",
       )}
     >

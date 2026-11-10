@@ -47,9 +47,9 @@ export function PaymentMethodOption({
       aria-checked={selected}
       onClick={() => onSelect(method.id)}
       className={cn(
-        "group relative flex w-full items-center justify-between rounded-2xl border bg-card p-4 text-left transition-all duration-200",
+        "tactile-control group relative flex w-full items-center justify-between rounded-2xl border bg-card p-4 text-left transition-all duration-200 outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
         selected
-          ? "border-primary/60 shadow-lg"
+          ? "border-primary/60"
           : "border-border/50 hover:border-primary/30",
       )}
     >

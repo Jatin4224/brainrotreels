@@ -618,14 +618,28 @@ html:has([data-app-banner]) {
 }
 
 /* SOURCE OF TRUTH KEYWORDS: TACTILE_UI, tactile-primary, tactile-surface,
- * tactile-field, tactile-inlay, --tactile-sheen, --tactile-shade,
- * --tactile-glow, --tactile-inset, SOFT_SKEUOMORPHISM, OVERLAY_NOT_COLOR,
- * design-buttons.md
+ * tactile-field, tactile-inlay, tactile-panel, tactile-raised, tactile-track,
+ * tactile-control, --tactile-sheen, --tactile-shade, --tactile-glow,
+ * --tactile-inset, SOFT_SKEUOMORPHISM, OVERLAY_NOT_COLOR, design-buttons.md
  *
  * WHAT:  The product surface depth language from design-buttons.md — a vertical
  *        gradient, an edge one step darker than the fill, a 1px inner top
- *        highlight and a soft shadow — as TOKENS plus four utilities that the
+ *        highlight and a soft shadow — as TOKENS plus NINE utilities that the
  *        shared primitives opt into.
+ *
+ *        THE WHOLE FAMILY, by what a surface IS rather than by what it looks
+ *        like, because picking the wrong one is the only way to get this wrong:
+ *          .tactile-primary  the one primary action per view (a wash over the
+ *                            caller's fill — see OVERLAY_NOT_COLOR)
+ *          .tactile-surface  an interactive raised control; owns hover + pressed
+ *          .tactile-inlay    a flat tinted fill that wants only the lit top edge
+ *          .tactile-field    something cut INTO the surface: an input, a select
+ *          .tactile-panel    a BORDERLESS elevated surface — card, popover,
+ *          -sm / -lg         dropdown, dialog. Draws its own hairline edge.
+ *          .tactile-raised   an elevated surface that ALREADY has a border, and
+ *                            stateless knobs. Same look, no second edge.
+ *          .tactile-track    the recessed channel a value travels along
+ *          .tactile-control  the "on" state of a small control. State only.
  *
  * WHY:   The marketing pages already own their own depth language
  *        (SOFT_BRUTALISM, the brutal-* utilities above). The product needed the
@@ -661,8 +675,19 @@ html:has([data-app-banner]) {
  *        colour-tinted glow of section 4.1 can set it locally; it defaults to
  *        neutral because CSS cannot read the fill a caller passed in.
  * WHERE: Consumed by the shared primitives in src/components/ui — button.tsx
- *        (default/outline/secondary), input.tsx, textarea.tsx, select.tsx and
- *        card.tsx. Available app-wide as plain utility classes. */
+ *        (default/outline/secondary), input.tsx, input-group.tsx, textarea.tsx,
+ *        select.tsx, card.tsx, checkbox.tsx, switch.tsx, tabs.tsx, badge.tsx,
+ *        alert.tsx, popover.tsx, dropdown-menu.tsx, dialog.tsx,
+ *        alert-dialog.tsx, tooltip.tsx and sidebar.tsx. Because the whole
+ *        product is built on those primitives, wiring them IS how the dashboard,
+ *        the project editor and the settings screens get the treatment — the
+ *        handful of surfaces that paint their own card or tile instead
+ *        (format-card, the pickers, the usage meters, the pricing cards) reach
+ *        for the matching utility by hand. Available app-wide as plain classes.
+ *
+ *        NOT the marketing or auth pages: those own SOFT_BRUTALISM and its
+ *        brutal-* family above, deliberately, and the two skin independently.
+ *        They still pick up every tactile primitive they render. */
 :root {
   /* How hard the wash lifts the top and shades the foot of a raised surface. */
   --tactile-sheen: 22%;
@@ -825,6 +850,119 @@ html:has([data-app-banner]) {
   .tactile-field:focus-visible,
   .tactile-field:focus-within {
     box-shadow: none;
+  }
+
+  /* SOURCE OF TRUTH KEYWORDS: tactile-panel, tactile-panel-sm, tactile-panel-lg,
+     PANEL_OWNS_ITS_EDGE, ONE_BOX_SHADOW_WINS
+     Every BORDERLESS elevated surface in the product: a card, a popover, a
+     dropdown, a select list, a dialog. Three sizes, mirroring the
+     brutal-shadow-sm/brutal-shadow/brutal-shadow-lg triple the marketing
+     surface already uses, so "how high does this float" is a choice between
+     named steps rather than a hand-written shadow per component.
+
+     EACH ONE DECLARES THE WHOLE STACK — lit top edge, hairline edge, ambient
+     shadow — and REPLACES the `shadow-md ring-1 ring-foreground/10` trio the
+     primitives carried. That is not tidying: `box-shadow` is a single
+     property, so a bare declaration in this layer is simply overwritten by any
+     `shadow-*` / `ring-*` utility on the same element (Tailwind v4 orders
+     utilities after components). Composing through the `--tw-*` shadow slots
+     would work but hands the edge back to per-component utility soup, which is
+     exactly what the tactile family exists to end. One class, one truth.
+
+     THE EDGE IS AN INSET RING for the same reason the button's is — see
+     THE_DARKER_EDGE_IS_AN_INSET_RING above — and it is drawn at
+     `--foreground 10%`, the weight the cards and popovers were already ringed
+     at, so nothing in the product changes thickness. */
+  .tactile-panel-sm,
+  .tactile-panel,
+  .tactile-panel-lg {
+    background-image: linear-gradient(
+      180deg,
+      color-mix(in srgb, white var(--tactile-sheen-soft), transparent) 0%,
+      transparent 55%
+    );
+  }
+
+  .tactile-panel-sm {
+    box-shadow:
+      var(--tactile-highlight-soft),
+      inset 0 0 0 1px color-mix(in oklab, var(--foreground) 10%, transparent),
+      var(--shadow-sm);
+  }
+
+  .tactile-panel {
+    box-shadow:
+      var(--tactile-highlight-soft),
+      inset 0 0 0 1px color-mix(in oklab, var(--foreground) 10%, transparent),
+      var(--shadow-md);
+  }
+
+  .tactile-panel-lg {
+    box-shadow:
+      var(--tactile-highlight-soft),
+      inset 0 0 0 1px color-mix(in oklab, var(--foreground) 10%, transparent),
+      var(--shadow-lg);
+  }
+
+  /* SOURCE OF TRUTH KEYWORDS: tactile-raised, BORDER_IS_THE_CALLERS
+     The counterpart to `.tactile-panel` for a surface that ALREADY DRAWS ITS
+     OWN BORDER — a format card, an alert, a switch knob. It contributes the
+     wash, the lit top edge and a contact shadow, and deliberately no ring:
+     design-buttons.md section 1 allows ONE border per surface, and an inset
+     ring beside a real border reads as a double edge.
+
+     Stateless on purpose. `.tactile-surface` is the INTERACTIVE raised control
+     and owns hover and pressed; a knob that slides inside a switch, and a card
+     whose hover `brutal-hover` already owns, both want the look without the
+     states. */
+  .tactile-raised {
+    background-image: linear-gradient(
+      180deg,
+      color-mix(in srgb, white var(--tactile-sheen-soft), transparent) 0%,
+      transparent 55%,
+      color-mix(in srgb, black var(--tactile-shade-soft), transparent) 100%
+    );
+    box-shadow: var(--tactile-highlight-soft), var(--shadow-xs);
+  }
+
+  /* SOURCE OF TRUTH KEYWORDS: tactile-track, RECESS_IS_NOT_A_FIELD
+     The recessed channel a thing travels or sits inside: a tabs list, a usage
+     meter's groove, a render progress bar. Separate from `.tactile-field`
+     even though the inset is identical, because a field GIVES THE SHADOW BACK
+     on focus so its focus ring can own the box-shadow — and a tabs list
+     CONTAINS the focusable tab, so on `.tactile-field` the groove would vanish
+     the moment somebody tabbed into it. */
+  .tactile-track {
+    box-shadow: var(--tactile-inset);
+  }
+
+  /* SOURCE OF TRUTH KEYWORDS: tactile-control, ON_IS_RAISED, SELECTED_IS_RAISED
+     The "on" half of a small control — a checked checkbox, a flipped switch,
+     the active tab, the current nav row. STATE ONLY: it declares nothing in the
+     resting state, so it composes with whatever the control already is
+     (`.tactile-field` for a checkbox cut into the surface, nothing at all for a
+     nav row), and ONE class covers Base UI's `data-checked`, `data-active` and
+     `aria-selected` instead of each primitive restating the same look.
+
+     Specificity does the work: class+attribute outranks the plain
+     `.tactile-field` class, so the raised state wins over the recess with no
+     `!important` and no ordering trick. */
+  .tactile-control[data-checked],
+  .tactile-control[data-active],
+  .tactile-control[aria-current="true"],
+  .tactile-control[aria-checked="true"],
+  .tactile-control[aria-pressed="true"],
+  .tactile-control[aria-selected="true"] {
+    background-image: linear-gradient(
+      180deg,
+      color-mix(in srgb, white var(--tactile-sheen), transparent) 0%,
+      transparent 60%,
+      color-mix(in srgb, black var(--tactile-shade), transparent) 100%
+    );
+    box-shadow:
+      inset 0 1px 0 var(--tactile-edge-light),
+      inset 0 0 0 1px var(--tactile-edge-dark),
+      var(--shadow-xs);
   }
 }
 

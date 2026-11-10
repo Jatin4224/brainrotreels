@@ -95,7 +95,7 @@ export function PricingCard({
         <>
           {/* Solid rounded surface — covers the dashed cell edges so the
               selected card reads as one object lifted off the grid. */}
-          <div className="absolute -inset-px z-0 rounded-2xl border border-border bg-card" />
+          <div className="tactile-raised absolute -inset-px z-0 rounded-2xl border border-border bg-card" />
           {/* Bottom-up glow + grain. Pointer-events off so the whole card stays
               clickable through it. */}
           <div className="pointer-events-none absolute -inset-px z-1 overflow-hidden rounded-2xl">

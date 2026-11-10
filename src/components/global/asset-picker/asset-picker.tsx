@@ -247,7 +247,7 @@ function AssetTile({
       onClick={onSelect}
       disabled={!ready}
       className={cn(
-        "flex flex-col overflow-hidden rounded-lg border border-border bg-card text-left",
+        "tactile-raised flex flex-col overflow-hidden rounded-lg border border-border bg-card text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
         ready ? "hover:border-primary" : "opacity-60",
       )}
     >

@@ -388,7 +388,7 @@ export function UpgradeContent({
           <button
             type="button"
             onClick={onClose}
-            className="absolute top-4 right-4 z-20 flex size-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            className="absolute top-4 right-4 z-20 flex size-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
             aria-label="Close"
           >
             <XIcon className="size-4" />
@@ -442,16 +442,16 @@ export function UpgradeContent({
                 )}
               </div>
 
-              <div className="mb-8 inline-flex items-center rounded-full border border-border/50 bg-muted/50 p-1 sm:mb-10">
+              <div className="tactile-track mb-8 inline-flex items-center rounded-full border border-border/50 bg-muted/50 p-1 sm:mb-10">
                 {(["monthly", "yearly"] as const).map((interval) => (
                   <button
                     key={interval}
                     type="button"
                     onClick={() => setBillingInterval(interval)}
                     className={cn(
-                      "flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium capitalize transition-all",
+                      "flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium capitalize transition-all outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
                       billingInterval === interval
-                        ? "bg-background text-foreground shadow-sm"
+                        ? "tactile-raised bg-background text-foreground"
                         : "text-muted-foreground hover:text-foreground",
                     )}
                   >
@@ -651,9 +651,9 @@ export function UpgradeContent({
                               aria-checked={selected}
                               onClick={() => setBillingInterval(interval)}
                               className={cn(
-                                "relative flex flex-col items-center justify-between rounded-2xl border bg-card p-4 transition-all duration-200",
+                                "tactile-control relative flex flex-col items-center justify-between rounded-2xl border bg-card p-4 transition-all duration-200 outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
                                 selected
-                                  ? "border-primary/60 shadow-lg"
+                                  ? "border-primary/60"
                                   : "border-border/50 hover:border-primary/30",
                               )}
                             >
