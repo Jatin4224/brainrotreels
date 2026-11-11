@@ -4,7 +4,9 @@
 
 /**
  * SOURCE OF TRUTH KEYWORDS: AUTH_SCREEN_COPY, AUTH_PANEL_COPY,
- *   AUTH_MOBILE_TAG, AuthScreenCopy, AuthPanelCopy, AuthFormMode,
+ *   AUTH_MOBILE_TAG, AUTH_SHOWCASE_REELS, AUTH_SHOWCASE_SOURCE,
+ *   AuthScreenCopy, AuthPanelCopy, AuthShowcaseReel, AuthShowcaseSource,
+ *   AuthFormMode,
  *   PAGE_OWNED_COPY, AUTH_SURFACE, OPERATOR_OWNS_THESE_CLAIMS, HERO_COPY
  *
  * WHAT:  Every word the sign-in and sign-up screens say that is not a field
@@ -36,6 +38,8 @@ import type {
   AuthFormMode,
   AuthPanelCopy,
   AuthScreenCopy,
+  AuthShowcaseReel,
+  AuthShowcaseSource,
 } from "@/lib/types";
 
 /**
@@ -90,15 +94,125 @@ export const AUTH_SCREEN_COPY: Record<AuthFormMode, AuthScreenCopy> = {
  *        supplied with the design and unverifiable from this codebase. It is
  *        the line most likely to go stale, and the one a visitor sees twice
  *        inside a single click.
+ *
+ *        ⚠ THE MIRROR IS DELIBERATELY BROKEN as of the animated panel. The
+ *        headline and lead now CAPTION the animation above them — a document
+ *        going in and five reels coming out — rather than restating the
+ *        landing hero word for word, because a caption that describes
+ *        something other than what is moving beside it is worse than no
+ *        caption. `socialProof` is still the hero's line verbatim and MUST
+ *        stay that way: it is the one claim a visitor sees twice inside a
+ *        single click, and two different numbers across that click is the
+ *        failure the pairing guards against.
  * WHERE: ./auth-showcase.tsx.
  */
 export const AUTH_PANEL_COPY: AuthPanelCopy = {
-  headlineBefore: "Create content people",
-  headlineHighlight: "actually",
-  headlineAfter: "want to watch",
-  lead: "Turn any idea, script, URL or document into a finished short with visuals, voice, sound and editing handled for you.",
+  headlineBefore: "One PDF in.",
+  headlineHighlight: "Five reels",
+  headlineAfter: "out.",
+  lead: "Drop a report, script or doc. Get motion-graphics reels with voice, captions and editing handled.",
   socialProof: "12,400+ creators · 38M views generated",
 };
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: AUTH_SHOWCASE_SOURCE, AuthShowcaseSource,
+ *   AUTH_SHOWCASE_REELS, SHOWCASE_IS_DATA, PDF card, Make reels
+ *
+ * WHAT:  The document that slides into the bar at the top of the animated
+ *        panel, and the words on the bar it lands in.
+ * WHY:   One sample, named once. The file name is also the subject of every
+ *        reel in `AUTH_SHOWCASE_REELS` below ("Q3", "+38% revenue"), so the
+ *        two have to be edited together to keep the panel telling one story —
+ *        which is an argument for them being neighbours in one file, not for
+ *        inlining either into the markup.
+ *
+ *        `placeholder` repeats the landing hero's own prompt field, trimmed
+ *        to what fits a 380px bar; it is the product's real first screen,
+ *        which is the whole point of showing it here.
+ * WHERE: ./auth-showcase.tsx.
+ */
+export const AUTH_SHOWCASE_SOURCE: AuthShowcaseSource = {
+  kind: "PDF",
+  fileName: "q3-growth-report.pdf",
+  meta: "12 pages · 2.4 MB",
+  placeholder: "Drop a PDF or script and …",
+  action: "Make reels",
+};
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: AUTH_SHOWCASE_REELS, AuthShowcaseReel,
+ *   AuthShowcaseReelTone, SHOWCASE_IS_DATA, AUTH_SHOWCASE_SOURCE
+ *
+ * WHAT:  The five reels that fan out from under the bar, in strip order.
+ *
+ * WHY:   FIVE, in this order, is load-bearing rather than a list that happens
+ *        to have five entries: the strip is five 100px cards touching, the
+ *        middle card is the one the stack grows out of, and the per-card
+ *        keyframes (`auth-reel-0` … `auth-reel-4` in globals.css) are written
+ *        against those five positions. Adding a sixth means a sixth keyframe
+ *        set and a re-measured strip, so ./auth-showcase.test.ts asserts the
+ *        length rather than letting a content edit quietly break the
+ *        animation.
+ *
+ *        They read as ONE document cut into parts — PART 1…5, one subject per
+ *        card, the kicker carrying the sequence — because that is the claim
+ *        the panel is making: a report goes in, a series comes out. Five
+ *        unrelated sample reels would show the same cards and say nothing.
+ *
+ *        The scores are the operator's sample figures (OPERATOR_OWNS_THESE_
+ *        CLAIMS). They sit in the 90s deliberately: this is a mockup of a
+ *        good result, and a mockup showing a 41 would be advertising the
+ *        failure case.
+ * WHERE: ./auth-showcase.tsx, which maps `tone` onto the strip's token
+ *        classes.
+ */
+export const AUTH_SHOWCASE_REELS: readonly AuthShowcaseReel[] = [
+  {
+    id: "part-1",
+    platform: "YT",
+    kicker: "PART 1",
+    title: "Q3 in 60 seconds",
+    caption: "the short version",
+    score: 98,
+    tone: "paper",
+  },
+  {
+    id: "part-2",
+    platform: "IG",
+    kicker: "PART 2",
+    title: "+38% revenue",
+    caption: "where it came from",
+    score: 96,
+    tone: "teal",
+  },
+  {
+    id: "part-3",
+    platform: "in",
+    kicker: "PART 3",
+    title: "3 big wins",
+    caption: "and why they worked",
+    score: 99,
+    tone: "amber",
+  },
+  {
+    id: "part-4",
+    platform: "TT",
+    kicker: "PART 4",
+    title: "What broke",
+    caption: "the honest bit",
+    score: 94,
+    tone: "plum",
+  },
+  {
+    id: "part-5",
+    platform: "X",
+    kicker: "PART 5",
+    title: "What's next",
+    caption: "our Q4 bets",
+    score: 97,
+    tone: "ember",
+  },
+];
 
 /**
  * SOURCE OF TRUTH KEYWORDS: AUTH_MOBILE_TAG, HERO_COPY

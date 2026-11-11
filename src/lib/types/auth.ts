@@ -250,3 +250,72 @@ export interface AuthPanelCopy {
 export const SOCIAL_PROVIDER_IDS = ["google", "apple"] as const;
 
 export type SocialProviderId = (typeof SOCIAL_PROVIDER_IDS)[number];
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: AuthShowcaseReelTone, AuthShowcaseReel,
+ *   AuthShowcaseSource, AUTH_SHOWCASE_REELS, AUTH_SHOWCASE_SOURCE,
+ *   AuthShowcase, SHOWCASE_IS_DATA, TOKENS_NOT_HEX, PANEL_IS_THE_PITCH
+ *
+ * WHAT:  The contents of the animated panel beside the desktop auth form —
+ *        the document that "enters" the bar, and the five reels that come
+ *        back out of it.
+ *
+ * WHY:   SHOWCASE_IS_DATA, the same rule `ReelShowcaseItem` states for the
+ *        landing hero's phones: the five reels are ONE card component
+ *        rendered five times from this array, not five slabs of markup.
+ *        Copy-pasted card markup is how a mockup ends up with part 4's title
+ *        over part 2's score, and the strip's geometry (five 100px cards
+ *        touching, rounded only at the two outer ends) has to stay a function
+ *        of the index rather than of what somebody typed into each copy.
+ *
+ *        TOKENS_NOT_HEX is why the surface is a `tone` from a CLOSED union
+ *        and not a colour. auth-design.md gives each card a hex pair; a
+ *        `background`/`text` string on this type would carry those hexes into
+ *        the component and out of reach of the palette. The tone names a
+ *        SLOT, which ./auth-showcase.tsx resolves against a closed map of
+ *        token classes — so re-skinning the strip is still one edit in
+ *        globals.css, and a tone that does not exist is a typecheck failure
+ *        rather than a card that silently renders transparent.
+ *
+ *        `score` is a NUMBER, unlike `ReelShowcaseItem.likes` which is the
+ *        pre-formatted string "1.2M". These are two-digit scores with no unit
+ *        and no abbreviation to decide, so there is nothing for a formatter
+ *        to get wrong and a number keeps the "0–100" claim on the type.
+ * WHERE: `AUTH_SHOWCASE_REELS` / `AUTH_SHOWCASE_SOURCE` in
+ *        src/components/global/auth/auth-content.ts, rendered by
+ *        src/components/global/auth/auth-showcase.tsx.
+ */
+export type AuthShowcaseReelTone =
+  | "paper"
+  | "teal"
+  | "amber"
+  | "plum"
+  | "ember";
+
+export interface AuthShowcaseReel {
+  id: string;
+  /** The two-character platform chip over the card, e.g. "YT", "in". */
+  platform: string;
+  /** The small outlined pill at the top of the card, e.g. "PART 1". */
+  kicker: string;
+  /** The card's display line — the only text on the card set in the display face. */
+  title: string;
+  /** One quiet line under the title. */
+  caption: string;
+  /** The predicted-performance number on the badge, 0–100. */
+  score: number;
+  tone: AuthShowcaseReelTone;
+}
+
+export interface AuthShowcaseSource {
+  /** The badge on the orange tile inside the document card, e.g. "PDF". */
+  kind: string;
+  /** The document's file name. */
+  fileName: string;
+  /** The line under it, e.g. "12 pages · 2.4 MB". */
+  meta: string;
+  /** The greyed text in the input bar the document drops into. */
+  placeholder: string;
+  /** The label on the pill the cursor presses. */
+  action: string;
+}

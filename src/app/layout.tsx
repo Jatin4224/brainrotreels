@@ -24,7 +24,13 @@
  */
 
 import type { Metadata } from "next";
-import { DM_Sans, Geist, Geist_Mono } from "next/font/google";
+import {
+  Bricolage_Grotesque,
+  DM_Sans,
+  Geist,
+  Geist_Mono,
+  Space_Grotesk,
+} from "next/font/google";
 import "./globals.css";
 import { BRANDING } from "@/lib/config";
 import {
@@ -73,6 +79,31 @@ const dmSans = DM_Sans({
   weight: ["400", "500", "700", "800", "900"],
 });
 
+/* SOURCE OF TRUTH KEYWORDS: bricolage, spaceGrotesk, --font-bricolage,
+ * --font-space-grotesk, auth-typography, AUTH_WEARS_THE_BRAND
+ *
+ * The AUTH screens' pair, wired into `.auth-typography` in globals.css:
+ * Bricolage Grotesque for the headlines and the reel titles on the showcase
+ * panel, Space Grotesk for everything else (auth-design.md §2). Declared here
+ * for the same reason `dmSans` is — next/font has to run in a module the
+ * layout tree can set a className from, and <html> is the one element whose
+ * variables reach every subtree. They cost nothing anywhere else: no surface
+ * outside src/app/(auth) references either variable, so the faces are only
+ * fetched by a page that paints with them.
+ *
+ * Both are VARIABLE fonts, so no `weight` is listed — the whole axis ships in
+ * one file and the 800 the headlines ask for is a `font-weight`, not a second
+ * request. */
+const bricolage = Bricolage_Grotesque({
+  variable: "--font-bricolage",
+  subsets: ["latin"],
+});
+
+const spaceGrotesk = Space_Grotesk({
+  variable: "--font-space-grotesk",
+  subsets: ["latin"],
+});
+
 export const metadata: Metadata = {
   metadataBase: BRANDING.metadataBase,
   title: {
@@ -96,6 +127,8 @@ export default function RootLayout({
         geistSans.variable,
         geistMono.variable,
         dmSans.variable,
+        bricolage.variable,
+        spaceGrotesk.variable,
       )}
     >
       <body

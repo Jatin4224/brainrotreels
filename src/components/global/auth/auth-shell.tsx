@@ -91,7 +91,22 @@ export function AuthShell({ children, aside, headerTag }: AuthShellProps) {
   const isSplit = aside !== undefined;
 
   return (
-    <div className="marketing-canvas flex min-h-svh flex-col bg-background p-6 lg:p-8">
+    /* DESKTOP_DOES_NOT_SCROLL, and only on the split screens. At `lg` the
+       sign-in and sign-up pages are exactly one viewport — the form on the
+       left, the animated panel on the right — and a page that scrolls by
+       forty pixels under an animation is the thing that makes the animation
+       look broken. The panel fits itself to whatever height it is given (see
+       auth-showcase-canvas in globals.css), so the height is a FIXED one
+       rather than a minimum. It stays a MINIMUM below `lg` and on the
+       single-column screens, where a tall form (sign-up on a short phone,
+       accept-invitation with a long org name) must still be reachable:
+       clipping a submit button is worse than a scrollbar. */
+    <div
+      className={cn(
+        "marketing-canvas auth-typography flex min-h-svh flex-col bg-background p-6 lg:p-8",
+        isSplit ? "lg:h-svh lg:min-h-0 lg:overflow-hidden" : "",
+      )}
+    >
       <header className="flex items-center justify-between gap-4">
         <PlatformLogo href="/" size="lg" />
 
@@ -115,7 +130,11 @@ export function AuthShell({ children, aside, headerTag }: AuthShellProps) {
         className={cn(
           "flex w-full flex-1 pt-8",
           isSplit
-            ? "flex-col gap-10 lg:grid lg:grid-cols-2 lg:items-stretch lg:gap-10 lg:pt-6"
+            ? /* `min-h-0` is what makes DESKTOP_DOES_NOT_SCROLL real: a flex
+                 child defaults to `min-height: auto`, so without it this row
+                 would grow to its content and push the fixed-height page into
+                 a scrollbar instead of handing the panel a bounded height. */
+              "flex-col gap-10 lg:grid lg:grid-cols-2 lg:items-stretch lg:gap-10 lg:min-h-0 lg:pt-6"
             : "flex-col items-center justify-center",
         )}
       >
@@ -123,7 +142,7 @@ export function AuthShell({ children, aside, headerTag }: AuthShellProps) {
           className={cn(
             "flex w-full flex-1 flex-col",
             isSplit
-              ? "max-w-[26rem] lg:mx-auto lg:justify-center"
+              ? "max-w-[26rem] lg:mx-auto lg:min-h-0 lg:justify-center"
               : "max-w-md flex-none",
           )}
         >

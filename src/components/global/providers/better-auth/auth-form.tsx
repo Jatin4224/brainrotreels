@@ -698,7 +698,12 @@ function AppleGlyph() {
   );
 }
 
-/* Inline Google "G" mark. */
+/* Inline Google "G" mark, drawn in `currentColor`.
+ * TODO(brand): this is the single-colour outline of Google's G, not the
+ * official four-colour asset — the repo ships no Google brand file, and
+ * Google's "Sign in with Google" guidelines require their own mark on the
+ * button. Drop the official SVG into public/ and point this at it before
+ * production. The same applies to <AppleGlyph> above. */
 function GoogleGlyph() {
   return (
     <svg

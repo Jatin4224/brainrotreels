@@ -33,6 +33,8 @@ export {
   AUTH_SCREEN_COPY,
   AUTH_PANEL_COPY,
   AUTH_MOBILE_TAG,
+  AUTH_SHOWCASE_SOURCE,
+  AUTH_SHOWCASE_REELS,
 } from "./auth-content";
 export type { AuthErrorProps } from "./auth-error";
 export type { AuthShellProps } from "./auth-shell";
