@@ -154,63 +154,55 @@ export const AUTH_SHOWCASE_SOURCE: AuthShowcaseSource = {
  *        length rather than letting a content edit quietly break the
  *        animation.
  *
- *        They read as ONE document cut into parts — PART 1…5, one subject per
- *        card, the kicker carrying the sequence — because that is the claim
- *        the panel is making: a report goes in, a series comes out. Five
- *        unrelated sample reels would show the same cards and say nothing.
+ *        REAL COVERS, which is the change from the first version of this
+ *        panel. Those five cards were DRAWINGS of reels — a kicker, a
+ *        headline in the display face, a one-line caption — and a drawing of
+ *        the product is the weakest thing a product page can show. These are
+ *        the renderer's own first frames, one per format the app can make
+ *        (a Reddit story, a motion-graphics explainer, a quiz, a diagram
+ *        explainer, a text-message story), so the strip now demonstrates the
+ *        RANGE as well as the count: five different kinds of short out of one
+ *        document, not five slices of the same deck.
  *
  *        The scores are the operator's sample figures (OPERATOR_OWNS_THESE_
  *        CLAIMS). They sit in the 90s deliberately: this is a mockup of a
  *        good result, and a mockup showing a 41 would be advertising the
  *        failure case.
- * WHERE: ./auth-showcase.tsx, which maps `tone` onto the strip's token
- *        classes.
+ * WHERE: ./auth-showcase.tsx. The files live in public/auth-reels/. If a
+ *        contact sheet of all five (00-all-five-preview.png) is ever added
+ *        beside them it is for humans and must NOT be referenced here — the
+ *        strip needs the five frames separately.
  */
 export const AUTH_SHOWCASE_REELS: readonly AuthShowcaseReel[] = [
   {
-    id: "part-1",
+    id: "reddit-story",
+    src: "/auth-reels/01-reddit-story.png",
     platform: "YT",
-    kicker: "PART 1",
-    title: "Q3 in 60 seconds",
-    caption: "the short version",
     score: 98,
-    tone: "paper",
   },
   {
-    id: "part-2",
+    id: "motion-graphics",
+    src: "/auth-reels/02-motion-graphics.png",
     platform: "IG",
-    kicker: "PART 2",
-    title: "+38% revenue",
-    caption: "where it came from",
     score: 96,
-    tone: "teal",
   },
   {
-    id: "part-3",
+    id: "quiz",
+    src: "/auth-reels/03-quiz.png",
     platform: "in",
-    kicker: "PART 3",
-    title: "3 big wins",
-    caption: "and why they worked",
     score: 99,
-    tone: "amber",
   },
   {
-    id: "part-4",
+    id: "explainer",
+    src: "/auth-reels/04-explainer.png",
     platform: "TT",
-    kicker: "PART 4",
-    title: "What broke",
-    caption: "the honest bit",
     score: 94,
-    tone: "plum",
   },
   {
-    id: "part-5",
+    id: "text-story",
+    src: "/auth-reels/05-text-story.png",
     platform: "X",
-    kicker: "PART 5",
-    title: "What's next",
-    caption: "our Q4 bets",
     score: 97,
-    tone: "ember",
   },
 ];
 

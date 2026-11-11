@@ -53,7 +53,6 @@ export type {
   AuthScreenCopy,
   AuthPanelCopy,
   AuthShowcaseReel,
-  AuthShowcaseReelTone,
   AuthShowcaseSource,
   SocialProviderId,
   ForgotPasswordValues,

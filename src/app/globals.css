@@ -664,34 +664,6 @@ html:has([data-app-banner]) {
   }
 }
 
-/* SOURCE OF TRUTH KEYWORDS: --reel-card-teal, --reel-card-plum,
- * AuthShowcase, AUTH_SHOWCASE_REELS, AuthShowcaseReelTone, TOKENS_NOT_HEX
- *
- * WHAT:  The two surfaces on the auth showcase strip that the brand palette
- *        does not already contain — a deep teal and a deep plum.
- * WHY:   The strip's five cards are a MOCKUP of five finished reels, so three
- *        of them can be (and are) the real brand surfaces: paper, the yellow
- *        accent and the orange. Two cannot, because a five-card strip needs
- *        five distinguishable backgrounds and the palette offers three. These
- *        are therefore artwork, exactly like --hand-skin above, and pinned
- *        across themes for the same reason: a reel thumbnail that inverts
- *        with the operator's theme stops reading as a thumbnail.
- *        They live here rather than as hex in the component because that is
- *        the rule this whole file exists to keep — re-skinning the strip
- *        stays one edit here.
- * WHERE: `REEL_TONES` in src/components/global/auth/auth-showcase.tsx, as
- *        `bg-reel-card-teal` / `bg-reel-card-plum`. */
-:root,
-.dark {
-  --reel-card-teal: oklch(0.268 0.0374 222);
-  --reel-card-plum: oklch(0.24 0.0476 297.4);
-}
-
-@theme inline {
-  --color-reel-card-teal: var(--reel-card-teal);
-  --color-reel-card-plum: var(--reel-card-plum);
-}
-
 /* SOURCE OF TRUTH KEYWORDS: auth-doc-drop, auth-make-pulse, auth-cursor-tap,
  * auth-reel-0, auth-reel-1, auth-reel-2, auth-reel-3, auth-reel-4,
  * --auth-loop, auth-showcase-canvas, AuthShowcase, ONE_LOOP_ONE_DURATION,

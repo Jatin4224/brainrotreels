@@ -51,12 +51,20 @@
  *        one class that pauses them all. `animation-play-state`, not
  *        unmounting: the loop resumes on the frame it stopped on.
  *
- *        TOKENS_NOT_HEX. auth-design.md §4.4 gives each card a hex pair; they
- *        are rendered here through `REEL_TONES`, a closed map onto the
- *        palette, so the strip re-skins with the rest of the brand. The two
- *        surfaces the palette did not already contain are tokens of their own
- *        (`--reel-card-teal`, `--reel-card-plum` in globals.css) rather than
- *        hex typed into this file.
+ *        COVER_IS_AN_IMAGE. The five cards show the renderer's REAL first
+ *        frames (public/auth-reels/), not five text cards drawn in the
+ *        palette. auth-design.md §4.4 specifies the drawn version — a tone,
+ *        a kicker, a title, a caption — and it is deliberately superseded:
+ *        at 100px wide no headline reads, so the drawn card had to invent
+ *        short ones, and a drawing of the output is a weaker claim than the
+ *        output. What survives from §4.4 is the GEOMETRY, which the
+ *        animation depends on: 100x178, gap 0, rounded only at the strip's
+ *        two outer ends, chip on the top edge, score badge at the bottom.
+ *
+ *        The only colours left on a card are the placeholder underneath the
+ *        image (`bg-surface-raised`, so a bright cover cannot flash white
+ *        while it loads) and the badge, which stays a dark chip over a scrim
+ *        because these covers are near-white at the bottom as often as not.
  *
  *        HIDDEN BELOW `lg`, not shrunk: the mobile artboards have no panel at
  *        all, and below that width the form column carries the headline
@@ -74,9 +82,10 @@
  */
 
 import * as React from "react";
+import Image from "next/image";
 import { LinkIcon, PointerIcon } from "lucide-react";
 
-import type { AuthShowcaseReel, AuthShowcaseReelTone } from "@/lib/types";
+import type { AuthShowcaseReel } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 import { HighlightHeading } from "@/components/global/highlight-heading";
@@ -90,18 +99,10 @@ export interface AuthShowcaseProps {
   className?: string | undefined;
 }
 
-/* Closed map rather than a template string, so Tailwind sees every class
- * literally and cannot tree-shake one of them out of the production build —
- * the same reason `LOGO_TONES` in platform-logo.tsx is written this way. */
-const REEL_TONES: Record<AuthShowcaseReelTone, string> = {
-  paper: "bg-foreground text-background",
-  teal: "bg-reel-card-teal text-foreground",
-  amber: "bg-brand-accent text-brand-accent-foreground",
-  plum: "bg-reel-card-plum text-foreground",
-  ember: "bg-brand text-brand-foreground",
-};
-
-/* One class per index rather than `auth-anim-reel-${i}` — same reason. */
+/* One class per index rather than `auth-anim-reel-${i}`, so Tailwind sees
+ * every class literally and cannot tree-shake one of them out of the
+ * production build — the same reason `LOGO_TONES` in platform-logo.tsx is
+ * written as a closed map. */
 const REEL_ANIMATIONS = [
   "auth-anim-reel-0",
   "auth-anim-reel-1",
@@ -315,30 +316,56 @@ function ReelCard({
         {reel.platform}
       </span>
 
+      {/* `relative` + `overflow-hidden` are what clip the cover to the
+          strip's corner radius; `bg-surface-raised` is what the card is
+          while the image is still arriving, so a bright frame can never
+          flash white against the panel. */}
       <div
         className={cn(
-          "relative flex h-[178px] flex-col justify-between overflow-hidden px-2.5 pb-[52px] pt-3",
-          REEL_TONES[reel.tone],
+          "relative h-[178px] overflow-hidden bg-surface-raised",
           corners,
         )}
       >
-        <span className="self-start rounded-full border-[1.5px] border-current px-1.5 py-px text-[9px] font-bold tracking-[0.08em]">
-          {reel.kicker}
-        </span>
+        {/* 100x178 is 9:16 to within a fifth of a pixel, so a 720x1280 cover
+            lands almost exactly whole — `cover` scales rather than crops
+            here. `center top` is the insurance: if either number is ever
+            nudged, the frames put their headline in the upper half and the
+            rotreels mark at the very bottom, so what gets cut should be the
+            bottom. `fill` + `sizes="100px"` is what stops Next serving a
+            720px source for a 100px box.
 
-        <div>
-          <p className="font-display text-[19px] font-extrabold leading-[0.95] tracking-tight">
-            {reel.title}
-          </p>
-          <p className="mt-1.5 text-[10px] font-medium leading-tight opacity-80">
-            {reel.caption}
-          </p>
-        </div>
+            `priority` on all five: they are above the fold on the widest
+            screens and they are the SUBJECT of a loop that starts
+            immediately, so a lazy one would pop in halfway through its
+            first pass. Five covers at ~120KB each is the cost. */}
+        <Image
+          src={reel.src}
+          alt=""
+          fill
+          sizes="100px"
+          priority
+          style={{ objectFit: "cover", objectPosition: "center top" }}
+        />
 
-        {/* The score sits on its own dark chip rather than on the card, so it
-            stays legible on all five surfaces — including the yellow one,
-            where the card's own foreground would not. */}
-        <span className="absolute bottom-2 left-1/2 flex w-[42px] -translate-x-1/2 flex-col items-center rounded-md bg-background/90 py-0.5">
+        {/* SCRIM_IS_NOT_A_THEME_COLOR, the same rule `.reel-scrim-bottom`
+            states in globals.css: this gradient is a function of the IMAGE
+            under it, not of the palette. It has to be black whatever the
+            theme does, because its only job is keeping the badge off a
+            bright frame — two of these five covers are near-white at the
+            bottom.
+
+            The utility is the landing page's own scrim at `opacity-70`, not
+            a second gradient written out here: that lands on the ~0.45 black
+            this card wants while keeping ONE definition of what a scrim is.
+            A copy of the gradient at a different strength is how two scrims
+            drift apart. */}
+        <span
+          aria-hidden="true"
+          className="reel-scrim-bottom pointer-events-none absolute inset-x-0 bottom-0 h-10 opacity-70"
+        />
+
+        {/* Above both, so the score reads on every cover. */}
+        <span className="absolute bottom-2 left-1/2 z-10 flex w-[42px] -translate-x-1/2 flex-col items-center rounded-md bg-background/90 py-0.5">
           <span className="text-[8px] leading-tight text-muted-foreground">
             Score
           </span>

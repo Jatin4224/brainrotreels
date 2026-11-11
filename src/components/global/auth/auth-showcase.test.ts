@@ -56,9 +56,32 @@ function escaped(text: string): string {
 describe("AuthShowcase", () => {
   it("renders every reel from the content array", () => {
     for (const reel of AUTH_SHOWCASE_REELS) {
-      expect(markup).toContain(escaped(reel.title));
-      expect(markup).toContain(escaped(reel.kicker));
       expect(markup).toContain(String(reel.score));
+      expect(markup).toContain(reel.platform);
+    }
+  });
+
+  /* COVER_IS_AN_IMAGE. The covers are what the panel is SHOWING, and
+   * next/image rewrites every `src` into a `/_next/image?url=…` query — so
+   * this asserts the encoded path, which is what actually has to reach the
+   * browser. A cover renamed in public/ without the array being updated is a
+   * silently empty card otherwise. */
+  it("renders each reel's cover image", () => {
+    for (const reel of AUTH_SHOWCASE_REELS) {
+      expect(markup).toContain(encodeURIComponent(reel.src));
+    }
+    /* No lazy cover: the strip is moving from the first frame. */
+    expect(markup).not.toContain('loading="lazy"');
+  });
+
+  /* The covers are decoration inside an aria-hidden stage, so they must carry
+   * an EMPTY alt — a described image here would be read out as part of a
+   * sign-in form. */
+  it("gives every cover an empty alt", () => {
+    const alts = markup.match(/<img[^>]*\salt="([^"]*)"/g) ?? [];
+    expect(alts).toHaveLength(AUTH_SHOWCASE_REELS.length);
+    for (const tag of alts) {
+      expect(tag).toContain('alt=""');
     }
   });
 
