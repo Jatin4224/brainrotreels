@@ -38,8 +38,12 @@ import { cn } from "@/lib/utils";
 export const PAGE_CONTAINER_WIDTHS = {
   /* Reading width — a single column of prose, a focused form. */
   sm: "max-w-3xl",
-  /* The app default — comfortable for cards, settings, and lists. */
-  default: "max-w-5xl",
+  /* The app default — comfortable for cards, settings, and lists.
+     945px exactly, per 00-dashboard-foundations.md section 2: it is the width
+     the format grid (3 columns, 16px gaps) and the editor's two-column split
+     were both drawn against, so a page that uses the default lines up with
+     the spec's screens instead of being 80px wider than all of them. */
+  default: "max-w-[945px]",
   /* Dense dashboards: multi-column grids, charts. */
   lg: "max-w-7xl",
   /* Opt-out: no cap, content spans the page (wide tables, boards). */

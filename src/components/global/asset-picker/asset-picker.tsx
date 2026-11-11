@@ -6,40 +6,40 @@
 
 /**
  * SOURCE OF TRUTH KEYWORDS: AssetPicker, AssetPickerProps, AssetTile,
- *   ASSETS_ARE_FILTERED_BY_LANE, SELECTION_IS_THE_CALLERS,
- *   SEARCH_IS_SERVER_SIDE, GLOBAL_MEANS_CONFIGURABLE, POLL_WHILE_PROCESSING
+ * ASSETS_ARE_FILTERED_BY_LANE, SELECTION_IS_THE_CALLERS,
+ * SEARCH_IS_SERVER_SIDE, GLOBAL_MEANS_CONFIGURABLE, POLL_WHILE_PROCESSING
  *
- * WHAT:  A dialog that lists the workspace's media and hands one back: the
- *        library picker the timeline editor inserts clips, images and music
- *        from.
+ * WHAT: A dialog that lists the workspace's media and hands one back: the
+ * library picker the timeline editor inserts clips, images and music
+ * from.
  *
- * WHY:   GLOBAL_MEANS_CONFIGURABLE, the same contract the background and visual
- *        pickers state. This component owns the listing, the search, the paging
- *        and the tiles, and owns NO write: `onSelect` is the only way anything
- *        leaves it. That is what lets the editor turn a chosen asset into an
- *        `addItem` op against its own document and its own revision, while a
- *        different screen could write it somewhere else entirely.
+ * WHY: GLOBAL_MEANS_CONFIGURABLE, the same contract the background and visual
+ * pickers state. This component owns the listing, the search, the paging
+ * and the tiles, and owns NO write: `onSelect` is the only way anything
+ * leaves it. That is what lets the editor turn a chosen asset into an
+ * `addItem` op against its own document and its own revision, while a
+ * different screen could write it somewhere else entirely.
  *
- *        ASSETS_ARE_FILTERED_BY_LANE. The caller passes the `kinds` that belong
- *        on the lane being filled, because the question "which media may go
- *        here" is the document's, not the media library's — `ASSET_KINDS`'
- *        own note says the kind drives "which timeline lane it may be dropped
- *        on". Showing a music bed in the picker for a video track would offer a
- *        choice the ops would then refuse.
+ * ASSETS_ARE_FILTERED_BY_LANE. The caller passes the `kinds` that belong
+ * on the lane being filled, because the question "which media may go
+ * here" is the document's, not the media library's — `ASSET_KINDS`'
+ * own note says the kind drives "which timeline lane it may be dropped
+ * on". Showing a music bed in the picker for a video track would offer a
+ * choice the ops would then refuse.
  *
- *        SEARCH_IS_SERVER_SIDE and so is the paging: `assets.list` already
- *        clamps, counts and signs a thumbnail per row (THUMB_URLS_WITH_THE_ROWS
- *        there), so filtering a page in the browser would search only what
- *        happened to be fetched — which reads as a broken search the moment a
- *        workspace has more than one page of media.
+ * SEARCH_IS_SERVER_SIDE and so is the paging: `assets.list` already
+ * clamps, counts and signs a thumbnail per row (THUMB_URLS_WITH_THE_ROWS
+ * there), so filtering a page in the browser would search only what
+ * happened to be fetched — which reads as a broken search the moment a
+ * workspace has more than one page of media.
  *
- *        POLL_WHILE_PROCESSING: an asset still being ingested has no usable
- *        variants, so it is listed as unavailable and the list refreshes while
- *        any row is unfinished. Offering it would put a clip in the timeline
- *        that the renderer cannot open yet.
+ * POLL_WHILE_PROCESSING: an asset still being ingested has no usable
+ * variants, so it is listed as unavailable and the list refreshes while
+ * any row is unfinished. Offering it would put a clip in the timeline
+ * that the renderer cannot open yet.
  *
  * WHERE: The timeline editor's add-media control. Open to any screen that needs
- *        a piece of the workspace's media.
+ * a piece of the workspace's media.
  */
 
 import * as React from "react";
@@ -80,10 +80,10 @@ export interface PickedAsset {
 /**
  * SOURCE OF TRUTH KEYWORDS: AssetRow, DERIVED_FROM_THE_ROUTER
  *
- * WHAT:  One row of assets.list, as the tile receives it.
- * WHY:   Indexed out of the router's own output rather than re-declared, so a
- *        column added to ASSET_LIST_SELECT reaches the tile without a
- *        hand-written DTO in between — the same choice FeatureGatesData makes.
+ * WHAT: One row of assets.list, as the tile receives it.
+ * WHY: Indexed out of the router's own output rather than re-declared, so a
+ * column added to ASSET_LIST_SELECT reaches the tile without a
+ * hand-written DTO in between — the same choice FeatureGatesData makes.
  * WHERE: AssetTile's props.
  */
 type AssetRow =
@@ -222,14 +222,14 @@ export function AssetPicker({
 /**
  * SOURCE OF TRUTH KEYWORDS: AssetTile, UNREADY_IS_DISABLED
  *
- * WHAT:  One asset as a selectable tile.
- * WHY:   UNREADY_IS_DISABLED — an asset whose ingest has not finished has no
- *        proxy to scrub and no master to render, so it is shown with its state
- *        rather than hidden or silently offered. Hiding it would make an upload
- *        that just finished look lost; offering it would put an unopenable clip
- *        in the timeline.
- *        A real `<button>` with the asset's name as its accessible name, so the
- *        grid is usable by keyboard and the thumbnail can be decoration.
+ * WHAT: One asset as a selectable tile.
+ * WHY: UNREADY_IS_DISABLED — an asset whose ingest has not finished has no
+ * proxy to scrub and no master to render, so it is shown with its state
+ * rather than hidden or silently offered. Hiding it would make an upload
+ * that just finished look lost; offering it would put an unopenable clip
+ * in the timeline.
+ * A real `<button>` with the asset's name as its accessible name, so the
+ * grid is usable by keyboard and the thumbnail can be decoration.
  * WHERE: AssetPicker's grid.
  */
 function AssetTile({
@@ -247,7 +247,7 @@ function AssetTile({
       onClick={onSelect}
       disabled={!ready}
       className={cn(
-        "flex flex-col overflow-hidden rounded-lg border border-border bg-card text-left",
+        "tactile-raised flex flex-col overflow-hidden rounded-lg border border-border bg-card text-left outline-none focus-ring",
         ready ? "hover:border-primary" : "opacity-60",
       )}
     >

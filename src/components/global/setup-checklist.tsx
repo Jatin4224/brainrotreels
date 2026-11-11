@@ -177,7 +177,7 @@ export function SetupChecklist({
           </code>
         </p>
 
-        <div className="space-y-1 rounded-2xl border bg-card p-1.5">
+        <div className="tactile-raised space-y-1 rounded-2xl border bg-card p-1.5">
           {items.map((item, index) => {
             const Icon = iconFor(item.icon);
             const isActive = index === activeIndex;

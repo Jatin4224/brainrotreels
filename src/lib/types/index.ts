@@ -43,6 +43,7 @@ export {
   authSchemaFor,
   forgotPasswordSchema,
   resetPasswordSchema,
+  SOCIAL_PROVIDER_IDS,
 } from "./auth";
 export type {
   SignInValues,
@@ -50,8 +51,8 @@ export type {
   AuthFormMode,
   AuthValuesByMode,
   AuthScreenCopy,
-  AuthShowcaseCard,
-  AuthShowcaseTone,
+  AuthPanelCopy,
+  SocialProviderId,
   ForgotPasswordValues,
   ResetPasswordValues,
 } from "./auth";
@@ -60,6 +61,8 @@ export type { JsonValue, JsonObject } from "./json";
 export {
   PROJECT_KINDS,
   CREATABLE_PROJECT_KINDS,
+  COMPOSER_LENGTHS,
+  composerSchema,
   PROJECT_STATUSES,
   ASPECT_RATIOS,
   CANVAS_BY_ASPECT,
@@ -82,6 +85,9 @@ export {
 } from "./project";
 export type {
   ProjectKind,
+  CreatableProjectKind,
+  ComposerLength,
+  ComposerValues,
   ProjectStatus,
   AspectRatio,
   CreateProjectValues,

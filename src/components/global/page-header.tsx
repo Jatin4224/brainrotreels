@@ -76,8 +76,12 @@ export function ContentLayout({
   return (
     /* Padding stays on the OUTER element and centering on the inner one: the
        gutter must survive on narrow screens where the container is already
-       below its cap and `mx-auto` contributes nothing. */
-    <div className="flex flex-1 flex-col p-4 md:p-6">
+       below its cap and `mx-auto` contributes nothing.
+       24px vertical / 44px horizontal at desktop, per
+       00-dashboard-foundations.md section 2. The horizontal gutter steps down
+       on smaller screens, where 44px either side of a 945px cap is width the
+       content needs more than the margin does. */
+    <div className="flex flex-1 flex-col px-4 py-6 sm:px-6 lg:px-11">
       <PageContainer width={width} className="gap-4">
         <PageHeader title={title} actions={actions} />
         {children}

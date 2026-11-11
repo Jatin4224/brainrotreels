@@ -6,21 +6,21 @@
 
 /**
  * SOURCE OF TRUTH KEYWORDS: PaymentMethodOption, PaymentMethodOptionProps,
- *   PaymentMethodSummary, PaymentMethodRow, UpgradeContent
+ * PaymentMethodSummary, PaymentMethodRow, UpgradeContent
  *
- * WHAT:  A saved card rendered as a CHOICE — click to pick it for this purchase.
- * WHY:   Deliberately not the same component as <PaymentMethodRow />, which is
- *        the management row: that one's whole surface is destructive and
- *        default-setting actions on a card you already own, and this one's whole
- *        surface is a single radio choice for one checkout. Folding both into
- *        one component would mean a card in the checkout list carrying a Delete
- *        button — a misclick that ends the purchase it appears in. They share
- *        the same PaymentMethodSummary shape, which is where the duplication
- *        would actually matter.
- *        Radio semantics (role + aria-checked) rather than a styled div, so the
- *        list is arrow-key navigable and announced as a choice.
+ * WHAT: A saved card rendered as a CHOICE — click to pick it for this purchase.
+ * WHY: Deliberately not the same component as <PaymentMethodRow />, which is
+ * the management row: that one's whole surface is destructive and
+ * default-setting actions on a card you already own, and this one's whole
+ * surface is a single radio choice for one checkout. Folding both into
+ * one component would mean a card in the checkout list carrying a Delete
+ * button — a misclick that ends the purchase it appears in. They share
+ * the same PaymentMethodSummary shape, which is where the duplication
+ * would actually matter.
+ * Radio semantics (role + aria-checked) rather than a styled div, so the
+ * list is arrow-key navigable and announced as a choice.
  * WHERE: The payment step of <UpgradeContent />; available to any future
- *        checkout surface through the billing barrel.
+ * checkout surface through the billing barrel.
  */
 
 import { CheckIcon, CreditCardIcon } from "lucide-react";
@@ -47,9 +47,9 @@ export function PaymentMethodOption({
       aria-checked={selected}
       onClick={() => onSelect(method.id)}
       className={cn(
-        "group relative flex w-full items-center justify-between rounded-2xl border bg-card p-4 text-left transition-all duration-200",
+        "tactile-control group relative flex w-full items-center justify-between rounded-2xl border bg-card p-4 text-left transition-all duration-200 outline-none focus-ring",
         selected
-          ? "border-primary/60 shadow-lg"
+          ? "border-primary/60"
           : "border-border/50 hover:border-primary/30",
       )}
     >

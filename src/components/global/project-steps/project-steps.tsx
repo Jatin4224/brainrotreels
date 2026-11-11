@@ -111,8 +111,12 @@ function StepLink({
     <Link
       href={`/dashboard/projects/${projectId}/${step.segment}`}
       aria-current={current ? "page" : undefined}
+      /* `.tactile-control` reads the `aria-current` above, so the current
+         step is RAISED rather than only tinted — matching the sidebar nav and
+         the active tab. It does nothing on the other steps by design: the
+         utility declares only the selected state. */
       className={cn(
-        "flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm transition-colors",
+        "tactile-control flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm transition-colors",
         current
           ? "bg-accent font-medium text-accent-foreground"
           : "text-muted-foreground hover:bg-accent/50 hover:text-foreground",

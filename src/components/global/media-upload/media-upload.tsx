@@ -6,35 +6,35 @@
 
 /**
  * SOURCE OF TRUTH KEYWORDS: MediaUpload, MediaUploadProps, UploadProgressRow,
- *   DROP_ZONE, GATE_ON_STORAGE, ACCEPT_FROM_THE_ALLOWLIST, GLOBAL_COMPONENT,
- *   DRAG_COUNTER
+ * DROP_ZONE, GATE_ON_STORAGE, ACCEPT_FROM_THE_ALLOWLIST, GLOBAL_COMPONENT,
+ * DRAG_COUNTER
  *
- * WHAT:  The drop zone: drag-and-drop or click to pick files, with a progress
- *        row per file and a plain reason on each refusal.
- * WHY:   GLOBAL_COMPONENT — this lives under components/global because three
- *        phases need it and none of them should own it: Phase 02's media
- *        library, Phase 11's background import and Phase 14's visual upload.
- *        Everything specific to a surface therefore arrives as a prop — the
- *        asset `kind`, the copy, whether the zone is a full panel or a compact
- *        tile — and nothing about the media page is hardcoded in here.
+ * WHAT: The drop zone: drag-and-drop or click to pick files, with a progress
+ * row per file and a plain reason on each refusal.
+ * WHY: GLOBAL_COMPONENT — this lives under components/global because three
+ * phases need it and none of them should own it: Phase 02's media
+ * library, Phase 11's background import and Phase 14's visual upload.
+ * Everything specific to a surface therefore arrives as a prop — the
+ * asset `kind`, the copy, whether the zone is a full panel or a compact
+ * tile — and nothing about the media page is hardcoded in here.
  *
- *        GATE_ON_STORAGE: the zone renders its own at-limit state instead of
- *        being wrapped in <FeatureGate>. A gate wraps a single clickable
- *        trigger and intercepts its onClick, which cannot express "the drop
- *        target is also inert" — a customer at their cap would still be able to
- *        drag files onto it and watch every one fail. At the cap the zone shows
- *        the registry's own upgrade sentence and opens the upgrade modal, which
- *        is the same destination the gate would have reached.
+ * GATE_ON_STORAGE: the zone renders its own at-limit state instead of
+ * being wrapped in <FeatureGate>. A gate wraps a single clickable
+ * trigger and intercepts its onClick, which cannot express "the drop
+ * target is also inert" — a customer at their cap would still be able to
+ * drag files onto it and watch every one fail. At the cap the zone shows
+ * the registry's own upgrade sentence and opens the upgrade modal, which
+ * is the same destination the gate would have reached.
  *
- *        ACCEPT_FROM_THE_ALLOWLIST: the `accept` attribute is generated from
- *        CONTENT_TYPE_ALLOWLIST, so the file picker offers exactly what the
- *        server will sign for. Typing a list of extensions here is how a picker
- *        ends up offering a format the API rejects.
+ * ACCEPT_FROM_THE_ALLOWLIST: the `accept` attribute is generated from
+ * CONTENT_TYPE_ALLOWLIST, so the file picker offers exactly what the
+ * server will sign for. Typing a list of extensions here is how a picker
+ * ends up offering a format the API rejects.
  *
- *        DRAG_COUNTER: `dragenter`/`dragleave` fire for every child element, so
- *        a naive boolean flickers off whenever the pointer crosses the inner
- *        text. The depth counter is the fix, and it is why this is not a
- *        one-line `useState(false)`.
+ * DRAG_COUNTER: `dragenter`/`dragleave` fire for every child element, so
+ * a naive boolean flickers off whenever the pointer crosses the inner
+ * text. The depth counter is the fix, and it is why this is not a
+ * one-line `useState(false)`.
  * WHERE: /dashboard/media (as a panel). Phases 11 and 14 as a compact tile.
  */
 
@@ -52,6 +52,7 @@ import { UPLOAD_CONTENT_TYPES, type UploadableAssetKind } from "@/lib/types";
 import { useFeatureGate } from "@/components/feature-gate";
 import { useUpgradeModal } from "@/components/global/upgrade-modal";
 import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
 import { Card, CardContent } from "@/components/ui/card";
 import { useMediaUpload, type UploadItem } from "./use-media-upload";
 
@@ -179,7 +180,7 @@ export function MediaUpload({
         }
         className={cn(
           "flex w-full flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-card text-center transition-colors",
-          "hover:border-primary/60 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
+          "hover:border-primary/60 focus-ring focus-visible:outline-none",
           variant === "panel" ? "px-6 py-10" : "px-4 py-6",
           isDragging && "border-primary bg-primary/5",
           atLimit && "opacity-70",
@@ -235,14 +236,14 @@ export function MediaUpload({
 /**
  * SOURCE OF TRUTH KEYWORDS: UploadProgressRow, PROGRESS_IS_A_DIV
  *
- * WHAT:  One file's row: name, size, state, and a progress bar while uploading.
- * WHY:   PROGRESS_IS_A_DIV — the bar is two divs with a width style rather than
- *        a new shadcn primitive. A Progress component would be a dependency and
- *        a file for one visual that appears nowhere else in the app; if a
- *        second caller ever needs it, THAT is the moment to extract it.
- *        Every colour is a theme token, including the states: `text-destructive`
- *        for a failure and `text-muted-foreground` for the pending ones, so the
- *        row reads correctly in both themes.
+ * WHAT: One file's row: name, size, state, and a progress bar while uploading.
+ * WHY: PROGRESS_IS_A_DIV — the bar is two divs with a width style rather than
+ * a new shadcn primitive. A Progress component would be a dependency and
+ * a file for one visual that appears nowhere else in the app; if a
+ * second caller ever needs it, THAT is the moment to extract it.
+ * Every colour is a theme token, including the states: `text-destructive`
+ * for a failure and `text-muted-foreground` for the pending ones, so the
+ * row reads correctly in both themes.
  * WHERE: The list inside <MediaUpload>.
  */
 function UploadProgressRow({ item }: { item: UploadItem }) {
@@ -257,19 +258,11 @@ function UploadProgressRow({ item }: { item: UploadItem }) {
       </div>
 
       {item.status === "uploading" ? (
-        <div
-          className="h-1 w-full overflow-hidden rounded-full bg-muted"
-          role="progressbar"
-          aria-valuenow={item.progress}
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-label={`Uploading ${item.filename}`}
-        >
-          <div
-            className="h-full bg-primary transition-[width]"
-            style={{ width: `${item.progress}%` }}
-          />
-        </div>
+        <Progress
+          value={item.progress}
+          size="sm"
+          label={`Uploading ${item.filename}`}
+        />
       ) : null}
 
       {item.status === "processing" ? (

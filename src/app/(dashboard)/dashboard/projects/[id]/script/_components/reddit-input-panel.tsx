@@ -305,7 +305,7 @@ export function RedditInputPanel({
             <AlertDescription>{preview.error.message}</AlertDescription>
           </Alert>
         ) : data === undefined ? null : (
-          <div className="flex flex-col gap-2 rounded-lg border border-border bg-card p-3">
+          <div className="tactile-raised flex flex-col gap-2 rounded-lg border border-border bg-card p-3">
             {data.title === null ? null : (
               <div className="flex flex-wrap items-center gap-2">
                 {data.subreddit === null ? null : (

@@ -31,7 +31,7 @@ function DialogOverlay({
     <DialogPrimitive.Backdrop
       data-slot="dialog-overlay"
       className={cn(
-        "fixed inset-0 isolate z-50 bg-black/10 duration-100 supports-backdrop-filter:backdrop-blur-xs data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0",
+        "fixed inset-0 isolate z-50 bg-overlay duration-100 supports-backdrop-filter:backdrop-blur-xs data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0",
         className
       )}
       {...props}
@@ -53,7 +53,20 @@ function DialogContent({
       <DialogPrimitive.Popup
         data-slot="dialog-content"
         className={cn(
-          "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl bg-popover p-4 text-sm text-popover-foreground ring-1 ring-foreground/10 duration-100 outline-none sm:max-w-sm data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
+        /* SOURCE OF TRUTH KEYWORDS: DIALOG_FITS_THE_VIEWPORT, max-h, dvh,
+           DialogContent, TALL_DIALOG_IS_UNREACHABLE
+           A centered dialog is `fixed top-1/2 -translate-y-1/2`, so content
+           taller than the viewport overflows BOTH edges at once and neither end
+           can be scrolled to — including this component's own footer buttons.
+           The bound belongs on the primitive and not on each caller: every
+           dialog has the failure, and one of them (visual-picker) had already
+           hand-patched it locally before this was fixed here.
+           `dvh` rather than `vh` so a mobile browser's retracting URL bar
+           cannot leave the dialog taller than the visible area. The 2rem is the
+           viewport gutter the width already reserves with max-w-[calc(100%-2rem)].
+           A caller that wants a different bound still wins — tailwind-merge
+           drops this `max-h` when one is passed in className. */
+          "fixed top-1/2 left-1/2 z-50 grid max-h-[calc(100dvh-2rem)] w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 overflow-y-auto rounded-xl bg-popover p-4 text-sm text-popover-foreground tactile-panel-lg duration-100 outline-none sm:max-w-sm data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
           className
         )}
         {...props}

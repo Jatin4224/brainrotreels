@@ -84,7 +84,7 @@ export function MotionGallery() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-end gap-4 rounded-lg border bg-card p-4">
+      <div className="tactile-raised flex flex-wrap items-end gap-4 rounded-lg border bg-card p-4">
         <Field label="Aspect">
           {/* The Select's `onValueChange` can report null (a cleared
               selection), which none of these three controls offers — so the

@@ -169,7 +169,7 @@ export function TimelineEditor({ projectId }: { projectId: string }) {
                   inputProps={{ doc: editor.doc, assets: editor.assets }}
                   controls
                   acknowledgeRemotionLicense
-                  className="overflow-hidden rounded-lg border border-border bg-card"
+                  className="tactile-raised overflow-hidden rounded-lg border border-border bg-card"
                   style={{
                     width: "100%",
                     aspectRatio: `${composition.width} / ${composition.height}`,
@@ -258,7 +258,7 @@ function EditorToolbar({
   projectId: string;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-card p-2">
+    <div className="tactile-raised flex flex-wrap items-center gap-2 rounded-lg border border-border bg-card p-2">
       <AddMediaButton
         doc={doc}
         playhead={editor.playhead}

@@ -4,7 +4,7 @@
 
 /**
  * SOURCE OF TRUTH KEYWORDS: SignUpPage, AUTH_SURFACE, AuthHero, AuthShowcase,
- *   AuthModeNav, RETURN_TO_AFTER_AUTH, OPEN_REDIRECT_GUARD
+ *   AUTH_MOBILE_TAG, RETURN_TO_AFTER_AUTH, OPEN_REDIRECT_GUARD
  *
  * WHAT:  /sign-up route — the split auth screen in sign-up mode. Hidden
  *        behind the proxy.ts redirect when REGISTRATION_OPEN=false, so
@@ -19,10 +19,9 @@ import type { Metadata } from "next";
 import {
   AuthForm,
   AuthHero,
-  AuthModeNav,
   AuthShell,
   AuthShowcase,
-  AUTH_SHOWCASE_COPY,
+  AUTH_MOBILE_TAG,
 } from "@/components/global/auth";
 import { resolveAuthCallback } from "@/lib/config";
 
@@ -44,12 +43,8 @@ export default async function SignUpPage({
   const destination = resolveAuthCallback(callbackURL);
 
   return (
-    <AuthShell
-      headerTag={AUTH_SHOWCASE_COPY.renderedBadgeShort}
-      headerEnd={<AuthModeNav mode="sign-up" callbackURL={destination} />}
-      aside={<AuthShowcase />}
-    >
-      <AuthHero mode="sign-up" className="mb-8 lg:mb-10" />
+    <AuthShell headerTag={AUTH_MOBILE_TAG} aside={<AuthShowcase />}>
+      <AuthHero mode="sign-up" className="mb-7" />
       <AuthForm
         mode="sign-up"
         {...(destination ? { callbackURL: destination } : {})}

@@ -41,6 +41,7 @@ import { trpc } from "@/trpc/react-provider";
 import { PIPELINE_STAGE_LABELS } from "@/lib/types/pipeline";
 import { cn } from "@/lib/utils";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -54,6 +55,14 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 /* The windows an operator actually asks for. A free-form range would need a
  * date picker and answer no question this console is for. */
+/* SOURCE OF TRUTH KEYWORDS: STAGE_FAILURE_ALERT_RATE
+ * The failure rate at which a pipeline stage stops being background noise and
+ * starts being something an operator should act on. A NAMED constant for the
+ * same reason usage-meter names NEARLY_FULL_THRESHOLD: a bare 0.1 buried in a
+ * ternary is a business rule nobody can find, and the first person to disagree
+ * with it will change one of the two places it appears. */
+const STAGE_FAILURE_ALERT_RATE = 0.1;
+
 const WINDOWS = [
   { value: "1", label: "Last 24 hours" },
   { value: "7", label: "Last 7 days" },
@@ -225,17 +234,17 @@ export function VideoOpsConsole() {
                 <span className="w-44 shrink-0 text-sm">
                   {PIPELINE_STAGE_LABELS[stage.stage].label}
                 </span>
-                <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
-                  <div
-                    className={cn(
-                      "h-full rounded-full",
-                      stage.failureRate > 0.1
-                        ? "bg-destructive"
-                        : "bg-primary",
-                    )}
-                    style={{ width: `${Math.min(stage.failureRate * 100, 100)}%` }}
-                  />
-                </div>
+                <Progress
+                  value={Math.min(stage.failureRate * 100, 100)}
+                  size="lg"
+                  className="w-auto flex-1"
+                  label={`${PIPELINE_STAGE_LABELS[stage.stage].label} failure rate`}
+                  indicatorClassName={cn(
+                    stage.failureRate > STAGE_FAILURE_ALERT_RATE
+                      ? "bg-destructive"
+                      : "bg-primary",
+                  )}
+                />
                 <span className="w-28 shrink-0 text-right text-xs text-muted-foreground tabular-nums">
                   {stage.attempts === 0
                     ? "not run"

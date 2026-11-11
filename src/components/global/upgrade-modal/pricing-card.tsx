@@ -6,23 +6,23 @@
 
 /**
  * SOURCE OF TRUTH KEYWORDS: PricingCard, PricingCardProps, PriceDisplay,
- *   PLAN_FEATURE_COPY, AvailablePlan, PlanFeatureRow, PRICING_NOISE_FILTER
+ * PLAN_FEATURE_COPY, AvailablePlan, PlanFeatureRow, PRICING_NOISE_FILTER
  *
- * WHAT:  One plan's card — name, description, state badges, price, CTA, and the
- *        registry-derived feature checklist.
- * WHY:   Flat and square by design: the card is a CELL of the dashed pricing
- *        grid, so its own rounding would fight the frame. Selection is what
- *        rounds it — the active card paints a rounded card surface plus a
- *        bottom-up gradient over the dashes, which is how it lifts out of the
- *        grid without the layout moving.
- *        PLAN_FEATURE_COPY: every line in the checklist comes from
- *        getPlanFeatureRows, so a resource added to RESOURCES appears on every
- *        card automatically and no plan can advertise something the gates would
- *        refuse. Rows the plan does NOT include stay visible but dimmed — the
- *        gap between tiers is the reason someone is on this screen.
- *        Prices arrive pre-formatted (`priceDisplay`) because the trial /
- *        yearly-equivalent wording depends on state the parent owns; the card
- *        renders, it does not decide.
+ * WHAT: One plan's card — name, description, state badges, price, CTA, and the
+ * registry-derived feature checklist.
+ * WHY: Flat and square by design: the card is a CELL of the dashed pricing
+ * grid, so its own rounding would fight the frame. Selection is what
+ * rounds it — the active card paints a rounded card surface plus a
+ * bottom-up gradient over the dashes, which is how it lifts out of the
+ * grid without the layout moving.
+ * PLAN_FEATURE_COPY: every line in the checklist comes from
+ * getPlanFeatureRows, so a resource added to RESOURCES appears on every
+ * card automatically and no plan can advertise something the gates would
+ * refuse. Rows the plan does NOT include stay visible but dimmed — the
+ * gap between tiers is the reason someone is on this screen.
+ * Prices arrive pre-formatted (`priceDisplay`) because the trial /
+ * yearly-equivalent wording depends on state the parent owns; the card
+ * renders, it does not decide.
  * WHERE: Rendered per plan by <UpgradeContent /> inside <PricingGridFrame />.
  */
 
@@ -65,6 +65,10 @@ export interface PricingCardProps {
   onSelect: () => void;
   /** Selects it AND moves to the payment step. */
   onProceed: () => void;
+  /** ROVING_TABINDEX — true for the one card that owns the group's tab stop. */
+  tabbable: boolean;
+  /** Ref callback from useRovingRadioGroup, so arrow keys can focus this card. */
+  registerRef: (element: HTMLElement | null) => void;
 }
 
 export function PricingCard({
@@ -80,6 +84,8 @@ export function PricingCard({
   savings,
   onSelect,
   onProceed,
+  tabbable,
+  registerRef,
 }: PricingCardProps) {
   const hasTrial = plan.trialDays > 0;
   /* The free tier is never bought, and the plan you already pay for is not a
@@ -87,15 +93,45 @@ export function PricingCard({
   const canProceed = !plan.isFree && !(isCurrentPlan && !isCurrentlyOnTrial);
 
   return (
+    /**
+     * SOURCE OF TRUTH KEYWORDS: CARD_IS_A_RADIO, ROVING_TABINDEX,
+     * RADIO_WITH_ONE_ACTION
+     *
+     * The card was a bare `<div onClick>`: no role, no tab stop, no key
+     * handler and no focus ring, so the plan grid — the app's checkout — could
+     * not be operated from a keyboard at all. It is a single choice among
+     * several, so it is a `radio` in the grid's `radiogroup` rather than a
+     * button, which is what makes a screen reader announce "2 of 4" and the
+     * arrow keys move between plans.
+     *
+     * RADIO_WITH_ONE_ACTION, stated because it is a known imperfection: a
+     * radio should not contain focusable descendants, and this one holds its
+     * CTA. The alternatives are worse — a visually-hidden <input> + <label>
+     * needs the CTA lifted out of the card's middle, which is a redesign — and
+     * the CTA already stops propagation so the two never fire together. Zero
+     * keyboard access was the larger defect.
+     */
     <div
+      ref={registerRef}
+      role="radio"
+      aria-checked={isSelected}
+      aria-label={`${plan.name} plan`}
+      tabIndex={tabbable ? 0 : -1}
       onClick={onSelect}
-      className="relative flex h-full cursor-pointer flex-col"
+      onKeyDown={(event) => {
+        /* Enter and Space select. Arrow keys belong to the GROUP, which owns
+         * the roving tab stop, so they are deliberately not handled here. */
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        onSelect();
+      }}
+      className="relative flex h-full cursor-pointer flex-col outline-none focus-ring"
     >
       {isSelected ? (
         <>
           {/* Solid rounded surface — covers the dashed cell edges so the
               selected card reads as one object lifted off the grid. */}
-          <div className="absolute -inset-px z-0 rounded-2xl border border-border bg-card" />
+          <div className="tactile-raised absolute -inset-px z-0 rounded-2xl border border-border bg-card" />
           {/* Bottom-up glow + grain. Pointer-events off so the whole card stays
               clickable through it. */}
           <div className="pointer-events-none absolute -inset-px z-1 overflow-hidden rounded-2xl">
@@ -234,10 +270,10 @@ export function PricingCard({
 /**
  * SOURCE OF TRUTH KEYWORDS: PRICING_NOISE_FILTER, pricing-noise
  *
- * WHAT:  The SVG turbulence filter the selected card's glow references by id.
- * WHY:   A filter has to exist in the document for `url(#pricing-noise)` to
- *        resolve, and defining it once — rather than inside each card — keeps
- *        one definition no matter how many plans render.
+ * WHAT: The SVG turbulence filter the selected card's glow references by id.
+ * WHY: A filter has to exist in the document for `url(#pricing-noise)` to
+ * resolve, and defining it once — rather than inside each card — keeps
+ * one definition no matter how many plans render.
  * WHERE: Rendered once by <UpgradeContent />; referenced by PricingCard above.
  */
 export function PricingNoiseFilter() {

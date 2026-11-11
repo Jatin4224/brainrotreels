@@ -110,9 +110,19 @@ const ASPECT_LABEL: Readonly<Record<(typeof ASPECT_RATIOS)[number], string>> = {
 export function CreateProjectSheetContent({
   organizationId,
   onClose,
+  initialKind = "reddit-story",
 }: {
   organizationId: string;
   onClose: () => void;
+  /**
+   * PRESELECTED_FORMAT. The dashboard home is a format PICKER — by the time
+   * this sheet opens the customer has already answered "which format", and
+   * asking again in the first field is what makes a picker feel decorative.
+   * Defaulted, so the projects page (which opens the sheet with no format in
+   * mind) is unchanged. The select stays enabled either way: a preselection
+   * is a head start, not a lock.
+   */
+  initialKind?: (typeof CREATABLE_PROJECT_KINDS)[number];
 }) {
   const router = useRouter();
   const utils = trpc.useUtils();
@@ -125,7 +135,7 @@ export function CreateProjectSheetContent({
     defaultValues: {
       organizationId,
       title: "",
-      kind: "reddit-story",
+      kind: initialKind,
       aspect: "9:16",
       sourceRef: "",
     },

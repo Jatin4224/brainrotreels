@@ -70,6 +70,7 @@ import {
   type RenderStatus,
 } from "@/lib/types";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -375,15 +376,15 @@ export function RenderPanel({ projectId }: { projectId: string }) {
 
             {isRunning(latest.status) ? (
               <div className="flex flex-col gap-1">
-                {/* A plain bar rather than a component import — this is the one
-                    progress indicator in the app, and a shared component for a
-                    single caller is the duplication rule applied backwards. */}
-                <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
-                  <div
-                    className="h-full rounded-full bg-primary transition-all"
-                    style={{ width: `${Math.round(latest.progress * 100)}%` }}
-                  />
-                </div>
+                {/* This carried a comment calling itself "the one progress
+                    indicator in the app", which had stopped being true four
+                    copies ago. It is also the bar that had no
+                    role="progressbar" — the longest render in the product,
+                    silent to a screen reader. */}
+                <Progress
+                  value={Math.round(latest.progress * 100)}
+                  label="Render progress"
+                />
                 <p className="text-xs text-muted-foreground">
                   {Math.round(latest.progress * 100)}% · this can take a few
                   minutes

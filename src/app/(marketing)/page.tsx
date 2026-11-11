@@ -140,23 +140,14 @@ export default function LandingPage() {
                   uses. This is the one place the headline has to out-shout a
                   full-colour illustration beside it, and a 400-weight face at
                   this size loses that fight. */}
-              <h1 className="font-display text-5xl font-extrabold leading-[0.95] tracking-tight text-foreground md:text-6xl">
-                {HERO_COPY.headlineBefore}{" "}
-                <span className="relative inline-block px-3 py-0.5">
-                  {/* HIGHLIGHT_IS_A_BLOCK — a tilted yellow solid behind one
-                      word, sized from the word so a rewrite cannot leave it
-                      the wrong width. Decoration, hidden from assistive tech;
-                      the sentence still reads as one sentence. */}
-                  <span
-                    aria-hidden="true"
-                    className="brand-highlight absolute inset-0 rounded-md"
-                  />
-                  <span className="relative text-brand-accent-foreground">
-                    {HERO_COPY.headlineHighlight}
-                  </span>
-                </span>{" "}
-                {HERO_COPY.headlineAfter}
-              </h1>
+              {/* HIGHLIGHT_IS_A_BLOCK — see the component for why the block
+                  is sized from the word and hidden from assistive tech. */}
+              <HighlightHeading
+                before={HERO_COPY.headlineBefore}
+                highlight={HERO_COPY.headlineHighlight}
+                after={HERO_COPY.headlineAfter}
+                className="font-display text-5xl font-extrabold leading-[0.95] tracking-tight text-foreground md:text-6xl"
+              />
 
               {/* THE_LEAD_IS_NOT_THE_TAGLINE — page-owned prose, because this
                   sentence names the four inputs and the six jobs, which is

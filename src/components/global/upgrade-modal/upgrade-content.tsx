@@ -6,32 +6,32 @@
 
 /**
  * SOURCE OF TRUTH KEYWORDS: UpgradeContent, UpgradeContentProps, UpgradeStep,
- *   UserScenario, UPGRADE_COPY_FROM_REGISTRY, DOWNGRADE_REQUIRES_CLEANUP,
- *   PRICES_LIVE_IN_STRIPE, PricingCard, FeatureComparisonTable
+ * UserScenario, UPGRADE_COPY_FROM_REGISTRY, DOWNGRADE_REQUIRES_CLEANUP,
+ * PRICES_LIVE_IN_STRIPE, PricingCard, FeatureComparisonTable
  *
- * WHAT:  The whole upgrade experience as an embeddable component — pick a plan
- *        (pricing grid + comparison table), pay (interval + card), celebrate.
- * WHY:   Separated from the Dialog shell so the same three-step flow can be
- *        dropped into a page, a settings tab, or an onboarding step without a
- *        modal around it. Every number it renders is derived, never written
- *        here: caps and features from RESOURCES, plan identity and trial length
- *        from PLANS, amounts from the billing provider, entitlement state from
- *        usage.getFeatureGates. The file names no plan and no resource.
- *        UPGRADE_COPY_FROM_REGISTRY: when a gate is what opened this, the
- *        resource's own upgrade sentence is shown at the top and its row is
- *        highlighted in the comparison table — the user is told what THEY hit,
- *        not a generic "upgrade for more".
- *        DOWNGRADE_REQUIRES_CLEANUP: a plan the organization is currently too
- *        big for is marked on its card and refused at the payment step, with the
- *        exact rows to reduce. The server refuses it too — this is the
- *        affordance, not the boundary.
- *        Which mutation runs is a consequence of state, not of a second UI:
- *        no subscription yet → createSubscription (trial-aware), an existing one
- *        → upgradeOrganization (prorated). Both already enforce their own
- *        permissions server-side; the UI mirrors them so a member who cannot buy
- *        is told who can instead of being handed a button that will fail.
+ * WHAT: The whole upgrade experience as an embeddable component — pick a plan
+ * (pricing grid + comparison table), pay (interval + card), celebrate.
+ * WHY: Separated from the Dialog shell so the same three-step flow can be
+ * dropped into a page, a settings tab, or an onboarding step without a
+ * modal around it. Every number it renders is derived, never written
+ * here: caps and features from RESOURCES, plan identity and trial length
+ * from PLANS, amounts from the billing provider, entitlement state from
+ * usage.getFeatureGates. The file names no plan and no resource.
+ * UPGRADE_COPY_FROM_REGISTRY: when a gate is what opened this, the
+ * resource's own upgrade sentence is shown at the top and its row is
+ * highlighted in the comparison table — the user is told what THEY hit,
+ * not a generic "upgrade for more".
+ * DOWNGRADE_REQUIRES_CLEANUP: a plan the organization is currently too
+ * big for is marked on its card and refused at the payment step, with the
+ * exact rows to reduce. The server refuses it too — this is the
+ * affordance, not the boundary.
+ * Which mutation runs is a consequence of state, not of a second UI:
+ * no subscription yet → createSubscription (trial-aware), an existing one
+ * → upgradeOrganization (prorated). Both already enforce their own
+ * permissions server-side; the UI mirrors them so a member who cannot buy
+ * is told who can instead of being handed a button that will fail.
  * WHERE: Rendered by <UpgradeModal />, which the root-level
- *        <UpgradeModalProvider /> mounts once for the whole app.
+ * <UpgradeModalProvider /> mounts once for the whole app.
  */
 
 import * as React from "react";
@@ -60,6 +60,7 @@ import {
 } from "@/lib/config";
 import { getPlanFeatureRows, type ResourceKey } from "@/lib/resources";
 import {
+  billingIntervalSchema,
   isPurchasablePlan,
   type AvailablePlan,
   type PurchasablePlanKey,
@@ -71,7 +72,9 @@ import {
   AddPaymentMethodDialog,
   PaymentMethodOption,
 } from "@/components/global/billing";
+import { useRovingRadioGroup } from "@/hooks/use-roving-radiogroup";
 import { UsageLimitList } from "@/components/global/usage-limit-list";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -237,6 +240,13 @@ export function UpgradeContent({
   }, [currentTier, isCurrentlyOnTrial]);
   const selectedPlan = planOverride ?? defaultPlan;
 
+  /* ROVING_TABINDEX for the plan grid — one tab stop, arrow keys between
+   * cards. See src/hooks/use-roving-radiogroup.ts. */
+  const planRoving = useRovingRadioGroup({
+    ids: React.useMemo(() => plans.map((plan) => plan.key), [plans]),
+    selectedId: selectedPlan,
+  });
+
   /* Charge the card the customer already pays with unless they pick another. */
   const paymentMethodId =
     cardOverride ??
@@ -388,7 +398,7 @@ export function UpgradeContent({
           <button
             type="button"
             onClick={onClose}
-            className="absolute top-4 right-4 z-20 flex size-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            className="absolute top-4 right-4 z-20 flex size-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground outline-none focus-ring"
             aria-label="Close"
           >
             <XIcon className="size-4" />
@@ -412,7 +422,7 @@ export function UpgradeContent({
                   own text so a short message stays a short chip, and it carries
                   the lock that names the thing that stopped them. */}
               {upgradeMessage ? (
-                <div className="mb-5 flex max-w-full items-center gap-2.5 rounded-full border border-border/70 bg-card/80 py-1.5 pr-5 pl-1.5 shadow-sm">
+                <div className="tactile-raised mb-5 flex max-w-full items-center gap-2.5 rounded-full border border-border/70 bg-card/80 py-1.5 pr-5 pl-1.5">
                   <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary/10">
                     <LockIcon className="size-3.5 text-primary" />
                   </span>
@@ -442,28 +452,43 @@ export function UpgradeContent({
                 )}
               </div>
 
-              <div className="mb-8 inline-flex items-center rounded-full border border-border/50 bg-muted/50 p-1 sm:mb-10">
-                {(["monthly", "yearly"] as const).map((interval) => (
-                  <button
-                    key={interval}
-                    type="button"
-                    onClick={() => setBillingInterval(interval)}
-                    className={cn(
-                      "flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium capitalize transition-all",
-                      billingInterval === interval
-                        ? "bg-background text-foreground shadow-sm"
-                        : "text-muted-foreground hover:text-foreground",
-                    )}
-                  >
-                    {interval}
-                    {interval === "yearly" && maxSavings > 0 ? (
-                      <span className="text-xs font-semibold text-success">
-                        -{maxSavings}%
-                      </span>
-                    ) : null}
-                  </button>
-                ))}
-              </div>
+              {/* SOURCE OF TRUTH KEYWORDS: INTERVAL_IS_A_TAB_LIST,
+                  SEGMENTED_CONTROL_IS_TABS
+                  This was a hand-rolled segmented control: a div with
+                  `tactile-track` and two buttons, the active one painted with
+                  `tactile-raised`. That is <TabsList> + <TabsTrigger>,
+                  re-implemented — and the copy had drifted, because
+                  `.tactile-raised` is the STATELESS utility while the
+                  primitive uses `.tactile-control`, so this pill's lit edge
+                  was drawn at a different strength (--tactile-sheen-soft) than
+                  every other active tab in the product. It also announced
+                  nothing: no selected state and no arrow-key navigation.
+                  The primitive brings all three for free. */}
+              <Tabs
+                value={billingInterval}
+                onValueChange={(value) => {
+                  const next = billingIntervalSchema.safeParse(value);
+                  if (next.success) setBillingInterval(next.data);
+                }}
+                className="mb-8 sm:mb-10"
+              >
+                <TabsList className="rounded-full">
+                  {(["monthly", "yearly"] as const).map((interval) => (
+                    <TabsTrigger
+                      key={interval}
+                      value={interval}
+                      className="gap-1.5 rounded-full px-4 capitalize"
+                    >
+                      {interval}
+                      {interval === "yearly" && maxSavings > 0 ? (
+                        <span className="text-xs font-semibold text-success">
+                          -{maxSavings}%
+                        </span>
+                      ) : null}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+              </Tabs>
 
               <AnimatePresence mode="wait">
                 {plansQuery.isPending ? (
@@ -511,6 +536,12 @@ export function UpgradeContent({
 
                     <PricingGridFrame columns={plans.length}>
                       <div
+                        /* RADIOGROUP_NOT_A_LIST_OF_BUTTONS — the plans are one
+                           choice, so the group names itself and owns the arrow
+                           keys while each card owns its own checked state. */
+                        role="radiogroup"
+                        aria-label="Choose a plan"
+                        onKeyDown={planRoving.handleKeyDown}
                         className={cn(
                           "grid w-full grid-cols-1 gap-0 sm:grid-cols-2",
                           /* Wrapping to a second row is the correct answer on a
@@ -541,6 +572,8 @@ export function UpgradeContent({
                               )}
                               billingInterval={billingInterval}
                               savings={calculateSavings(plan)}
+                              tabbable={planRoving.activeId === plan.key}
+                              registerRef={planRoving.registerRef(plan.key)}
                               onSelect={() => setPlanOverride(plan.key)}
                               onProceed={() => {
                                 setPlanOverride(plan.key);
@@ -651,9 +684,9 @@ export function UpgradeContent({
                               aria-checked={selected}
                               onClick={() => setBillingInterval(interval)}
                               className={cn(
-                                "relative flex flex-col items-center justify-between rounded-2xl border bg-card p-4 transition-all duration-200",
+                                "tactile-control relative flex flex-col items-center justify-between rounded-2xl border bg-card p-4 transition-all duration-200 outline-none focus-ring",
                                 selected
-                                  ? "border-primary/60 shadow-lg"
+                                  ? "border-primary/60"
                                   : "border-border/50 hover:border-primary/30",
                               )}
                             >
@@ -836,10 +869,10 @@ export function UpgradeContent({
 /**
  * SOURCE OF TRUTH KEYWORDS: resolveScenario, UserScenario
  *
- * WHAT:  Which of the six situations the viewer is in.
- * WHY:   Pure function of state the caller already has, so the copy, the CTA and
- *        the success wording all follow one decision instead of three
- *        independent ternaries drifting apart in the JSX.
+ * WHAT: Which of the six situations the viewer is in.
+ * WHY: Pure function of state the caller already has, so the copy, the CTA and
+ * the success wording all follow one decision instead of three
+ * independent ternaries drifting apart in the JSX.
  * WHERE: <UpgradeContent /> above.
  */
 function resolveScenario(input: {
@@ -880,12 +913,12 @@ function getPreviousPlanName(plan: PlanKey): string | null {
 /**
  * SOURCE OF TRUTH KEYWORDS: getPriceDisplay, PriceDisplay, PRICES_LIVE_IN_STRIPE
  *
- * WHAT:  The two lines of a card's price block for the chosen interval.
- * WHY:   Three facts collapse into one headline — the amount, whether a trial
- *        delays it, and that a yearly price is quoted per month. Deciding that
- *        once here is what keeps <PricingCard /> a renderer. A missing amount
- *        renders as an em dash rather than "$NaN": a plan whose price id isn't
- *        configured yet must still show what it INCLUDES.
+ * WHAT: The two lines of a card's price block for the chosen interval.
+ * WHY: Three facts collapse into one headline — the amount, whether a trial
+ * delays it, and that a yearly price is quoted per month. Deciding that
+ * once here is what keeps <PricingCard /> a renderer. A missing amount
+ * renders as an em dash rather than "$NaN": a plan whose price id isn't
+ * configured yet must still show what it INCLUDES.
  * WHERE: <UpgradeContent /> above.
  */
 function getPriceDisplay(
@@ -952,15 +985,15 @@ function getIntervalPrice(
 
 /**
  * SOURCE OF TRUTH KEYWORDS: submitPlanChange, createSubscription,
- *   upgradeOrganization, setDefaultPaymentMethod
+ * upgradeOrganization, setDefaultPaymentMethod
  *
- * WHAT:  Runs the right billing mutation for the organization's current state.
- * WHY:   There is no "change plan" endpoint that covers both cases, and there
- *        shouldn't be: a first subscription needs a card attached and is
- *        trial-eligible, while a change to an existing one is a prorated price
- *        swap on a subscription that already has a card. Choosing between them
- *        HERE keeps that branch out of the JSX, and picking a non-default card
- *        promotes it first so the renewal charges what the user just chose.
+ * WHAT: Runs the right billing mutation for the organization's current state.
+ * WHY: There is no "change plan" endpoint that covers both cases, and there
+ * shouldn't be: a first subscription needs a card attached and is
+ * trial-eligible, while a change to an existing one is a prorated price
+ * swap on a subscription that already has a card. Choosing between them
+ * HERE keeps that branch out of the JSX, and picking a non-default card
+ * promotes it first so the renewal charges what the user just chose.
  * WHERE: handlePurchase in <UpgradeContent />.
  */
 async function submitPlanChange(input: {

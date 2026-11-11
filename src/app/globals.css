@@ -317,7 +317,7 @@ html:has([data-app-banner]) {
   /* One step ABOVE --card: the hero's input shell and the cards that sit on
      top of another card. The app palette has no such step because the product
      never stacks two surfaces; the landing page does, constantly. */
-  --surface-raised: oklch(0.213 0.009 265);
+  --surface-raised: oklch(0.244 0.0159 269);
 }
 
 @theme inline {
@@ -344,14 +344,14 @@ html:has([data-app-banner]) {
      this page knows there are two palettes, and nothing in the product shifts
      by a pixel. */
   .marketing-canvas {
-    --background: oklch(0.141 0.012 266);
-    --foreground: oklch(0.968 0.002 85);
-    --card: oklch(0.181 0.009 266);
-    --card-foreground: oklch(0.968 0.002 85);
-    --muted: oklch(0.213 0.009 265);
+    --background: oklch(0.1598 0.0132 270.5);
+    --foreground: oklch(0.9693 0.004 106.5);
+    --card: oklch(0.2052 0.0123 270.8);
+    --card-foreground: oklch(0.9693 0.004 106.5);
+    --muted: oklch(0.244 0.0159 269);
     --muted-foreground: oklch(0.654 0.008 70);
-    --secondary: oklch(0.213 0.009 265);
-    --border: oklch(0.226 0.009 265);
+    --secondary: oklch(0.244 0.0159 269);
+    --border: oklch(0.2524 0.0158 269);
     --input: oklch(0.226 0.009 265);
     /* The filled-heart red on the phone mockups' action rail. A FIXED signal
        colour like --alert-banner, not a themed one: it is part of a simulated
@@ -508,6 +508,29 @@ html:has([data-app-banner]) {
  *        Every animation stops under `prefers-reduced-motion`: the phone then
  *        shows the first short, still, with the thumb resting. Nothing is
  *        hidden, so the composition is unchanged. */
+/* SOURCE OF TRUTH KEYWORDS: --overlay, SCRIM_IS_A_TOKEN, DialogOverlay,
+ * SheetOverlay, AlertDialogOverlay
+ *
+ * WHAT:  The wash behind a modal surface.
+ * WHY:   It was `bg-black/10` typed into three primitives — a raw colour, so
+ *        it could never follow the theme, and at 10% over this product's
+ *        near-black page it dimmed nothing: the dialog read as floating over a
+ *        page that still looked live and clickable. A scrim's whole job is to
+ *        say the thing behind it is inert.
+ *
+ *        Pinned across themes like --alert-banner and --success: a scrim is a
+ *        function of "there is a modal above this", not of the palette. Paired
+ *        with the `backdrop-blur-xs` the overlays already carry.
+ * WHERE: dialog.tsx, alert-dialog.tsx and sheet.tsx, as `bg-overlay`. */
+:root,
+.dark {
+  --overlay: oklch(0 0 0 / 0.5);
+}
+
+@theme inline {
+  --color-overlay: var(--overlay);
+}
+
 :root,
 .dark {
   --hand-skin: oklch(0.82 0.056 59);
@@ -617,15 +640,116 @@ html:has([data-app-banner]) {
   }
 }
 
+/* SOURCE OF TRUTH KEYWORDS: FOCUS_IS_AN_OUTLINE, focus-ring, focus-ring-inset,
+ * ONE_FOCUS_AFFORDANCE, OUTLINE_COMPOSES_SHADOW_REPLACES, --ring, TACTILE_UI
+ *
+ * WHAT:  The product's single focus indicator, as a utility: a 2px solid ring
+ *        in `--ring`, offset 2px, plus the invalid-state colouring.
+ *
+ * WHY:   OUTLINE_COMPOSES_SHADOW_REPLACES. Focus used to be `ring-*`, which is
+ *        a BOX-SHADOW. So is every tactile surface in this file. box-shadow is
+ *        a single property, so focusing a button, a checked checkbox, the
+ *        active tab or the current nav row REPLACED its depth with the ring —
+ *        the element flattened for exactly as long as it was focused. Two
+ *        cases were worse than cosmetic: Base UI activates a tab on arrow-key
+ *        focus, so the active tab was flat for the whole keyboard interaction,
+ *        and `aria-invalid` flattened a field at rest, i.e. precisely while
+ *        somebody was looking at the error. `outline` is a separate property
+ *        and composes with any shadow, so the depth survives.
+ *
+ *        IT IS AN `@utility`, NOT A COMPONENT CLASS, for the same reason the
+ *        tactile family had to stop fighting utilities: a component-layer rule
+ *        loses to the `outline-none` these elements already carry. As a
+ *        utility whose body is nested under `&:focus-visible`, it is (0,2,0)
+ *        against `outline-none`'s (0,1,0) and wins on SPECIFICITY rather than
+ *        on source order, which is the only way to be sure.
+ *
+ *        It writes the `outline` SHORTHAND deliberately. Tailwind's own
+ *        `outline-2` sets `outline-style: var(--tw-outline-style)`, and
+ *        `outline-none` sets that variable to `none` — so the obvious
+ *        conversion, `focus-visible:outline-2`, renders NOTHING on any element
+ *        that also has `outline-none`. Which is most of them.
+ *
+ *        ONE_FOCUS_AFFORDANCE: the product previously mixed `ring-3`, `ring-2`
+ *        and `ring-[3px]`, and some interactive surfaces had none at all. One
+ *        name means one look, and the width is set here rather than per call
+ *        site.
+ *
+ *        `focus-ring-inset` is the same indicator drawn INSIDE the element,
+ *        for anything whose parent clips it — a table row, a tile in a
+ *        scrolling grid. An outline is clipped by `overflow-hidden` exactly as
+ *        a ring was.
+ * WHERE: Every interactive element in src/components/ui, src/components/global
+ *        and the dashboard routes. Replaces `focus-visible:ring-*`,
+ *        `focus-visible:border-ring` and `aria-invalid:ring-*`. */
+@utility focus-ring {
+  /* Invalid at REST: the error has to be visible before the field is focused.
+     Softened, because this one is always on screen. */
+  &[aria-invalid="true"] {
+    outline: 2px solid color-mix(in srgb, var(--destructive) 45%, transparent);
+    outline-offset: 2px;
+  }
+
+  /* The colour is a VARIABLE so a variant can repoint it without fighting
+     this rule for the `outline` property. A destructive button sets
+     `[--focus-ring-color:var(--destructive)]`, which is a plain custom
+     property with no state and no specificity contest — the alternative, a
+     second `outline-color` utility, ties at (0,2,0) and is decided by
+     source order, which is not something to rely on. */
+  &:focus-visible {
+    outline: 2px solid var(--focus-ring-color, var(--ring));
+    outline-offset: 2px;
+  }
+
+  /* Both at once — (0,3,0), so it beats either rule above whatever the order. */
+  &[aria-invalid="true"]:focus-visible {
+    outline: 2px solid var(--destructive);
+    outline-offset: 2px;
+  }
+}
+
+/* For a SHELL that owns the focus look on behalf of a field nested inside
+   it — the composer card, the hero prompt card. The inner field opts out with
+   `focus-visible:outline-none!`, and the shell lights up instead, which is
+   what those components always intended; before this there was no rule to
+   carry that intent, so the field simply had no focus indicator at all. */
+@utility focus-ring-within {
+  &:focus-within {
+    outline: 2px solid var(--focus-ring-color, var(--ring));
+    outline-offset: 2px;
+  }
+}
+
+@utility focus-ring-inset {
+  &:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: -2px;
+  }
+}
+
 /* SOURCE OF TRUTH KEYWORDS: TACTILE_UI, tactile-primary, tactile-surface,
- * tactile-field, tactile-inlay, --tactile-sheen, --tactile-shade,
- * --tactile-glow, --tactile-inset, SOFT_SKEUOMORPHISM, OVERLAY_NOT_COLOR,
- * design-buttons.md
+ * tactile-field, tactile-inlay, tactile-panel, tactile-raised, tactile-track,
+ * tactile-control, --tactile-sheen, --tactile-shade, --tactile-glow,
+ * --tactile-inset, SOFT_SKEUOMORPHISM, OVERLAY_NOT_COLOR, design-buttons.md
  *
  * WHAT:  The product surface depth language from design-buttons.md — a vertical
  *        gradient, an edge one step darker than the fill, a 1px inner top
- *        highlight and a soft shadow — as TOKENS plus four utilities that the
+ *        highlight and a soft shadow — as TOKENS plus NINE utilities that the
  *        shared primitives opt into.
+ *
+ *        THE WHOLE FAMILY, by what a surface IS rather than by what it looks
+ *        like, because picking the wrong one is the only way to get this wrong:
+ *          .tactile-primary  the one primary action per view (a wash over the
+ *                            caller's fill — see OVERLAY_NOT_COLOR)
+ *          .tactile-surface  an interactive raised control; owns hover + pressed
+ *          .tactile-inlay    a flat tinted fill that wants only the lit top edge
+ *          .tactile-field    something cut INTO the surface: an input, a select
+ *          .tactile-panel    a BORDERLESS elevated surface — card, popover,
+ *          -sm / -lg         dropdown, dialog. Draws its own hairline edge.
+ *          .tactile-raised   an elevated surface that ALREADY has a border, and
+ *                            stateless knobs. Same look, no second edge.
+ *          .tactile-track    the recessed channel a value travels along
+ *          .tactile-control  the "on" state of a small control. State only.
  *
  * WHY:   The marketing pages already own their own depth language
  *        (SOFT_BRUTALISM, the brutal-* utilities above). The product needed the
@@ -661,8 +785,19 @@ html:has([data-app-banner]) {
  *        colour-tinted glow of section 4.1 can set it locally; it defaults to
  *        neutral because CSS cannot read the fill a caller passed in.
  * WHERE: Consumed by the shared primitives in src/components/ui — button.tsx
- *        (default/outline/secondary), input.tsx, textarea.tsx, select.tsx and
- *        card.tsx. Available app-wide as plain utility classes. */
+ *        (default/outline/secondary), input.tsx, input-group.tsx, textarea.tsx,
+ *        select.tsx, card.tsx, checkbox.tsx, switch.tsx, tabs.tsx, badge.tsx,
+ *        alert.tsx, popover.tsx, dropdown-menu.tsx, dialog.tsx,
+ *        alert-dialog.tsx, tooltip.tsx and sidebar.tsx. Because the whole
+ *        product is built on those primitives, wiring them IS how the dashboard,
+ *        the project editor and the settings screens get the treatment — the
+ *        handful of surfaces that paint their own card or tile instead
+ *        (format-card, the pickers, the usage meters, the pricing cards) reach
+ *        for the matching utility by hand. Available app-wide as plain classes.
+ *
+ *        NOT the marketing or auth pages: those own SOFT_BRUTALISM and its
+ *        brutal-* family above, deliberately, and the two skin independently.
+ *        They still pick up every tactile primitive they render. */
 :root {
   /* How hard the wash lifts the top and shades the foot of a raised surface. */
   --tactile-sheen: 22%;
@@ -816,14 +951,288 @@ html:has([data-app-banner]) {
     box-shadow: var(--tactile-highlight-soft);
   }
 
-  /* Fields only. Held in its own utility so the focus ring the primitives
-     already declare is free to take the box-shadow back on :focus-visible. */
+  /* Fields only. It used to SURRENDER the inset on focus, because the focus
+     ring was a box-shadow and the two could not share the property — so a
+     field lost its recess for exactly as long as you were typing in it. Focus
+     is an outline now (see FOCUS_IS_AN_OUTLINE), which composes, so the recess
+     stays and the surrender rule is gone. */
   .tactile-field {
     box-shadow: var(--tactile-inset);
   }
 
-  .tactile-field:focus-visible,
-  .tactile-field:focus-within {
-    box-shadow: none;
+  /* SOURCE OF TRUTH KEYWORDS: tactile-panel, tactile-panel-sm, tactile-panel-lg,
+     PANEL_OWNS_ITS_EDGE, ONE_BOX_SHADOW_WINS
+     Every BORDERLESS elevated surface in the product: a card, a popover, a
+     dropdown, a select list, a dialog. Three sizes, mirroring the
+     brutal-shadow-sm/brutal-shadow/brutal-shadow-lg triple the marketing
+     surface already uses, so "how high does this float" is a choice between
+     named steps rather than a hand-written shadow per component.
+
+     EACH ONE DECLARES THE WHOLE STACK — lit top edge, hairline edge, ambient
+     shadow — and REPLACES the `shadow-md ring-1 ring-foreground/10` trio the
+     primitives carried. That is not tidying: `box-shadow` is a single
+     property, so a bare declaration in this layer is simply overwritten by any
+     `shadow-*` / `ring-*` utility on the same element (Tailwind v4 orders
+     utilities after components). Composing through the `--tw-*` shadow slots
+     would work but hands the edge back to per-component utility soup, which is
+     exactly what the tactile family exists to end. One class, one truth.
+
+     THE EDGE IS AN INSET RING for the same reason the button's is — see
+     THE_DARKER_EDGE_IS_AN_INSET_RING above — and it is drawn at
+     `--foreground 10%`, the weight the cards and popovers were already ringed
+     at, so nothing in the product changes thickness. */
+  .tactile-panel-sm,
+  .tactile-panel,
+  .tactile-panel-lg {
+    background-image: linear-gradient(
+      180deg,
+      color-mix(in srgb, white var(--tactile-sheen-soft), transparent) 0%,
+      transparent 55%
+    );
   }
+
+  .tactile-panel-sm {
+    box-shadow:
+      var(--tactile-highlight-soft),
+      inset 0 0 0 1px color-mix(in oklab, var(--foreground) 10%, transparent),
+      var(--shadow-sm);
+  }
+
+  .tactile-panel {
+    box-shadow:
+      var(--tactile-highlight-soft),
+      inset 0 0 0 1px color-mix(in oklab, var(--foreground) 10%, transparent),
+      var(--shadow-md);
+  }
+
+  .tactile-panel-lg {
+    box-shadow:
+      var(--tactile-highlight-soft),
+      inset 0 0 0 1px color-mix(in oklab, var(--foreground) 10%, transparent),
+      var(--shadow-lg);
+  }
+
+  /* SOURCE OF TRUTH KEYWORDS: tactile-raised, BORDER_IS_THE_CALLERS
+     The counterpart to `.tactile-panel` for a surface that ALREADY DRAWS ITS
+     OWN BORDER — a format card, an alert, a switch knob. It contributes the
+     wash, the lit top edge and a contact shadow, and deliberately no ring:
+     design-buttons.md section 1 allows ONE border per surface, and an inset
+     ring beside a real border reads as a double edge.
+
+     Stateless on purpose. `.tactile-surface` is the INTERACTIVE raised control
+     and owns hover and pressed; a knob that slides inside a switch, and a card
+     whose hover `brutal-hover` already owns, both want the look without the
+     states. */
+  .tactile-raised {
+    background-image: linear-gradient(
+      180deg,
+      color-mix(in srgb, white var(--tactile-sheen-soft), transparent) 0%,
+      transparent 55%,
+      color-mix(in srgb, black var(--tactile-shade-soft), transparent) 100%
+    );
+    box-shadow: var(--tactile-highlight-soft), var(--shadow-xs);
+  }
+
+  /* SOURCE OF TRUTH KEYWORDS: tactile-track, RECESS_IS_NOT_A_FIELD
+     The recessed channel a thing travels or sits inside: a tabs list, a usage
+     meter's groove, a render progress bar. Separate from `.tactile-field`
+     even though the inset is identical, because a field GIVES THE SHADOW BACK
+     on focus so its focus ring can own the box-shadow — and a tabs list
+     CONTAINS the focusable tab, so on `.tactile-field` the groove would vanish
+     the moment somebody tabbed into it. */
+  .tactile-track {
+    box-shadow: var(--tactile-inset);
+  }
+
+  /* SOURCE OF TRUTH KEYWORDS: tactile-control, ON_IS_RAISED, SELECTED_IS_RAISED
+     The "on" half of a small control — a checked checkbox, a flipped switch,
+     the active tab, the current nav row. STATE ONLY: it declares nothing in the
+     resting state, so it composes with whatever the control already is
+     (`.tactile-field` for a checkbox cut into the surface, nothing at all for a
+     nav row), and ONE class covers Base UI's `data-checked`, `data-active` and
+     `aria-selected` instead of each primitive restating the same look.
+
+     Specificity does the work: class+attribute outranks the plain
+     `.tactile-field` class, so the raised state wins over the recess with no
+     `!important` and no ordering trick. */
+  .tactile-control[data-checked],
+  .tactile-control[data-active],
+  .tactile-control[data-selected],
+  /* ANY aria-current value, not just "true". The spec's useful values are
+     words — "page", "step", "location" — and all three of this app's real
+     call sites emit "page". Matching only "true" made this branch dead
+     everywhere except the one component that had been written to satisfy it,
+     which is the wrong way round: the CSS should follow correct ARIA, not the
+     other way. "false" is excluded because it means NOT current. */
+  .tactile-control[aria-current]:not([aria-current="false"]),
+  .tactile-control[aria-checked="true"],
+  .tactile-control[aria-pressed="true"],
+  .tactile-control[aria-selected="true"] {
+    background-image: linear-gradient(
+      180deg,
+      color-mix(in srgb, white var(--tactile-sheen), transparent) 0%,
+      transparent 60%,
+      color-mix(in srgb, black var(--tactile-shade), transparent) 100%
+    );
+    box-shadow:
+      inset 0 1px 0 var(--tactile-edge-light),
+      inset 0 0 0 1px var(--tactile-edge-dark),
+      var(--shadow-xs);
+  }
+}
+
+/* SOURCE OF TRUTH KEYWORDS: app-canvas, APP_DESIGN_LANGUAGE, DASHBOARD_PALETTE,
+ * --border-strong, --foreground-2, --muted-foreground-2, --cat-explain,
+ * --cat-market, --cat-entertain, --cat-music, --badge-new, --pro,
+ * --primary-soft, TOKENS_NOT_HEX, ONE_PRODUCT_ONE_ORANGE
+ *
+ * WHAT:  The authenticated app's surface palette — the blue-tinted near-black
+ *        page, its four stacked surfaces, two border weights, four text
+ *        weights, the orange action colour and the category accents — from
+ *        00-dashboard-foundations.md §1.
+ *
+ * WHY:   It REDEFINES THE EXISTING TOKEN NAMES rather than inventing
+ *        `--app-bg` and friends, exactly as `.marketing-canvas` above does.
+ *        That is the whole trick: every component beneath keeps using plain
+ *        `bg-card` / `border-border` / `text-muted-foreground` / `bg-primary`
+ *        and simply comes out in the dashboard palette, so the spec is
+ *        delivered without editing a single Card, Button, Input or Table.
+ *        Scoped to a CLASS and not to `.dark`, so the marketing pages, the
+ *        auth screens and the render previews are untouched — the app had
+ *        exactly one palette before this, and the two must not fight.
+ *
+ *        ONE_PRODUCT_ONE_ORANGE. The spec samples the CTA at #E8603C and notes
+ *        it against auth's #FA5F29; its own header says to snap to the auth
+ *        tokens where they differ, so `--primary` here IS `--brand` — the
+ *        colour the landing page and the sign-in button already use. Two
+ *        oranges three pixels apart, one on the page you sign in from and one
+ *        on the page you land on, is a difference nobody can name and
+ *        everybody can feel.
+ *
+ *        THIS INVERTS AN EARLIER DECISION, deliberately. `--primary` was white
+ *        app-wide (MARKETING_DESIGN_LANGUAGE calls the product "deliberately
+ *        MONOCHROME — a workspace where the only coloured thing is the thing
+ *        you must act on"). The dashboard spec asks for an orange primary, and
+ *        the rule survives the change: the action colour is still reserved for
+ *        actions, and the four category accents below are the only other
+ *        colours, each carrying a meaning.
+ *
+ *        VALUES COME FROM THE DESIGN EXPORT, NOT FROM THE SAMPLED SPEC. An
+ *        earlier pass used the hex in 00-dashboard-foundations.md section 1,
+ *        which was eyedropped off a compressed screen recording and is stated
+ *        there as plus-or-minus 3. The Dash-Home export then arrived with the
+ *        real values, and they are the AUTH tokens exactly — #0B0D13,
+ *        #15171D, #1D2028, #1F222A, #2A2D36, #F5F5F2, #9B9891, #F2CF3B,
+ *        #FA5F29. The recording was a lossy copy of the auth palette all
+ *        along, which is what 00-foundations predicted when it said to snap
+ *        to the auth tokens. So these are no longer conversions of anything:
+ *        the surfaces below ARE the auth palette, and sign-in and the app are
+ *        one product by construction rather than by resemblance.
+ *
+ * WHERE: Applied by src/app/(dashboard)/layout.tsx to the shell wrapper.
+ *        Colour values come from the Dash-Home / DashSidebar design export,
+ *        cross-checked against auth-design.md section 2. */
+.app-canvas {
+  /* Surfaces, darkest to lightest: page → sidebar → cards/fields → raised.
+     The design has FEWER steps than the sampled spec did: one card colour
+     (#15171D) and one raised colour (#1D2028), not four. Collapsing them is
+     deliberate — the extra steps in the recording were compression.
+
+     ⚠ EVERY VALUE IS AN EXACT CONVERSION OF THE HEX BESIDE IT, computed
+     through the Oklab matrix — not matched by eye, and NOT copied from
+     `.marketing-canvas`. Two earlier attempts got this wrong in opposite
+     directions: hand-estimating the oklch put the greys 3-5 light, and then
+     borrowing the marketing values put them 5-7 dark, because the marketing
+     canvas is its OWN ramp (a deeper blue-black tuned for a page with
+     radial washes over it) and not the auth palette it resembles. The
+     dashboard, the auth screens and this design export all want the same
+     surfaces, so the hex in the comments is the contract — re-derive from
+     those, never from the other canvas. */
+  --background: oklch(0.1598 0.0132 270.5); /* #0B0D13 */
+  /* The one step the marketing palette has no name for: the sidebar sits
+     between the page and a card, so the nav reads as a panel the content
+     floats on rather than as more page. */
+  --sidebar: oklch(0.1783 0.0128 270.6); /* #0F1117 */
+  --card: oklch(0.2052 0.0123 270.8); /* #15171D */
+  --popover: oklch(0.2052 0.0123 270.8);
+  --input: oklch(0.2052 0.0123 270.8);
+  --muted: oklch(0.244 0.0159 269); /* #1D2028 */
+  --secondary: oklch(0.244 0.0159 269);
+  --accent: oklch(0.244 0.0159 269);
+  --surface-raised: oklch(0.244 0.0159 269);
+
+  /* Two border weights, exactly as auth has them: `--line` for card edges and
+     dividers, `--line-2` for inputs, pills and a card's hover state. */
+  --border: oklch(0.2524 0.0158 269); /* #1F222A */
+  --sidebar-border: oklch(0.2524 0.0158 269);
+  --border-strong: oklch(0.2979 0.0169 270.8); /* #2A2D36 */
+
+  /* Four text weights, auth's `--fg / --fg-2 / --mut / --ph`.
+     `--foreground-2` sits between body and muted — card body, filter chips,
+     recent items — and the app had no step there before this. */
+  --foreground: oklch(0.9693 0.004 106.5); /* #F5F5F2 */
+  --card-foreground: oklch(0.9693 0.004 106.5);
+  --popover-foreground: oklch(0.9693 0.004 106.5);
+  --secondary-foreground: oklch(0.9693 0.004 106.5);
+  --accent-foreground: oklch(0.9693 0.004 106.5);
+  --sidebar-foreground: oklch(0.9693 0.004 106.5);
+  /* The two steps the marketing palette has no name for, on the same hue and
+     chroma as the ones above so they read as the same family: card body and
+     filter chips (#D6D4CE), and placeholder text (#6F6D68). */
+  --foreground-2: oklch(0.8698 0.0085 91.5); /* #D6D4CE */
+  --muted-foreground: oklch(0.6801 0.0107 87.5); /* #9B9891 */
+  --muted-foreground-2: oklch(0.535 0.0081 88.7); /* #6F6D68 */
+
+  /* The action colour, and the focus ring that has to be visible against it.
+     ⚠ CONTRAST_DEBT, stated here because this is where it is created. White on
+     this orange is about 3.1:1, which clears WCAG AA for LARGE text only
+     (>=18.66px bold / >=24px). The auth CTA is safe because it is pinned at
+     18px/700 (CTA_IS_LARGE_TEXT in auth-styles.ts); the app's default <Button>
+     is 14px, so every primary button in the dashboard is now below AA for its
+     label. The design does this too, and MOSTLY gets away
+     with it: the featured CTA in Dash-Home is 18px/700, which IS large text
+     and passes. The ones that do not are the small white-on-orange labels,
+     notably the sidebar Upgrade button at 14px/700. The two ways out, neither taken here because both
+     change the look the spec asked for: darken --primary to roughly #C2410C so
+     white clears 4.5:1, or set --primary-foreground to a near-black (about
+     6:1 on this orange, the same move --brand-accent-foreground makes on the
+     yellow). Decide it deliberately rather than by drift. */
+  --primary: var(--brand);
+  --primary-foreground: var(--brand-foreground);
+  --sidebar-primary: var(--brand);
+  --sidebar-primary-foreground: var(--brand-foreground);
+  --ring: var(--brand);
+  /* The spec's `--act-soft`: the "Beta" pill fill and the selected-plan glow.
+     A mix rather than a fourth literal, so it tracks --primary by definition. */
+  --primary-soft: color-mix(in oklab, var(--brand) 14%, transparent);
+
+  /* Category accents. These carry MEANING — a dot, an eyebrow and an avatar
+     all read as "this is Explain" — which is why they are four named tokens
+     and not a generic chart ramp. */
+  --cat-explain: oklch(0.7555 0.0978 183.5); /* #5EC4B6 */
+  --cat-market: oklch(0.7217 0.1767 305.5); /* #C084FC */
+  --cat-entertain: oklch(0.7044 0.1566 278.4); /* #8B93FF */
+  --cat-music: oklch(0.8003 0.1821 151.7); /* #4ADE80 */
+
+  /* Stickers. `--pro` deliberately equals `--cat-market`: "Best for" on the
+     top tier and the Marketing category are the same violet in the recording,
+     and naming it twice is what lets either move without the other. */
+  --badge-new: oklch(0.7726 0.1268 231.1);
+  --pro: oklch(0.7217 0.1767 305.5);
+
+  background-color: var(--background);
+  color: var(--foreground);
+}
+
+@theme inline {
+  --color-border-strong: var(--border-strong);
+  --color-foreground-2: var(--foreground-2);
+  --color-muted-foreground-2: var(--muted-foreground-2);
+  --color-primary-soft: var(--primary-soft);
+  --color-cat-explain: var(--cat-explain);
+  --color-cat-market: var(--cat-market);
+  --color-cat-entertain: var(--cat-entertain);
+  --color-cat-music: var(--cat-music);
+  --color-badge-new: var(--badge-new);
+  --color-pro: var(--pro);
 }

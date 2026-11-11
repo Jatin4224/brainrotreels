@@ -5,97 +5,117 @@
 "use client";
 
 /**
- * SOURCE OF TRUTH KEYWORDS: PortalOrganizations
+ * SOURCE OF TRUTH KEYWORDS: PortalOrganizations, DataTable, PORTAL_PAGE_SIZE,
+ *   PortalOrganizationRow, PLACEHOLDER_DIMMING, inferRouterOutputs
  *
  * WHAT:  Paginated list of every organization on the platform (name, plan,
  *        members, created), for the portal admin.
+ * WHY:   Uses the shared <DataTable>. The hand-rolled version this replaces
+ *        had the exact bug DataTable exists to end: `useQuery({ page })` with
+ *        no `placeholderData`, so every page turn produced a new query key,
+ *        `isLoading` went true again and the whole list collapsed to a grey
+ *        <Skeleton>. /portal/users was migrated when DataTable landed and this
+ *        page was missed, which is also why the two portal lists looked
+ *        nothing alike — a real <Table> on one, a `divide-y` card stack with a
+ *        differently-worded pager on the other.
+ *
+ *        ROW TYPE COMES FROM THE ROUTER, not from the service. The service
+ *        exports `PortalOrganizationRow`, but it is `import 'server-only'` and
+ *        this is a client component; `inferRouterOutputs` is how every other
+ *        table in the app (audit-logs, media, projects) names its row, and it
+ *        cannot drift from what the procedure actually returns.
+ *
+ *        PAGE_SIZE still mirrors PORTAL_PAGE_SIZE in src/trpc/routers/portal.ts
+ *        — portal.listOrganizations returns `{ items, total }` with no
+ *        `totalPages`, so the client derives it and the two must agree.
  * WHERE: Rendered by /portal/organizations. Reads trpc.portal.listOrganizations.
  */
 
 import * as React from "react";
+import type { inferRouterOutputs } from "@trpc/server";
 
+import type { AppRouter } from "@/trpc/routers/_app";
 import { trpc } from "@/trpc/react-provider";
+import {
+  DataTable,
+  type DataTableColumn,
+} from "@/components/global/data-table";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
 
 /* Mirrors PORTAL_PAGE_SIZE in src/trpc/routers/portal.ts. */
 const PAGE_SIZE = 25;
 
+type PortalOrganizationRow =
+  inferRouterOutputs<AppRouter>["portal"]["listOrganizations"]["items"][number];
+
+const columns: readonly DataTableColumn<PortalOrganizationRow>[] = [
+  {
+    id: "organization",
+    header: "Organization",
+    cell: (org) => (
+      <div className="min-w-0">
+        <div className="flex items-center gap-2">
+          <span className="truncate text-sm font-medium">{org.name}</span>
+          {org.isPortalOrganization ? (
+            <Badge variant="secondary">Portal</Badge>
+          ) : null}
+        </div>
+        <p className="truncate text-xs text-muted-foreground">/{org.slug}</p>
+      </div>
+    ),
+  },
+  {
+    id: "members",
+    header: "Members",
+    hideOnMobile: true,
+    className: "text-muted-foreground whitespace-nowrap",
+    cell: (org) => `${org.memberCount} member${org.memberCount === 1 ? "" : "s"}`,
+  },
+  {
+    id: "created",
+    header: "Created",
+    hideOnMobile: true,
+    className: "text-muted-foreground whitespace-nowrap",
+    cell: (org) => new Date(org.createdAt).toLocaleDateString(),
+  },
+  {
+    id: "plan",
+    header: "Plan",
+    className: "text-right",
+    cell: (org) => (
+      <div className="flex shrink-0 justify-end">
+        <Badge variant="outline" className="capitalize">
+          {org.plan ?? "free"}
+          {org.subscriptionStatus ? ` · ${org.subscriptionStatus}` : ""}
+        </Badge>
+      </div>
+    ),
+  },
+];
+
 export function PortalOrganizations() {
   const [page, setPage] = React.useState(1);
-  const { data, isLoading } = trpc.portal.listOrganizations.useQuery({ page });
+  const query = trpc.portal.listOrganizations.useQuery(
+    { page },
+    { placeholderData: (previous) => previous, retry: false },
+  );
 
-  if (isLoading) return <Skeleton className="h-64 w-full" />;
-  if (!data || data.items.length === 0) {
-    return (
-      <Card>
-        <CardContent className="py-8 text-center text-sm text-muted-foreground">
-          No organizations yet.
-        </CardContent>
-      </Card>
-    );
-  }
-
-  const totalPages = Math.max(1, Math.ceil(data.total / PAGE_SIZE));
+  const data = query.data;
 
   return (
-    <div className="flex flex-col gap-3">
-      <Card>
-        <CardContent className="flex flex-col divide-y p-0">
-          {data.items.map((org) => (
-            <div
-              key={org.id}
-              className="flex items-center justify-between gap-4 px-4 py-3"
-            >
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="truncate text-sm font-medium">
-                    {org.name}
-                  </span>
-                  {org.isPortalOrganization ? (
-                    <Badge variant="secondary">Portal</Badge>
-                  ) : null}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  /{org.slug} · {org.memberCount} member
-                  {org.memberCount === 1 ? "" : "s"} ·{" "}
-                  {new Date(org.createdAt).toLocaleDateString()}
-                </p>
-              </div>
-              <Badge variant="outline" className="capitalize shrink-0">
-                {org.plan ?? "free"}
-                {org.subscriptionStatus ? ` · ${org.subscriptionStatus}` : ""}
-              </Badge>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
-
-      <div className="flex items-center justify-between">
-        <span className="text-xs text-muted-foreground">
-          {data.total} total · page {page} of {totalPages}
-        </span>
-        <div className="flex gap-1">
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={page <= 1}
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-          >
-            Previous
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={page >= totalPages}
-            onClick={() => setPage((p) => p + 1)}
-          >
-            Next
-          </Button>
-        </div>
-      </div>
-    </div>
+    <DataTable<PortalOrganizationRow>
+      columns={columns}
+      rows={data?.items ?? []}
+      getRowId={(org) => org.id}
+      total={data?.total ?? 0}
+      page={page}
+      pageSize={PAGE_SIZE}
+      onPageChange={setPage}
+      isLoading={query.isPending && data === undefined}
+      isFetching={query.isFetching}
+      error={query.error?.message ?? null}
+      empty="No organizations yet."
+      countLabel={["organization", "organizations"]}
+    />
   );
 }

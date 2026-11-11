@@ -33,6 +33,7 @@
 import { cn } from "@/lib/utils";
 import { formatBytes, RESOURCES, type LimitResourceKey } from "@/lib/resources";
 import { useFeatureGate } from "@/components/feature-gate";
+import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 
 /** Where the bar turns to the warning colour — early enough to act on. */
@@ -86,28 +87,23 @@ export function UsageMeter({
 
       {/* UNLIMITED_HAS_NO_BAR — see the file header. */}
       {gate.isUnlimited || gate.limit === null ? null : (
-        <div
-          className="h-1.5 w-full overflow-hidden rounded-full bg-muted"
-          role="progressbar"
-          aria-valuenow={Math.round(ratio * 100)}
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-label={`${gate.featureName} used`}
-        >
-          <div
-            className={cn(
-              "h-full transition-[width]",
-              /* At the cap the bar is destructive; approaching it, the warning
-                 colour. Both are theme tokens — never a hex. */
-              gate.atLimit
-                ? "bg-destructive"
-                : ratio >= NEARLY_FULL_THRESHOLD
-                  ? "bg-primary/70"
-                  : "bg-primary",
-            )}
-            style={{ width: `${Math.max(ratio * 100, ratio > 0 ? 2 : 0)}%` }}
-          />
-        </div>
+        <Progress
+          value={Math.round(ratio * 100)}
+          label={`${gate.featureName} used`}
+          indicatorClassName={cn(
+            /* At the cap the bar is destructive; approaching it, the warning
+               colour. Both are theme tokens — never a hex. */
+            gate.atLimit
+              ? "bg-destructive"
+              : ratio >= NEARLY_FULL_THRESHOLD
+                ? "bg-primary/70"
+                : "bg-primary",
+            /* A sliver for any non-zero usage, so "barely used" still reads as
+               used. A min-width rather than a floored VALUE, because the value
+               is what `aria-valuenow` reports and it must stay truthful. */
+            ratio > 0 && "min-w-[2%]",
+          )}
+        />
       )}
 
       {gate.atLimit ? (

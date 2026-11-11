@@ -513,7 +513,7 @@ function TopicFields({
       </div>
 
       {sample === undefined ? null : (
-        <div className="flex flex-col gap-3 rounded-lg border border-border bg-card p-3">
+        <div className="tactile-raised flex flex-col gap-3 rounded-lg border border-border bg-card p-3">
           <p className="text-sm font-medium text-foreground">
             {sample.question.question}
           </p>
@@ -976,7 +976,7 @@ function ImportRows({
   }
 
   return (
-    <div className="flex flex-col gap-3 rounded-lg border border-border bg-card p-3">
+    <div className="tactile-raised flex flex-col gap-3 rounded-lg border border-border bg-card p-3">
       <div className="flex flex-col gap-1">
         <Label htmlFor="quiz-import">Paste your questions</Label>
         <p className="text-xs text-muted-foreground">

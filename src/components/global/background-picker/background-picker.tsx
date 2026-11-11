@@ -6,57 +6,57 @@
 
 /**
  * SOURCE OF TRUTH KEYWORDS: BackgroundPicker, BackgroundPickerProps,
- *   BackgroundTileButton, RADIOGROUP_NOT_A_LIST_OF_BUTTONS, ROVING_TABINDEX,
- *   LOCKED_NOT_HIDDEN, UPLOAD_TILE_IS_THE_SHARED_COMPONENT,
- *   SELECTION_IS_THE_SERVER_S, BACKDROP_IS_A_CHOICE
+ * BackgroundTileButton, RADIOGROUP_NOT_A_LIST_OF_BUTTONS, ROVING_TABINDEX,
+ * LOCKED_NOT_HIDDEN, UPLOAD_TILE_IS_THE_SHARED_COMPONENT,
+ * SELECTION_IS_THE_SERVER_S, BACKDROP_IS_A_CHOICE
  *
- * WHAT:  The background chooser: a grid of catalogue loops and the workspace's
- *        own clips, a tile for "no footage", and an upload tile.
+ * WHAT: The background chooser: a grid of catalogue loops and the workspace's
+ * own clips, a tile for "no footage", and an upload tile.
  *
- * WHY:   RADIOGROUP_NOT_A_LIST_OF_BUTTONS. The tiles are a single-select, so
- *        they are a `radiogroup` of `radio`s rather than twenty buttons — which
- *        is what the phase's "fully keyboard navigable" actually requires. A
- *        grid of buttons is reachable with Tab, but it makes a screen-reader
- *        user hear twenty unrelated controls instead of one choice with twenty
- *        options, and it puts twenty stops between the grid and whatever
- *        follows it.
+ * WHY: RADIOGROUP_NOT_A_LIST_OF_BUTTONS. The tiles are a single-select, so
+ * they are a `radiogroup` of `radio`s rather than twenty buttons — which
+ * is what the phase's "fully keyboard navigable" actually requires. A
+ * grid of buttons is reachable with Tab, but it makes a screen-reader
+ * user hear twenty unrelated controls instead of one choice with twenty
+ * options, and it puts twenty stops between the grid and whatever
+ * follows it.
  *
- *        ROVING_TABINDEX is the other half of that pattern: exactly one tile is
- *        tabbable and the arrow keys move within the group. The COLUMN COUNT is
- *        measured from the laid-out tiles rather than hard-coded, because the
- *        grid is responsive — Up and Down have to move a row, and a constant
- *        here would move the wrong distance at every breakpoint but one.
+ * ROVING_TABINDEX is the other half of that pattern: exactly one tile is
+ * tabbable and the arrow keys move within the group. The COLUMN COUNT is
+ * measured from the laid-out tiles rather than hard-coded, because the
+ * grid is responsive — Up and Down have to move a row, and a constant
+ * here would move the wrong distance at every breakpoint but one.
  *
- *        LOCKED_NOT_HIDDEN. A locked tile is rendered, focusable and
- *        selectable-looking, and choosing it opens the upgrade modal instead of
- *        applying. Hiding it would remove the upsell; disabling it would take
- *        it out of the keyboard order, so a customer navigating with a keyboard
- *        could not find out that the thing exists.
+ * LOCKED_NOT_HIDDEN. A locked tile is rendered, focusable and
+ * selectable-looking, and choosing it opens the upgrade modal instead of
+ * applying. Hiding it would remove the upsell; disabling it would take
+ * it out of the keyboard order, so a customer navigating with a keyboard
+ * could not find out that the thing exists.
  *
- *        SELECTION_IS_THE_SERVER_S. There is no local "selected" state. The
- *        highlighted tile comes from the list query, which gets it from the
- *        same resolver the pipeline uses (ONE_RESOLVER_TWO_CALLERS), so the
- *        tile shown as selected is the row that will be in the video —
- *        including a default nobody has chosen yet. A local optimistic
- *        selection would be the one thing capable of disagreeing with the
- *        render.
+ * SELECTION_IS_THE_SERVER_S. There is no local "selected" state. The
+ * highlighted tile comes from the list query, which gets it from the
+ * same resolver the pipeline uses (ONE_RESOLVER_TWO_CALLERS), so the
+ * tile shown as selected is the row that will be in the video —
+ * including a default nobody has chosen yet. A local optimistic
+ * selection would be the one thing capable of disagreeing with the
+ * render.
  *
- *        BACKDROP_IS_A_CHOICE, which is why "No footage" is a TILE in the group
- *        rather than a Clear button beside it. It is one of the options, it is
- *        what a new project uses when the catalogue is empty, and a customer
- *        going back to it is choosing a look rather than undoing something.
+ * BACKDROP_IS_A_CHOICE, which is why "No footage" is a TILE in the group
+ * rather than a Clear button beside it. It is one of the options, it is
+ * what a new project uses when the catalogue is empty, and a customer
+ * going back to it is choosing a look rather than undoing something.
  *
- *        UPLOAD_TILE_IS_THE_SHARED_COMPONENT — `<MediaUpload variant="compact">`
- *        rather than a second drop zone, which the phase asks for in so many
- *        words. That component already carries the storage gate, the accept
- *        list and the refusal copy, and a second one would re-derive all three.
- *        It sits OUTSIDE the radiogroup: it is an action, not an option.
+ * UPLOAD_TILE_IS_THE_SHARED_COMPONENT — `<MediaUpload variant="compact">`
+ * rather than a second drop zone, which the phase asks for in so many
+ * words. That component already carries the storage gate, the accept
+ * list and the refusal copy, and a second one would re-derive all three.
+ * It sits OUTSIDE the radiogroup: it is an action, not an option.
  *
- *        Nothing about this component is project-shaped beyond one optional
- *        prop, and the write is replaceable through `onSelect` — so Phase 15's
- *        editor can mount it over its own mutation without forking it.
+ * Nothing about this component is project-shaped beyond one optional
+ * prop, and the write is replaceable through `onSelect` — so Phase 15's
+ * editor can mount it over its own mutation without forking it.
  * WHERE: src/components/global/background-picker. Mounted by the generate
- *        screen; `src/app/(dashboard)/dashboard/projects/[id]/generate`.
+ * screen; `src/app/(dashboard)/dashboard/projects/[id]/generate`.
  */
 
 import * as React from "react";
@@ -72,6 +72,7 @@ import {
   maxUploadBytesForPlan,
   type LibraryAssetKind,
 } from "@/lib/types";
+import { useRovingRadioGroup } from "@/hooks/use-roving-radiogroup";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -87,13 +88,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 /**
  * SOURCE OF TRUTH KEYWORDS: BackgroundPickerProps, GLOBAL_MEANS_CONFIGURABLE
  *
- * WHAT:  Everything a caller can steer, and nothing it has to.
- * WHY:   GLOBAL_MEANS_CONFIGURABLE. `onSelect` is the slot that matters: with
- *        it, the caller owns the write (Phase 15's editor, which has a document
- *        in hand and its own revision rules); without it, the component calls
- *        `backgroundLibrary.applyBackground` itself, which is what the generate screen
- *        wants. `projectId` is optional for the same reason a workspace-level
- *        default picker is a sensible surface to build later.
+ * WHAT: Everything a caller can steer, and nothing it has to.
+ * WHY: GLOBAL_MEANS_CONFIGURABLE. `onSelect` is the slot that matters: with
+ * it, the caller owns the write (Phase 15's editor, which has a document
+ * in hand and its own revision rules); without it, the component calls
+ * `backgroundLibrary.applyBackground` itself, which is what the generate screen
+ * wants. `projectId` is optional for the same reason a workspace-level
+ * default picker is a sensible surface to build later.
  * WHERE: The generate screen passes `projectId` and nothing else.
  */
 export interface BackgroundPickerProps {
@@ -177,82 +178,14 @@ export function BackgroundPicker({
 
   const selectedId = data?.selectedAssetId ?? NO_FOOTAGE;
 
-  /**
-   * SOURCE OF TRUTH KEYWORDS: ROVING_TABINDEX, ACTIVE_FOLLOWS_SELECTION
-   *
-   * The tile the arrow keys are on. DERIVED rather than synchronised: until
-   * somebody moves within the group, the tabbable tile is whichever one is
-   * checked — so tabbing in lands on the current choice, and the server
-   * changing the selection (a successful apply, another tab's write) moves the
-   * tab stop with it. An effect mirroring `selectedId` into state would do the
-   * same thing one render later and for the price of a cascading render.
-   */
-  const [movedTo, setMovedTo] = React.useState<string | null>(null);
-  const activeId =
-    movedTo !== null && options.some((option) => option.id === movedTo)
-      ? movedTo
-      : selectedId;
-
-  const tileRefs = React.useRef(new Map<string, HTMLButtonElement>());
-
-  function focusTile(id: string) {
-    setMovedTo(id);
-    tileRefs.current.get(id)?.focus();
-  }
-
-  /**
-   * SOURCE OF TRUTH KEYWORDS: columnCount, ROVING_TABINDEX
-   *
-   * How many tiles are on a row, measured from the laid-out elements. The grid
-   * is responsive, so this cannot be a constant — and `offsetTop` is the one
-   * thing that knows where the browser actually put them. Falls back to 1,
-   * which makes Up and Down behave like Left and Right rather than doing
-   * nothing.
-   */
-  function columnCount(): number {
-    const first = options[0];
-    const firstEl =
-      first === undefined ? undefined : tileRefs.current.get(first.id);
-    if (firstEl === undefined) return 1;
-
-    for (const [index, option] of options.entries()) {
-      const element = tileRefs.current.get(option.id);
-      if (element !== undefined && element.offsetTop !== firstEl.offsetTop) {
-        return Math.max(1, index);
-      }
-    }
-    return Math.max(1, options.length);
-  }
-
-  function handleKeyDown(event: React.KeyboardEvent) {
-    const index = options.findIndex((option) => option.id === activeId);
-    if (index < 0) return;
-
-    const columns = columnCount();
-    const moves: Readonly<Record<string, number>> = {
-      ArrowRight: 1,
-      ArrowLeft: -1,
-      ArrowDown: columns,
-      ArrowUp: -columns,
-    };
-
-    if (event.key === "Home" || event.key === "End") {
-      event.preventDefault();
-      const target = options[event.key === "Home" ? 0 : options.length - 1];
-      if (target !== undefined) focusTile(target.id);
-      return;
-    }
-
-    const delta = moves[event.key];
-    if (delta === undefined) return;
-
-    event.preventDefault();
-    /* Clamped rather than wrapped: wrapping from the last tile of a row to the
-     * first of the next is what a LIST does, and this is a grid — a customer
-     * pressing Right at the edge expects to stay put, not to jump a row. */
-    const next = options[Math.min(options.length - 1, Math.max(0, index + delta))];
-    if (next !== undefined) focusTile(next.id);
-  }
+  /* ROVING_TABINDEX + ACTIVE_FOLLOWS_SELECTION, and the measured column count
+   * the arrow keys need, now live in the shared hook — the pricing grid needed
+   * the identical behaviour, so it was extracted rather than copied.
+   * See src/hooks/use-roving-radiogroup.ts. */
+  const roving = useRovingRadioGroup({
+    ids: React.useMemo(() => options.map((option) => option.id), [options]),
+    selectedId,
+  });
 
   function choose(id: string, locked: boolean) {
     if (disabled) return;
@@ -327,19 +260,16 @@ export function BackgroundPicker({
         <div
           role="radiogroup"
           aria-label="Background"
-          onKeyDown={handleKeyDown}
+          onKeyDown={roving.handleKeyDown}
           className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4"
         >
           {options.map((option) => (
             <BackgroundTileButton
               key={option.id}
-              ref={(element) => {
-                if (element === null) tileRefs.current.delete(option.id);
-                else tileRefs.current.set(option.id, element);
-              }}
+              ref={roving.registerRef(option.id)}
               tile={option.tile}
               checked={option.id === selectedId}
-              tabbable={option.id === activeId}
+              tabbable={option.id === roving.activeId}
               busy={busy}
               onChoose={() =>
                 choose(option.id, option.tile?.locked ?? false)
@@ -392,24 +322,24 @@ export function BackgroundPicker({
 
 /**
  * SOURCE OF TRUTH KEYWORDS: BackgroundTileButton, LOCKED_NOT_HIDDEN,
- *   POSTER_OR_ICON
+ * POSTER_OR_ICON
  *
- * WHAT:  One option in the group: the poster, the name, and the badges.
+ * WHAT: One option in the group: the poster, the name, and the badges.
  *
- * WHY:   POSTER_OR_ICON. The poster is the `thumb` variant the ingest built, so
- *        a row whose ingest has not produced one yet — or whose poster step
- *        failed — falls back to an icon rather than rendering a broken image.
- *        The same degradation the media grid already does.
+ * WHY: POSTER_OR_ICON. The poster is the `thumb` variant the ingest built, so
+ * a row whose ingest has not produced one yet — or whose poster step
+ * failed — falls back to an icon rather than rendering a broken image.
+ * The same degradation the media grid already does.
  *
- *        A plain `<img>` rather than `next/image`: the URL is either a signed,
- *        short-lived one or a CDN URL for an object this app does not know the
- *        dimensions of ahead of time, and neither is something the Next loader
- *        can usefully optimise.
+ * A plain `<img>` rather than `next/image`: the URL is either a signed,
+ * short-lived one or a CDN URL for an object this app does not know the
+ * dimensions of ahead of time, and neither is something the Next loader
+ * can usefully optimise.
  *
- *        The licence is shown on the tile. That is not decoration — it is the
- *        answer to the single riskiest question in this product, and a customer
- *        about to publish something monetised is entitled to read it without
- *        opening anything.
+ * The licence is shown on the tile. That is not decoration — it is the
+ * answer to the single riskiest question in this product, and a customer
+ * about to publish something monetised is entitled to read it without
+ * opening anything.
  * WHERE: The radiogroup above.
  */
 const BackgroundTileButton = React.forwardRef<
@@ -453,8 +383,8 @@ const BackgroundTileButton = React.forwardRef<
          there is nothing to discover about a write already in flight. */
       disabled={busy}
       className={cn(
-        "flex flex-col gap-2 rounded-xl border p-2 text-left transition",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        "tactile-control flex flex-col gap-2 rounded-xl border p-2 text-left transition",
+        "focus-visible:outline-none focus-ring",
         checked ? "border-primary bg-accent" : "border-border hover:bg-accent/50",
         busy && "opacity-60",
       )}
