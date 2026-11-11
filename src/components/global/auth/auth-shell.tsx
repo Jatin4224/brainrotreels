@@ -91,20 +91,26 @@ export function AuthShell({ children, aside, headerTag }: AuthShellProps) {
   const isSplit = aside !== undefined;
 
   return (
-    /* DESKTOP_DOES_NOT_SCROLL, and only on the split screens. At `lg` the
-       sign-in and sign-up pages are exactly one viewport — the form on the
-       left, the animated panel on the right — and a page that scrolls by
-       forty pixels under an animation is the thing that makes the animation
-       look broken. The panel fits itself to whatever height it is given (see
-       auth-showcase-canvas in globals.css), so the height is a FIXED one
-       rather than a minimum. It stays a MINIMUM below `lg` and on the
-       single-column screens, where a tall form (sign-up on a short phone,
-       accept-invitation with a long org name) must still be reachable:
-       clipping a submit button is worse than a scrollbar. */
+    /* DESKTOP_DOES_NOT_SCROLL, and only on the split screens: at `lg` the
+       sign-in and sign-up pages are one viewport — the form on the left, the
+       animated panel on the right — and a page that scrolls by forty pixels
+       under a looping animation is what makes the animation look broken.
+       The panel fits itself to whatever height it is given (see
+       auth-showcase-canvas in globals.css), so the page height can be FIXED
+       rather than a minimum.
+
+       `auth-split-lock` and not `lg:h-svh lg:overflow-hidden`, because the
+       lock has a FLOOR as well as a breakpoint — see the class in
+       globals.css. A fixed height with a centred column that does not fit is
+       not a page that scrolls, it is a page whose heading sits on top of the
+       wordmark and whose submit button sits on top of the legal line, which
+       is exactly what a short viewport (or browser zoom, which shortens the
+       viewport the same way) produced here. Below the floor the page is a
+       minimum height again and simply scrolls. */
     <div
       className={cn(
         "marketing-canvas auth-typography flex min-h-svh flex-col bg-background p-6 lg:p-8",
-        isSplit ? "lg:h-svh lg:min-h-0 lg:overflow-hidden" : "",
+        isSplit ? "auth-split-lock" : "",
       )}
     >
       <header className="flex items-center justify-between gap-4">
@@ -130,11 +136,7 @@ export function AuthShell({ children, aside, headerTag }: AuthShellProps) {
         className={cn(
           "flex w-full flex-1 pt-8",
           isSplit
-            ? /* `min-h-0` is what makes DESKTOP_DOES_NOT_SCROLL real: a flex
-                 child defaults to `min-height: auto`, so without it this row
-                 would grow to its content and push the fixed-height page into
-                 a scrollbar instead of handing the panel a bounded height. */
-              "flex-col gap-10 lg:grid lg:grid-cols-2 lg:items-stretch lg:gap-10 lg:min-h-0 lg:pt-6"
+            ? "flex-col gap-10 lg:grid lg:grid-cols-2 lg:items-stretch lg:gap-10 lg:pt-6"
             : "flex-col items-center justify-center",
         )}
       >
@@ -142,7 +144,7 @@ export function AuthShell({ children, aside, headerTag }: AuthShellProps) {
           className={cn(
             "flex w-full flex-1 flex-col",
             isSplit
-              ? "max-w-[26rem] lg:mx-auto lg:min-h-0 lg:justify-center"
+              ? "auth-form-column max-w-[26rem] lg:mx-auto lg:justify-center"
               : "max-w-md flex-none",
           )}
         >

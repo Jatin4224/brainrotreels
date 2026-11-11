@@ -1129,6 +1129,53 @@ html:has([data-app-banner]) {
 }
 
 @layer components {
+  /* SOURCE OF TRUTH KEYWORDS: auth-split-lock, auth-form-column, AuthShell,
+     DESKTOP_DOES_NOT_SCROLL, LOCK_HAS_A_FLOOR, AuthShowcase
+     WHAT:  The one-viewport lock on the split auth screens, and the floor
+            under it.
+     WHY:   LOCK_HAS_A_FLOOR. A fixed page height plus a vertically CENTRED
+            form is only a layout while the form fits. The first version of
+            this locked the height at every viewport from `lg` up, and on a
+            short one — a laptop, or any browser zoomed past 100%, which
+            shortens the viewport exactly the same way — the column simply
+            overflowed its track in both directions: the heading landed on
+            the wordmark and the submit button landed on the legal line. A
+            page that cannot fit must SCROLL, so the lock only applies above
+            the height the tallest of these screens (sign-up, with the OAuth
+            row) actually needs. Below it the page is `min-height` again and
+            behaves like any other page.
+
+            The floor is a HEIGHT query, not a breakpoint, because that is
+            what the failure depends on. 800px is where the acceptance sizes
+            in auth-design.md §7 sit (1440x900 and 1280x800), so the lock
+            still holds for both.
+
+            `overflow-y: auto` on the column is the second half of the same
+            argument: if a deployment adds enough to the form to overflow
+            even above the floor, it must scroll INSIDE its own column —
+            where it stays beside the panel and clear of the header and
+            footer — rather than paint over them. `min-height: 0` is what
+            lets that happen at all; a flex child defaults to
+            `min-height: auto` and refuses to shrink below its content.
+     WHERE: src/components/global/auth/auth-shell.tsx, on the page root
+            (`auth-split-lock`) and the form column (`auth-form-column`). */
+  @media (min-width: 1024px) and (min-height: 800px) {
+    .auth-split-lock {
+      height: 100svh;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .auth-split-lock > main {
+      min-height: 0;
+    }
+
+    .auth-split-lock .auth-form-column {
+      min-height: 0;
+      overflow-y: auto;
+    }
+  }
+
   .auth-showcase {
     /* The loop every layer below shares. Override it on the panel to slow the
        whole composition down without changing the shape of the motion. */
