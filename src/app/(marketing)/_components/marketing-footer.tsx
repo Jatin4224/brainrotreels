@@ -30,8 +30,8 @@
  */
 
 import Link from "next/link";
-import { FilmIcon } from "lucide-react";
 
+import { PlatformLogo } from "@/components/global/platform-logo";
 import { AUTH_ROUTES } from "@/lib/config/auth-routes";
 import { APP_DESCRIPTION, APP_NAME } from "@/lib/config/branding";
 import type { MarketingNavColumn } from "@/lib/types";
@@ -81,15 +81,7 @@ export function MarketingFooter() {
             A 5-column grid wrapped the last column onto its own row. */}
         <div className="mb-12 grid gap-12 sm:grid-cols-2 lg:grid-cols-6 lg:gap-8">
           <div className="flex flex-col gap-4 lg:col-span-2">
-            <Link
-              href="/"
-              className="flex items-center gap-2 font-display text-base font-bold tracking-tight text-foreground"
-            >
-              <span className="brutal-border brutal-shadow-sm flex size-7 items-center justify-center rounded-lg bg-brand text-brand-foreground">
-                <FilmIcon className="size-3.5" aria-hidden="true" />
-              </span>
-              {APP_NAME}
-            </Link>
+            <PlatformLogo href="/" size="md" />
             <p className="max-w-xs text-sm leading-relaxed text-muted-foreground">
               {APP_DESCRIPTION}
             </p>

@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" role="img" aria-label="rotreels">
+  <!--
+    SOURCE OF TRUTH KEYWORDS: icon.svg, LOWERCASE_R_MARK, ACCENT_DOT_IS_THE_BRAND,
+      PlatformLogo, FAVICON_IS_A_FILE_NOT_A_COMPONENT
+
+    WHAT:  The browser-tab / PWA icon — the same lowercase `r` + accent dot the
+           PlatformLogo tile draws.
+    WHY:   FAVICON_IS_A_FILE_NOT_A_COMPONENT: Next's metadata file convention
+           serves this as a static asset, so it is read outside the app, with no
+           stylesheet and therefore no theme tokens. The values below are the
+           sRGB resolution of --brand-accent and the dark tile from globals.css,
+           and they are the ONLY place in the app allowed to be literal, because
+           a <link rel="icon"> cannot resolve a CSS variable. The tile is kept
+           dark in both schemes: browser chrome is light or dark per window and
+           a mark that disappears in one of them is worse than one that is
+           always a dark chip.
+    WHERE: src/app/icon.svg — picked up automatically by Next's app-router
+           metadata conventions. Mirrors src/components/global/platform-logo.tsx.
+  -->
+  <rect width="24" height="24" rx="7" fill="#1C1C1F" />
+  <g fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round">
+    <path d="M9.4 6.8v10.4" />
+    <path d="M9.4 11C9.4 8.5 11.4 6.8 13.9 6.8" />
+  </g>
+  <rect x="12.2" y="14.9" width="3.8" height="3.8" rx="1.1" fill="#F7D146" />
+</svg>

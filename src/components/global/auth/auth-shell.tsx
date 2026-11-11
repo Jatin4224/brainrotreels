@@ -93,7 +93,7 @@ export function AuthShell({ children, aside, headerTag }: AuthShellProps) {
   return (
     <div className="marketing-canvas flex min-h-svh flex-col bg-background p-6 lg:p-8">
       <header className="flex items-center justify-between gap-4">
-        <PlatformLogo href="/" tone="brand" size="lg" />
+        <PlatformLogo href="/" size="lg" />
 
         {headerTag ? (
           <span className="brutal-shadow inline-flex -rotate-[4deg] items-center gap-2 rounded-full bg-foreground px-4 py-2 text-sm font-medium text-background lg:hidden">

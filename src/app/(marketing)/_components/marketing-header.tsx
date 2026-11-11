@@ -32,11 +32,10 @@
  */
 
 import Link from "next/link";
-import { FilmIcon } from "lucide-react";
 
+import { PlatformLogo } from "@/components/global/platform-logo";
 import { buttonVariants } from "@/components/ui/button";
 import { AUTH_ROUTES } from "@/lib/config/auth-routes";
-import { APP_NAME } from "@/lib/config/branding";
 import type { MarketingLink } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -60,15 +59,7 @@ export function MarketingHeader() {
   return (
     <header className="sticky top-0 z-40 border-b border-border/60 bg-background/70 backdrop-blur-xl">
       <nav className="mx-auto flex h-14 max-w-7xl items-center justify-between gap-4 px-6">
-        <Link
-          href="/"
-          className="flex items-center gap-2 font-display text-base font-bold tracking-tight text-foreground"
-        >
-          <span className="brutal-border brutal-shadow-sm flex size-7 items-center justify-center rounded-lg bg-brand text-brand-foreground">
-            <FilmIcon className="size-3.5" aria-hidden="true" />
-          </span>
-          {APP_NAME}
-        </Link>
+        <PlatformLogo href="/" size="md" />
 
         <div className="flex items-center gap-6">
           <div className="hidden items-center gap-6 text-sm font-medium md:flex">

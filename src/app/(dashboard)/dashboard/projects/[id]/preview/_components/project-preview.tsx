@@ -44,7 +44,7 @@ import { trpc } from "@/trpc/react-provider";
 import { useActiveOrganizationId } from "@/hooks/use-active-organization";
 import { TimelineRenderer } from "@/remotion/timeline-renderer";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Card, CardContent } from "@/components/ui/card";
+import { StatePanel } from "@/components/global/state-panel";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export function ProjectPreview({ projectId }: { projectId: string }) {
@@ -77,31 +77,22 @@ export function ProjectPreview({ projectId }: { projectId: string }) {
   /* PREVIEW_EMPTY_STATES — the two cases are deliberately not merged. */
   if (data.doc === null) {
     const broken = data.timelineErrors.length > 0;
-    return (
-      <Card>
-        <CardContent className="py-10 text-center text-sm text-muted-foreground">
-          {broken ? (
-            <>
-              <p className="font-medium text-foreground">
-                This timeline could not be read
-              </p>
-              <p className="mt-1">
-                It was written in a format this version cannot open. Nothing has
-                been lost — please contact support with the project name.
-              </p>
-            </>
-          ) : (
-            <>
-              <p className="font-medium text-foreground">
-                Nothing to preview yet
-              </p>
-              <p className="mt-1">
-                This project has no timeline. Generate one to see it here.
-              </p>
-            </>
-          )}
-        </CardContent>
-      </Card>
+    /* TONE_SEPARATES_THE_TWO_CASES. Both branches used to render at the same
+       muted weight, so "we cannot read your timeline" looked exactly like
+       "you have not made one yet" — the first needs support, the second needs
+       a button. The destructive tone is the distinction the copy alone was
+       carrying. */
+    return broken ? (
+      <StatePanel
+        tone="destructive"
+        title="This timeline could not be read"
+        description="It was written in a format this version cannot open. Nothing has been lost — please contact support with the project name."
+      />
+    ) : (
+      <StatePanel
+        title="Nothing to preview yet"
+        description="This project has no timeline. Generate one to see it here."
+      />
     );
   }
 

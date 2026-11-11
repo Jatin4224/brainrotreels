@@ -51,6 +51,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { StatePanel } from "@/components/global/state-panel";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -136,11 +137,7 @@ export function ModerationQueue() {
       </div>
 
       {items.length === 0 ? (
-        <Card>
-          <CardContent className="py-10 text-center text-sm text-muted-foreground">
-            Nothing {status} in the log.
-          </CardContent>
-        </Card>
+        <StatePanel description={`Nothing ${status} in the log.`} />
       ) : (
         <ul className="flex flex-col gap-3">
           {items.map((record) => (

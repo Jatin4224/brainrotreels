@@ -67,6 +67,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { StatePanel } from "@/components/global/state-panel";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -613,9 +614,9 @@ function StyleGallery({
 
       <CardContent>
         {styles.length === 0 ? (
-          <p className="py-10 text-center text-sm text-muted-foreground">
-            No styles match that search.
-          </p>
+          /* PANEL_OWNS_THE_CARD — this is already inside a CardContent, so it
+             takes the panel's padding and centring without a second card. */
+          <StatePanel card={false} description="No styles match that search." />
         ) : (
           /* RADIOGROUP_NOT_A_LIST_OF_BUTTONS. These were `aria-pressed`
              toggles — forty of them, each its own tab stop — while the
