@@ -46,6 +46,7 @@
 
 import { cn } from "@/lib/utils";
 
+import { HighlightHeading } from "@/components/global/highlight-heading";
 import { AUTH_PANEL_COPY } from "./auth-content";
 
 export interface AuthShowcaseProps {
@@ -67,16 +68,15 @@ export function AuthShowcase({ className }: AuthShowcaseProps) {
       <span className="halo-brand pointer-events-none absolute left-1/2 top-1/4 -z-0 h-[36rem] w-[44rem] -translate-x-1/2 opacity-25 blur-[60px]" />
 
       <div className="relative max-w-[34rem]">
-        <p className="font-display text-5xl font-extrabold leading-[1.05] tracking-tight text-foreground xl:text-6xl">
-          {AUTH_PANEL_COPY.headlineBefore}{" "}
-          <span className="relative inline-block px-3 py-0.5">
-            <span className="brand-highlight absolute inset-0 rounded-md" />
-            <span className="relative text-brand-accent-foreground">
-              {AUTH_PANEL_COPY.headlineHighlight}
-            </span>
-          </span>{" "}
-          {AUTH_PANEL_COPY.headlineAfter}
-        </p>
+        {/* This copy had lost the `aria-hidden` on its decorative block;
+            the shared component carries it so that cannot happen again. */}
+        <HighlightHeading
+          as="p"
+          before={AUTH_PANEL_COPY.headlineBefore}
+          highlight={AUTH_PANEL_COPY.headlineHighlight}
+          after={AUTH_PANEL_COPY.headlineAfter}
+          className="font-display text-5xl font-extrabold leading-[1.05] tracking-tight text-foreground xl:text-6xl"
+        />
 
         <p className="mt-8 text-lg leading-relaxed text-muted-foreground">
           {AUTH_PANEL_COPY.lead}

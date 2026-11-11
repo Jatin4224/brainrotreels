@@ -472,7 +472,7 @@ function MintedKey({
   };
 
   return (
-    <div className="bg-card flex flex-col gap-3 rounded-lg border p-4">
+    <div className="tactile-raised flex flex-col gap-3 rounded-lg border bg-card p-4">
       <div>
         <p className="text-sm font-medium">{name} is ready</p>
         <p className="text-muted-foreground text-sm">

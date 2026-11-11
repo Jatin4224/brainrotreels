@@ -6,42 +6,42 @@
 
 /**
  * SOURCE OF TRUTH KEYWORDS: BeatStrip, A_STILL_PER_BEAT, ONE_BEAT_IS_THE_UNIT,
- *   A_FALLBACK_IS_VISIBLE, THE_STRIP_READS_A_VIEW_NOT_THE_BLOB,
- *   FROZEN_STILLS_ONE_PLAYER, THEME_TOKENS_FOR_CHROME
+ * A_FALLBACK_IS_VISIBLE, THE_STRIP_READS_A_VIEW_NOT_THE_BLOB,
+ * FROZEN_STILLS_ONE_PLAYER, THEME_TOKENS_FOR_CHROME
  *
- * WHAT:  The phase's step 14 — every beat of a motion project as a still, with
- *        "redesign this beat" re-running exactly one of them.
+ * WHAT: The phase's step 14 — every beat of a motion project as a still, with
+ * "redesign this beat" re-running exactly one of them.
  *
- * WHY:   A_STILL_PER_BEAT is what makes a designed video reviewable. The
- *        deterministic checks prove no beat overflows, overlaps or leaves the
- *        safe zone; none of them can tell whether the right thing is on screen.
- *        That judgement needs a human looking at twelve pictures, and it needs
- *        to be cheap enough to do after every generation.
+ * WHY: A_STILL_PER_BEAT is what makes a designed video reviewable. The
+ * deterministic checks prove no beat overflows, overlaps or leaves the
+ * safe zone; none of them can tell whether the right thing is on screen.
+ * That judgement needs a human looking at twelve pictures, and it needs
+ * to be cheap enough to do after every generation.
  *
- *        FROZEN_STILLS_ONE_PLAYER. The strip draws each beat FROZEN at its
- *        midpoint and animates only the selected one. Twelve live previews is
- *        twelve requestAnimationFrame loops recomputing twelve layouts sixty
- *        times a second, which makes a review screen stutter on the machine of
- *        the person doing the reviewing. The midpoint is the honest frozen
- *        moment because ANIMATION_NEVER_MOVES_THE_INK — an entrance changes
- *        opacity and scale, never the measured rectangle — so a still at the
- *        middle of a beat shows exactly where every element lands.
+ * FROZEN_STILLS_ONE_PLAYER. The strip draws each beat FROZEN at its
+ * midpoint and animates only the selected one. Twelve live previews is
+ * twelve requestAnimationFrame loops recomputing twelve layouts sixty
+ * times a second, which makes a review screen stutter on the machine of
+ * the person doing the reviewing. The midpoint is the honest frozen
+ * moment because ANIMATION_NEVER_MOVES_THE_INK — an entrance changes
+ * opacity and scale, never the measured rectangle — so a still at the
+ * middle of a beat shows exactly where every element lands.
  *
- *        A_FALLBACK_IS_VISIBLE. A beat the model could not design shows a
- *        "plain" badge, because the alternative is a customer assuming the
- *        plainest beat in their video is what the model thought best. That
- *        badge is the entire reason `source` is stored
- *        (A_FALLBACK_IS_RECORDED) and it is what the redesign button is for.
+ * A_FALLBACK_IS_VISIBLE. A beat the model could not design shows a
+ * "plain" badge, because the alternative is a customer assuming the
+ * plainest beat in their video is what the model thought best. That
+ * badge is the entire reason `source` is stored
+ * (A_FALLBACK_IS_RECORDED) and it is what the redesign button is for.
  *
- *        ONE_BEAT_IS_THE_UNIT: the button redesigns one beat and the response
- *        carries that one beat back, so eleven unchanged scenes are neither
- *        re-requested nor re-rendered. The query is invalidated rather than
- *        patched by hand, because the server's view is the one that includes
- *        what the write actually stored.
+ * ONE_BEAT_IS_THE_UNIT: the button redesigns one beat and the response
+ * carries that one beat back, so eleven unchanged scenes are neither
+ * re-requested nor re-rendered. The query is invalidated rather than
+ * patched by hand, because the server's view is the one that includes
+ * what the write actually stored.
  *
- *        THEME_TOKENS_FOR_CHROME. The previews contain literal render colours,
- *        because video has no theme (RENDER_COLOURS_ARE_LITERAL); every pixel
- *        of the strip's own furniture is a theme token.
+ * THEME_TOKENS_FOR_CHROME. The previews contain literal render colours,
+ * because video has no theme (RENDER_COLOURS_ARE_LITERAL); every pixel
+ * of the strip's own furniture is a theme token.
  * WHERE: The motion route, above the primitive gallery.
  */
 
@@ -193,7 +193,7 @@ export function BeatStrip({ projectId }: { projectId: string }) {
               type="button"
               onClick={() => setSelected(position)}
               aria-current={beat.index === current.index}
-              className={`tactile-control flex shrink-0 flex-col gap-1 rounded-md border p-1 text-left transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50 ${
+              className={`tactile-control flex shrink-0 flex-col gap-1 rounded-md border p-1 text-left transition-colors outline-none focus-ring ${
                 beat.index === current.index
                   ? "border-primary bg-accent"
                   : "hover:bg-accent/50"
@@ -293,7 +293,7 @@ export function BeatStrip({ projectId }: { projectId: string }) {
 
 /**
  * SOURCE OF TRUTH KEYWORDS: BeatStill, FROZEN_STILLS_ONE_PLAYER,
- *   THE_MIDPOINT_IS_THE_HONEST_FRAME
+ * THE_MIDPOINT_IS_THE_HONEST_FRAME
  *
  * One beat as a frozen thumbnail. THE_MIDPOINT_IS_THE_HONEST_FRAME: an element
  * that enters late is on screen by then and an entrance has finished, so the

@@ -43,6 +43,7 @@
 import type { AuthFormMode } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
+import { HighlightHeading } from "@/components/global/highlight-heading";
 import { AUTH_SCREEN_COPY } from "./auth-content";
 
 export interface AuthHeroProps {
@@ -56,19 +57,12 @@ export function AuthHero({ mode, className }: AuthHeroProps) {
   return (
     <div className={cn("flex flex-col items-start text-left", className)}>
       {/* Below lg: the pitch, because nothing else on screen is carrying it. */}
-      <h1 className="font-display text-[2.75rem] font-extrabold leading-[0.98] tracking-tight text-foreground lg:hidden">
-        {copy.mobileHeadlineBefore}{" "}
-        <span className="relative inline-block px-3 py-0.5">
-          <span
-            aria-hidden="true"
-            className="brand-highlight absolute inset-0 rounded-md"
-          />
-          <span className="relative text-brand-accent-foreground">
-            {copy.mobileHeadlineHighlight}
-          </span>
-        </span>
-        {copy.mobileHeadlineAfter ? ` ${copy.mobileHeadlineAfter}` : null}
-      </h1>
+      <HighlightHeading
+        before={copy.mobileHeadlineBefore}
+        highlight={copy.mobileHeadlineHighlight}
+        after={copy.mobileHeadlineAfter ?? undefined}
+        className="font-display text-[2.75rem] font-extrabold leading-[0.98] tracking-tight text-foreground lg:hidden"
+      />
 
       {/* lg and up: plain and quiet, because the panel is doing the talking. */}
       <div className="hidden lg:block">

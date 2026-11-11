@@ -6,39 +6,39 @@
 
 /**
  * SOURCE OF TRUTH KEYWORDS: DataTable, DataTableColumn, DataTableProps,
- *   PAGINATION_SLOTS, expandedRow, toolbar slot, PLACEHOLDER_DIMMING,
- *   SERVER_TOTAL_PAGES, usePaginatedFilters
+ * PAGINATION_SLOTS, expandedRow, toolbar slot, PLACEHOLDER_DIMMING,
+ * SERVER_TOTAL_PAGES, usePaginatedFilters
  *
- * WHAT:  The one list surface: owns pagination, loading, empty and error
- *        states, and row expansion. Everything app-specific arrives as a slot.
- * WHY:   Pagination had been hand-rolled twice (audit logs, portal users) and
- *        the two copies had already diverged — portal users has no
- *        placeholderData and no isFetching guard, so its rows blank out on
- *        every page change. One component ends that.
+ * WHAT: The one list surface: owns pagination, loading, empty and error
+ * states, and row expansion. Everything app-specific arrives as a slot.
+ * WHY: Pagination had been hand-rolled twice (audit logs, portal users) and
+ * the two copies had already diverged — portal users has no
+ * placeholderData and no isFetching guard, so its rows blank out on
+ * every page change. One component ends that.
  *
- *        Three contract decisions worth stating, because the obvious API gets
- *        each of them wrong:
+ * Three contract decisions worth stating, because the obvious API gets
+ * each of them wrong:
  *
- *        `toolbar` is ONE slot holding search AND filters together. Splitting
- *        them looks tidier but breaks the real caller: the audit filter bar
- *        contains its own search input and its Clear button needs the search
- *        value, so a separate `search` prop renders two boxes.
+ * `toolbar` is ONE slot holding search AND filters together. Splitting
+ * them looks tidier but breaks the real caller: the audit filter bar
+ * contains its own search input and its Clear button needs the search
+ * value, so a separate `search` prop renders two boxes.
  *
- *        `expandedRow` exists because the audit log's row expands to a full
- *        -width detail panel. A columns-only API cannot express that, and
- *        omitting it would have silently dropped the feature during migration.
+ * `expandedRow` exists because the audit log's row expands to a full
+ * -width detail panel. A columns-only API cannot express that, and
+ * omitting it would have silently dropped the feature during migration.
  *
- *        SERVER_TOTAL_PAGES: `totalPages` is optional and PREFERRED over the
- *        derived value. `auditLogs.list` computes it server-side (the
- *        procedure factory's paginate contract); deriving from `total/pageSize`
- *        instead would re-implement it on a pageSize the client merely
- *        asserts matches the server's.
+ * SERVER_TOTAL_PAGES: `totalPages` is optional and PREFERRED over the
+ * derived value. `auditLogs.list` computes it server-side (the
+ * procedure factory's paginate contract); deriving from `total/pageSize`
+ * instead would re-implement it on a pageSize the client merely
+ * asserts matches the server's.
  *
- *        PLACEHOLDER_DIMMING: with `placeholderData` the previous rows stay on
- *        screen during a refetch, so without the dim a filter change looks
- *        like nothing happened.
+ * PLACEHOLDER_DIMMING: with `placeholderData` the previous rows stay on
+ * screen during a refetch, so without the dim a filter change looks
+ * like nothing happened.
  * WHERE: Used by every list screen. See audit-logs-table.tsx for the reference
- *        caller, including the expanded row.
+ * caller, including the expanded row.
  */
 
 import * as React from "react";
@@ -264,7 +264,7 @@ export function DataTable<TRow>({
                               setExpanded(isOpen ? null : id);
                             },
                             className:
-                              "cursor-pointer outline-none focus-visible:ring-3 focus-visible:ring-inset focus-visible:ring-ring/50",
+                              "cursor-pointer outline-none focus-ring-inset",
                           }
                         : {})}
                     >

@@ -4,55 +4,55 @@
 
 /**
  * SOURCE OF TRUTH KEYWORDS: AUTH_CTA_CLASS, AUTH_FIELD_CLASS,
- *   AUTH_LABEL_CLASS, AUTH_SOCIAL_BUTTON_CLASS, AUTH_LINK_CLASS,
- *   AUTH_DIVIDER_CLASS, AUTH_SURFACE, TOKENS_NOT_HEX, CTA_IS_LARGE_TEXT,
- *   SIXTEEN_PX_STOPS_IOS_ZOOM, TOUCH_TARGET_44
+ * AUTH_LABEL_CLASS, AUTH_SOCIAL_BUTTON_CLASS, AUTH_LINK_CLASS,
+ * AUTH_DIVIDER_CLASS, AUTH_SURFACE, TOKENS_NOT_HEX, CTA_IS_LARGE_TEXT,
+ * SIXTEEN_PX_STOPS_IOS_ZOOM, TOUCH_TARGET_44
  *
- * WHAT:  The shared skins of the auth screens — the one loud primary button,
- *        the field, its label, a social button, the "or with email" rule and
- *        an inline link.
+ * WHAT: The shared skins of the auth screens — the one loud primary button,
+ * the field, its label, a social button, the "or with email" rule and
+ * an inline link.
  *
- * WHY:   Four screens wear these (sign-in, sign-up, forgot password, reset
- *        password) and a fifth borrows them (accept invitation). Written into
- *        each form, the first restyle quietly leaves one of them behind —
- *        which is exactly how this flow ended up with a bordered invitation
- *        card in the middle of four bare ones. Class constants rather than
- *        five wrapper components because that is the pattern the landing page
- *        already uses for its one shared CTA skin (`PRIMARY_CTA` in
- *        src/app/(marketing)/page.tsx): the markup stays a real <Button> or
- *        <Input> that callers can pass props to, and nothing has to be
- *        re-exported through a barrel to be reused.
+ * WHY: Four screens wear these (sign-in, sign-up, forgot password, reset
+ * password) and a fifth borrows them (accept invitation). Written into
+ * each form, the first restyle quietly leaves one of them behind —
+ * which is exactly how this flow ended up with a bordered invitation
+ * card in the middle of four bare ones. Class constants rather than
+ * five wrapper components because that is the pattern the landing page
+ * already uses for its one shared CTA skin (`PRIMARY_CTA` in
+ * src/app/(marketing)/page.tsx): the markup stays a real <Button> or
+ * <Input> that callers can pass props to, and nothing has to be
+ * re-exported through a barrel to be reused.
  *
- *        TOKENS_NOT_HEX throughout. `bg-brand`, `text-brand-foreground`,
- *        `bg-surface-raised` and `border-border` all resolve against
- *        `.marketing-canvas`, applied by AuthShell, so re-skinning every auth
- *        screen is still one edit in globals.css.
+ * TOKENS_NOT_HEX throughout. `bg-brand`, `text-brand-foreground`,
+ * `bg-surface-raised` and `border-border` all resolve against
+ * `.marketing-canvas`, applied by AuthShell, so re-skinning every auth
+ * screen is still one edit in globals.css.
  *
- *        CTA_IS_LARGE_TEXT, and the reason the label is pinned at 19px/700
- *        rather than left to taste: white on the brand orange is about 3.1:1,
- *        which clears WCAG for LARGE text only (>=18.66px bold). Shrink this
- *        label and the button silently stops passing. auth-design.md §4 says
- *        the same thing; this is where it is enforced.
+ * CTA_IS_LARGE_TEXT, and the reason the label is pinned at 19px/700
+ * rather than left to taste: white on the brand orange is about 3.1:1,
+ * which clears WCAG for LARGE text only (>=18.66px bold). Shrink this
+ * label and the button silently stops passing. auth-design.md §4 says
+ * the same thing; this is where it is enforced.
  *
- *        WHY 19 AND NOT `text-lg`. This was `text-lg` — 18px — for as long
- *        as the rule above has been written down, which means it MISSED the
- *        threshold it claims to meet, by 0.66px, on every auth screen. Nobody
- *        caught it because 18 and "18.66" read as the same number. 19px
- *        (1.1875rem) is the smallest step over the line that Tailwind's scale
- *        cannot express, which is why this is an arbitrary value and must stay
- *        one: swapping it back to a named size silently fails the audit again.
+ * WHY 19 AND NOT `text-lg`. This was `text-lg` — 18px — for as long
+ * as the rule above has been written down, which means it MISSED the
+ * threshold it claims to meet, by 0.66px, on every auth screen. Nobody
+ * caught it because 18 and "18.66" read as the same number. 19px
+ * (1.1875rem) is the smallest step over the line that Tailwind's scale
+ * cannot express, which is why this is an arbitrary value and must stay
+ * one: swapping it back to a named size silently fails the audit again.
  *
- *        SIXTEEN_PX_STOPS_IOS_ZOOM: the field is `text-base` (16px) at every
- *        width, not `md:text-sm` like the product's default <Input>. Safari
- *        zooms the whole page when a focused field is under 16px, and on a
- *        sign-in screen that reflow lands mid-password.
+ * SIXTEEN_PX_STOPS_IOS_ZOOM: the field is `text-base` (16px) at every
+ * width, not `md:text-sm` like the product's default <Input>. Safari
+ * zooms the whole page when a focused field is under 16px, and on a
+ * sign-in screen that reflow lands mid-password.
  *
- *        TOUCH_TARGET_44: the field and both button skins are at least 44px
- *        tall (the CTA 56), so every control clears the minimum target size
- *        on a phone without each screen remembering to say so.
+ * TOUCH_TARGET_44: the field and both button skins are at least 44px
+ * tall (the CTA 56), so every control clears the minimum target size
+ * on a phone without each screen remembering to say so.
  *
  * WHERE: The Better Auth auth / forgot-password / reset-password forms and
- *        the accept-invitation screen. Compose with `cn()`.
+ * the accept-invitation screen. Compose with `cn()`.
  */
 
 /**
@@ -79,4 +79,4 @@ export const AUTH_DIVIDER_CLASS =
 
 /** An inline link inside body copy — the cross-links and the legal line. */
 export const AUTH_LINK_CLASS =
-  "font-semibold text-foreground underline underline-offset-4 outline-none hover:text-brand-accent focus-visible:ring-3 focus-visible:ring-ring/50";
+  "font-semibold text-foreground underline underline-offset-4 outline-none hover:text-brand-accent focus-ring";

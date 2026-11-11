@@ -6,47 +6,47 @@
 
 /**
  * SOURCE OF TRUTH KEYWORDS: ComposerScreen, THE_COMPOSER_IS_ONE_FIELD,
- *   composerSchema, projects.create, scripts.generate, scripts.estimateCost,
- *   COST_ON_THE_BUTTON, WRITE_IT_FOR_ME, THIS_IS_MY_SCRIPT, FeatureGate
+ * composerSchema, projects.create, scripts.generate, scripts.estimateCost,
+ * COST_ON_THE_BUTTON, WRITE_IT_FOR_ME, THIS_IS_MY_SCRIPT, FeatureGate
  *
- * WHAT:  The "What's your video about?" screen — one big field for a script
- *        or an idea, the length and tone it should be written to, and the two
- *        ways out: have it written, or keep what you pasted.
+ * WHAT: The "What's your video about?" screen — one big field for a script
+ * or an idea, the length and tone it should be written to, and the two
+ * ways out: have it written, or keep what you pasted.
  *
- * WHY:   THE_COMPOSER_IS_ONE_FIELD. This replaces a side sheet that asked for
- *        a title, a format, an aspect ratio and a source URL before anything
- *        happened — four questions, none of which is the one the customer
- *        arrived with. The title is derived from what they type, the format
- *        came from the card they clicked, and the aspect has a sensible
- *        default, so the screen asks only what it genuinely cannot infer.
+ * WHY: THE_COMPOSER_IS_ONE_FIELD. This replaces a side sheet that asked for
+ * a title, a format, an aspect ratio and a source URL before anything
+ * happened — four questions, none of which is the one the customer
+ * arrived with. The title is derived from what they type, the format
+ * came from the card they clicked, and the aspect has a sensible
+ * default, so the screen asks only what it genuinely cannot infer.
  *
- *        TWO ACTIONS, BOTH REAL, and the difference between them is who
- *        writes the words:
- *        WRITE_IT_FOR_ME creates the project and runs `scripts.generate` over
- *        the text as a source — this is the one that costs credits.
- *        THIS_IS_MY_SCRIPT creates the project and stores what was pasted
- *        VERBATIM as the first script block, then opens the editor. It costs
- *        nothing and calls no model. It is three round trips (create, add an
- *        empty block, fill it) because the API has no "import a script"
- *        endpoint; one endpoint would make it one, and that is the obvious
- *        next backend change.
+ * TWO ACTIONS, BOTH REAL, and the difference between them is who
+ * writes the words:
+ * WRITE_IT_FOR_ME creates the project and runs `scripts.generate` over
+ * the text as a source — this is the one that costs credits.
+ * THIS_IS_MY_SCRIPT creates the project and stores what was pasted
+ * VERBATIM as the first script block, then opens the editor. It costs
+ * nothing and calls no model. It is three round trips (create, add an
+ * empty block, fill it) because the API has no "import a script"
+ * endpoint; one endpoint would make it one, and that is the obvious
+ * next backend change.
  *
- *        COST_ON_THE_BUTTON: the price is read from `scripts.estimateCost`,
- *        the SAME estimator the server charges from, and it re-reads when the
- *        length changes because the cost is derived from the word budget.
- *        A hardcoded "100 credits" would be a number that silently stops
- *        being true. The button also knows whether the workspace can afford
- *        it, so the refusal happens before the project is created rather than
- *        halfway through.
+ * COST_ON_THE_BUTTON: the price is read from `scripts.estimateCost`,
+ * the SAME estimator the server charges from, and it re-reads when the
+ * length changes because the cost is derived from the word budget.
+ * A hardcoded "100 credits" would be a number that silently stops
+ * being true. The button also knows whether the workspace can afford
+ * it, so the refusal happens before the project is created rather than
+ * halfway through.
  *
- *        THE PROJECT IS CREATED FIRST, and that ordering is deliberate: both
- *        actions commit a draft before doing anything slow or expensive, so a
- *        generation that fails leaves a project the customer can retry from
- *        instead of losing what they typed.
+ * THE PROJECT IS CREATED FIRST, and that ordering is deliberate: both
+ * actions commit a draft before doing anything slow or expensive, so a
+ * generation that fails leaves a project the customer can retry from
+ * instead of losing what they typed.
  *
  * WHERE: Rendered by src/app/(dashboard)/dashboard/new/page.tsx, which is
- *        where the home screen's format cards now navigate. Format copy comes
- *        from src/lib/config/formats.ts.
+ * where the home screen's format cards now navigate. Format copy comes
+ * from src/lib/config/formats.ts.
  */
 
 import * as React from "react";
@@ -83,6 +83,7 @@ import {
 } from "@/components/ui/form";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import { HighlightHeading } from "@/components/global/highlight-heading";
 
 import { CATEGORY_CLASSES } from "../../_components";
 import { ComposerSettingPill } from "./composer-setting-pill";
@@ -255,7 +256,7 @@ export function ComposerScreen({ kind }: ComposerScreenProps) {
         >
           <Link
             href={ROUTES.dashboard}
-            className="inline-flex items-center gap-1.5 text-muted-foreground outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
+            className="inline-flex items-center gap-1.5 text-muted-foreground outline-none hover:text-foreground focus-ring"
           >
             <ArrowLeftIcon className="size-4" aria-hidden="true" />
             Formats
@@ -291,24 +292,18 @@ export function ComposerScreen({ kind }: ComposerScreenProps) {
         onOpenChange={setHowItWorksOpen}
       />
 
-      <h1 className="font-display text-[2.75rem] font-extrabold leading-none tracking-tight text-foreground lg:text-[3.25rem]">
-        What&apos;s your video{" "}
-        <span className="relative inline-block px-3 py-0.5">
-          <span
-            aria-hidden="true"
-            className="brand-highlight absolute inset-0 rounded-xl"
-          />
-          <span className="relative text-brand-accent-foreground">about</span>
-        </span>
-        {/* Clears the highlight's 6px offset shadow — see the note on
-            .brand-highlight in globals.css. */}
-        <span className="ml-3">?</span>
-      </h1>
+      <HighlightHeading
+        before="What's your video"
+        highlight="about"
+        trailing="?"
+        radius="xl"
+        className="font-display text-[2.75rem] font-extrabold leading-none tracking-tight text-foreground lg:text-[3.25rem]"
+      />
 
       <Form {...form}>
         <form className="flex flex-col gap-5">
           {/* ── The composer card ────────────────────────────────────── */}
-          <div className="tactile-raised rounded-[22px] border border-border bg-card p-5">
+          <div className="tactile-raised focus-ring-within rounded-[22px] border border-border bg-card p-5">
             <FormField
               control={form.control}
               name="prompt"
@@ -321,7 +316,7 @@ export function ComposerScreen({ kind }: ComposerScreenProps) {
                       aria-label="Your script or idea"
                       placeholder="Paste your script, or describe an idea."
                       disabled={busy !== null}
-                      className="min-h-44 resize-none border-0 bg-transparent px-1 text-lg leading-relaxed text-foreground shadow-none placeholder:text-muted-foreground focus-visible:ring-0 md:text-lg"
+                      className="min-h-44 resize-none border-0 bg-transparent px-1 text-lg leading-relaxed text-foreground shadow-none placeholder:text-muted-foreground focus-visible:outline-none! md:text-lg"
                     />
                   </FormControl>
                   <FormMessage className="px-1" />
@@ -435,7 +430,7 @@ export function ComposerScreen({ kind }: ComposerScreenProps) {
                   })
                 }
                 disabled={busy !== null}
-                className="rounded-full border border-border-strong px-4 py-2.5 text-sm text-foreground-2 outline-none transition-colors hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 motion-reduce:transition-none"
+                className="rounded-full border border-border-strong px-4 py-2.5 text-sm text-foreground-2 outline-none transition-colors hover:text-foreground focus-ring motion-reduce:transition-none"
               >
                 {suggestion}
               </button>

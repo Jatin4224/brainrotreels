@@ -6,37 +6,37 @@
 
 /**
  * SOURCE OF TRUTH KEYWORDS: AppSidebar, SECTION_LABELS, SidebarUpgradeNudge,
- *   SidebarSearch, SidebarRecentProjects, SidebarPlanMeter, SIDEBAR_BLOCK_ORDER,
- *   SidebarNewVideoButton,
- *   WORDMARK_THEN_SWITCHER
+ * SidebarSearch, SidebarRecentProjects, SidebarPlanMeter, SIDEBAR_BLOCK_ORDER,
+ * SidebarNewVideoButton,
+ * WORDMARK_THEN_SWITCHER
  *
- * WHAT:  The dashboard sidebar. Wordmark, the search row, a fixed Dashboard
- *        home link plus the registry-derived nav (getSidebarNav) grouped by
- *        section, the three most recent projects, then the plan meter, the
- *        upgrade nudge and the account row.
+ * WHAT: The dashboard sidebar. Wordmark, the search row, a fixed Dashboard
+ * home link plus the registry-derived nav (getSidebarNav) grouped by
+ * section, the three most recent projects, then the plan meter, the
+ * upgrade nudge and the account row.
  *
- *        SIDEBAR_BLOCK_ORDER follows 00-dashboard-foundations.md section 2 top
- *        to bottom. The order is the argument: the things you do many times a
- *        day are at the top under your thumb, the things you do once a month
- *        (plan, billing, account) are pinned to the bottom, and "Recent" sits
- *        between them because it is navigation that happens to be data.
+ * SIDEBAR_BLOCK_ORDER follows 00-dashboard-foundations.md section 2 top
+ * to bottom. The order is the argument: the things you do many times a
+ * day are at the top under your thumb, the things you do once a month
+ * (plan, billing, account) are pinned to the bottom, and "Recent" sits
+ * between them because it is navigation that happens to be data.
  *
- *        WORDMARK_THEN_SWITCHER: the spec draws a plain wordmark where this
- *        app has an organization switcher, and both are right. A workspace is
- *        the product's name to somebody who only has one, so the wordmark is
- *        always shown and the switcher appears UNDER it only once there is a
- *        second organization to switch to. Dropping the switcher to match the
- *        drawing would have made every multi-workspace account unable to
- *        change workspace; showing it to a solo creator is a control that can
- *        only ever confirm what it already says.
- * WHY:   Items come straight from RESOURCES — permission gating reuses
- *        useActiveOrganization().hasPermission (owners always pass) and
- *        flag-gated items are hidden when the plan doesn't include them
- *        (usage.getFeatureGates). One registry edit adds/removes a sidebar
- *        item; there is no separate nav list to keep in sync.
+ * WORDMARK_THEN_SWITCHER: the spec draws a plain wordmark where this
+ * app has an organization switcher, and both are right. A workspace is
+ * the product's name to somebody who only has one, so the wordmark is
+ * always shown and the switcher appears UNDER it only once there is a
+ * second organization to switch to. Dropping the switcher to match the
+ * drawing would have made every multi-workspace account unable to
+ * change workspace; showing it to a solo creator is a control that can
+ * only ever confirm what it already says.
+ * WHY: Items come straight from RESOURCES — permission gating reuses
+ * useActiveOrganization().hasPermission (owners always pass) and
+ * flag-gated items are hidden when the plan doesn't include them
+ * (usage.getFeatureGates). One registry edit adds/removes a sidebar
+ * item; there is no separate nav list to keep in sync.
  * WHERE: Mounted by src/app/(dashboard)/layout.tsx inside <SidebarProvider>.
- *        Reads getSidebarNav (src/lib/resources.ts), gate data
- *        (trpc.usage.getFeatureGates), and active-org permissions.
+ * Reads getSidebarNav (src/lib/resources.ts), gate data
+ * (trpc.usage.getFeatureGates), and active-org permissions.
  */
 
 import * as React from "react";
@@ -81,11 +81,11 @@ const NAV_SECTIONS = getSidebarNav();
 /**
  * SOURCE OF TRUTH KEYWORDS: AppSidebarProps, SERVER_PROVIDER_BRANCH
  *
- * WHAT:  The sidebar's two provider-owned slots, supplied by a SERVER parent.
- * WHY:   SERVER_PROVIDER_BRANCH — this component is a client component, so
- *        importing the provider surfaces here would pull BOTH providers into the
- *        browser bundle. Taking them as already-rendered elements keeps the
- *        branch on the server; only the selected provider is ever serialised.
+ * WHAT: The sidebar's two provider-owned slots, supplied by a SERVER parent.
+ * WHY: SERVER_PROVIDER_BRANCH — this component is a client component, so
+ * importing the provider surfaces here would pull BOTH providers into the
+ * browser bundle. Taking them as already-rendered elements keeps the
+ * branch on the server; only the selected provider is ever serialised.
  * WHERE: Supplied by src/app/(dashboard)/layout.tsx.
  */
 export interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
@@ -139,7 +139,7 @@ export function AppSidebar({
             the rail itself) is the only thing that fits. */}
         <Link
           href={ROUTES.dashboard}
-          className="flex h-10 items-center px-2 text-[0.9375rem] font-bold tracking-tight text-sidebar-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/50 group-data-[collapsible=icon]:hidden"
+          className="flex h-10 items-center px-2 text-[0.9375rem] font-bold tracking-tight text-sidebar-foreground outline-none focus-ring group-data-[collapsible=icon]:hidden"
         >
           {APP_NAME}
         </Link>

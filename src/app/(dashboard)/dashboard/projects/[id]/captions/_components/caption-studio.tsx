@@ -6,37 +6,37 @@
 
 /**
  * SOURCE OF TRUTH KEYWORDS: CaptionStudio, AlignmentPanel, StyleGallery,
- *   StyleCard, LOCKED_NOT_HIDDEN, DEGRADE_IS_VISIBLE, RESTYLING_IS_FREE,
- *   KEYBOARD_NAVIGABLE_GALLERY, POLL_WHILE_ALIGNING
+ * StyleCard, LOCKED_NOT_HIDDEN, DEGRADE_IS_VISIBLE, RESTYLING_IS_FREE,
+ * KEYBOARD_NAVIGABLE_GALLERY, POLL_WHILE_ALIGNING
  *
- * WHAT:  The captions screen: the state of the word timings, the style
- *        library, and the three controls that decide how captions look.
+ * WHAT: The captions screen: the state of the word timings, the style
+ * library, and the three controls that decide how captions look.
  *
- * WHY:   LOCKED_NOT_HIDDEN. Every style in the library is rendered; the ones
- *        the plan does not include carry a lock badge and open the upgrade
- *        modal instead of applying. A style a customer never sees is one they
- *        have no reason to pay for — and the server refuses the apply anyway,
- *        so the badge is an affordance rather than the boundary.
+ * WHY: LOCKED_NOT_HIDDEN. Every style in the library is rendered; the ones
+ * the plan does not include carry a lock badge and open the upgrade
+ * modal instead of applying. A style a customer never sees is one they
+ * have no reason to pay for — and the server refuses the apply anyway,
+ * so the badge is an affordance rather than the boundary.
  *
- *        DEGRADE_IS_VISIBLE, which is one of the phase's own checks: an
- *        alignment that fell back to an even distribution says so, in a
- *        warning the customer can act on, with the button that fixes it next
- *        to it. A degraded video that LOOKS correct is worse than a failed
- *        one, because it is published.
+ * DEGRADE_IS_VISIBLE, which is one of the phase's own checks: an
+ * alignment that fell back to an even distribution says so, in a
+ * warning the customer can act on, with the button that fixes it next
+ * to it. A degraded video that LOOKS correct is worse than a failed
+ * one, because it is published.
  *
- *        RESTYLING_IS_FREE and the UI says so out loud. Changing the style
- *        spends no credits and makes no provider call, so the save button is
- *        never behind a confirmation; only "Re-align" is, because that one
- *        costs money.
+ * RESTYLING_IS_FREE and the UI says so out loud. Changing the style
+ * spends no credits and makes no provider call, so the save button is
+ * never behind a confirmation; only "Re-align" is, because that one
+ * costs money.
  *
- *        KEYBOARD_NAVIGABLE_GALLERY — every card is a real `<button>` with
- *        `aria-pressed`, and the preview inside it is `aria-hidden` because
- *        it is decoration: the accessible name is the style's NAME, which is
- *        the only part a screen reader can usefully convey about a look.
+ * KEYBOARD_NAVIGABLE_GALLERY — every card is a real `<button>` with
+ * `aria-pressed`, and the preview inside it is `aria-hidden` because
+ * it is decoration: the accessible name is the style's NAME, which is
+ * the only part a screen reader can usefully convey about a look.
  *
- *        POLL_WHILE_ALIGNING: the workflow writes the alignment row when it
- *        finishes and nothing pushes that to the browser. The poll stops by
- *        itself once the alignment is no longer stale.
+ * POLL_WHILE_ALIGNING: the workflow writes the alignment row when it
+ * finishes and nothing pushes that to the browser. The poll stops by
+ * itself once the alignment is no longer stale.
  * WHERE: Rendered by /dashboard/projects/[id]/captions.
  */
 
@@ -217,7 +217,7 @@ interface Draft {
 
 /**
  * SOURCE OF TRUTH KEYWORDS: AlignmentPanel, DEGRADE_IS_VISIBLE,
- *   READY_LINES_ONLY, ALIGNMENT_IS_PAID_WORK
+ * READY_LINES_ONLY, ALIGNMENT_IS_PAID_WORK
  */
 function AlignmentPanel({
   organizationId,
@@ -370,15 +370,15 @@ function AlignmentPanel({
 
 /**
  * SOURCE OF TRUTH KEYWORDS: StageAndControls, POSITION_IS_A_BAND,
- *   RESTYLING_IS_FREE
+ * RESTYLING_IS_FREE
  *
- * WHY:   The position control is three BANDS rather than a continuous
- *        slider, and that is a deliberate departure from the phase's wording.
- *        A pixel slider implies a precision the document does not have at
- *        this stage — the band is clamped into the platform's safe zone at
- *        render time, so two nearby slider positions would often produce the
- *        identical frame and the control would feel broken. Phase 15's editor
- *        is where a caption gets nudged by hand, against a real frame.
+ * WHY: The position control is three BANDS rather than a continuous
+ * slider, and that is a deliberate departure from the phase's wording.
+ * A pixel slider implies a precision the document does not have at
+ * this stage — the band is clamped into the platform's safe zone at
+ * render time, so two nearby slider positions would often produce the
+ * identical frame and the control would feel broken. Phase 15's editor
+ * is where a caption gets nudged by hand, against a real frame.
  */
 function StageAndControls({
   organizationId,
@@ -534,7 +534,7 @@ function StageAndControls({
 
 /**
  * SOURCE OF TRUTH KEYWORDS: StyleGallery, StyleCard, LOCKED_NOT_HIDDEN,
- *   KEYBOARD_NAVIGABLE_GALLERY
+ * KEYBOARD_NAVIGABLE_GALLERY
  */
 function StyleGallery({
   styles,
@@ -631,7 +631,7 @@ function StyleGallery({
                 }}
                 className={[
                   "tactile-control flex flex-col gap-2 rounded-xl border p-2 text-left transition",
-                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  "focus-visible:outline-none focus-ring",
                   style.id === selectedId
                     ? "border-primary bg-accent"
                     : "border-border hover:bg-accent/50",
@@ -687,13 +687,13 @@ function wordsPerChunkOptions(): number[] {
 /**
  * SOURCE OF TRUTH KEYWORDS: isAligning, POLL_WHILE_ALIGNING
  *
- * WHAT:  Whether an alignment asked for at `requestedAt` has landed yet.
- * WHY:   Compares the stored alignment's timestamp with the moment the run
- *        was requested, rather than watching `upToDate`. A DEGRADED
- *        alignment is deliberately never "up to date" (it must be
- *        re-runnable), so a poll keyed on that flag would never stop on the
- *        one outcome where the customer most needs the screen to settle and
- *        show them the warning.
+ * WHAT: Whether an alignment asked for at `requestedAt` has landed yet.
+ * WHY: Compares the stored alignment's timestamp with the moment the run
+ * was requested, rather than watching `upToDate`. A DEGRADED
+ * alignment is deliberately never "up to date" (it must be
+ * re-runnable), so a poll keyed on that flag would never stop on the
+ * one outcome where the customer most needs the screen to settle and
+ * show them the warning.
  * WHERE: CaptionStudio's poll interval and the panel's button state.
  */
 function isAligning(
@@ -710,24 +710,24 @@ function isAligning(
 
 /**
  * SOURCE OF TRUTH KEYWORDS: alignHasStalled, A_WAIT_MUST_HAVE_A_DEADLINE,
- *   isAligning, ALIGN_DEADLINE_MS
+ * isAligning, ALIGN_DEADLINE_MS
  *
- * WHAT:  Whether a requested alignment stopped reporting without ever landing.
+ * WHAT: Whether a requested alignment stopped reporting without ever landing.
  *
- * WHY:   A_WAIT_MUST_HAVE_A_DEADLINE. `isAligning` returned true for as long
- *        as `alignment` was null, and the align workflow has three permanent
- *        failure paths that throw BEFORE writing any alignment row — a voice
- *        withdrawn mid-run, a narration that is no longer alignable, a
- *        provider refusal. On any of them no row ever appears, so the button
- *        stayed disabled on "Timing…" and the screen polled every two seconds
- *        for the rest of the tab's life, showing no error at all.
+ * WHY: A_WAIT_MUST_HAVE_A_DEADLINE. `isAligning` returned true for as long
+ * as `alignment` was null, and the align workflow has three permanent
+ * failure paths that throw BEFORE writing any alignment row — a voice
+ * withdrawn mid-run, a narration that is no longer alignable, a
+ * provider refusal. On any of them no row ever appears, so the button
+ * stayed disabled on "Timing…" and the screen polled every two seconds
+ * for the rest of the tab's life, showing no error at all.
  *
- *        The deadline is what ends that, and this predicate is what makes the
- *        ending legible: without it the button would simply re-enable and the
- *        customer would be left to guess whether anything had happened. The
- *        workflow's own failure is recorded on its pipeline stage — a later
- *        change could surface that directly, which would be better than a
- *        clock — but a clock is what makes the screen honest today.
+ * The deadline is what ends that, and this predicate is what makes the
+ * ending legible: without it the button would simply re-enable and the
+ * customer would be left to guess whether anything had happened. The
+ * workflow's own failure is recorded on its pipeline stage — a later
+ * change could surface that directly, which would be better than a
+ * clock — but a clock is what makes the screen honest today.
  * WHERE: CaptionStudio, beside the poll.
  */
 function alignHasStalled(

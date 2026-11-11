@@ -41,7 +41,7 @@ export function OwnershipCard({
   }
 
   return (
-    <div className="flex items-center justify-between gap-4 rounded-lg border bg-card p-4 transition-colors hover:bg-accent/50">
+    <div className="tactile-raised flex items-center justify-between gap-4 rounded-lg border bg-card p-4 transition-colors hover:bg-accent/50">
       <div className="flex min-w-0 flex-1 items-center gap-3">
         <Avatar className="size-10 shrink-0">
           {owner.user.image ? (

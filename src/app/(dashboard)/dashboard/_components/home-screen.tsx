@@ -6,49 +6,49 @@
 
 /**
  * SOURCE OF TRUTH KEYWORDS: DashboardHomeScreen, HOME_IS_A_FORMAT_PICKER,
- *   FORMATS, FORMAT_CATEGORIES, FEATURED_FORMAT_KIND, COMPOSER_ROUTE,
- *   FeatureGate, GREETING_IS_LOCAL, FILTER_IS_CLIENT_STATE
+ * FORMATS, FORMAT_CATEGORIES, FEATURED_FORMAT_KIND, COMPOSER_ROUTE,
+ * FeatureGate, GREETING_IS_LOCAL, FILTER_IS_CLIENT_STATE
  *
- * WHAT:  The dashboard home screen — a greeting and credit balance, the
- *        "What are you making?" headline, category filter chips, the
- *        featured format, and the remaining formats grouped by category.
+ * WHAT: The dashboard home screen — a greeting and credit balance, the
+ * "What are you making?" headline, category filter chips, the
+ * featured format, and the remaining formats grouped by category.
  *
- * WHY:   HOME_IS_A_FORMAT_PICKER. The old home was a placeholder card telling
- *        the operator to declare features in the registry. The question a
- *        creator actually arrives with is "what am I making today", and every
- *        answer on this screen starts the same mutation with a different
- *        format preselected.
+ * WHY: HOME_IS_A_FORMAT_PICKER. The old home was a placeholder card telling
+ * the operator to declare features in the registry. The question a
+ * creator actually arrives with is "what am I making today", and every
+ * answer on this screen starts the same mutation with a different
+ * format preselected.
  *
- *        IT OFFERS WHAT THIS APP CAN BUILD, not what the design drew. The
- *        mockup shows studios this product does not have (Director, Marketing
- *        Studio, Italian Brainrot). Rendering them would be advertising
- *        vapour from inside a paid product. Instead every card is driven by
- *        `FORMATS`, which is keyed by `ProjectKind` — so the picker and the
- *        pipeline cannot disagree, and the day a kind is added its card
- *        appears here with no edit to this file.
+ * IT OFFERS WHAT THIS APP CAN BUILD, not what the design drew. The
+ * mockup shows studios this product does not have (Director, Marketing
+ * Studio, Italian Brainrot). Rendering them would be advertising
+ * vapour from inside a paid product. Instead every card is driven by
+ * `FORMATS`, which is keyed by `ProjectKind` — so the picker and the
+ * pipeline cannot disagree, and the day a kind is added its card
+ * appears here with no edit to this file.
  *
- *        FILTER_IS_CLIENT_STATE and nothing more: the chips re-filter an
- *        array already in memory. No query, no URL param — this is a four
- *        item list, and a round trip to narrow it would be slower than not
- *        filtering at all. (If the catalogue ever grows past a screenful,
- *        the chip state is the thing to lift into the URL.)
+ * FILTER_IS_CLIENT_STATE and nothing more: the chips re-filter an
+ * array already in memory. No query, no URL param — this is a four
+ * item list, and a round trip to narrow it would be slower than not
+ * filtering at all. (If the catalogue ever grows past a screenful,
+ * the chip state is the thing to lift into the URL.)
  *
- *        GREETING_IS_LOCAL: computed from the BROWSER's clock in an effect,
- *        not during render. The server renders in its own timezone, so
- *        greeting someone "good evening" server-side is wrong for most of
- *        the world and also a hydration mismatch. It starts empty and fills
- *        in, which is why it is the one thing on the screen allowed to
- *        appear a frame late.
+ * GREETING_IS_LOCAL: computed from the BROWSER's clock in an effect,
+ * not during render. The server renders in its own timezone, so
+ * greeting someone "good evening" server-side is wrong for most of
+ * the world and also a hydration mismatch. It starts empty and fills
+ * in, which is why it is the one thing on the screen allowed to
+ * appear a frame late.
  *
- *        STARTING IS STILL GATED. Every CTA routes through one
- *        <FeatureGate resource="projects">-wrapped handler, so a workspace at
- *        its plan cap gets the upgrade modal instead of a form the server
- *        would refuse — the same contract <CreateProjectButton> already has.
+ * STARTING IS STILL GATED. Every CTA routes through one
+ * <FeatureGate resource="projects">-wrapped handler, so a workspace at
+ * its plan cap gets the upgrade modal instead of a form the server
+ * would refuse — the same contract <CreateProjectButton> already has.
  *
  * WHERE: Rendered by src/app/(dashboard)/dashboard/page.tsx. Format content
- *        comes from src/lib/config/formats.ts, colours from ./format-tokens,
- *        the cards from ./format-card, and the create flow is the sheet the
- *        projects page already uses.
+ * comes from src/lib/config/formats.ts, colours from ./format-tokens,
+ * the cards from ./format-card, and the create flow is the sheet the
+ * projects page already uses.
  */
 
 import * as React from "react";
@@ -76,6 +76,7 @@ import { trpc } from "@/trpc/react-provider";
 import { FeatureGate } from "@/components/feature-gate";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { HighlightHeading } from "@/components/global/highlight-heading";
 
 import { FormatCard } from "./format-card";
 import { CATEGORY_CLASSES } from "./format-tokens";
@@ -87,17 +88,17 @@ type Filter = "all" | FormatCategoryKey;
 
 /**
  * SOURCE OF TRUTH KEYWORDS: localGreeting, serverGreeting, subscribeToNothing,
- *   GREETING_IS_LOCAL
+ * GREETING_IS_LOCAL
  *
- * WHAT:  The three arguments `useSyncExternalStore` needs to read the
- *        viewer's local time of day without a hydration mismatch.
- * WHY:   The "store" never changes during a session, so `subscribe` returns
- *        an unsubscribe and does nothing — the hook is being used for its
- *        SERVER SNAPSHOT, not for its subscription. `localGreeting` returns
- *        one of three interned strings, so successive calls compare equal
- *        under Object.is and React does not loop.
- *        Module scope, not inline: a `subscribe` identity that changes every
- *        render makes the hook resubscribe on every render.
+ * WHAT: The three arguments `useSyncExternalStore` needs to read the
+ * viewer's local time of day without a hydration mismatch.
+ * WHY: The "store" never changes during a session, so `subscribe` returns
+ * an unsubscribe and does nothing — the hook is being used for its
+ * SERVER SNAPSHOT, not for its subscription. `localGreeting` returns
+ * one of three interned strings, so successive calls compare equal
+ * under Object.is and React does not loop.
+ * Module scope, not inline: a `subscribe` identity that changes every
+ * render makes the hook resubscribe on every render.
  * WHERE: DashboardHomeScreen above.
  */
 function subscribeToNothing(): () => void {
@@ -159,21 +160,13 @@ export function DashboardHomeScreen() {
       <HomeHeader greeting={greeting} name={profile?.name ?? null} />
 
       <div>
-        <h1 className="font-display text-[2.75rem] font-extrabold leading-none tracking-tight text-foreground lg:text-[3.25rem]">
-          What are you{" "}
-          <span className="relative inline-block px-3 py-0.5">
-            <span
-              aria-hidden="true"
-              className="brand-highlight absolute inset-0 rounded-xl"
-            />
-            <span className="relative text-brand-accent-foreground">
-              making
-            </span>
-          </span>
-          {/* Clears the highlight's 6px offset shadow — see the note on
-              .brand-highlight in globals.css. */}
-          <span className="ml-3">?</span>
-        </h1>
+        <HighlightHeading
+          before="What are you"
+          highlight="making"
+          trailing="?"
+          radius="xl"
+          className="font-display text-[2.75rem] font-extrabold leading-none tracking-tight text-foreground lg:text-[3.25rem]"
+        />
         <p className="mt-3 max-w-2xl text-base leading-relaxed text-muted-foreground">
           Pick by what you&apos;re starting from. Every format writes its own
           script, casts a voice and captions itself.
@@ -221,13 +214,13 @@ export function DashboardHomeScreen() {
 /**
  * SOURCE OF TRUTH KEYWORDS: HomeHeader, CREDITS_PILL, PERMISSION_GATED_READ
  *
- * WHAT:  The thin row above the headline — who is being greeted, and what
- *        they have left to spend.
- * WHY:   PERMISSION_GATED_READ: the balance query needs `credits:read`, so a
- *        member without it sees the greeting alone rather than a pill that
- *        can only ever render an error. The pill is a LINK to the credits
- *        screen — a number a creator watches go down is one they will want to
- *        act on, and making them hunt for the page is the whole friction.
+ * WHAT: The thin row above the headline — who is being greeted, and what
+ * they have left to spend.
+ * WHY: PERMISSION_GATED_READ: the balance query needs `credits:read`, so a
+ * member without it sees the greeting alone rather than a pill that
+ * can only ever render an error. The pill is a LINK to the credits
+ * screen — a number a creator watches go down is one they will want to
+ * act on, and making them hunt for the page is the whole friction.
  * WHERE: The top of the home screen.
  */
 function HomeHeader({
@@ -283,14 +276,14 @@ function HomeHeader({
 /**
  * SOURCE OF TRUTH KEYWORDS: CategoryChips, FILTER_IS_CLIENT_STATE, radiogroup
  *
- * WHAT:  The "All formats / Explain / Entertain / …" filter row.
- * WHY:   A `radiogroup` of buttons, not a tablist: these select the MEANING
- *        of one list rather than swapping panels, and nothing appears in
- *        place when one is pressed. Same call, and the same reasoning, as the
- *        landing page's hero mode tabs.
- *        Categories with no format in them are not rendered at all — a chip
- *        that can only ever produce an empty screen is a dead control, and
- *        this app has no Market or Music formats today.
+ * WHAT: The "All formats / Explain / Entertain / …" filter row.
+ * WHY: A `radiogroup` of buttons, not a tablist: these select the MEANING
+ * of one list rather than swapping panels, and nothing appears in
+ * place when one is pressed. Same call, and the same reasoning, as the
+ * landing page's hero mode tabs.
+ * Categories with no format in them are not rendered at all — a chip
+ * that can only ever produce an empty screen is a dead control, and
+ * this app has no Market or Music formats today.
  * WHERE: Between the headline and the featured panel.
  */
 function CategoryChips({
@@ -330,7 +323,7 @@ function CategoryChips({
             aria-checked={active}
             onClick={() => onChange(chip.id)}
             className={cn(
-              "tactile-control inline-flex min-h-10 items-center gap-2 rounded-full border px-4 text-sm font-medium outline-none transition-colors focus-visible:ring-3 focus-visible:ring-ring/50 motion-reduce:transition-none",
+              "tactile-control inline-flex min-h-10 items-center gap-2 rounded-full border px-4 text-sm font-medium outline-none transition-colors focus-ring motion-reduce:transition-none",
               active
                 ? "border-foreground bg-foreground text-background"
                 : "border-border-strong bg-transparent text-foreground-2 hover:text-foreground",
@@ -352,15 +345,15 @@ function CategoryChips({
 
 /**
  * SOURCE OF TRUTH KEYWORDS: FeaturedFormat, FEATURED_FORMAT_KIND,
- *   CTA_IS_LARGE_TEXT, FeatureGate
+ * CTA_IS_LARGE_TEXT, FeatureGate
  *
- * WHAT:  The large panel for the one format the product is pushing.
- * WHY:   CTA_IS_LARGE_TEXT — the button is 18px/700, which is what keeps
- *        white on the brand orange inside WCAG's large-text allowance (see
- *        CONTRAST_DEBT in globals.css). Shrinking this label is the one
- *        change here that would break accessibility rather than just looks.
- *        The CTA is wrapped in <FeatureGate> so a workspace at its project
- *        cap meets the upgrade modal instead of the create form.
+ * WHAT: The large panel for the one format the product is pushing.
+ * WHY: CTA_IS_LARGE_TEXT — the button is 18px/700, which is what keeps
+ * white on the brand orange inside WCAG's large-text allowance (see
+ * CONTRAST_DEBT in globals.css). Shrinking this label is the one
+ * change here that would break accessibility rather than just looks.
+ * The CTA is wrapped in <FeatureGate> so a workspace at its project
+ * cap meets the upgrade modal instead of the create form.
  * WHERE: Between the chips and the category sections.
  */
 function FeaturedFormat({
@@ -421,7 +414,7 @@ function FeaturedFormat({
               <button
                 type="button"
                 onClick={() => onStart(kind)}
-                className="brutal-shadow-brand inline-flex min-h-[52px] cursor-pointer items-center gap-2.5 rounded-2xl bg-brand px-[22px] text-lg font-bold text-brand-foreground outline-none hover:bg-brand/90 focus-visible:ring-3 focus-visible:ring-ring/50"
+                className="brutal-shadow-brand inline-flex min-h-[52px] cursor-pointer items-center gap-2.5 rounded-2xl bg-brand px-[22px] text-lg font-bold text-brand-foreground outline-none hover:bg-brand/90 focus-ring"
               >
                 {format.cta}
                 <ArrowRightIcon className="size-[18px]" aria-hidden="true" />

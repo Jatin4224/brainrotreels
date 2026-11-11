@@ -508,6 +508,29 @@ html:has([data-app-banner]) {
  *        Every animation stops under `prefers-reduced-motion`: the phone then
  *        shows the first short, still, with the thumb resting. Nothing is
  *        hidden, so the composition is unchanged. */
+/* SOURCE OF TRUTH KEYWORDS: --overlay, SCRIM_IS_A_TOKEN, DialogOverlay,
+ * SheetOverlay, AlertDialogOverlay
+ *
+ * WHAT:  The wash behind a modal surface.
+ * WHY:   It was `bg-black/10` typed into three primitives — a raw colour, so
+ *        it could never follow the theme, and at 10% over this product's
+ *        near-black page it dimmed nothing: the dialog read as floating over a
+ *        page that still looked live and clickable. A scrim's whole job is to
+ *        say the thing behind it is inert.
+ *
+ *        Pinned across themes like --alert-banner and --success: a scrim is a
+ *        function of "there is a modal above this", not of the palette. Paired
+ *        with the `backdrop-blur-xs` the overlays already carry.
+ * WHERE: dialog.tsx, alert-dialog.tsx and sheet.tsx, as `bg-overlay`. */
+:root,
+.dark {
+  --overlay: oklch(0 0 0 / 0.5);
+}
+
+@theme inline {
+  --color-overlay: var(--overlay);
+}
+
 :root,
 .dark {
   --hand-skin: oklch(0.82 0.056 59);
@@ -614,6 +637,93 @@ html:has([data-app-banner]) {
     .reel-touch {
       opacity: 0;
     }
+  }
+}
+
+/* SOURCE OF TRUTH KEYWORDS: FOCUS_IS_AN_OUTLINE, focus-ring, focus-ring-inset,
+ * ONE_FOCUS_AFFORDANCE, OUTLINE_COMPOSES_SHADOW_REPLACES, --ring, TACTILE_UI
+ *
+ * WHAT:  The product's single focus indicator, as a utility: a 2px solid ring
+ *        in `--ring`, offset 2px, plus the invalid-state colouring.
+ *
+ * WHY:   OUTLINE_COMPOSES_SHADOW_REPLACES. Focus used to be `ring-*`, which is
+ *        a BOX-SHADOW. So is every tactile surface in this file. box-shadow is
+ *        a single property, so focusing a button, a checked checkbox, the
+ *        active tab or the current nav row REPLACED its depth with the ring —
+ *        the element flattened for exactly as long as it was focused. Two
+ *        cases were worse than cosmetic: Base UI activates a tab on arrow-key
+ *        focus, so the active tab was flat for the whole keyboard interaction,
+ *        and `aria-invalid` flattened a field at rest, i.e. precisely while
+ *        somebody was looking at the error. `outline` is a separate property
+ *        and composes with any shadow, so the depth survives.
+ *
+ *        IT IS AN `@utility`, NOT A COMPONENT CLASS, for the same reason the
+ *        tactile family had to stop fighting utilities: a component-layer rule
+ *        loses to the `outline-none` these elements already carry. As a
+ *        utility whose body is nested under `&:focus-visible`, it is (0,2,0)
+ *        against `outline-none`'s (0,1,0) and wins on SPECIFICITY rather than
+ *        on source order, which is the only way to be sure.
+ *
+ *        It writes the `outline` SHORTHAND deliberately. Tailwind's own
+ *        `outline-2` sets `outline-style: var(--tw-outline-style)`, and
+ *        `outline-none` sets that variable to `none` — so the obvious
+ *        conversion, `focus-visible:outline-2`, renders NOTHING on any element
+ *        that also has `outline-none`. Which is most of them.
+ *
+ *        ONE_FOCUS_AFFORDANCE: the product previously mixed `ring-3`, `ring-2`
+ *        and `ring-[3px]`, and some interactive surfaces had none at all. One
+ *        name means one look, and the width is set here rather than per call
+ *        site.
+ *
+ *        `focus-ring-inset` is the same indicator drawn INSIDE the element,
+ *        for anything whose parent clips it — a table row, a tile in a
+ *        scrolling grid. An outline is clipped by `overflow-hidden` exactly as
+ *        a ring was.
+ * WHERE: Every interactive element in src/components/ui, src/components/global
+ *        and the dashboard routes. Replaces `focus-visible:ring-*`,
+ *        `focus-visible:border-ring` and `aria-invalid:ring-*`. */
+@utility focus-ring {
+  /* Invalid at REST: the error has to be visible before the field is focused.
+     Softened, because this one is always on screen. */
+  &[aria-invalid="true"] {
+    outline: 2px solid color-mix(in srgb, var(--destructive) 45%, transparent);
+    outline-offset: 2px;
+  }
+
+  /* The colour is a VARIABLE so a variant can repoint it without fighting
+     this rule for the `outline` property. A destructive button sets
+     `[--focus-ring-color:var(--destructive)]`, which is a plain custom
+     property with no state and no specificity contest — the alternative, a
+     second `outline-color` utility, ties at (0,2,0) and is decided by
+     source order, which is not something to rely on. */
+  &:focus-visible {
+    outline: 2px solid var(--focus-ring-color, var(--ring));
+    outline-offset: 2px;
+  }
+
+  /* Both at once — (0,3,0), so it beats either rule above whatever the order. */
+  &[aria-invalid="true"]:focus-visible {
+    outline: 2px solid var(--destructive);
+    outline-offset: 2px;
+  }
+}
+
+/* For a SHELL that owns the focus look on behalf of a field nested inside
+   it — the composer card, the hero prompt card. The inner field opts out with
+   `focus-visible:outline-none!`, and the shell lights up instead, which is
+   what those components always intended; before this there was no rule to
+   carry that intent, so the field simply had no focus indicator at all. */
+@utility focus-ring-within {
+  &:focus-within {
+    outline: 2px solid var(--focus-ring-color, var(--ring));
+    outline-offset: 2px;
+  }
+}
+
+@utility focus-ring-inset {
+  &:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: -2px;
   }
 }
 
@@ -841,15 +951,13 @@ html:has([data-app-banner]) {
     box-shadow: var(--tactile-highlight-soft);
   }
 
-  /* Fields only. Held in its own utility so the focus ring the primitives
-     already declare is free to take the box-shadow back on :focus-visible. */
+  /* Fields only. It used to SURRENDER the inset on focus, because the focus
+     ring was a box-shadow and the two could not share the property — so a
+     field lost its recess for exactly as long as you were typing in it. Focus
+     is an outline now (see FOCUS_IS_AN_OUTLINE), which composes, so the recess
+     stays and the surrender rule is gone. */
   .tactile-field {
     box-shadow: var(--tactile-inset);
-  }
-
-  .tactile-field:focus-visible,
-  .tactile-field:focus-within {
-    box-shadow: none;
   }
 
   /* SOURCE OF TRUTH KEYWORDS: tactile-panel, tactile-panel-sm, tactile-panel-lg,
@@ -949,7 +1057,14 @@ html:has([data-app-banner]) {
      `!important` and no ordering trick. */
   .tactile-control[data-checked],
   .tactile-control[data-active],
-  .tactile-control[aria-current="true"],
+  .tactile-control[data-selected],
+  /* ANY aria-current value, not just "true". The spec's useful values are
+     words — "page", "step", "location" — and all three of this app's real
+     call sites emit "page". Matching only "true" made this branch dead
+     everywhere except the one component that had been written to satisfy it,
+     which is the wrong way round: the CSS should follow correct ARIA, not the
+     other way. "false" is excluded because it means NOT current. */
+  .tactile-control[aria-current]:not([aria-current="false"]),
   .tactile-control[aria-checked="true"],
   .tactile-control[aria-pressed="true"],
   .tactile-control[aria-selected="true"] {

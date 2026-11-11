@@ -6,40 +6,40 @@
 
 /**
  * SOURCE OF TRUTH KEYWORDS: AuthForm, AuthFormProps, GOOGLE_OAUTH_ENABLED,
- *   authClient, signInSchema, signUpSchema, GoogleGlyph, AuthSocialRow,
- *   AuthPasswordField, CheckInbox, AUTH_SURFACE, CTA_PINS_TO_THE_BOTTOM,
- *   ONE_RESPONSIVE_COMPONENT
+ * authClient, signInSchema, signUpSchema, GoogleGlyph, AuthSocialRow,
+ * AuthPasswordField, CheckInbox, AUTH_SURFACE, CTA_PINS_TO_THE_BOTTOM,
+ * ONE_RESPONSIVE_COMPONENT
  *
- * WHAT:  The email+password+Google auth surface. `AuthForm` is a thin
- *        dispatcher that mounts a concrete RHF form per mode (sign-in or
- *        sign-up). Each form is: the segmented mode switch, the OAuth row,
- *        the "or with email" rule, the fields, the one loud CTA, and a
- *        cross-link footer.
+ * WHAT: The email+password+Google auth surface. `AuthForm` is a thin
+ * dispatcher that mounts a concrete RHF form per mode (sign-in or
+ * sign-up). Each form is: the segmented mode switch, the OAuth row,
+ * the "or with email" rule, the fields, the one loud CTA, and a
+ * cross-link footer.
  *
- * WHY:   CLAUDE.md mandates zod + react-hook-form for every input surface, so
- *        both forms resolve against the shared schemas in src/lib/types. Two
- *        concrete forms (not one generic) give exact RHF `Path<>` inference
- *        without `any`.
+ * WHY: CLAUDE.md mandates zod + react-hook-form for every input surface, so
+ * both forms resolve against the shared schemas in src/lib/types. Two
+ * concrete forms (not one generic) give exact RHF `Path<>` inference
+ * without `any`.
  *
- *        ONE_RESPONSIVE_COMPONENT, per auth-design.md §8: the desktop and
- *        mobile artboards are the SAME component at two widths, not two
- *        screens. Below `lg` the form sits bare on the page background and
- *        its CTA pins to the bottom (CTA_PINS_TO_THE_BOTTOM — the `mt-auto`
- *        below, which only reaches the viewport edge because AuthShell makes
- *        the column fill the screen); at `lg` and up it collects into a card
- *        beside the showcase panel and the mode tabs appear. Branching on
- *        width in JS instead would need a measured breakpoint, which is a
- *        hydration mismatch on the first paint of the one screen that must
- *        not flicker.
+ * ONE_RESPONSIVE_COMPONENT, per auth-design.md §8: the desktop and
+ * mobile artboards are the SAME component at two widths, not two
+ * screens. Below `lg` the form sits bare on the page background and
+ * its CTA pins to the bottom (CTA_PINS_TO_THE_BOTTOM — the `mt-auto`
+ * below, which only reaches the viewport edge because AuthShell makes
+ * the column fill the screen); at `lg` and up it collects into a card
+ * beside the showcase panel and the mode tabs appear. Branching on
+ * width in JS instead would need a measured breakpoint, which is a
+ * hydration mismatch on the first paint of the one screen that must
+ * not flicker.
  *
- *        The skins come from `@/components/global/auth/auth-styles` rather
- *        than being typed here, so the forgot-password and reset-password
- *        screens cannot drift away from these two.
+ * The skins come from `@/components/global/auth/auth-styles` rather
+ * than being typed here, so the forgot-password and reset-password
+ * screens cannot drift away from these two.
  *
  * WHERE: Mounted by src/app/(auth)/sign-in|sign-up/page.tsx inside AuthShell,
- *        under <AuthHero>; talks to authClient
- *        (src/lib/better-auth/auth-client.ts); schemas live in
- *        src/lib/types/auth.ts.
+ * under <AuthHero>; talks to authClient
+ * (src/lib/better-auth/auth-client.ts); schemas live in
+ * src/lib/types/auth.ts.
  */
 
 import * as React from "react";
@@ -89,8 +89,8 @@ import { CheckInbox } from "./check-inbox";
 /**
  * SOURCE OF TRUTH KEYWORDS: AuthFormProps
  *
- * WHAT:  Props for AuthForm — mode + optional post-success callback URL
- *        (defaults to ROUTES.dashboard).
+ * WHAT: Props for AuthForm — mode + optional post-success callback URL
+ * (defaults to ROUTES.dashboard).
  * WHERE: Used by the (auth) route pages.
  */
 export interface AuthFormProps {
@@ -122,7 +122,7 @@ const AUTH_CARD_CLASS = "flex flex-1 flex-col gap-5 lg:flex-none";
 /**
  * SOURCE OF TRUTH KEYWORDS: AuthForm
  *
- * WHAT:  Selects the concrete form by `mode`.
+ * WHAT: Selects the concrete form by `mode`.
  * WHERE: Rendered by sign-in/page.tsx and sign-up/page.tsx.
  */
 /* POST_AUTH_TARGET_IS_THE_DASHBOARD, not "/". `/` is a public landing page
@@ -472,18 +472,18 @@ function AuthSubmit({
 
 /**
  * SOURCE OF TRUTH KEYWORDS: AuthPasswordField, SHOW_HIDE_IS_A_BUTTON,
- *   TOUCH_TARGET_44
+ * TOUCH_TARGET_44
  *
- * WHAT:  A password input with a Show/Hide toggle inside its right edge.
- * WHY:   SHOW_HIDE_IS_A_BUTTON — a real <button type="button"> with an
- *        `aria-label` that says what pressing it will DO, so it neither
- *        submits the form nor reads as "Show" with no object. The field keeps
- *        80px of right padding so a long password never runs under the
- *        toggle, and the toggle is at least 44px wide for the touch target.
- *        `tabIndex={-1}`: Tab from the password should reach the submit
- *        button, which is where somebody typing is going; the toggle is
- *        reachable by Shift+Tab and by touch, and sighted keyboard users have
- *        no reason to stop on it mid-flow.
+ * WHAT: A password input with a Show/Hide toggle inside its right edge.
+ * WHY: SHOW_HIDE_IS_A_BUTTON — a real <button type="button"> with an
+ * `aria-label` that says what pressing it will DO, so it neither
+ * submits the form nor reads as "Show" with no object. The field keeps
+ * 80px of right padding so a long password never runs under the
+ * toggle, and the toggle is at least 44px wide for the touch target.
+ * `tabIndex={-1}`: Tab from the password should reach the submit
+ * button, which is where somebody typing is going; the toggle is
+ * reachable by Shift+Tab and by touch, and sighted keyboard users have
+ * no reason to stop on it mid-flow.
  * WHERE: Both forms above. Receives RHF's field props directly.
  */
 const AuthPasswordField = React.forwardRef<
@@ -506,7 +506,7 @@ const AuthPasswordField = React.forwardRef<
         onClick={() => setVisible((current) => !current)}
         aria-label={visible ? "Hide password" : "Show password"}
         aria-pressed={visible}
-        className="absolute inset-y-0 right-0 flex min-w-11 items-center justify-center rounded-r-xl px-4 text-base font-medium text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 motion-reduce:transition-none"
+        className="absolute inset-y-0 right-0 flex min-w-11 items-center justify-center rounded-r-xl px-4 text-base font-medium text-muted-foreground outline-none transition-colors hover:text-foreground focus-ring motion-reduce:transition-none"
       >
         {/* A WORD, NOT AN ICON. The artboard spells it out, and it is the
             right call: a crossed-out eye is read as both "it is hidden" and
@@ -522,31 +522,31 @@ const AuthPasswordField = React.forwardRef<
 
 /**
  * SOURCE OF TRUTH KEYWORDS: AuthSocialRow, SOCIAL_PROVIDERS, SocialProviderId,
- *   GOOGLE_OAUTH_ENABLED, APPLE_OAUTH_ENABLED, SOCIAL_PROVIDERS_ARE_OPT_IN,
- *   NO_DEAD_PROVIDER_BUTTONS
+ * GOOGLE_OAUTH_ENABLED, APPLE_OAUTH_ENABLED, SOCIAL_PROVIDERS_ARE_OPT_IN,
+ * NO_DEAD_PROVIDER_BUTTONS
  *
- * WHAT:  The OAuth buttons above the "or with email" rule — Google, Apple, or
- *        nothing when neither is configured.
+ * WHAT: The OAuth buttons above the "or with email" rule — Google, Apple, or
+ * nothing when neither is configured.
  *
- * WHY:   NO_DEAD_PROVIDER_BUTTONS, which is the rule the list below exists to
- *        keep. A provider renders only when its PUBLIC client id is present,
- *        mirroring `resolveSocialProviders` in src/lib/better-auth/auth.ts
- *        exactly — the server refuses a provider it has no secret for, and a
- *        button that opens a round trip ending in "unsupported provider"
- *        reads to a user as the product being broken rather than the provider
- *        being switched off. The envs are the two halves of one switch.
+ * WHY: NO_DEAD_PROVIDER_BUTTONS, which is the rule the list below exists to
+ * keep. A provider renders only when its PUBLIC client id is present,
+ * mirroring `resolveSocialProviders` in src/lib/better-auth/auth.ts
+ * exactly — the server refuses a provider it has no secret for, and a
+ * button that opens a round trip ending in "unsupported provider"
+ * reads to a user as the product being broken rather than the provider
+ * being switched off. The envs are the two halves of one switch.
  *
- *        A LIST, not two hand-written buttons: the row's column count is
- *        derived from how many are enabled, so one provider is full width and
- *        two split the row, with no layout branch to get wrong. Adding a
- *        third is an entry here plus a resolver on the server.
+ * A LIST, not two hand-written buttons: the row's column count is
+ * derived from how many are enabled, so one provider is full width and
+ * two split the row, with no layout branch to get wrong. Adding a
+ * third is an entry here plus a resolver on the server.
  *
- *        The whole block disappears when nothing is configured, rule and all:
- *        an "or with email" divider with nothing above it is the oldest bug
- *        in this pattern.
+ * The whole block disappears when nothing is configured, rule and all:
+ * an "or with email" divider with nothing above it is the oldest bug
+ * in this pattern.
  *
  * WHERE: Both forms above. `onSelect` is given the provider id and routes it
- *        to authClient.signIn.social.
+ * to authClient.signIn.social.
  */
 const SOCIAL_PROVIDERS = [
   {
@@ -640,13 +640,13 @@ function AuthFooter({
 /**
  * SOURCE OF TRUTH KEYWORDS: useAuthEffects, pendingProvider, SocialProviderId
  *
- * WHAT:  Shared error state plus the OAuth handler for both forms.
- * WHY:   `pendingProvider` is the id of the provider being used, not a
- *        boolean: with two buttons in the row, a single `isPending` would
- *        spin BOTH of them on one click. It doubles as the re-entrancy guard
- *        the boolean was — a non-null value means a redirect is already in
- *        flight. The provider id goes into the failure message so "Apple
- *        sign-in failed" names the thing that actually failed.
+ * WHAT: Shared error state plus the OAuth handler for both forms.
+ * WHY: `pendingProvider` is the id of the provider being used, not a
+ * boolean: with two buttons in the row, a single `isPending` would
+ * spin BOTH of them on one click. It doubles as the re-entrancy guard
+ * the boolean was — a non-null value means a redirect is already in
+ * flight. The provider id goes into the failure message so "Apple
+ * sign-in failed" names the thing that actually failed.
  * WHERE: SignInForm and SignUpForm above.
  */
 function useAuthEffects() {

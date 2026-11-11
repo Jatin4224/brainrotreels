@@ -6,47 +6,47 @@
 
 /**
  * SOURCE OF TRUTH KEYWORDS: TimelineTracks, TrackLane, ClipBlock, TimelineRuler,
- *   PIXELS_PER_SECOND, DRAG_IS_A_PREVIEW_THEN_AN_OP, SNAP_TO_BOUNDARIES,
- *   EDGE_IS_A_TRIM_BODY_IS_A_MOVE, CAPTIONS_ARE_NOT_DRAGGABLE,
- *   KEYBOARD_REACHABLE_CLIPS
+ * PIXELS_PER_SECOND, DRAG_IS_A_PREVIEW_THEN_AN_OP, SNAP_TO_BOUNDARIES,
+ * EDGE_IS_A_TRIM_BODY_IS_A_MOVE, CAPTIONS_ARE_NOT_DRAGGABLE,
+ * KEYBOARD_REACHABLE_CLIPS
  *
- * WHAT:  The five lanes along the bottom of the editor: the ruler, the
- *        playhead, and every clip as a draggable, trimmable, selectable block.
+ * WHAT: The five lanes along the bottom of the editor: the ruler, the
+ * playhead, and every clip as a draggable, trimmable, selectable block.
  *
- * WHY:   DRAG_IS_A_PREVIEW_THEN_AN_OP. A drag moves a CSS offset and nothing
- *        else; the document is untouched until the pointer comes up, when one
- *        op is emitted for the whole gesture. Two things fall out of that and
- *        both matter: the undo stack gets one entry per gesture rather than one
- *        per mouse move (ONE_GESTURE_ONE_UNDO in the session), and the
- *        autosave posts one op rather than two hundred.
+ * WHY: DRAG_IS_A_PREVIEW_THEN_AN_OP. A drag moves a CSS offset and nothing
+ * else; the document is untouched until the pointer comes up, when one
+ * op is emitted for the whole gesture. Two things fall out of that and
+ * both matter: the undo stack gets one entry per gesture rather than one
+ * per mouse move (ONE_GESTURE_ONE_UNDO in the session), and the
+ * autosave posts one op rather than two hundred.
  *
- *        EDGE_IS_A_TRIM_BODY_IS_A_MOVE, which is what every editor does and
- *        what the ops already distinguish: dragging an edge changes the length
- *        without moving the other edge (`trim`), dragging the body changes the
- *        start and keeps the length (`move`). Conflating them is named in
- *        ops.ts as the most common way a hand-rolled timeline gets edits
- *        wrong, so the two gestures are different handles here rather than one
- *        handle with a modifier.
+ * EDGE_IS_A_TRIM_BODY_IS_A_MOVE, which is what every editor does and
+ * what the ops already distinguish: dragging an edge changes the length
+ * without moving the other edge (`trim`), dragging the body changes the
+ * start and keeps the length (`move`). Conflating them is named in
+ * ops.ts as the most common way a hand-rolled timeline gets edits
+ * wrong, so the two gestures are different handles here rather than one
+ * handle with a modifier.
  *
- *        SNAP_TO_BOUNDARIES: a drag lands on a nearby clip edge or the
- *        playhead when it is within a few pixels, because frame-accurate
- *        butt-joins are the common intent and nobody can hit them by hand. The
- *        threshold is in PIXELS, not seconds — it has to feel the same at every
- *        zoom level.
+ * SNAP_TO_BOUNDARIES: a drag lands on a nearby clip edge or the
+ * playhead when it is within a few pixels, because frame-accurate
+ * butt-joins are the common intent and nobody can hit them by hand. The
+ * threshold is in PIXELS, not seconds — it has to feel the same at every
+ * zoom level.
  *
- *        CAPTIONS_ARE_NOT_DRAGGABLE, enforced by the ops and reflected here
- *        rather than contradicted: a caption's timing comes from the words it
- *        covers (CAPTIONS_FOLLOW_WORDS), so its block selects and opens the
- *        text editor instead of offering handles that would be refused.
+ * CAPTIONS_ARE_NOT_DRAGGABLE, enforced by the ops and reflected here
+ * rather than contradicted: a caption's timing comes from the words it
+ * covers (CAPTIONS_FOLLOW_WORDS), so its block selects and opens the
+ * text editor instead of offering handles that would be refused.
  *
- *        KEYBOARD_REACHABLE_CLIPS — every block is a real `<button>` with an
- *        accessible name and `aria-pressed`, so the timeline is navigable by
- *        tab and the editor's shortcuts (split, delete) work on whatever is
- *        selected. A div with an onClick would make the whole screen
- *        mouse-only.
+ * KEYBOARD_REACHABLE_CLIPS — every block is a real `<button>` with an
+ * accessible name and `aria-pressed`, so the timeline is navigable by
+ * tab and the editor's shortcuts (split, delete) work on whatever is
+ * selected. A div with an onClick would make the whole screen
+ * mouse-only.
  *
  * WHERE: Rendered by timeline-editor.tsx, driven by use-timeline-editor's
- *        `edit`.
+ * `edit`.
  */
 
 import * as React from "react";
@@ -67,14 +67,14 @@ import { Button } from "@/components/ui/button";
 /**
  * SOURCE OF TRUTH KEYWORDS: PIXELS_PER_SECOND, ZOOM_LEVELS, SNAP_PIXELS
  *
- * WHAT:  The zoom scale, and how close a drag has to land to snap.
- * WHY:   A fixed set rather than a continuous slider: the useful question is
- *        "whole video" versus "this sentence", and three answers cover it
- *        without a control nobody can aim. 12px/s fits roughly three minutes
- *        on a laptop, which is the length this product makes.
- *        SNAP_PIXELS is in screen pixels so the gesture feels identical at
- *        every zoom — eight is about the width of a fingertip's worth of mouse
- *        wobble and well short of the gap between two deliberate positions.
+ * WHAT: The zoom scale, and how close a drag has to land to snap.
+ * WHY: A fixed set rather than a continuous slider: the useful question is
+ * "whole video" versus "this sentence", and three answers cover it
+ * without a control nobody can aim. 12px/s fits roughly three minutes
+ * on a laptop, which is the length this product makes.
+ * SNAP_PIXELS is in screen pixels so the gesture feels identical at
+ * every zoom — eight is about the width of a fingertip's worth of mouse
+ * wobble and well short of the gap between two deliberate positions.
  * WHERE: The zoom buttons; secondsFromDelta and snap below.
  */
 const ZOOM_LEVELS = [12, 40, 120] as const;
@@ -115,11 +115,11 @@ export interface TimelineTracksProps {
 /**
  * SOURCE OF TRUTH KEYWORDS: DragState, DRAG_IS_A_PREVIEW_THEN_AN_OP
  *
- * WHAT:  The gesture in progress: what is being dragged, from where, and by
- *        how far so far.
- * WHY:   Held in one state object rather than three, so a render can never see
- *        a half-updated gesture — and so releasing the pointer has everything
- *        it needs to build the op without reading the DOM back.
+ * WHAT: The gesture in progress: what is being dragged, from where, and by
+ * how far so far.
+ * WHY: Held in one state object rather than three, so a render can never see
+ * a half-updated gesture — and so releasing the pointer has everything
+ * it needs to build the op without reading the DOM back.
  * WHERE: TimelineTracks' pointer handlers.
  */
 interface DragState {
@@ -192,7 +192,7 @@ export function TimelineTracks({
 
   /**
    * SOURCE OF TRUTH KEYWORDS: endDrag, DRAG_IS_A_PREVIEW_THEN_AN_OP,
-   *   EDGE_IS_A_TRIM_BODY_IS_A_MOVE
+   * EDGE_IS_A_TRIM_BODY_IS_A_MOVE
    *
    * Turns the finished gesture into exactly one op. A gesture that moved less
    * than a frame's worth emits nothing, so a click that wobbled is a
@@ -355,11 +355,11 @@ export function TimelineTracks({
 /**
  * SOURCE OF TRUTH KEYWORDS: TimelineRuler, SECOND_TICKS
  *
- * WHAT:  The second-by-second scale, clickable to move the playhead.
- * WHY:   The tick interval follows the zoom so the labels never collide: at the
- *        widest zoom every fifth second is labelled, at the closest every one.
- *        A fixed interval produces either an unreadable smear or three ticks on
- *        a three-minute project.
+ * WHAT: The second-by-second scale, clickable to move the playhead.
+ * WHY: The tick interval follows the zoom so the labels never collide: at the
+ * widest zoom every fifth second is labelled, at the closest every one.
+ * A fixed interval produces either an unreadable smear or three ticks on
+ * a three-minute project.
  * WHERE: The top row of the tracks panel.
  */
 function TimelineRuler({
@@ -401,12 +401,12 @@ function TimelineRuler({
 /**
  * SOURCE OF TRUTH KEYWORDS: TrackLane, UNRESOLVED_ITEM_IS_SHOWN_NOT_HIDDEN
  *
- * WHAT:  One lane: its label, and its items as positioned blocks.
- * WHY:   UNRESOLVED_ITEM_IS_SHOWN_NOT_HIDDEN. An item whose span cannot be
- *        resolved — an anchor pointing at a word the document lost — is drawn
- *        as a flagged block rather than skipped. A missing clip is the hardest
- *        bug for a customer to report, because the thing they would describe
- *        is not on screen.
+ * WHAT: One lane: its label, and its items as positioned blocks.
+ * WHY: UNRESOLVED_ITEM_IS_SHOWN_NOT_HIDDEN. An item whose span cannot be
+ * resolved — an anchor pointing at a word the document lost — is drawn
+ * as a flagged block rather than skipped. A missing clip is the hardest
+ * bug for a customer to report, because the thing they would describe
+ * is not on screen.
  * WHERE: TimelineTracks.
  */
 function TrackLane({
@@ -468,16 +468,16 @@ function TrackLane({
 
 /**
  * SOURCE OF TRUTH KEYWORDS: ClipBlock, EDGE_IS_A_TRIM_BODY_IS_A_MOVE,
- *   CAPTIONS_ARE_NOT_DRAGGABLE, KEYBOARD_REACHABLE_CLIPS
+ * CAPTIONS_ARE_NOT_DRAGGABLE, KEYBOARD_REACHABLE_CLIPS
  *
- * WHAT:  One clip: selectable, draggable by the body, trimmable by either edge.
- * WHY:   The handles are absent on a caption and on an item whose times are
- *        anchors, because the ops refuse both — an affordance that produces a
- *        refusal is worse than no affordance. See CAPTIONS_FOLLOW_WORDS in
- *        ops.ts.
+ * WHAT: One clip: selectable, draggable by the body, trimmable by either edge.
+ * WHY: The handles are absent on a caption and on an item whose times are
+ * anchors, because the ops refuse both — an affordance that produces a
+ * refusal is worse than no affordance. See CAPTIONS_FOLLOW_WORDS in
+ * ops.ts.
  *
- *        The drag preview is a CSS transform on this element only; the
- *        document does not move until the pointer is released.
+ * The drag preview is a CSS transform on this element only; the
+ * document does not move until the pointer is released.
  * WHERE: TrackLane.
  */
 function ClipBlock({
@@ -551,7 +551,7 @@ function ClipBlock({
         onClick={() => onSelect(item.id)}
         onPointerDown={begin("move")}
         className={cn(
-          "h-full w-full overflow-hidden rounded border px-1 text-left text-[10px] leading-tight outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+          "h-full w-full overflow-hidden rounded border px-1 text-left text-[10px] leading-tight outline-none focus-ring",
           LANE_TONE[track.type],
           timed ? "cursor-grab" : "cursor-pointer",
           selected && "ring-2 ring-ring",
@@ -596,7 +596,7 @@ function UnresolvedBlock({
       onClick={() => onSelect(item.id)}
       style={{ height: LANE_HEIGHT_PX - 28 }}
       className={cn(
-        "absolute left-1 top-6 rounded border border-destructive bg-destructive/15 px-1 text-[10px] text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+        "absolute left-1 top-6 rounded border border-destructive bg-destructive/15 px-1 text-[10px] text-foreground outline-none focus-ring",
         selected && "ring-2 ring-ring",
       )}
     >

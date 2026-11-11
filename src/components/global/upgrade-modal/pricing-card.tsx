@@ -6,23 +6,23 @@
 
 /**
  * SOURCE OF TRUTH KEYWORDS: PricingCard, PricingCardProps, PriceDisplay,
- *   PLAN_FEATURE_COPY, AvailablePlan, PlanFeatureRow, PRICING_NOISE_FILTER
+ * PLAN_FEATURE_COPY, AvailablePlan, PlanFeatureRow, PRICING_NOISE_FILTER
  *
- * WHAT:  One plan's card — name, description, state badges, price, CTA, and the
- *        registry-derived feature checklist.
- * WHY:   Flat and square by design: the card is a CELL of the dashed pricing
- *        grid, so its own rounding would fight the frame. Selection is what
- *        rounds it — the active card paints a rounded card surface plus a
- *        bottom-up gradient over the dashes, which is how it lifts out of the
- *        grid without the layout moving.
- *        PLAN_FEATURE_COPY: every line in the checklist comes from
- *        getPlanFeatureRows, so a resource added to RESOURCES appears on every
- *        card automatically and no plan can advertise something the gates would
- *        refuse. Rows the plan does NOT include stay visible but dimmed — the
- *        gap between tiers is the reason someone is on this screen.
- *        Prices arrive pre-formatted (`priceDisplay`) because the trial /
- *        yearly-equivalent wording depends on state the parent owns; the card
- *        renders, it does not decide.
+ * WHAT: One plan's card — name, description, state badges, price, CTA, and the
+ * registry-derived feature checklist.
+ * WHY: Flat and square by design: the card is a CELL of the dashed pricing
+ * grid, so its own rounding would fight the frame. Selection is what
+ * rounds it — the active card paints a rounded card surface plus a
+ * bottom-up gradient over the dashes, which is how it lifts out of the
+ * grid without the layout moving.
+ * PLAN_FEATURE_COPY: every line in the checklist comes from
+ * getPlanFeatureRows, so a resource added to RESOURCES appears on every
+ * card automatically and no plan can advertise something the gates would
+ * refuse. Rows the plan does NOT include stay visible but dimmed — the
+ * gap between tiers is the reason someone is on this screen.
+ * Prices arrive pre-formatted (`priceDisplay`) because the trial /
+ * yearly-equivalent wording depends on state the parent owns; the card
+ * renders, it does not decide.
  * WHERE: Rendered per plan by <UpgradeContent /> inside <PricingGridFrame />.
  */
 
@@ -95,7 +95,7 @@ export function PricingCard({
   return (
     /**
      * SOURCE OF TRUTH KEYWORDS: CARD_IS_A_RADIO, ROVING_TABINDEX,
-     *   RADIO_WITH_ONE_ACTION
+     * RADIO_WITH_ONE_ACTION
      *
      * The card was a bare `<div onClick>`: no role, no tab stop, no key
      * handler and no focus ring, so the plan grid — the app's checkout — could
@@ -125,7 +125,7 @@ export function PricingCard({
         event.preventDefault();
         onSelect();
       }}
-      className="relative flex h-full cursor-pointer flex-col outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+      className="relative flex h-full cursor-pointer flex-col outline-none focus-ring"
     >
       {isSelected ? (
         <>
@@ -270,10 +270,10 @@ export function PricingCard({
 /**
  * SOURCE OF TRUTH KEYWORDS: PRICING_NOISE_FILTER, pricing-noise
  *
- * WHAT:  The SVG turbulence filter the selected card's glow references by id.
- * WHY:   A filter has to exist in the document for `url(#pricing-noise)` to
- *        resolve, and defining it once — rather than inside each card — keeps
- *        one definition no matter how many plans render.
+ * WHAT: The SVG turbulence filter the selected card's glow references by id.
+ * WHY: A filter has to exist in the document for `url(#pricing-noise)` to
+ * resolve, and defining it once — rather than inside each card — keeps
+ * one definition no matter how many plans render.
  * WHERE: Rendered once by <UpgradeContent />; referenced by PricingCard above.
  */
 export function PricingNoiseFilter() {

@@ -6,34 +6,34 @@
 
 /**
  * SOURCE OF TRUTH KEYWORDS: DeleteItemDialog, DELETING_A_SCENE_ASKS,
- *   captionsOver, CaptionOrphanPolicy, ONE_GESTURE_ONE_UNDO
+ * captionsOver, CaptionOrphanPolicy, ONE_GESTURE_ONE_UNDO
  *
- * WHAT:  The confirmation for deleting a clip, which becomes a QUESTION when
- *        the clip has captions over it: keep them, or delete them too.
+ * WHAT: The confirmation for deleting a clip, which becomes a QUESTION when
+ * the clip has captions over it: keep them, or delete them too.
  *
- * WHY:   DELETING_A_SCENE_ASKS is one of the phase's guards, and it is a
- *        question rather than a rule because both answers are right sometimes
- *        — cutting a scene whose narration is also going means the captions
- *        go with it, and trimming a visual while keeping the voice means they
- *        stay. The ops layer will not decide this for us: `delete` removes the
- *        item it names and nothing else, deliberately, so a scene deleted
- *        without asking leaves captions hanging over nothing.
+ * WHY: DELETING_A_SCENE_ASKS is one of the phase's guards, and it is a
+ * question rather than a rule because both answers are right sometimes
+ * — cutting a scene whose narration is also going means the captions
+ * go with it, and trimming a visual while keeping the voice means they
+ * stay. The ops layer will not decide this for us: `delete` removes the
+ * item it names and nothing else, deliberately, so a scene deleted
+ * without asking leaves captions hanging over nothing.
  *
- *        ONE_GESTURE_ONE_UNDO: whichever answer is given, the ops go to `edit`
- *        in ONE call, so "delete this scene and its four captions" costs one
- *        undo step rather than five.
+ * ONE_GESTURE_ONE_UNDO: whichever answer is given, the ops go to `edit`
+ * in ONE call, so "delete this scene and its four captions" costs one
+ * undo step rather than five.
  *
- *        The plain case still confirms, but without the choice — a delete is
- *        one keystroke away (KEYBOARD_IS_THE_EDITOR) and undo is in memory
- *        only, so the dialog is the cheapest guard available against deleting
- *        the wrong thing.
+ * The plain case still confirms, but without the choice — a delete is
+ * one keystroke away (KEYBOARD_IS_THE_EDITOR) and undo is in memory
+ * only, so the dialog is the cheapest guard available against deleting
+ * the wrong thing.
  *
- *        The caller KEYS this component on the target, so the choice resets
- *        per clip without an effect — a previous "delete them too" carrying
- *        silently into the next clip is the one mistake a confirmation dialog
- *        must not make.
+ * The caller KEYS this component on the target, so the choice resets
+ * per clip without an effect — a previous "delete them too" carrying
+ * silently into the next clip is the one mistake a confirmation dialog
+ * must not make.
  * WHERE: Opened by the inspector's delete button and by the editor's Delete
- *        shortcut.
+ * shortcut.
  */
 
 import * as React from "react";
@@ -145,7 +145,7 @@ export function DeleteItemDialog({
                 aria-checked={policy === option}
                 onClick={() => setPolicy(option)}
                 className={cn(
-                  "tactile-control rounded-lg border border-border p-3 text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+                  "tactile-control rounded-lg border border-border p-3 text-left outline-none focus-ring",
                   policy === option && "border-primary bg-primary/5",
                 )}
               >
@@ -172,12 +172,12 @@ export function DeleteItemDialog({
 /**
  * SOURCE OF TRUTH KEYWORDS: captionsOver, OVERLAP_NOT_CONTAINMENT
  *
- * WHAT:  The caption items whose span overlaps this item's.
- * WHY:   OVERLAP_NOT_CONTAINMENT. A caption that merely STARTS inside the clip
- *        and runs past its end is still a caption over this clip, and the
- *        narrower containment test would quietly leave it behind — which is
- *        the orphan the dialog exists to prevent. The epsilon keeps two clips
- *        that merely butt-join from counting as an overlap.
+ * WHAT: The caption items whose span overlaps this item's.
+ * WHY: OVERLAP_NOT_CONTAINMENT. A caption that merely STARTS inside the clip
+ * and runs past its end is still a caption over this clip, and the
+ * narrower containment test would quietly leave it behind — which is
+ * the orphan the dialog exists to prevent. The epsilon keeps two clips
+ * that merely butt-join from counting as an overlap.
  * WHERE: DeleteItemDialog.
  */
 function captionsOver(

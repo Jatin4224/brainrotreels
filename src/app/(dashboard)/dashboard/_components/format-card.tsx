@@ -6,35 +6,35 @@
 
 /**
  * SOURCE OF TRUTH KEYWORDS: FormatCard, FormatCardProps, FORMATS,
- *   CATEGORY_CLASSES, isStartableFormat, COMING_SOON_IS_NOT_A_BUTTON,
- *   CARD_IS_ONE_TARGET
+ * CATEGORY_CLASSES, isStartableFormat, COMING_SOON_IS_NOT_A_BUTTON,
+ * CARD_IS_ONE_TARGET
  *
- * WHAT:  One horizontal format card — a tinted media column with the format's
- *        two-character mark, then its eyebrow, title, two-line pitch and the
- *        call to action.
+ * WHAT: One horizontal format card — a tinted media column with the format's
+ * two-character mark, then its eyebrow, title, two-line pitch and the
+ * call to action.
  *
- * WHY:   CARD_IS_ONE_TARGET. The whole card is the button, not just the CTA
- *        line at the bottom: the design draws the arrow as the affordance but
- *        people aim at the card, and two nested targets (a card that
- *        navigates containing a link that also navigates) is the classic way
- *        to ship a nested-interactive accessibility error. So the card is a
- *        single <button>, the CTA row is decoration inside it, and the
- *        accessible name is the title plus the action.
+ * WHY: CARD_IS_ONE_TARGET. The whole card is the button, not just the CTA
+ * line at the bottom: the design draws the arrow as the affordance but
+ * people aim at the card, and two nested targets (a card that
+ * navigates containing a link that also navigates) is the classic way
+ * to ship a nested-interactive accessibility error. So the card is a
+ * single <button>, the CTA row is decoration inside it, and the
+ * accessible name is the title plus the action.
  *
- *        COMING_SOON_IS_NOT_A_BUTTON. A format outside
- *        `CREATABLE_PROJECT_KINDS` renders as a non-interactive panel with a
- *        badge, not a disabled button — `isStartableFormat` is asked, not
- *        the `comingSoon` copy flag, so the registry's authority decides.
- *        A disabled control that never becomes enabled only teaches people
- *        to keep pressing it.
+ * COMING_SOON_IS_NOT_A_BUTTON. A format outside
+ * `CREATABLE_PROJECT_KINDS` renders as a non-interactive panel with a
+ * badge, not a disabled button — `isStartableFormat` is asked, not
+ * the `comingSoon` copy flag, so the registry's authority decides.
+ * A disabled control that never becomes enabled only teaches people
+ * to keep pressing it.
  *
- *        The card takes `onStart` rather than an href because starting a
- *        video is a MUTATION behind a form (the create sheet), not a page —
- *        the same reason the invitation screen's accept is a button.
+ * The card takes `onStart` rather than an href because starting a
+ * video is a MUTATION behind a form (the create sheet), not a page —
+ * the same reason the invitation screen's accept is a button.
  *
  * WHERE: The category sections of the dashboard home screen. Content comes
- *        from `FORMATS` (src/lib/config/formats.ts); colours from
- *        ./format-tokens.
+ * from `FORMATS` (src/lib/config/formats.ts); colours from
+ * ./format-tokens.
  */
 
 import { ArrowRightIcon } from "lucide-react";
@@ -120,7 +120,7 @@ export function FormatCard({ kind, onStart, className }: FormatCardProps) {
          restated. */
       className={cn(
         shell,
-        "brutal-hover cursor-pointer text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+        "brutal-hover cursor-pointer text-left outline-none focus-ring",
         className,
       )}
     >

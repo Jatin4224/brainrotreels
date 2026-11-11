@@ -49,6 +49,7 @@ import {
   useActiveOrganizationId,
 } from "@/hooks/use-active-organization";
 import { permissions } from "@/lib/permissions";
+import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 
 /* The denominator floor. A workspace holding 40 credits should not see a bar
@@ -115,15 +116,13 @@ export function SidebarPlanMeter() {
       </div>
 
       {balance !== null ? (
-        <span
-          aria-hidden="true"
-          className="tactile-track block h-1 w-full overflow-hidden rounded-full bg-secondary"
-        >
-          <span
-            className="block h-full rounded-full bg-foreground-2 transition-[width] duration-300 motion-reduce:transition-none"
-            style={{ width: `${filled}%` }}
-          />
-        </span>
+        <Progress
+          value={filled}
+          decorative
+          size="sm"
+          trackClassName="bg-secondary"
+          indicatorClassName="bg-foreground-2"
+        />
       ) : null}
     </div>
   );

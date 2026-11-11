@@ -4,44 +4,44 @@
 
 /**
  * SOURCE OF TRUTH KEYWORDS: HeroPromptCard, HERO_INPUT_MODES, heroPromptSchema,
- *   HERO_MODE_TABS, AUTH_IS_A_CLICK_NOT_A_REDIRECT, EVERY_INPUT_IS_VALIDATED,
- *   THE_FIELD_IS_THE_PITCH, AUTH_CALLBACK_PARAM, authRouteWithCallback
+ * HERO_MODE_TABS, AUTH_IS_A_CLICK_NOT_A_REDIRECT, EVERY_INPUT_IS_VALIDATED,
+ * THE_FIELD_IS_THE_PITCH, AUTH_CALLBACK_PARAM, authRouteWithCallback
  *
- * WHAT:  The hero's input card — four mode tabs (Idea / Script / URL /
- *        Document), one textarea whose placeholder follows the tab, and the
- *        "Make my video" button that starts the signup.
+ * WHAT: The hero's input card — four mode tabs (Idea / Script / URL /
+ * Document), one textarea whose placeholder follows the tab, and the
+ * "Make my video" button that starts the signup.
  *
- * WHY:   THE_FIELD_IS_THE_PITCH. A landing page for a tool that turns text
- *        into video should let a visitor type the text; the control IS the
- *        product demo, which is why it is a real field with real validation
- *        rather than a picture of one.
+ * WHY: THE_FIELD_IS_THE_PITCH. A landing page for a tool that turns text
+ * into video should let a visitor type the text; the control IS the
+ * product demo, which is why it is a real field with real validation
+ * rather than a picture of one.
  *
- *        AUTH_IS_A_CLICK_NOT_A_REDIRECT, and this is the one place on the
- *        public surface where that needs saying twice. Submitting NAVIGATES to
- *        sign-up — a deliberate press, not a session read, and nothing on this
- *        page asks the server who the visitor is (PUBLIC_PAGE_NO_AUTH holds:
- *        this component makes no tRPC call). It is routed through
- *        `authRouteWithCallback` so the visitor lands on their projects after
- *        authenticating instead of a generic dashboard.
+ * AUTH_IS_A_CLICK_NOT_A_REDIRECT, and this is the one place on the
+ * public surface where that needs saying twice. Submitting NAVIGATES to
+ * sign-up — a deliberate press, not a session read, and nothing on this
+ * page asks the server who the visitor is (PUBLIC_PAGE_NO_AUTH holds:
+ * this component makes no tRPC call). It is routed through
+ * `authRouteWithCallback` so the visitor lands on their projects after
+ * authenticating instead of a generic dashboard.
  *
- *        HONEST_ABOUT_THE_DRAFT: what they typed is NOT carried through signup
- *        yet, so the button says what actually happens rather than implying the
- *        video is already being made. Carrying it would mean a contract between
- *        this page and the create-project flow — a stashed draft, a consumer
- *        that reads it, and an expiry — and a half-built version of that is a
- *        visitor watching their paragraph vanish. Wiring it is a change HERE
- *        plus a read in the create-project sheet, in one go.
+ * HONEST_ABOUT_THE_DRAFT: what they typed is NOT carried through signup
+ * yet, so the button says what actually happens rather than implying the
+ * video is already being made. Carrying it would mean a contract between
+ * this page and the create-project flow — a stashed draft, a consumer
+ * that reads it, and an expiry — and a half-built version of that is a
+ * visitor watching their paragraph vanish. Wiring it is a change HERE
+ * plus a read in the create-project sheet, in one go.
  *
- *        EVERY_INPUT_IS_VALIDATED — zod + React Hook Form via zodResolver, the
- *        same shadcn approach every other form in this app uses. The rules are
- *        per mode (a URL must parse) and live on `heroPromptSchema` in
- *        @/lib/types, not here: a validation rule written inside a component is
- *        a rule no other caller can reuse and no test can reach.
+ * EVERY_INPUT_IS_VALIDATED — zod + React Hook Form via zodResolver, the
+ * same shadcn approach every other form in this app uses. The rules are
+ * per mode (a URL must parse) and live on `heroPromptSchema` in
+ * @/lib/types, not here: a validation rule written inside a component is
+ * a rule no other caller can reuse and no test can reach.
  *
- *        The tabs are buttons in a `radiogroup`, not links and not a `<Tabs>`:
- *        they select the MEANING of one field rather than swapping panels, so
- *        the text survives a tab change (ONE_SHAPE_FOUR_MODES) and assistive
- *        tech is told it is choosing among four options for one control.
+ * The tabs are buttons in a `radiogroup`, not links and not a `<Tabs>`:
+ * they select the MEANING of one field rather than swapping panels, so
+ * the text survives a tab change (ONE_SHAPE_FOUR_MODES) and assistive
+ * tech is told it is choosing among four options for one control.
  * WHERE: Rendered in the hero of src/app/(marketing)/page.tsx.
  */
 
@@ -77,12 +77,12 @@ import { cn } from "@/lib/utils";
 /**
  * SOURCE OF TRUTH KEYWORDS: HERO_MODE_TABS, HeroInputMode
  *
- * WHAT:  How each input mode is labelled and prompted.
- * WHY:   A `Record<HeroInputMode, …>` rather than a list, so adding a mode to
- *        `HERO_INPUT_MODES` fails the typecheck here until the tab knows what
- *        to call it — a new mode cannot reach the page as a blank button. The
- *        order on screen comes from `HERO_INPUT_MODES`, so the schema and the
- *        tab row cannot disagree about which modes exist.
+ * WHAT: How each input mode is labelled and prompted.
+ * WHY: A `Record<HeroInputMode, …>` rather than a list, so adding a mode to
+ * `HERO_INPUT_MODES` fails the typecheck here until the tab knows what
+ * to call it — a new mode cannot reach the page as a blank button. The
+ * order on screen comes from `HERO_INPUT_MODES`, so the schema and the
+ * tab row cannot disagree about which modes exist.
  * WHERE: The tab row and the textarea placeholder below.
  */
 const HERO_MODE_TABS: Record<
@@ -133,7 +133,7 @@ export function HeroPromptCard({ className }: { className?: string }) {
       <form
         onSubmit={form.handleSubmit(onSubmit)}
         className={cn(
-          "brutal-border brutal-shadow-lg w-full max-w-xl rounded-2xl bg-card p-2.5 text-left",
+          "brutal-border brutal-shadow-lg focus-ring-within w-full max-w-xl rounded-2xl bg-card p-2.5 text-left",
           className,
         )}
       >
@@ -159,7 +159,7 @@ export function HeroPromptCard({ className }: { className?: string }) {
                       aria-checked={isActive}
                       onClick={() => field.onChange(option)}
                       className={cn(
-                        "h-9 rounded-lg px-4 text-sm font-semibold transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50 motion-reduce:transition-none",
+                        "h-9 rounded-lg px-4 text-sm font-semibold transition-colors outline-none focus-ring motion-reduce:transition-none",
                         isActive
                           ? "bg-brand-accent font-bold text-brand-accent-foreground"
                           : "text-muted-foreground hover:text-foreground",
@@ -197,7 +197,7 @@ export function HeroPromptCard({ className }: { className?: string }) {
                         void form.handleSubmit(onSubmit)();
                       }
                     }}
-                    className="min-h-11 flex-1 resize-none border-0 bg-transparent px-3 py-2.5 text-base text-foreground shadow-none placeholder:text-muted-foreground focus-visible:ring-0"
+                    className="min-h-11 flex-1 resize-none border-0 bg-transparent px-3 py-2.5 text-base text-foreground shadow-none placeholder:text-muted-foreground focus-visible:outline-none!"
                   />
                 </FormControl>
 
