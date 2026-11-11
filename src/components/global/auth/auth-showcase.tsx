@@ -31,9 +31,11 @@
  *        the email field next rather than at a repeat of the advert.
  *
  *        HIGHLIGHT_IS_A_BLOCK and TOKENS_NOT_HEX, both reused rather than
- *        restated: `.brand-highlight` and `bg-card` / `text-muted-foreground`
- *        resolve against `.marketing-canvas`, which AuthShell applies, so
- *        re-skinning this panel is one edit in globals.css.
+ *        restated: the headline is a <HighlightHeading />, and `bg-card` /
+ *        `text-muted-foreground` resolve against `.marketing-canvas`, which
+ *        AuthShell applies, so re-skinning this panel is one edit in
+ *        globals.css. This copy of the construct was the one that had lost
+ *        `aria-hidden` on the decorative block — the component carries it.
  *
  *        HIDDEN BELOW `lg`, not shrunk: the mobile artboards have no panel at
  *        all, and below that width the form column carries the headline

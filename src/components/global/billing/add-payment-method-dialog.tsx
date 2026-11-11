@@ -27,6 +27,7 @@ import { trpc } from "@/trpc/react-provider";
 import { StripeElementsProvider } from "./stripe-elements-provider";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { stripeCardElementOptions } from "./stripe-element-style";
 import { Label } from "@/components/ui/label";
 import {
   Dialog,
@@ -89,9 +90,9 @@ function AddPaymentMethodForm({
   const [cardReady, setCardReady] = React.useState(false);
   const [submitting, setSubmitting] = React.useState(false);
 
-  /* Stripe iframe can't read CSS tokens — literal, theme-derived colors. */
-  const isDark = resolvedTheme !== "light";
-  const cardTextColor = isDark ? "#ffffff" : "#0f172a";
+  /* STRIPE_CANNOT_READ_TOKENS — see ./stripe-element-style. This used to
+   * inline "#71717a" and "#dc2626" here while the other form named them. */
+  const cardOptions = stripeCardElementOptions(resolvedTheme !== "light");
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -133,17 +134,7 @@ function AddPaymentMethodForm({
         <Label>Card details</Label>
         <div className="rounded-md border p-3">
           <CardElement
-            options={{
-              style: {
-                base: {
-                  fontSize: "16px",
-                  color: cardTextColor,
-                  "::placeholder": { color: "#71717a" },
-                },
-                invalid: { color: "#dc2626" },
-              },
-              hidePostalCode: false,
-            }}
+            options={{ ...cardOptions, hidePostalCode: false }}
             onChange={(e) => {
               setError(e.error?.message ?? null);
               setCardReady(e.complete);

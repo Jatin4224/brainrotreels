@@ -73,6 +73,7 @@ import {
   type LibraryAssetKind,
 } from "@/lib/types";
 import { useRovingRadioGroup } from "@/hooks/use-roving-radiogroup";
+import { SelectableTile } from "@/components/global/selectable-tile";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -369,25 +370,17 @@ const BackgroundTileButton = React.forwardRef<
       : `${tile.filename}${tile.locked ? " (locked)" : ""}${tile.mine ? " (your upload)" : ""}`;
 
   return (
-    <button
+    /* The shell — radio semantics, the roving tab stop, the raised checked
+       state — is <SelectableTile />, shared with the caption-style grid. Only
+       what is specific to a FOOTAGE tile stays here. `busy` is the real
+       disable; a locked tile is not disabled (LOCKED_NOT_HIDDEN). */
+    <SelectableTile
       ref={ref}
-      type="button"
-      role="radio"
-      aria-checked={checked}
-      aria-label={label}
-      /* ROVING_TABINDEX — one stop for the whole group. */
-      tabIndex={tabbable ? 0 : -1}
-      onClick={onChoose}
-      /* Not `disabled`: a locked tile must stay in the keyboard order so it can
-         be discovered (LOCKED_NOT_HIDDEN). `busy` is a real disable, because
-         there is nothing to discover about a write already in flight. */
+      checked={checked}
+      label={label}
+      tabbable={tabbable}
       disabled={busy}
-      className={cn(
-        "tactile-control flex flex-col gap-2 rounded-xl border p-2 text-left transition",
-        "focus-visible:outline-none focus-ring",
-        checked ? "border-primary bg-accent" : "border-border hover:bg-accent/50",
-        busy && "opacity-60",
-      )}
+      onChoose={onChoose}
     >
       <span className="relative flex aspect-[9/16] w-full items-center justify-center overflow-hidden rounded-lg bg-muted">
         {tile === null ? (
@@ -448,6 +441,6 @@ const BackgroundTileButton = React.forwardRef<
           ) : null}
         </span>
       )}
-    </button>
+    </SelectableTile>
   );
 });

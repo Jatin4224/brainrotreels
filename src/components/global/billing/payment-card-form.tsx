@@ -22,6 +22,7 @@ import { useTheme } from "next-themes";
 import { Loader2Icon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { stripeCardElementOptions } from "./stripe-element-style";
 
 export function PaymentCardForm({
   onPaymentMethod,
@@ -40,14 +41,9 @@ export function PaymentCardForm({
   const [cardError, setCardError] = React.useState<string | null>(null);
   const [tokenizing, setTokenizing] = React.useState(false);
 
-  /* Stripe Elements renders in an iframe, so it CANNOT read our CSS variables /
-   * Tailwind tokens — it only accepts literal color strings. These are the
-   * sanctioned exception to the no-hardcoded-colors rule: derived per theme so
-   * the card field still matches light/dark. (Pattern from funnelmods.) */
-  const isDark = resolvedTheme !== "light";
-  const cardTextColor = isDark ? "#ffffff" : "#0f172a";
-  const cardPlaceholderColor = "#71717a";
-  const cardInvalidColor = "#dc2626";
+  /* STRIPE_CANNOT_READ_TOKENS — the colours and the reason they are literals
+   * live in ./stripe-element-style, shared with the add-card dialog. */
+  const cardOptions = stripeCardElementOptions(resolvedTheme !== "light");
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -73,16 +69,7 @@ export function PaymentCardForm({
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       <div className="rounded-md border px-3 py-3">
         <CardElement
-          options={{
-            style: {
-              base: {
-                fontSize: "15px",
-                color: cardTextColor,
-                "::placeholder": { color: cardPlaceholderColor },
-              },
-              invalid: { color: cardInvalidColor },
-            },
-          }}
+          options={cardOptions}
           onChange={(e) => setCardError(e.error?.message ?? null)}
         />
       </div>

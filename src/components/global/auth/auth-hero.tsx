@@ -25,10 +25,11 @@
  *        the width in JS to choose would flicker on the one screen that must
  *        not.
  *
- *        HIGHLIGHT_IS_A_BLOCK, reusing `.brand-highlight` from globals.css
- *        rather than restating the tilt and the hard offset shadow: the
- *        landing hero already owns that treatment, and a second copy is how
- *        the two drift apart by a degree. It is sized from the phrase it
+ *        HIGHLIGHT_IS_A_BLOCK, via <HighlightHeading /> rather than restating
+ *        the wrapper, the tilt and the hard offset shadow. The prediction in
+ *        this note — that a second copy is how the two drift apart by a
+ *        degree — is what actually happened across five copies, so the
+ *        construct is now one component and this screen is a caller. It is sized from the phrase it
  *        wraps, so rewording cannot leave the block the wrong width, and it
  *        is `aria-hidden` — the sentence still reads as one sentence.
  *
