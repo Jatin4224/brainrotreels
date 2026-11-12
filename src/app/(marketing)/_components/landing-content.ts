@@ -110,46 +110,71 @@ export const LANDING_FEATURE_KEYS: readonly ResourceKey[] = [
  *
  * WHAT:  The 9:16 samples in the strip under the hero.
  * WHY:   PRODUCT_AS_PROOF — the page's only imagery is output, so each tile
- *        names the format that made it and how long it runs. No `poster` is
- *        set: a fresh deployment has rendered nothing yet, and the tile paints
- *        its format tag over an empty frame rather than linking a 404. An
- *        operator with real renders adds the URLs here, in one place, and the
- *        strip starts showing them.
- * WHERE: src/app/(marketing)/_components/proof-strip.tsx.
+ *        names the format that made it and how long it runs.
+ *
+ *        THE POSTERS ARE REAL FRAMES, shipped with the app in
+ *        public/auth-reels/ and shared with the animated panel on the auth
+ *        screens (AUTH_SHOWCASE_REELS). The strip ran without them for as
+ *        long as there was nothing rendered to show — ProofStrip paints the
+ *        format tag over an empty frame rather than linking a 404, which is
+ *        what let an operator deploy on day one — and that fallback still
+ *        works for a clip with no `poster`. These five simply stop a visitor
+ *        meeting a wall of blank tiles on the page that is supposed to prove
+ *        the product makes video.
+ *
+ *        A ROOT-RELATIVE PATH, not an off-domain URL, which is the case
+ *        ProofStrip's plain <img> exists for: an operator pointing `poster`
+ *        at their own CDN must keep working without a `remotePatterns` entry,
+ *        so the component stays on <img> even though these particular five
+ *        are local and next/image would handle them.
+ *
+ *        ⚠ EACH TITLE DESCRIBES ITS OWN FRAME. The titles here used to be
+ *        five plausible sample names written before there were any frames to
+ *        go with them; with real posters a caption about heat pumps under a
+ *        revenue chart is not a placeholder, it is a page contradicting
+ *        itself. Re-poster a clip and its title has to move with it.
+ * WHERE: src/app/(marketing)/_components/proof-strip.tsx. The same files back
+ *        the auth showcase strip — see AUTH_SHOWCASE_REELS in
+ *        src/components/global/auth/auth-content.ts.
  */
 export const LANDING_PROOF_CLIPS: readonly MarketingProofClip[] = [
   {
     id: "proof-reddit",
-    title: "The one where nobody told the new hire",
+    title: "My roommate labeled every egg in the fridge",
     kind: "reddit-story",
     duration: "0:48",
+    poster: "/auth-reels/01-reddit-story.png",
     handle: "@deepfacts",
   },
   {
     id: "proof-voiceover",
-    title: "Why planes still have ashtrays",
+    title: "How Netflix knows what you'll watch next",
     kind: "voiceover",
     duration: "0:36",
+    poster: "/auth-reels/04-explainer.png",
     handle: "@mindrot",
   },
   {
     id: "proof-quiz",
-    title: "Guess the capital in 3 seconds",
+    title: "Which planet has the most moons?",
     kind: "quiz",
     duration: "0:31",
+    poster: "/auth-reels/03-quiz.png",
     handle: "@quizloop",
   },
   {
     id: "proof-motion",
-    title: "How a heat pump actually works",
+    title: "Q3 revenue, explained in 60 seconds",
     kind: "motion",
     duration: "0:52",
+    poster: "/auth-reels/02-motion-graphics.png",
   },
   {
     id: "proof-voiceover-2",
-    title: "The shipping container that changed trade",
+    title: "The leftovers thread that went too far",
     kind: "voiceover",
     duration: "0:44",
+    poster: "/auth-reels/05-text-story.png",
   },
 ];
 

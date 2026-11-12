@@ -91,9 +91,30 @@ export function AuthShell({ children, aside, headerTag }: AuthShellProps) {
   const isSplit = aside !== undefined;
 
   return (
-    <div className="marketing-canvas flex min-h-svh flex-col bg-background p-6 lg:p-8">
+    /* DESKTOP_DOES_NOT_SCROLL, and only on the split screens: at `lg` the
+       sign-in and sign-up pages are one viewport — the form on the left, the
+       animated panel on the right — and a page that scrolls by forty pixels
+       under a looping animation is what makes the animation look broken.
+       The panel fits itself to whatever height it is given (see
+       auth-showcase-canvas in globals.css), so the page height can be FIXED
+       rather than a minimum.
+
+       `auth-split-lock` and not `lg:h-svh lg:overflow-hidden`, because the
+       lock has a FLOOR as well as a breakpoint — see the class in
+       globals.css. A fixed height with a centred column that does not fit is
+       not a page that scrolls, it is a page whose heading sits on top of the
+       wordmark and whose submit button sits on top of the legal line, which
+       is exactly what a short viewport (or browser zoom, which shortens the
+       viewport the same way) produced here. Below the floor the page is a
+       minimum height again and simply scrolls. */
+    <div
+      className={cn(
+        "marketing-canvas auth-typography flex min-h-svh flex-col bg-background p-6 lg:p-8",
+        isSplit ? "auth-split-lock" : "",
+      )}
+    >
       <header className="flex items-center justify-between gap-4">
-        <PlatformLogo href="/" tone="brand" size="lg" />
+        <PlatformLogo href="/" size="lg" />
 
         {headerTag ? (
           <span className="brutal-shadow inline-flex -rotate-[4deg] items-center gap-2 rounded-full bg-foreground px-4 py-2 text-sm font-medium text-background lg:hidden">
@@ -123,7 +144,7 @@ export function AuthShell({ children, aside, headerTag }: AuthShellProps) {
           className={cn(
             "flex w-full flex-1 flex-col",
             isSplit
-              ? "max-w-[26rem] lg:mx-auto lg:justify-center"
+              ? "auth-form-column max-w-[26rem] lg:mx-auto lg:justify-center"
               : "max-w-md flex-none",
           )}
         >

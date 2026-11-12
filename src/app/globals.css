@@ -373,6 +373,30 @@ html:has([data-app-banner]) {
     background-attachment: fixed;
   }
 
+  /* SOURCE OF TRUTH KEYWORDS: auth-typography, --font-bricolage,
+     --font-space-grotesk, --font-display, AUTH_WEARS_THE_BRAND, AuthShell
+     The auth screens' two faces, applied as ONE class beside
+     `.marketing-canvas` and for the same reason: the palette and the
+     typography are both properties of the SURFACE, not of any component on
+     it, so a form, a field or a heading underneath keeps using plain
+     `font-display` / inherited body type and simply comes out in the auth
+     faces. auth-design.md §2 asks for Bricolage Grotesque 800 on the
+     headlines and Space Grotesk everywhere else; `--font-display` is
+     RE-POINTED rather than replaced so every existing `font-display` caller
+     on these screens (AuthHero, the showcase headline, PlatformLogo's
+     wordmark) follows without being touched. The body face is set as a plain
+     `font-family` and not by re-pointing `--font-sans`, because `font-sans`
+     is applied once on <html>: descendants inherit the RESOLVED family, so
+     re-pointing the variable here would change nothing. Both fall back
+     through the app's own faces, so a blocked font request degrades to the
+     UI face rather than to a serif. Nothing outside src/app/(auth) can shift,
+     because the class is applied in AuthShell and nowhere else. */
+  .auth-typography {
+    --font-display: var(--font-bricolage), var(--font-dm-sans), Geist,
+      sans-serif;
+    font-family: var(--font-space-grotesk), var(--font-geist-sans), sans-serif;
+  }
+
   /* SOURCE OF TRUTH KEYWORDS: brand-highlight, HIGHLIGHT_IS_A_BLOCK
      The yellow block the hero sets one word of the headline into. A tilted
      solid with a hard, un-blurred offset shadow — the shadow is what stops it
@@ -636,6 +660,615 @@ html:has([data-app-banner]) {
 
     .reel-touch {
       opacity: 0;
+    }
+  }
+}
+
+/* SOURCE OF TRUTH KEYWORDS: auth-doc-drop, auth-make-pulse, auth-cursor-tap,
+ * auth-reel-0, auth-reel-1, auth-reel-2, auth-reel-3, auth-reel-4,
+ * --auth-loop, auth-showcase-canvas, AuthShowcase, ONE_LOOP_ONE_DURATION,
+ * MEASURED_NOT_EASED, auth-showcase-paused
+ *
+ * WHAT:  The eight animations on the auth showcase panel — a document falling
+ *        into the input bar, the "Make reels" pill pulsing under a cursor,
+ *        and five reel cards rising out from under the bar and fanning into a
+ *        strip — plus the one scale that fits the whole panel to the viewport.
+ *
+ * WHY:   ONE_LOOP_ONE_DURATION. All eight share `--auth-loop` and
+ *        `linear infinite`, and every keyframe list is written in PERCENT of
+ *        that one loop. That is what keeps the pill pulsing on the exact
+ *        frame the document starts sinking and the strip sliding out on the
+ *        frame after: eight animations with eight durations drift apart
+ *        within seconds, and nothing short of a reload re-syncs them.
+ *        Changing the speed is `--auth-loop` on the panel, once.
+ *
+ *        MEASURED_NOT_EASED, which is why these lists are long and the timing
+ *        function is `linear`. The stops were measured frame by frame from
+ *        the reference recording (auth-design_1.md §5.2) and the curve lives
+ *        in the SPACING of the stops, not in an easing function — so a
+ *        tidy-up that collapses them to three stops and a cubic-bezier does
+ *        not simplify this, it replaces the motion with a different one. Do
+ *        not re-time them; copy them.
+ *
+ *        THE X OFFSETS ARE THE STRIP'S GEOMETRY: five cards 100px wide with
+ *        NO gap, so a card's resting offset is (index − 2) × 100. Change the
+ *        card width and every x value here scales by newWidth / 100. The y
+ *        values likewise assume the mask and bar positions the component
+ *        lays out; moving the bar scales them by (barTop − cardTop) / 170.
+ *
+ *        auth-showcase-canvas: the panel is a FIXED 560x708 design, scaled to
+ *        fit, not a fluid layout. Fluid would leave the measured pixel
+ *        keyframes above describing a box that is no longer that size — the
+ *        document would miss the bar. Scaling keeps the whole composition in
+ *        proportion at any viewport, and the fit factors are the width and
+ *        height the shell actually leaves (viewport minus page padding,
+ *        header, footer and panel padding), min()-ed so neither axis
+ *        overflows. This is what lets the auth page fit 1280x800 with no
+ *        scrollbar.
+ *
+ *        auth-showcase-paused is set by the component from an
+ *        IntersectionObserver and `visibilitychange`: eight infinite
+ *        animations repainting behind a hidden tab are a battery cost with
+ *        nobody watching.
+ * WHERE: src/components/global/auth/auth-showcase.tsx. */
+@keyframes auth-doc-drop {
+  0% {
+    transform: translateY(-175px);
+  }
+  5.7% {
+    transform: translateY(-140px);
+  }
+  11.4% {
+    transform: translateY(-110px);
+  }
+  17.1% {
+    transform: translateY(-100px);
+  }
+  22.9% {
+    transform: translateY(-63px);
+  }
+  28.6% {
+    transform: translateY(-43px);
+  }
+  31.4% {
+    transform: translateY(-16px);
+  }
+  37.1% {
+    transform: translateY(-2px);
+  }
+  42.9% {
+    transform: translateY(0px);
+  }
+  65.7% {
+    transform: translateY(0px);
+  }
+  68.6% {
+    transform: translateY(4px);
+  }
+  71.4% {
+    transform: translateY(15px);
+  }
+  77.1% {
+    transform: translateY(36px);
+  }
+  82.9% {
+    transform: translateY(72px);
+  }
+  88.6% {
+    transform: translateY(106px);
+  }
+  91.4% {
+    transform: translateY(124px);
+  }
+  94.3% {
+    transform: translateY(155px);
+  }
+  100% {
+    transform: translateY(180px);
+  }
+}
+
+@keyframes auth-make-pulse {
+  0%,
+  65.7% {
+    transform: scale(1);
+  }
+  68.6% {
+    transform: scale(1.21);
+  }
+  71.4% {
+    transform: scale(1.25);
+  }
+  77.1% {
+    transform: scale(1.17);
+  }
+  82.9% {
+    transform: scale(1.04);
+  }
+  88.6%,
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes auth-cursor-tap {
+  0%,
+  65.7% {
+    transform: scale(1);
+  }
+  68.6% {
+    transform: scale(0.85);
+  }
+  74.3%,
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes auth-reel-0 {
+  0% {
+    opacity: 1;
+    transform: translate(185px, -65px);
+  }
+  5.7% {
+    opacity: 1;
+    transform: translate(130px, -40px);
+  }
+  11.4% {
+    opacity: 1;
+    transform: translate(48px, -12px);
+  }
+  17.1% {
+    opacity: 1;
+    transform: translate(30px, -7px);
+  }
+  22.9% {
+    opacity: 1;
+    transform: translate(0px, 0px);
+  }
+  65.7% {
+    opacity: 1;
+    transform: translate(0, 0);
+  }
+  68.6% {
+    opacity: 1;
+    transform: translate(130px, 0);
+  }
+  71.4% {
+    opacity: 1;
+    transform: translate(252px, 0);
+  }
+  77.1% {
+    opacity: 1;
+    transform: translate(383px, 0);
+  }
+  82.9% {
+    opacity: 0;
+    transform: translate(520px, 0);
+  }
+  85.7% {
+    opacity: 0;
+    transform: translate(200px, -230px);
+  }
+  88.6% {
+    opacity: 1;
+    transform: translate(200px, -155px);
+  }
+  94.3% {
+    opacity: 1;
+    transform: translate(194px, -120px);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(185px, -65px);
+  }
+}
+
+@keyframes auth-reel-1 {
+  0% {
+    opacity: 1;
+    transform: translate(93px, -65px);
+  }
+  5.7% {
+    opacity: 1;
+    transform: translate(65px, -40px);
+  }
+  11.4% {
+    opacity: 1;
+    transform: translate(24px, -12px);
+  }
+  17.1% {
+    opacity: 1;
+    transform: translate(15px, -7px);
+  }
+  22.9% {
+    opacity: 1;
+    transform: translate(0px, 0px);
+  }
+  65.7% {
+    opacity: 1;
+    transform: translate(0, 0);
+  }
+  68.6% {
+    opacity: 1;
+    transform: translate(130px, 0);
+  }
+  71.4% {
+    opacity: 1;
+    transform: translate(252px, 0);
+  }
+  77.1% {
+    opacity: 1;
+    transform: translate(383px, 0);
+  }
+  82.9% {
+    opacity: 0;
+    transform: translate(520px, 0);
+  }
+  85.7% {
+    opacity: 0;
+    transform: translate(100px, -230px);
+  }
+  88.6% {
+    opacity: 1;
+    transform: translate(100px, -155px);
+  }
+  94.3% {
+    opacity: 1;
+    transform: translate(97px, -120px);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(93px, -65px);
+  }
+}
+
+@keyframes auth-reel-2 {
+  0% {
+    opacity: 1;
+    transform: translate(0px, -65px);
+  }
+  5.7% {
+    opacity: 1;
+    transform: translate(0px, -40px);
+  }
+  11.4% {
+    opacity: 1;
+    transform: translate(0px, -12px);
+  }
+  17.1% {
+    opacity: 1;
+    transform: translate(0px, -7px);
+  }
+  22.9% {
+    opacity: 1;
+    transform: translate(0px, 0px);
+  }
+  65.7% {
+    opacity: 1;
+    transform: translate(0, 0);
+  }
+  68.6% {
+    opacity: 1;
+    transform: translate(130px, 0);
+  }
+  71.4% {
+    opacity: 1;
+    transform: translate(252px, 0);
+  }
+  77.1% {
+    opacity: 1;
+    transform: translate(383px, 0);
+  }
+  82.9% {
+    opacity: 0;
+    transform: translate(520px, 0);
+  }
+  85.7% {
+    opacity: 0;
+    transform: translate(0px, -230px);
+  }
+  88.6% {
+    opacity: 1;
+    transform: translate(0px, -155px);
+  }
+  94.3% {
+    opacity: 1;
+    transform: translate(0px, -120px);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(0px, -65px);
+  }
+}
+
+@keyframes auth-reel-3 {
+  0% {
+    opacity: 1;
+    transform: translate(-93px, -65px);
+  }
+  5.7% {
+    opacity: 1;
+    transform: translate(-65px, -40px);
+  }
+  11.4% {
+    opacity: 1;
+    transform: translate(-24px, -12px);
+  }
+  17.1% {
+    opacity: 1;
+    transform: translate(-15px, -7px);
+  }
+  22.9% {
+    opacity: 1;
+    transform: translate(0px, 0px);
+  }
+  65.7% {
+    opacity: 1;
+    transform: translate(0, 0);
+  }
+  68.6% {
+    opacity: 1;
+    transform: translate(130px, 0);
+  }
+  71.4% {
+    opacity: 1;
+    transform: translate(252px, 0);
+  }
+  77.1% {
+    opacity: 1;
+    transform: translate(383px, 0);
+  }
+  82.9% {
+    opacity: 0;
+    transform: translate(520px, 0);
+  }
+  85.7% {
+    opacity: 0;
+    transform: translate(-100px, -230px);
+  }
+  88.6% {
+    opacity: 1;
+    transform: translate(-100px, -155px);
+  }
+  94.3% {
+    opacity: 1;
+    transform: translate(-97px, -120px);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(-93px, -65px);
+  }
+}
+
+@keyframes auth-reel-4 {
+  0% {
+    opacity: 1;
+    transform: translate(-185px, -65px);
+  }
+  5.7% {
+    opacity: 1;
+    transform: translate(-130px, -40px);
+  }
+  11.4% {
+    opacity: 1;
+    transform: translate(-48px, -12px);
+  }
+  17.1% {
+    opacity: 1;
+    transform: translate(-30px, -7px);
+  }
+  22.9% {
+    opacity: 1;
+    transform: translate(0px, 0px);
+  }
+  65.7% {
+    opacity: 1;
+    transform: translate(0, 0);
+  }
+  68.6% {
+    opacity: 1;
+    transform: translate(130px, 0);
+  }
+  71.4% {
+    opacity: 1;
+    transform: translate(252px, 0);
+  }
+  77.1% {
+    opacity: 1;
+    transform: translate(383px, 0);
+  }
+  82.9% {
+    opacity: 0;
+    transform: translate(520px, 0);
+  }
+  85.7% {
+    opacity: 0;
+    transform: translate(-200px, -230px);
+  }
+  88.6% {
+    opacity: 1;
+    transform: translate(-200px, -155px);
+  }
+  94.3% {
+    opacity: 1;
+    transform: translate(-194px, -120px);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(-185px, -65px);
+  }
+}
+
+@layer components {
+  /* SOURCE OF TRUTH KEYWORDS: auth-split-lock, auth-form-column, AuthShell,
+     DESKTOP_DOES_NOT_SCROLL, LOCK_HAS_A_FLOOR, AuthShowcase
+     WHAT:  The one-viewport lock on the split auth screens, and the floor
+            under it.
+     WHY:   LOCK_HAS_A_FLOOR. A fixed page height plus a vertically CENTRED
+            form is only a layout while the form fits. The first version of
+            this locked the height at every viewport from `lg` up, and on a
+            short one — a laptop, or any browser zoomed past 100%, which
+            shortens the viewport exactly the same way — the column simply
+            overflowed its track in both directions: the heading landed on
+            the wordmark and the submit button landed on the legal line. A
+            page that cannot fit must SCROLL, so the lock only applies above
+            the height the tallest of these screens (sign-up, with the OAuth
+            row) actually needs. Below it the page is `min-height` again and
+            behaves like any other page.
+
+            The floor is a HEIGHT query, not a breakpoint, because that is
+            what the failure depends on. 800px is where the acceptance sizes
+            in auth-design.md §7 sit (1440x900 and 1280x800), so the lock
+            still holds for both.
+
+            `overflow-y: auto` on the column is the second half of the same
+            argument: if a deployment adds enough to the form to overflow
+            even above the floor, it must scroll INSIDE its own column —
+            where it stays beside the panel and clear of the header and
+            footer — rather than paint over them. `min-height: 0` is what
+            lets that happen at all; a flex child defaults to
+            `min-height: auto` and refuses to shrink below its content.
+     WHERE: src/components/global/auth/auth-shell.tsx, on the page root
+            (`auth-split-lock`) and the form column (`auth-form-column`). */
+  @media (min-width: 1024px) and (min-height: 800px) {
+    .auth-split-lock {
+      height: 100svh;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .auth-split-lock > main {
+      min-height: 0;
+    }
+
+    .auth-split-lock .auth-form-column {
+      min-height: 0;
+      overflow-y: auto;
+    }
+  }
+
+  .auth-showcase {
+    /* The loop every layer below shares. Override it on the panel to slow the
+       whole composition down without changing the shape of the motion. */
+    --auth-loop: 1.17s;
+    /* Two fit factors, min()-ed: neither axis may overflow the panel. */
+    --auth-fit-w: 1;
+    --auth-fit-h: 1;
+    --auth-scale: min(var(--auth-fit-w), var(--auth-fit-h));
+  }
+
+  /* The 560x708 design block. ABSOLUTE, so its laid-out height is zero and a
+     panel shorter than the design cannot push the page into a scrollbar —
+     the transform decides what is actually seen. */
+  .auth-showcase-canvas {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 560px;
+    height: 708px;
+    transform: translate(-50%, -50%) scale(var(--auth-scale));
+  }
+
+  @media (max-width: 1439px) {
+    .auth-showcase {
+      --auth-fit-w: 0.92;
+    }
+  }
+  @media (max-width: 1279px) {
+    .auth-showcase {
+      --auth-fit-w: 0.8;
+    }
+  }
+  @media (max-width: 1151px) {
+    .auth-showcase {
+      --auth-fit-w: 0.69;
+    }
+  }
+  /* The height ladder, measured rather than guessed: the panel is handed
+     `100vh − 180px` (page padding, header, the main's top padding and the
+     footer), and the design is 708px tall, so each step is the smallest
+     factor that still fits at the BOTTOM of its range. */
+  @media (max-height: 899px) {
+    .auth-showcase {
+      --auth-fit-h: 0.94;
+    }
+  }
+  @media (max-height: 849px) {
+    .auth-showcase {
+      --auth-fit-h: 0.87;
+    }
+  }
+  @media (max-height: 799px) {
+    .auth-showcase {
+      --auth-fit-h: 0.79;
+    }
+  }
+  @media (max-height: 749px) {
+    .auth-showcase {
+      --auth-fit-h: 0.72;
+    }
+  }
+  @media (max-height: 699px) {
+    .auth-showcase {
+      --auth-fit-h: 0.65;
+    }
+  }
+  @media (max-height: 649px) {
+    .auth-showcase {
+      --auth-fit-h: 0.57;
+    }
+  }
+
+  .auth-anim-doc {
+    animation: auth-doc-drop var(--auth-loop) linear infinite;
+  }
+
+  .auth-anim-make {
+    animation: auth-make-pulse var(--auth-loop) linear infinite;
+  }
+
+  .auth-anim-cursor {
+    transform-origin: 30% 20%;
+    animation: auth-cursor-tap var(--auth-loop) linear infinite;
+  }
+
+  .auth-anim-reel-0 {
+    animation: auth-reel-0 var(--auth-loop) linear infinite;
+  }
+  .auth-anim-reel-1 {
+    animation: auth-reel-1 var(--auth-loop) linear infinite;
+  }
+  .auth-anim-reel-2 {
+    animation: auth-reel-2 var(--auth-loop) linear infinite;
+  }
+  .auth-anim-reel-3 {
+    animation: auth-reel-3 var(--auth-loop) linear infinite;
+  }
+  .auth-anim-reel-4 {
+    animation: auth-reel-4 var(--auth-loop) linear infinite;
+  }
+
+  /* Off-screen, or a hidden tab. `paused` rather than unmounted, so the panel
+     resumes on the frame it stopped on when the tab comes back. */
+  .auth-showcase-paused [class*="auth-anim-"] {
+    animation-play-state: paused;
+  }
+
+  /* Animations off: every layer sits at its base state — the document at rest
+     on the bar, the pill unpressed, the full strip of five reels. Each
+     element's STATIC position in the markup IS its resting position, so
+     cancelling the animation is all that is needed. */
+  @media (prefers-reduced-motion: reduce) {
+    .auth-anim-doc,
+    .auth-anim-make,
+    .auth-anim-cursor,
+    .auth-anim-reel-0,
+    .auth-anim-reel-1,
+    .auth-anim-reel-2,
+    .auth-anim-reel-3,
+    .auth-anim-reel-4 {
+      animation: none;
     }
   }
 }

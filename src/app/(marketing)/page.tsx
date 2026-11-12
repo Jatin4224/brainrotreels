@@ -78,6 +78,7 @@ import { APP_NAME } from "@/lib/config/branding";
 import { PLANS, PLAN_ORDER } from "@/lib/config/plans";
 import { RESOURCES } from "@/lib/resources";
 import { cn } from "@/lib/utils";
+import { HighlightHeading } from "@/components/global/highlight-heading";
 
 import {
   HANDLED_FOR_YOU,

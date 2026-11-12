@@ -52,6 +52,8 @@ export type {
   AuthValuesByMode,
   AuthScreenCopy,
   AuthPanelCopy,
+  AuthShowcaseReel,
+  AuthShowcaseSource,
   SocialProviderId,
   ForgotPasswordValues,
   ResetPasswordValues,

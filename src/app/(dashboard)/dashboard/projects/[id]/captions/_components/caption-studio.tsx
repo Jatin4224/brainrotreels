@@ -43,6 +43,8 @@
 import * as React from "react";
 import { toast } from "sonner";
 
+import { useRovingRadioGroup } from "@/hooks/use-roving-radiogroup";
+import { SelectableTile } from "@/components/global/selectable-tile";
 import { trpc } from "@/trpc/react-provider";
 import {
   useActiveOrganization,
@@ -65,6 +67,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { StatePanel } from "@/components/global/state-panel";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -570,6 +573,13 @@ function StyleGallery({
 }) {
   const { open } = useUpgradeModal();
 
+  /* One tab stop for the whole grid, arrow keys within it — the behaviour the
+     background picker already had and this one did not. */
+  const styleRoving = useRovingRadioGroup({
+    ids: React.useMemo(() => styles.map((style) => style.id), [styles]),
+    selectedId,
+  });
+
   return (
     <Card>
       <CardHeader className="gap-3">
@@ -604,18 +614,29 @@ function StyleGallery({
 
       <CardContent>
         {styles.length === 0 ? (
-          <p className="py-10 text-center text-sm text-muted-foreground">
-            No styles match that search.
-          </p>
+          /* PANEL_OWNS_THE_CARD — this is already inside a CardContent, so it
+             takes the panel's padding and centring without a second card. */
+          <StatePanel card={false} description="No styles match that search." />
         ) : (
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
+          /* RADIOGROUP_NOT_A_LIST_OF_BUTTONS. These were `aria-pressed`
+             toggles — forty of them, each its own tab stop — while the
+             visually identical background picker was a proper radio group
+             with one. Same look, two different controls. Both are now
+             <SelectableTile /> inside a real group. */
+          <div
+            role="radiogroup"
+            aria-label="Caption style"
+            onKeyDown={styleRoving.handleKeyDown}
+            className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4"
+          >
             {styles.map((style) => (
-              <button
+              <SelectableTile
                 key={style.id}
-                type="button"
-                aria-pressed={style.id === selectedId}
-                aria-label={`${style.name}${style.locked ? " (locked)" : ""}`}
-                onClick={() => {
+                ref={styleRoving.registerRef(style.id)}
+                checked={style.id === selectedId}
+                tabbable={styleRoving.activeId === style.id}
+                label={`${style.name}${style.locked ? " (locked)" : ""}`}
+                onChoose={() => {
                   if (style.locked) {
                     /* The registry resource, so the modal shows that
                      * entry.s own copy — UPGRADE_COPY_FROM_REGISTRY. */
@@ -629,13 +650,6 @@ function StyleGallery({
                   }
                   onSelect(style.id);
                 }}
-                className={[
-                  "tactile-control flex flex-col gap-2 rounded-xl border p-2 text-left transition",
-                  "focus-visible:outline-none focus-ring",
-                  style.id === selectedId
-                    ? "border-primary bg-accent"
-                    : "border-border hover:bg-accent/50",
-                ].join(" ")}
               >
                 <CaptionPreview
                   styleId={style.id}
@@ -663,7 +677,7 @@ function StyleGallery({
                     Low contrast
                   </span>
                 ) : null}
-              </button>
+              </SelectableTile>
             ))}
           </div>
         )}

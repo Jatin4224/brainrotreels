@@ -47,6 +47,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { StatePanel } from "@/components/global/state-panel";
 import {
   Table,
   TableBody,
@@ -102,16 +103,6 @@ export interface DataTableProps<TRow> {
   skeletonRows?: number;
 }
 
-function Shell({ children }: { children: React.ReactNode }) {
-  return (
-    <Card>
-      <CardContent className="py-10 text-center text-sm text-muted-foreground">
-        {children}
-      </CardContent>
-    </Card>
-  );
-}
-
 export function DataTable<TRow>({
   columns,
   rows,
@@ -152,10 +143,18 @@ export function DataTable<TRow>({
     return (
       <div className="flex flex-col gap-4">
         {header}
-        {/* Deliberately a plain card, never an upgrade prompt — a failed query
-            is not a plan problem, and conflating them sends the reader to
-            billing for a network error. */}
-        <Shell>{error}</Shell>
+        {/* Deliberately a plain panel, never an upgrade prompt — a failed
+            query is not a plan problem, and conflating them sends the reader
+            to billing for a network error.
+            ERROR_NEEDS_A_HEADLINE: the message used to be the only thing in
+            the panel, at muted weight, which made a failed load look exactly
+            like an empty list. The title says which of the two this is; the
+            server's message stays under it as the detail. */}
+        <StatePanel
+          tone="destructive"
+          title="This list could not be loaded"
+          description={error}
+        />
       </div>
     );
   }
@@ -179,11 +178,14 @@ export function DataTable<TRow>({
     return (
       <div className="flex flex-col gap-4">
         {header}
-        <Shell>
+        {/* The callers pass a title+sentence fragment of their own, so this
+            stays a children panel rather than a title/description one — the
+            DataTable `empty` contract is unchanged. */}
+        <StatePanel>
           {isFiltered
             ? (emptyFiltered ?? "Nothing matches these filters.")
             : (empty ?? "Nothing here yet.")}
-        </Shell>
+        </StatePanel>
       </div>
     );
   }

@@ -64,6 +64,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { StatePanel } from "@/components/global/state-panel";
 import {
   Form,
   FormControl,
@@ -246,23 +247,15 @@ export function ScriptEditor({ projectId }: { projectId: string }) {
       ) : null}
 
       {generating ? (
-        <Card>
-          <CardContent className="py-10 text-center text-sm text-muted-foreground">
-            <p className="font-medium text-foreground">Writing your script…</p>
-            <p className="mt-1">
-              This takes up to a minute. You can leave this page.
-            </p>
-          </CardContent>
-        </Card>
+        <StatePanel
+          title="Writing your script…"
+          description="This takes up to a minute. You can leave this page."
+        />
       ) : blocks.length === 0 ? (
-        <Card>
-          <CardContent className="py-10 text-center text-sm text-muted-foreground">
-            <p className="font-medium text-foreground">No script yet</p>
-            <p className="mt-1">
-              Give us a topic, a link or some text and we will write one.
-            </p>
-          </CardContent>
-        </Card>
+        <StatePanel
+          title="No script yet"
+          description="Give us a topic, a link or some text and we will write one."
+        />
       ) : (
         <ScriptBlockList
           organizationId={organizationId}

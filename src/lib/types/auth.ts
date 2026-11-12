@@ -250,3 +250,73 @@ export interface AuthPanelCopy {
 export const SOCIAL_PROVIDER_IDS = ["google", "apple"] as const;
 
 export type SocialProviderId = (typeof SOCIAL_PROVIDER_IDS)[number];
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: AuthShowcaseReel, AuthShowcaseSource,
+ *   AUTH_SHOWCASE_REELS, AUTH_SHOWCASE_SOURCE, AuthShowcase,
+ *   SHOWCASE_IS_DATA, COVER_IS_AN_IMAGE, PANEL_IS_THE_PITCH
+ *
+ * WHAT:  The contents of the animated panel beside the desktop auth form —
+ *        the document that "enters" the bar, and the five reels that come
+ *        back out of it.
+ *
+ * WHY:   SHOWCASE_IS_DATA, the same rule `ReelShowcaseItem` states for the
+ *        landing hero's phones: the five reels are ONE card component
+ *        rendered five times from this array, not five slabs of markup.
+ *        Copy-pasted card markup is how a mockup ends up with part 4's title
+ *        over part 2's score, and the strip's geometry (five 100px cards
+ *        touching, rounded only at the two outer ends) has to stay a function
+ *        of the index rather than of what somebody typed into each copy.
+ *
+ *        COVER_IS_AN_IMAGE, and the reason this type carries a `src` rather
+ *        than a headline, a kicker and a surface colour. The strip used to
+ *        draw five TEXT cards — a tone from a closed union, a title set in
+ *        the display face — which was a drawing OF a reel rather than a
+ *        reel. These are the real first frames the renderer produces, so the
+ *        panel now shows the product's actual output at the moment it is
+ *        claiming what the product outputs. The cards are 100px wide: no
+ *        headline set at that size reads anyway, which is why the text
+ *        version had to invent short ones.
+ *
+ *        A ROOT-RELATIVE PATH into `public/`, not an import of the file.
+ *        These are five fixed covers shipped with the app, and a string is
+ *        what `next/image` wants; an import would also work but would put a
+ *        binary in the module graph of a type's content file for nothing.
+ *        Off-domain URLs are NOT supported here on purpose — next/image
+ *        refuses them without a `remotePatterns` entry per deployment (see
+ *        proof-strip.tsx, which uses a plain <img> for exactly that reason).
+ *
+ *        `score` is a NUMBER, unlike `ReelShowcaseItem.likes` which is the
+ *        pre-formatted string "1.2M". These are two-digit scores with no unit
+ *        and no abbreviation to decide, so there is nothing for a formatter
+ *        to get wrong and a number keeps the "0–100" claim on the type.
+ * WHERE: `AUTH_SHOWCASE_REELS` / `AUTH_SHOWCASE_SOURCE` in
+ *        src/components/global/auth/auth-content.ts, rendered by
+ *        src/components/global/auth/auth-showcase.tsx.
+ */
+export interface AuthShowcaseReel {
+  id: string;
+  /**
+   * The cover frame, as a path under `public/`. 9:16, cropped to the card
+   * from the TOP — see auth-showcase.tsx — so the frame's headline survives
+   * and only its footer is lost.
+   */
+  src: string;
+  /** The two-character platform chip over the card, e.g. "YT", "in". */
+  platform: string;
+  /** The predicted-performance number on the badge, 0–100. */
+  score: number;
+}
+
+export interface AuthShowcaseSource {
+  /** The badge on the orange tile inside the document card, e.g. "PDF". */
+  kind: string;
+  /** The document's file name. */
+  fileName: string;
+  /** The line under it, e.g. "12 pages · 2.4 MB". */
+  meta: string;
+  /** The greyed text in the input bar the document drops into. */
+  placeholder: string;
+  /** The label on the pill the cursor presses. */
+  action: string;
+}

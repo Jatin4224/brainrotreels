@@ -58,6 +58,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { StatePanel } from "@/components/global/state-panel";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -190,14 +191,10 @@ function SpeakerPanel({
 
   if (speakers.length === 0) {
     return (
-      <Card>
-        <CardContent className="py-10 text-center text-sm text-muted-foreground">
-          <p className="font-medium text-foreground">No speakers yet</p>
-          <p className="mt-1">
-            Write a script first — the speakers come from it.
-          </p>
-        </CardContent>
-      </Card>
+      <StatePanel
+        title="No speakers yet"
+        description="Write a script first — the speakers come from it."
+      />
     );
   }
 
