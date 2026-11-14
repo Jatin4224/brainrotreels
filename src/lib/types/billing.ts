@@ -19,6 +19,7 @@
 import { z } from "zod";
 
 import type { BillingInterval, PlanKey } from "@/lib/config/plans";
+import type { ResourceKey } from "@/lib/resources";
 
 const organizationIdSchema = z.string().min(1, "Organization ID is required.");
 
@@ -112,3 +113,74 @@ export interface AvailablePlan {
   monthlyPrice: PlanPrice | null;
   yearlyPrice: PlanPrice | null;
 }
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: DowngradeBlocker, DowngradeBlockerMap,
+ *   DOWNGRADE_REQUIRES_CLEANUP, TYPES_LIVE_IN_LIB_TYPES
+ *
+ * WHAT:  Everything an organization is currently using that a target plan would
+ *        not allow — the reasons a downgrade must be refused — and the per-plan
+ *        map of them the billing screen reads.
+ *
+ * WHY:   TYPES_LIVE_IN_LIB_TYPES, and here that is a security boundary rather
+ *        than tidiness. These two describe the SHAPE of a gate decision, while
+ *        computing one needs Prisma — so they used to live in
+ *        src/lib/feature-gate.ts beside the queries. That module could not then
+ *        take `import 'server-only'`, because the billing screen's client
+ *        components import these types from it; the whole gate decider stayed
+ *        importable from a browser bundle to keep two type imports working.
+ *        Moving the types here costs nothing (`import type` is erased either
+ *        way) and let the decider be sealed.
+ * WHERE: Produced by getDowngradeBlockers / getDowngradeBlockerMap in
+ *        src/lib/feature-gate.ts; consumed by the usage router, the downgrade
+ *        guard on the billing screen, plan-selector and usage-limit-list.
+ */
+export interface DowngradeBlocker {
+  resource: ResourceKey;
+  /** Display name from the registry entry. */
+  name: string;
+  /** What the organization is using now, pre-formatted for display. */
+  current: string;
+  /** What the target plan permits, pre-formatted, or null for a flag. */
+  allowed: string | null;
+  /** How many units must go before the downgrade can proceed. Null for flags. */
+  excess: number | null;
+  /** True when the target plan drops the feature entirely rather than capping it. */
+  isFeatureLoss: boolean;
+}
+
+export type DowngradeBlockerMap = Partial<Record<PlanKey, DowngradeBlocker[]>>;
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: ENTITLED_SUBSCRIPTION_STATUSES,
+ *   ENTITLED_STATUSES_ARE_AN_ALLOWLIST, SUBSCRIPTION_STATUS_IS_A_STRING
+ *
+ * WHAT:  The `Subscription.status` values that still carry a paid plan's
+ *        entitlements.
+ *
+ * WHY:   ENTITLED_STATUSES_ARE_AN_ALLOWLIST. An entitlement resolver that reads
+ *        the status column for one value and ignores the rest hands the paid
+ *        tier to `canceled`, `unpaid`, `incomplete` and `incomplete_expired`
+ *        subscriptions for as long as `periodEnd` is in the future — which is
+ *        how a cancelled customer keeps full access until their old period runs
+ *        out. Listing what IS entitled means a status nobody anticipated
+ *        withholds the plan instead of granting it.
+ *
+ *        `past_due` is included on purpose. The provider retries a failed charge
+ *        over several days, and cutting off a customer whose card is about to
+ *        succeed is the worse error; `canceled` is excluded because nothing is
+ *        still being attempted. That is a BUSINESS decision, which is why it is
+ *        declared here as data rather than buried in an adapter's control flow.
+ *
+ *        SUBSCRIPTION_STATUS_IS_A_STRING: the Prisma column is a `String` with
+ *        no enum block, so this list is the only thing standing between a
+ *        provider's new status value and an accidental entitlement.
+ * WHERE: Every EntitlementAdapter's getTier — currently
+ *        src/lib/adapters/better-auth/index.ts. A provider that owns
+ *        subscriptions should map its own statuses onto these before comparing.
+ */
+export const ENTITLED_SUBSCRIPTION_STATUSES: readonly string[] = [
+  "active",
+  "trialing",
+  "past_due",
+];

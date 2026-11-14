@@ -123,7 +123,7 @@ export function CaptionStudio({ projectId }: { projectId: string }) {
 
   const utils = trpc.useUtils();
 
-  const state = trpc.captions.get.useQuery(
+  const state = trpc.captionStyles.get.useQuery(
     { organizationId: organizationId ?? "", projectId },
     {
       enabled,
@@ -137,7 +137,7 @@ export function CaptionStudio({ projectId }: { projectId: string }) {
     },
   );
 
-  const library = trpc.captions.styles.useQuery(
+  const library = trpc.captionStyles.styles.useQuery(
     {
       organizationId: organizationId ?? "",
       ...(search.trim().length > 0 ? { search: search.trim() } : {}),
@@ -187,7 +187,7 @@ export function CaptionStudio({ projectId }: { projectId: string }) {
           canApply={canApply}
           onSaved={() => {
             setDraft(null);
-            void utils.captions.invalidate();
+            void utils.captionStyles.invalidate();
           }}
         />
 
@@ -249,7 +249,7 @@ function AlignmentPanel({
   stalled: boolean;
   onAligning: () => void;
 }) {
-  const align = trpc.captions.align.useMutation({
+  const align = trpc.captionStyles.align.useMutation({
     onSuccess: (result) => {
       if (result.queued) {
         onAligning();
@@ -404,7 +404,7 @@ function StageAndControls({
   canApply: boolean;
   onSaved: () => void;
 }) {
-  const apply = trpc.captions.applyStyle.useMutation({
+  const apply = trpc.captionStyles.applyStyle.useMutation({
     onSuccess: (result) => {
       toast.success("Caption style saved", {
         description: result.written

@@ -229,7 +229,11 @@ export interface PaginationContext {
  */
 export interface ProtectedOptions {
   /** Member must hold one of these org roles (e.g. `['owner']`) to call. */
-  requireRole?: string[];
+  /* `readonly` because it is only ever read (`.includes`), and the owner list
+   * callers should pass — OWNER_ROLE_NAMES — is a readonly tuple. A mutable
+   * `string[]` here forced handlers to re-type the role names inline, which is
+   * how one of them came to omit `client-owner`. */
+  requireRole?: readonly string[];
   /** Member must hold this `resource:action` permission. Owners always pass. */
   requirePermission?: Permission;
   paginate?: boolean | PaginationOptions;

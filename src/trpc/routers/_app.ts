@@ -71,7 +71,14 @@ export const appRouter = createTRPCRouter({
   credits: creditsRouter,
   scripts: scriptsRouter,
   voices: voicesRouter,
-  captions: captionsRouter,
+  /* Mounted under its REGISTRY KEY, like every other gated router here. The
+   * mount name is what `getResourceFromPath` looks up, so mounting this as
+   * `captions` while the registry calls it `captionStyles` resolved to null and
+   * silently skipped the entire per-resource section: the `align` limit of 10
+   * per 5 minutes never fired, and `captions.align` is a full-narration STT
+   * round trip with a provider call per line. The audit `describe` templates
+   * were dead for the same reason. */
+  captionStyles: captionsRouter,
   /* Mounted under the REGISTRY KEY, which is what gates the whole router: the
    * factory refuses every verb of a flag resource the plan does not include —
    * GATE_IS_THE_WHOLE_ROUTER in src/trpc/routers/timeline.ts. */

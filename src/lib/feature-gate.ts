@@ -26,6 +26,8 @@
  *        Tier comes from src/lib/adapters.
  */
 
+import "server-only";
+
 import { cache } from "react";
 import { prisma } from "@/lib/config/prisma";
 import {
@@ -335,19 +337,17 @@ export async function checkBooleanFeature(
  * WHERE: Exposed through the usage router; consumed by the downgrade guard on
  *        the billing screen.
  */
-export interface DowngradeBlocker {
-  resource: ResourceKey;
-  /** Display name from the registry entry. */
-  name: string;
-  /** What the organization is using now, pre-formatted for display. */
-  current: string;
-  /** What the target plan permits, pre-formatted, or null for a flag. */
-  allowed: string | null;
-  /** How many units must go before the downgrade can proceed. Null for flags. */
-  excess: number | null;
-  /** True when the target plan drops the feature entirely rather than capping it. */
-  isFeatureLoss: boolean;
-}
+/* The SHAPE is declared in lib/types/billing.ts (TYPES_LIVE_IN_LIB_TYPES), which
+ * is what lets this module take `import "server-only"` — the billing screen's
+ * client components need these two types, and while they lived here the gate
+ * decider had to stay importable from a browser bundle to supply them.
+ * Imported as well as re-exported: the helpers below annotate with it, and
+ * `export … from` alone would create no local binding. */
+import type {
+  DowngradeBlocker,
+  DowngradeBlockerMap,
+} from "@/lib/types/billing";
+export type { DowngradeBlocker, DowngradeBlockerMap };
 
 /* Every limit resource whose usage exceeds what `plan` permits, in the shape the
  * UI renders. Shared by the downgrade check (measured against the plan being
@@ -439,7 +439,7 @@ export const getDowngradeBlockers = cache(
  * WHERE: Exposed through the usage router; consumed by <ChangePlanDialog />.
  *        ENFORCEMENT is separate and server-side, in billing.upgradeOrganization.
  */
-export type DowngradeBlockerMap = Partial<Record<PlanKey, DowngradeBlocker[]>>;
+/* See the re-export above — the shape is declared in lib/types/billing.ts. */
 
 /**
  * SOURCE OF TRUTH KEYWORDS: getPlanOverages, PlanOverageState, OVER_PLAN_STATE,

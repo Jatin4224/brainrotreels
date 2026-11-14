@@ -21,7 +21,7 @@ import { TRPCError } from "@trpc/server";
 import { protectedProcedure } from "../procedures";
 import { getAuthAdapter } from "@/lib/adapters";
 import { permissions } from "@/lib/permissions";
-import { updateOrganizationSettingsSchema } from "@/lib/types";
+import { OWNER_ROLE_NAMES, updateOrganizationSettingsSchema } from "@/lib/types";
 
 export const organizationSettingsRouter = createTRPCRouter({
   get: protectedProcedure({
@@ -56,7 +56,12 @@ export const organizationSettingsRouter = createTRPCRouter({
   /* Destructive, owner-only. The schema cascades members, roles, usage metrics
    * and audit rows, so this is the single call that retires a tenant. */
   delete: protectedProcedure({
-    requireRole: ["owner"],
+    /* OWNER_ROLE_NAMES, not a literal. The list is `["owner", "client-owner"]`
+     * — a portal-created client owner IS an owner — so the hardcoded `["owner"]`
+     * locked exactly those tenants out of retiring their own workspace, and did
+     * it with the provider-coupled role-string comparison the docs tell handlers
+     * not to write. One list, one answer. */
+    requireRole: OWNER_ROLE_NAMES,
     requirePermission: permissions.ORGANIZATION_SETTINGS_UPDATE,
     audit: { entity: "organization", action: "delete" },
   })
