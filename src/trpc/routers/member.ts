@@ -122,6 +122,16 @@ export const memberRouter = createTRPCRouter({
           organizationId: input.organizationId,
           memberId: member.id,
           role: input.role,
+          /* A_GRANT_CANNOT_EXCEED_THE_GRANTER. The decoder caps the new role
+           * against what THIS caller holds, which is what stops a member with
+           * `member:update` minting a role carrying permissions they lack and
+           * assigning it. `ctx.organization.permissions` is the empty-array
+           * sentinel for a full-access member, so the flag has to travel with
+           * it. */
+          granter: {
+            hasFullAccess: ctx.memberHasFullAccess,
+            permissions: ctx.organization.permissions,
+          },
         });
       } catch (error) {
         const mapped = toRoleTRPCError(error);

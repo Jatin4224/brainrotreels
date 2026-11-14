@@ -29,10 +29,45 @@ import {
   deleteRoleSchema,
 } from "@/lib/types";
 import {
+  permissionsBeyondAuthority,
   permissionsToStatement,
   statementToPermissions,
   type PermissionStatement,
 } from "@/lib/permissions";
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: assertGrantWithinAuthority,
+ *   A_GRANT_CANNOT_EXCEED_THE_GRANTER, permissionsBeyondAuthority,
+ *   role escalation
+ *
+ * WHAT:  Refuses a role write carrying any permission the caller does not hold.
+ * WHY:   `organizationRoles:update` is in the admin preset, and a role row IS
+ *        the permission source the context resolver reads — so without this an
+ *        admin could write `billing:*` into any role and have it granted on
+ *        their next request. The permission gate on the procedure answers "may
+ *        you edit roles at all", which is a different question from "may you
+ *        hand out THIS".
+ *
+ *        Local to this router rather than pushed into the procedure factory:
+ *        the factory gates on a permission the PATH implies, and it has no way
+ *        to know that `input.permissions` here is a grant rather than ordinary
+ *        payload. processRole covers the member/invitation surfaces for the
+ *        same invariant, which is why the comparison itself lives in
+ *        lib/permissions and not in either caller.
+ * WHERE: organizationRoles.create and .update, before the row is written.
+ */
+function assertGrantWithinAuthority(
+  requested: readonly string[],
+  granter: { hasFullAccess: boolean; permissions: readonly string[] },
+): void {
+  const excess = permissionsBeyondAuthority(requested, granter);
+  if (excess.length > 0) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: `You cannot grant a permission you do not hold yourself: ${excess.join(", ")}.`,
+    });
+  }
+}
 
 /* Parse the stored JSON statement back to a permission-string list. */
 function parsePermissions(raw: string): string[] {
@@ -80,6 +115,11 @@ export const organizationRolesRouter = createTRPCRouter({
         });
       }
 
+      assertGrantWithinAuthority(input.permissions, {
+        hasFullAccess: ctx.memberHasFullAccess,
+        permissions: ctx.organization.permissions,
+      });
+
       const statement = permissionsToStatement(input.permissions);
       return ctx.db.organizationRole.create({
         data: {
@@ -98,10 +138,33 @@ export const organizationRolesRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const role = await ctx.db.organizationRole.findFirst({
         where: { id: input.roleId, organizationId: input.organizationId },
-        select: { id: true },
+        select: { id: true, role: true },
       });
       if (!role)
         throw new TRPCError({ code: "NOT_FOUND", message: "Role not found" });
+
+      /* YOU_CANNOT_EDIT_THE_ROLE_YOU_HOLD. Checked BEFORE the authority
+       * comparison, because against your own row that comparison can never
+       * refuse anything useful: the permissions you are adding are measured
+       * against the row that is about to define them, so every self-grant looks
+       * legitimate one request later. member.update already locks a caller out
+       * of their own membership row; this is the same rule for the role that
+       * row points at, and without it that lock was trivially side-stepped.
+       *
+       * Full-access members are exempt: ownership is never stored here (the
+       * name is reserved), so they cannot be editing their own row. */
+      if (!ctx.memberHasFullAccess && role.role === ctx.organization.role) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message:
+            "You cannot change the permissions of the role you hold yourself. Ask an owner to change it.",
+        });
+      }
+
+      assertGrantWithinAuthority(input.permissions, {
+        hasFullAccess: ctx.memberHasFullAccess,
+        permissions: ctx.organization.permissions,
+      });
 
       const statement = permissionsToStatement(input.permissions);
       return ctx.db.organizationRole.update({

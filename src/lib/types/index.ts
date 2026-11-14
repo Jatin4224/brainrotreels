@@ -228,6 +228,7 @@ export type {
   UpdateMemberValues,
   CreateRoleValues,
   UpdateRoleValues,
+  PermissionGrantAuthority,
 } from "./team";
 export {
   billingIntervalSchema,
@@ -236,6 +237,7 @@ export {
   upgradeSubscriptionSchema,
   paymentMethodIdSchema,
   isPurchasablePlan,
+  ENTITLED_SUBSCRIPTION_STATUSES,
 } from "./billing";
 export type {
   CreateSubscriptionValues,
@@ -243,6 +245,8 @@ export type {
   PurchasablePlanKey,
   PlanPrice,
   AvailablePlan,
+  DowngradeBlocker,
+  DowngradeBlockerMap,
 } from "./billing";
 export {
   CREDITABLE_KINDS,

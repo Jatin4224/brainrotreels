@@ -80,7 +80,11 @@ export type StructuredErrorCause =
     }
   | {
       errorCode: typeof ERROR_CODES.INSUFFICIENT_PERMISSIONS;
-      required: string[];
+      /* `readonly` because the payload is only ever read and serialised, and
+       * the role allowlists handed to it (OWNER_ROLE_NAMES) are readonly
+       * tuples. A mutable array here would push callers back to re-typing role
+       * names inline at the call site. */
+      required: readonly string[];
       current: string;
       message: string;
     }

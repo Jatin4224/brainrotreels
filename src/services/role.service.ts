@@ -23,10 +23,15 @@ import "server-only";
 
 import type { DbClient } from "@/lib/config/prisma";
 import {
+  permissionsBeyondAuthority,
   permissionsToStatement,
   statementToPermissions,
 } from "@/lib/permissions";
-import { isOwnerRoleName, permissionStringSchema } from "@/lib/types";
+import {
+  isOwnerRoleName,
+  permissionStringSchema,
+  type PermissionGrantAuthority,
+} from "@/lib/types";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: RoleEscalationError, UnknownPermissionError,
@@ -58,6 +63,37 @@ export class UnknownPermissionError extends Error {
     super(`Unknown permission: ${unknownPermissions.join(", ")}.`);
     this.name = "UnknownPermissionError";
     this.unknownPermissions = unknownPermissions;
+  }
+}
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: PermissionEscalationError,
+ *   A_GRANT_CANNOT_EXCEED_THE_GRANTER, permissionsBeyondAuthority
+ *
+ * WHAT:  The refusal when a caller tries to hand out a permission they do not
+ *        themselves hold.
+ * WHY:   A third class rather than reusing RoleEscalationError, because the two
+ *        are different events and only one of them is an attack on a reserved
+ *        name. An owner-role request can never be legitimate from any caller;
+ *        an over-reaching permission set is legitimate for an owner and refused
+ *        only for this caller, so the message has to name what was over-reached
+ *        for and the audit trail should be able to tell them apart.
+ *
+ *        Still a FORBIDDEN rather than a BAD_REQUEST: the payload is
+ *        well-formed and every permission in it is real (UnknownPermissionError
+ *        already covers the malformed case). What is missing is authority, and
+ *        retrying the same payload will not acquire any.
+ * WHERE: Thrown by processRole; mapped to FORBIDDEN by src/trpc/role-error.ts.
+ */
+export class PermissionEscalationError extends Error {
+  readonly excessPermissions: readonly string[];
+
+  constructor(excessPermissions: readonly string[]) {
+    super(
+      `You cannot grant a permission you do not hold yourself: ${excessPermissions.join(", ")}.`,
+    );
+    this.name = "PermissionEscalationError";
+    this.excessPermissions = excessPermissions;
   }
 }
 
@@ -97,16 +133,33 @@ async function ensureRole(
 }
 
 /**
- * SOURCE OF TRUTH KEYWORDS: processRole
+ * SOURCE OF TRUTH KEYWORDS: processRole, A_GRANT_CANNOT_EXCEED_THE_GRANTER,
+ *   PermissionGrantAuthority, assertWithinAuthority, EVERY_BRANCH_IS_A_GRANT
  *
  * WHAT:  Resolves the encoded role string to a stored role name (creating the
  *        role when needed) and returns that name for Member.role / Invitation.role.
- * WHERE: invitation.create, member.update.
+ *
+ * WHY:   `granter` is required, not optional, and that is deliberate:
+ *        A_GRANT_CANNOT_EXCEED_THE_GRANTER has to hold on every path into this
+ *        function, and an optional parameter defaulting to "unrestricted" would
+ *        make the insecure call the easy one to write. A new caller now cannot
+ *        compile without stating whose authority the grant is made under.
+ *
+ *        EVERY_BRANCH_IS_A_GRANT. All THREE decode branches assign power and
+ *        all three are checked, including the plain-role-name branch that looks
+ *        like a no-op. It is not: naming an EXISTING role hands the target
+ *        whatever that row already holds, so a caller with `member:update`
+ *        could assign the finance role — `billing:*` and all — to a second
+ *        account without ever encoding a permission. That branch was the
+ *        quietest of the three and needed the lookup the others do not.
+ * WHERE: invitation.create and member.update, both via the membership adapter,
+ *        which threads the caller's authority down from `ctx`.
  */
 export async function processRole(
   db: DbClient,
   organizationId: string,
   role: string,
+  granter: PermissionGrantAuthority,
 ): Promise<string> {
   /* OWNER_IS_NEVER_ASSIGNABLE. Checked on the RAW input as well as on every
    * resolved name below, so neither `"owner"` nor `"Owner |||[…]"` (which
@@ -122,6 +175,7 @@ export async function processRole(
     const permissions = parsePermissions(permsPart);
     const roleName = normalizeRoleName(namePart);
     if (isOwnerRoleName(roleName)) throw new RoleEscalationError(role);
+    assertWithinAuthority(permissions, granter);
     await ensureRole(db, organizationId, roleName, permissions);
     return roleName;
   }
@@ -130,13 +184,43 @@ export async function processRole(
    * collide with an owner name, so only the permissions need checking. */
   if (role.startsWith("[")) {
     const permissions = parsePermissions(role);
+    assertWithinAuthority(permissions, granter);
     const roleName = customRoleName(permissions);
     await ensureRole(db, organizationId, roleName, permissions);
     return roleName;
   }
 
-  /* Plain, already-existing role name. */
+  /* Plain, already-existing role name — a grant of whatever that row holds,
+   * so it is checked against the stored permissions rather than waved through.
+   * A name with no row carries nothing to over-reach for and resolves as it
+   * always did; the member gains no permissions from it. */
+  const existing = await db.organizationRole.findFirst({
+    where: { organizationId, role },
+    select: { permission: true },
+  });
+  if (existing) {
+    assertWithinAuthority(parseRolePermissions(existing.permission), granter);
+  }
   return role;
+}
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: assertWithinAuthority,
+ *   A_GRANT_CANNOT_EXCEED_THE_GRANTER, PermissionEscalationError
+ *
+ * WHAT:  Throws unless every permission being granted is one the granter holds.
+ * WHY:   The three call sites above would otherwise each repeat the compare and
+ *        the throw, and a fourth branch added later would quietly repeat
+ *        neither. Thin on purpose — the comparison itself lives in
+ *        `permissionsBeyondAuthority` so it can be unit-tested without a db.
+ * WHERE: processRole's three branches.
+ */
+function assertWithinAuthority(
+  requested: readonly string[],
+  granter: PermissionGrantAuthority,
+): void {
+  const excess = permissionsBeyondAuthority(requested, granter);
+  if (excess.length > 0) throw new PermissionEscalationError(excess);
 }
 
 /**

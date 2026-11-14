@@ -43,6 +43,7 @@ import { getCachedSession } from "@/lib/better-auth/auth";
 import { getUserMemberships } from "@/services/membership.service";
 import { prisma } from "@/lib/config/prisma";
 import { PLANS, PLAN_KEYS, type PlanKey } from "@/lib/config/plans";
+import { ENTITLED_SUBSCRIPTION_STATUSES } from "@/lib/types/billing";
 
 /* PROVIDER_ISOLATION runtime backstop — see src/lib/adapters/provider.ts. */
 assertProviderActive("better-auth");
@@ -172,6 +173,22 @@ const getBetterAuthTier = cache(
 
     const now = new Date();
     if (subscription.periodEnd && subscription.periodEnd < now) return freeTier;
+
+    /* ENTITLED_STATUSES_ARE_AN_ALLOWLIST. Without this the status column was
+     * read for `trialing` and nothing else, so `canceled`, `unpaid`,
+     * `incomplete` and `incomplete_expired` all returned the PAID tier for as
+     * long as `periodEnd` stayed in the future — entitlements were revoked only
+     * when `customer.subscription.deleted` eventually arrived. An allowlist
+     * rather than a denylist because a status this code has never heard of
+     * should withhold a paid plan, not grant one.
+     *
+     * `past_due` IS entitled, deliberately: Stripe retries a failed payment for
+     * days, and cutting a paying customer off mid-dunning over a card that is
+     * about to succeed is worse than the alternative. `canceled` is different —
+     * there is nothing still being attempted. */
+    if (!ENTITLED_SUBSCRIPTION_STATUSES.includes(subscription.status)) {
+      return freeTier;
+    }
 
     const isOnTrial =
       subscription.status === "trialing" &&
