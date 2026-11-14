@@ -23,6 +23,8 @@ export { RENDER_KEY_VERSION, renderCacheKey } from "./cache-key";
 export type { RenderCacheInputs } from "./cache-key";
 export { dropUnknownRenderKinds } from "./sanitise";
 export type { SanitiseResult } from "./sanitise";
+export { compositionMetadataFor } from "./metadata";
+export type { CompositionMetadata } from "./metadata";
 export {
   LAYER_ORDER,
   collectAssetHandles,

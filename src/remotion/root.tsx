@@ -33,8 +33,8 @@
 
 import { Composition } from "remotion";
 
-import { planComposition } from "@/lib/render";
-import { resolveWordAnchors, timelineDocSchema } from "@/lib/timeline";
+import { compositionMetadataFor } from "@/lib/render";
+import { resolveWordAnchors } from "@/lib/timeline";
 import { FIXTURES_BY_KIND } from "@/lib/timeline/fixtures";
 import { TIMELINE_COMPOSITION_ID } from "@/lib/types/render";
 import { devAssetMap } from "./dev-assets";
@@ -45,10 +45,11 @@ import {
 
 /**
  * SOURCE OF TRUTH KEYWORDS: METADATA_FROM_THE_PROPS, calculateMetadata,
- *   ONE_PRODUCTION_COMPOSITION, DURATION_FROM_THE_DOCUMENT
+ *   ONE_PRODUCTION_COMPOSITION, DURATION_FROM_THE_DOCUMENT,
+ *   SANITISE_BEFORE_BOTH_PARSES, compositionMetadataFor
  *
- * WHAT:  Derives a composition's canvas and frame count from the document it
- *        is actually being handed.
+ * WHAT:  Adapts `compositionMetadataFor` to the argument shape Remotion hands
+ *        a `calculateMetadata` prop.
  *
  * WHY:   METADATA_FROM_THE_PROPS, and it is the piece without which a cloud
  *        render is silently wrong. A `<Composition>` declares its
@@ -60,40 +61,20 @@ import {
  *        it succeeds, it is paid for, and the only symptom is a video that
  *        stops mid-sentence.
  *
- *        `calculateMetadata` is the hook that runs with the real
- *        `inputProps` in hand, so the answer comes from `planComposition()` on
- *        the document being rendered. It is the same function the preview page
- *        and the local CLI already use, which is what keeps all three
- *        agreeing (DURATION_FROM_THE_DOCUMENT).
+ *        `calculateMetadata` is the hook that runs with the real `inputProps`
+ *        in hand, so the answer can come from the document being rendered
+ *        (DURATION_FROM_THE_DOCUMENT).
  *
- *        The document is PARSED here rather than trusted, because props arrive
- *        as JSON across a network on the Lambda path and this runs before the
- *        component does. A document that will not parse falls back to one
- *        second at the canvas the schema defaults to, so the render produces a
- *        black frame and the component logs the reason
- *        (BAD_DOCUMENT_DRAWS_BLACK) — rather than this throwing, which on
- *        Lambda is a render that consumed its budget and produced nothing to
- *        look at.
+ *        The derivation itself lives in src/lib/render/metadata.ts, not here,
+ *        because it has to stay in lockstep with the sanitise-then-parse the
+ *        COMPONENT performs (SANITISE_BEFORE_BOTH_PARSES) and because this
+ *        file cannot be unit-tested without a browser. Keeping only the
+ *        adapter here is what let that ordering be tested at all.
  * WHERE: The production composition below, and every fixture composition, so
  *        the studio exercises the same code path a render does.
  */
 function metadataFromProps({ props }: { props: TimelineRendererProps }) {
-  const parsed = timelineDocSchema.safeParse(props.doc);
-  if (!parsed.success) {
-    console.error(
-      "[remotion/root] calculateMetadata could not parse the document; rendering one black frame.",
-      parsed.error.issues.slice(0, 5),
-    );
-    return { durationInFrames: 30, fps: 30, width: 1080, height: 1920 };
-  }
-
-  const plan = planComposition(parsed.data);
-  return {
-    durationInFrames: plan.durationInFrames,
-    fps: plan.fps,
-    width: plan.width,
-    height: plan.height,
-  };
+  return compositionMetadataFor(props.doc);
 }
 
 export function RemotionRoot() {

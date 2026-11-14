@@ -36,8 +36,11 @@
  *        whatever JSON arrived, so it cannot rely on the document already being
  *        well-formed — every navigation step below is defensive for that
  *        reason, not out of habit.
- * WHERE: Called by src/remotion/timeline-renderer.tsx immediately before the
- *        strict parse. Unit-tested in ./sanitise.test.ts.
+ * WHERE: Called immediately before the strict parse by BOTH parsers of the
+ *        document, which must agree about what it contains
+ *        (SANITISE_BEFORE_BOTH_PARSES): src/remotion/timeline-renderer.tsx
+ *        before drawing, and `metadataFromProps` in src/remotion/root.tsx
+ *        before sizing the composition. Unit-tested in ./sanitise.test.ts.
  */
 
 import { RENDER_KINDS } from "@/lib/timeline";
@@ -67,7 +70,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  *        An item with NO `render` field is kept. That is not an oversight —
  *        audio and caption items legitimately have none (there is nothing to
  *        choose between), and dropping them would silence every video.
- * WHERE: TimelineRenderer, before `timelineDocSchema.safeParse`.
+ * WHERE: TimelineRenderer and `metadataFromProps`, each before their
+ *        `timelineDocSchema.safeParse`.
  */
 export function dropUnknownRenderKinds(input: unknown): SanitiseResult {
   const known: readonly string[] = RENDER_KINDS;
