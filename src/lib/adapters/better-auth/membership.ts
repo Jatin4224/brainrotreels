@@ -22,6 +22,7 @@ import { prisma } from "@/lib/config/prisma";
 import { processRole, roleDisplayName } from "@/services/role.service";
 import { sendOrganizationInvitationEmail } from "@/services/email.service";
 import { APP_URL } from "@/lib/config/branding";
+import type { PermissionGrantAuthority } from "@/lib/types/team";
 import type { AdapterInvitationResult, AdapterMemberRow } from "../types";
 
 const INVITATION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -94,10 +95,19 @@ async function inviteMember(params: {
   inviterUserId: string;
   inviterName: string;
   organizationName: string;
+  granter: PermissionGrantAuthority;
 }): Promise<AdapterInvitationResult> {
   /* processRole decodes the member sheet's encoded role string and creates the
-   * OrganizationRole row on demand — the same path the router used before. */
-  const role = await processRole(prisma, params.organizationId, params.role);
+   * OrganizationRole row on demand — the same path the router used before. The
+   * inviter's authority caps what the decoded role may carry
+   * (A_GRANT_CANNOT_EXCEED_THE_GRANTER); without it an admin could invite a
+   * second account holding permissions the admin does not have. */
+  const role = await processRole(
+    prisma,
+    params.organizationId,
+    params.role,
+    params.granter,
+  );
   const invitation = await prisma.invitation.create({
     data: {
       id: nanoid(),
@@ -170,8 +180,14 @@ async function updateMemberRole(params: {
   organizationId: string;
   memberId: string;
   role: string;
+  granter: PermissionGrantAuthority;
 }): Promise<void> {
-  const role = await processRole(prisma, params.organizationId, params.role);
+  const role = await processRole(
+    prisma,
+    params.organizationId,
+    params.role,
+    params.granter,
+  );
   await prisma.member.updateMany({
     where: { id: params.memberId, organizationId: params.organizationId },
     data: { role },

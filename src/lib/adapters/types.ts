@@ -29,6 +29,7 @@
  */
 
 import type { PlanKey } from "@/lib/config/plans";
+import type { PermissionGrantAuthority } from "@/lib/types/team";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: AUTH_PROVIDER_IDS, AuthProviderId
@@ -252,6 +253,13 @@ export interface TenancyAdapter {
     inviterUserId: string;
     inviterName: string;
     organizationName: string;
+    /**
+     * A_GRANT_CANNOT_EXCEED_THE_GRANTER — the inviter's own effective
+     * permissions, which cap what the invited role may carry. Required rather
+     * than optional so a provider implementation cannot forget to pass it on
+     * and silently restore the escalation path. See PermissionGrantAuthority.
+     */
+    granter: PermissionGrantAuthority;
   }): Promise<AdapterInvitationResult>;
   /**
    * Withdraw a pending invitation. Resolves `true` when a row was actually
@@ -283,6 +291,8 @@ export interface TenancyAdapter {
     organizationId: string;
     memberId: string;
     role: string;
+    /** See `inviteMember.granter` — the same cap on the same decode path. */
+    granter: PermissionGrantAuthority;
   }): Promise<void>;
   /** Remove an accepted member from the organization. */
   removeMember(params: {

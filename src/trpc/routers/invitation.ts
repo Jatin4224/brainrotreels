@@ -138,7 +138,13 @@ export const invitationRouter = createTRPCRouter({
        * permission. That refusal matters most HERE: `accept` copies
        * Invitation.role verbatim into Member.role, so a stored `"owner"` would
        * become full access the moment the invitee signed up — and
-       * `invitation:create` is in the admin preset. */
+       * `invitation:create` is in the admin preset.
+       *
+       * A_GRANT_CANNOT_EXCEED_THE_GRANTER closes the other half of that same
+       * hole. Refusing only the owner NAME left an admin free to invite their
+       * own second address carrying `billing:*`, accept it, and act through an
+       * account that outranks them — an escalation that never once mentions
+       * ownership. The cap is the inviter's own permission set. */
       let result;
       try {
         result = await adapter.tenancy.inviteMember({
@@ -148,6 +154,10 @@ export const invitationRouter = createTRPCRouter({
           inviterUserId: ctx.user.id,
           inviterName: ctx.user.name,
           organizationName: ctx.organization.name,
+          granter: {
+            hasFullAccess: ctx.memberHasFullAccess,
+            permissions: ctx.organization.permissions,
+          },
         });
       } catch (error) {
         const mapped = toRoleTRPCError(error);

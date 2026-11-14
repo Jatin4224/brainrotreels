@@ -228,6 +228,7 @@ export type {
   UpdateMemberValues,
   CreateRoleValues,
   UpdateRoleValues,
+  PermissionGrantAuthority,
 } from "./team";
 export {
   billingIntervalSchema,

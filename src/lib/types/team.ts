@@ -67,6 +67,44 @@ export const permissionStringSchema = z
   .string()
   .refine((value) => VALID_PERMISSION_SET.has(value), "Unknown permission.");
 
+/**
+ * SOURCE OF TRUTH KEYWORDS: PermissionGrantAuthority, A_GRANT_CANNOT_EXCEED_THE_GRANTER,
+ *   permissionsBeyondAuthority, hasFullAccess, role escalation
+ *
+ * WHAT:  What the CALLER of a role write is allowed to hand out — their own
+ *        effective permission set, plus the full-access flag that stands in for
+ *        "all of them".
+ *
+ * WHY:   A_GRANT_CANNOT_EXCEED_THE_GRANTER is the invariant the RBAC system was
+ *        missing, and its absence was two live escalation paths rather than one
+ *        bug. `OWNER_IS_NEVER_ASSIGNABLE` stops a caller naming the owner role,
+ *        but nothing stopped them assembling owner-equivalent POWER out of
+ *        permissions they did not themselves hold: the admin preset grants
+ *        `organizationRoles:update` and `invitation:create`, so an admin could
+ *        either rewrite a role row to hold `billing:*` or invite a second
+ *        account carrying it. Neither request names an owner, so neither was
+ *        refused.
+ *
+ *        Modelled as a value the router passes DOWN rather than something the
+ *        service reads for itself: the service layer has no session, and a
+ *        decoder that resolved its own authority would be trusting whatever
+ *        organization id it was handed. The router already holds the resolved
+ *        membership, so it is the honest source.
+ *
+ *        `hasFullAccess` is kept separate from the permission list because the
+ *        procedure factory resolves full-access members to an EMPTY array as a
+ *        deliberate optimisation — the gate never reads it. Treating that empty
+ *        array as "holds nothing" would lock owners out of role management
+ *        entirely, which is the obvious wrong fix.
+ * WHERE: Built by member.update, invitation.create and the organizationRoles
+ *        writes from `ctx`; consumed by `permissionsBeyondAuthority`
+ *        (lib/permissions) and `processRole` (role.service).
+ */
+export interface PermissionGrantAuthority {
+  readonly hasFullAccess: boolean;
+  readonly permissions: readonly string[];
+}
+
 export const roleNameSchema = z
   .string()
   .trim()

@@ -33,6 +33,9 @@ import {
   type PermissionAction,
   type ResourceKey,
 } from "@/lib/resources";
+/* The leaf module, not the `@/lib/types` barrel: the barrel pulls in schemas
+ * that have no business in a module every router and adapter imports. */
+import type { PermissionGrantAuthority } from "@/lib/types/team";
 
 export type Permission = DerivedPermission;
 
@@ -150,6 +153,47 @@ export function getAdminPresetPermissions(): string[] {
     for (const { permission } of group.permissions) perms.push(permission);
   }
   return perms;
+}
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: permissionsBeyondAuthority,
+ *   A_GRANT_CANNOT_EXCEED_THE_GRANTER, PermissionGrantAuthority,
+ *   role escalation, hasFullAccess
+ *
+ * WHAT:  Which of `requested` the granter does not themselves hold — empty when
+ *        the grant is legitimate.
+ *
+ * WHY:   A_GRANT_CANNOT_EXCEED_THE_GRANTER, written once, here, because it is
+ *        the single invariant three separate write surfaces were missing
+ *        (organizationRoles.create, organizationRoles.update, and processRole's
+ *        three decode branches). A copy per surface is how the original gap
+ *        came about — the one nobody updated is the one that leaks.
+ *
+ *        Returns the offending list rather than a boolean so the refusal can
+ *        name what was over-reached for. A caller told only "forbidden" files a
+ *        bug report; a caller told "you cannot grant billing:read" fixes their
+ *        own payload.
+ *
+ *        Pure and registry-free on purpose: it compares two sets and nothing
+ *        else, so it is cheap enough to call on every role write and testable
+ *        without a database. Validity of each string is a SEPARATE question,
+ *        already answered by `permissionStringSchema`
+ *        (PERMISSIONS_ARE_VALIDATED_NOT_TRUSTED) — a permission that is unknown
+ *        AND over-reaching should be reported as unknown first, so this does
+ *        not re-check the registry.
+ * WHERE: organizationRoles.create / .update, and processRole's three branches.
+ */
+export function permissionsBeyondAuthority(
+  requested: readonly string[],
+  granter: PermissionGrantAuthority,
+): string[] {
+  /* An owner holds everything, and the factory hands them an empty permission
+   * array as a deliberate shortcut — so this has to come first or ownership
+   * would read as holding nothing. */
+  if (granter.hasFullAccess) return [];
+
+  const held = new Set(granter.permissions);
+  return [...new Set(requested)].filter((perm) => !held.has(perm));
 }
 
 /**

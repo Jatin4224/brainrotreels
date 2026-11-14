@@ -33,12 +33,26 @@
 import { TRPCError } from "@trpc/server";
 
 import {
+  PermissionEscalationError,
   RoleEscalationError,
   UnknownPermissionError,
 } from "@/services/role.service";
 
 export function toRoleTRPCError(error: unknown): TRPCError | null {
   if (error instanceof RoleEscalationError) {
+    return new TRPCError({
+      code: "FORBIDDEN",
+      message: error.message,
+      cause: error,
+    });
+  }
+
+  /* A_GRANT_CANNOT_EXCEED_THE_GRANTER. FORBIDDEN, not BAD_REQUEST: the payload
+   * is well-formed and every permission in it is real — what the caller lacks
+   * is the authority to hand it out, which the same payload will never gain.
+   * The message already names the over-reached permissions so the team UI can
+   * show which toggles to drop. */
+  if (error instanceof PermissionEscalationError) {
     return new TRPCError({
       code: "FORBIDDEN",
       message: error.message,
