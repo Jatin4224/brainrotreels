@@ -33,6 +33,10 @@ These docs explain how this boilerplate is shaped and why. The README tells you 
 17. `17-phase7.md` — voices and TTS: the line as the unit of re-synthesis, and why the cache key covers the voice
 18. `18-phase8.md` — alignment and captions: why the transcript is never the script, and why a failed aligner still ships a video
 
+Not part of the read order, but worth knowing it exists:
+
+- `28-hardening-fixes.md` — a log of correctness and security fixes applied across the existing phases, with what each one cost and what to grep for. Read it before using the dated review in the repo root as a to-do list.
+
 ## If you only have five minutes
 
 Read `01-architecture.md` for the mental model, then jump to `07-adding-a-feature.md`. Come back for the rest later.
