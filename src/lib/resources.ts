@@ -649,7 +649,7 @@ export const RESOURCES = {
    */
   captionStyles: {
     name: "Caption styles",
-    description: "The caption style library",
+    description: "Apply a caption style and time it to the voice",
     permissions: ["read", "apply", "align"],
     audit: {
       describe: {
@@ -704,7 +704,7 @@ export const RESOURCES = {
    */
   backgroundLibrary: {
     name: "Background library",
-    description: "The curated background catalogue",
+    description: "Drop in a background without sourcing footage",
     permissions: ["read", "apply", "sync"],
     limit: {
       perPlan: {
@@ -817,7 +817,7 @@ export const RESOURCES = {
    */
   avatars: {
     name: "Characters",
-    description: "The illustrated character catalogue",
+    description: "Cast an illustrated character for each speaker",
     permissions: ["read", "assign", "sync"],
     audit: {
       describe: {
@@ -1061,7 +1061,7 @@ export const RESOURCES = {
    */
   motionStudio: {
     name: "Motion studio",
-    description: "AI-designed animated explainer videos",
+    description: "Generate an animated explainer instead of stock footage",
     flag: {
       perPlan: {
         free: false,
