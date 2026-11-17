@@ -497,9 +497,22 @@ html:has([data-app-banner]) {
       border-color 0.2s;
   }
 
-  .brutal-hover:hover {
-    border-color: color-mix(in oklab, var(--foreground) 18%, transparent);
-    transform: translateY(-1px);
+  /* HOVER_IS_A_CAPABILITY, not a state every device can leave. A touch
+     browser has no pointer to move away, so it fakes the hover on tap and
+     holds it until something else is tapped: without this gate, tapping a
+     format card on a phone leaves it lifted a pixel with a brightened border
+     for as long as the visitor reads it. Tailwind's own `hover:` variant
+     compiles to this query in v4 — this rule is hand-written, so it has to
+     say so itself.
+
+     Both halves matter: `hover: hover` means the primary input can hover at
+     all, and `pointer: fine` rules out the coarse pointers (some Android
+     browsers, a TV remote) that claim hover and cannot aim at a 1px lift. */
+  @media (hover: hover) and (pointer: fine) {
+    .brutal-hover:hover {
+      border-color: color-mix(in oklab, var(--foreground) 18%, transparent);
+      transform: translateY(-1px);
+    }
   }
 
   .brutal-hover:active {
