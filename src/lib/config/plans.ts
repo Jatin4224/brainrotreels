@@ -45,6 +45,22 @@ import {
  * (isPortalOrganization). It grants everything (unlimited limits, all flags) and
  * is never shown in pricing or the upgrade order.
  */
+/**
+ * SOURCE OF TRUTH KEYWORDS: PLAN_PRICE_CURRENCY_SYMBOL, PLACEHOLDER_PRICES
+ *
+ * WHAT:  The symbol shown before a plan's monthly amount.
+ * WHY:   A symbol and not a locale format, because the pricing cards render
+ *        on the server for every visitor alike — formatting per request's
+ *        locale would make the cached marketing page wrong for somebody.
+ *        Env-driven like every other plan string, so an operator selling in
+ *        euros changes one variable rather than editing JSX.
+ * WHERE: The plan cards on the landing page and /pricing.
+ */
+export const PLAN_PRICE_CURRENCY_SYMBOL = envString(
+  publicEnv.NEXT_PUBLIC_PRICE_CURRENCY_SYMBOL,
+  "$",
+);
+
 export const PLAN_KEYS = [
   "free",
   "starter",
@@ -59,6 +75,19 @@ export type BillingInterval = "monthly" | "yearly";
 
 export interface PlanDefinition {
   name: string;
+  /**
+   * What the card SHOWS per month, in whole currency units. Display only: the
+   * amount actually charged is whatever the Stripe price below says, and
+   * nothing reads this on the way to checkout.
+   *
+   * ⚠ PLACEHOLDER_PRICES. The defaults in PLANS are invented numbers, put
+   * there so the pricing section has something to render. They are NOT this
+   * product's prices. Set NEXT_PUBLIC_<PLAN>_MONTHLY_AMOUNT for every plan
+   * before any public deploy, or the page advertises figures nobody agreed
+   * to and Stripe charges something else at the till.
+   */
+  monthlyAmount: number;
+
   /* One line under the plan name on a pricing card — who the plan is for. */
   description: string;
   icon: string;
@@ -97,6 +126,7 @@ export const PLANS: Record<PlanKey, PlanDefinition> = {
       publicEnv.NEXT_PUBLIC_FREE_DESCRIPTION,
       "Everything you need to try things out.",
     ),
+    monthlyAmount: envInteger(publicEnv.NEXT_PUBLIC_FREE_MONTHLY_AMOUNT, 0),
     icon: "Package",
     showPlan: envBoolean(publicEnv.NEXT_PUBLIC_FREE_SHOW_PLAN, true),
     trialDays: envInteger(publicEnv.NEXT_PUBLIC_FREE_TRIAL_DAYS, 0),
@@ -108,6 +138,7 @@ export const PLANS: Record<PlanKey, PlanDefinition> = {
       publicEnv.NEXT_PUBLIC_STARTER_DESCRIPTION,
       "For a small team getting off the ground.",
     ),
+    monthlyAmount: envInteger(publicEnv.NEXT_PUBLIC_STARTER_MONTHLY_AMOUNT, 19),
     icon: "Rocket",
     showPlan: envBoolean(publicEnv.NEXT_PUBLIC_STARTER_SHOW_PLAN, true),
     trialDays: envInteger(publicEnv.NEXT_PUBLIC_STARTER_TRIAL_DAYS, 14),
@@ -122,6 +153,7 @@ export const PLANS: Record<PlanKey, PlanDefinition> = {
       publicEnv.NEXT_PUBLIC_PRO_DESCRIPTION,
       "For teams that need room to grow.",
     ),
+    monthlyAmount: envInteger(publicEnv.NEXT_PUBLIC_PRO_MONTHLY_AMOUNT, 49),
     icon: "Zap",
     showPlan: envBoolean(publicEnv.NEXT_PUBLIC_PRO_SHOW_PLAN, true),
     trialDays: envInteger(publicEnv.NEXT_PUBLIC_PRO_TRIAL_DAYS, 14),
@@ -136,6 +168,10 @@ export const PLANS: Record<PlanKey, PlanDefinition> = {
       publicEnv.NEXT_PUBLIC_ENTERPRISE_DESCRIPTION,
       "Unlimited scale with everything included.",
     ),
+    monthlyAmount: envInteger(
+      publicEnv.NEXT_PUBLIC_ENTERPRISE_MONTHLY_AMOUNT,
+      149,
+    ),
     icon: "Building",
     showPlan: envBoolean(publicEnv.NEXT_PUBLIC_ENTERPRISE_SHOW_PLAN, true),
     trialDays: envInteger(publicEnv.NEXT_PUBLIC_ENTERPRISE_TRIAL_DAYS, 30),
@@ -148,6 +184,9 @@ export const PLANS: Record<PlanKey, PlanDefinition> = {
   portal: {
     name: "Portal",
     description: "Platform administration workspace.",
+    /* Never sold, so there is no price to show. Not env-driven for the same
+       reason the name is not: this tier is not a product. */
+    monthlyAmount: 0,
     icon: "ShieldCheck",
     showPlan: false,
     trialDays: 0,

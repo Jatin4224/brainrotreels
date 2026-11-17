@@ -75,7 +75,11 @@ import { FaqAccordion } from "@/components/global/faq-accordion";
 import { buttonVariants } from "@/components/ui/button";
 import { AUTH_ROUTES } from "@/lib/config/auth-routes";
 import { APP_NAME } from "@/lib/config/branding";
-import { PLANS, PLAN_ORDER } from "@/lib/config/plans";
+import {
+  PLANS,
+  PLAN_ORDER,
+  PLAN_PRICE_CURRENCY_SYMBOL,
+} from "@/lib/config/plans";
 import { RESOURCES, getEntryPlanForResource } from "@/lib/resources";
 import { cn } from "@/lib/utils";
 import { HighlightHeading } from "@/components/global/highlight-heading";
@@ -418,6 +422,25 @@ export default function LandingPage() {
                     </p>
                   </div>
 
+                  {/* A NUMBER, not "see checkout". Four plans with no figure
+                      on them asked a visitor to start a signup to learn the
+                      price, which is where most of them stopped. `free` shows
+                      the word rather than "$0" — zero priced like a product
+                      reads as a discount on something, not as free. */}
+                  <p className="font-display text-3xl font-extrabold tracking-tight text-foreground">
+                    {definition.monthlyAmount === 0 ? (
+                      "Free"
+                    ) : (
+                      <>
+                        {`${PLAN_PRICE_CURRENCY_SYMBOL}${definition.monthlyAmount}`}
+                        <span className="text-base font-semibold text-muted-foreground">
+                          {" "}
+                          /month
+                        </span>
+                      </>
+                    )}
+                  </p>
+
                   {definition.trialDays > 0 ? (
                     <p className="brutal-border-thin w-fit rounded-full bg-muted px-2.5 py-0.5 text-[10px] font-black uppercase tracking-[0.12em] text-muted-foreground">
                       {definition.trialDays}-day free trial
@@ -442,7 +465,7 @@ export default function LandingPage() {
           </ul>
 
           <p className="mt-8 text-center text-xs text-muted-foreground">
-            Prices are shown at checkout.{" "}
+            Billed monthly. Cancel any time.{" "}
             <Link
               href="/pricing"
               className="font-semibold underline underline-offset-4 hover:text-foreground"
