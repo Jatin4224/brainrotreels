@@ -718,6 +718,17 @@ html:has([data-app-banner]) {
     animation: reel-touch 3s infinite;
   }
 
+  /* Off-screen, or a hidden tab. `paused` rather than unmounted, so the feed
+     resumes on the frame it stopped on rather than snapping back to slide one
+     when the visitor scrolls up again — a loop that restarts is a loop they
+     can see is fake. The class is set by ReelStage from an IntersectionObserver
+     and `visibilitychange`, the same pair AuthShowcase uses: three infinite
+     animations repainting 6,000px above the fold, or behind a hidden tab, is a
+     battery cost with nobody watching. */
+  .reel-stage-paused :is(.reel-feed, .reel-hand, .reel-touch) {
+    animation-play-state: paused;
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .reel-feed,
     .reel-hand,

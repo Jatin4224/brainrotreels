@@ -33,6 +33,10 @@
  *        `LANDING_REELS` from ./landing-content.ts.
  */
 
+"use client";
+
+import * as React from "react";
+
 import type { ReelShowcaseItem } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -56,6 +60,49 @@ export function ReelStage({
   feedLabel,
   className,
 }: ReelStageProps) {
+  /* LOOPS_PAUSE_WHEN_NOBODY_IS_WATCHING. Three infinite animations run here,
+     and the hero is the top of a 6,500px page — without this they keep
+     repainting for the whole scroll and behind a hidden tab. Same pair as
+     AuthShowcase: an IntersectionObserver for off-screen, `visibilitychange`
+     for a backgrounded tab, and `animation-play-state: paused` rather than
+     unmounting, so the feed resumes mid-swipe instead of snapping to slide
+     one. The ref goes on the element this component ALREADY renders, so
+     nothing is added to the layout. */
+  const stageRef = React.useRef<HTMLDivElement | null>(null);
+  const [isPaused, setIsPaused] = React.useState(false);
+
+  React.useEffect(() => {
+    const stage = stageRef.current;
+    if (!stage) return;
+
+    let isTabVisible = true;
+    let isOnScreen = true;
+    const sync = () => setIsPaused(!(isTabVisible && isOnScreen));
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        if (!entry) return;
+        isOnScreen = entry.isIntersecting;
+        sync();
+      },
+      { threshold: 0 },
+    );
+    observer.observe(stage);
+
+    const onVisibility = () => {
+      isTabVisible = document.visibilityState === "visible";
+      sync();
+    };
+    onVisibility();
+    document.addEventListener("visibilitychange", onVisibility);
+
+    return () => {
+      observer.disconnect();
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, []);
+
   return (
     /* TWO BOXES, both load-bearing. The inner one is a FIXED 620×660 stage the
      * composition is positioned against in absolute pixels, and it is 700 wide
@@ -88,9 +135,11 @@ export function ReelStage({
      * Moving by the WHOLE gutter instead, the obvious first guess, overshot by
      * ~130px at 1900px and cut the sleeve and the yellow pill in half. */
     <div
+      ref={stageRef}
       className={cn(
         "relative h-[356px] min-[900px]:h-[409px] min-[1024px]:h-[462px] min-[1240px]:h-[561px] min-[1440px]:h-[660px]",
         "min-[1240px]:translate-x-[calc(max(0px,50vw-758px))]",
+        isPaused && "reel-stage-paused",
         className,
       )}
     >
