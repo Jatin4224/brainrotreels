@@ -131,7 +131,12 @@ export default function LandingPage() {
               proof line, while the stage is a fixed-size object that does not
               benefit from more room. Below 900px the phones stack under the
               words: there is no width at which two columns of this fit. */}
-          <div className="grid items-center gap-10 min-[900px]:grid-cols-[1.05fr_1fr]">
+          {/* The column gap widens once there is room for it: at 1240px and
+              up the words and the phone are two separate objects and 40px
+              reads as a seam between them, not a gap. Below that the stage is
+              already overflowing its column and extra gap only squeezes the
+              headline. */}
+          <div className="grid items-center gap-10 min-[900px]:grid-cols-[1.05fr_1fr] min-[1240px]:gap-16">
             {/* hero-enter owns the one page-load sequence: its children rise
                 and fade in reading order, delays set by nth-child in
                 globals.css so this markup stays a plain column. */}

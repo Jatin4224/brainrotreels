@@ -133,12 +133,27 @@ export function ReelStage({
      * viewport at every width, and the `max(0px, …)` makes it a no-op as soon
      * as the stage is already overflowing — which it is at 1440px and below.
      * Moving by the WHOLE gutter instead, the obvious first guess, overshot by
-     * ~130px at 1900px and cut the sleeve and the yellow pill in half. */
+     * ~130px at 1900px and cut the sleeve and the yellow pill in half.
+     *
+     * 678 AND NOT 758, re-derived when the hand was scaled to 0.8: the arm
+     * used to end at x=692 inside the 700px box and now ends at 618, so the
+     * old constant left the composition stranded 88-129px short of the edge
+     * instead of the 24px it was tuned for. Shrinking the art moved this
+     * number — if the hand is ever resized again, this is the second place
+     * to change. */
     <div
       ref={stageRef}
       className={cn(
         "relative h-[356px] min-[900px]:h-[409px] min-[1024px]:h-[462px] min-[1240px]:h-[561px] min-[1440px]:h-[660px]",
-        "min-[1240px]:translate-x-[calc(max(0px,50vw-758px))]",
+        /* TWO CONSTANTS, ONE PER SCALE STEP. 1240-1439 runs the stage at
+           scale .85, so the composition is 15% narrower and ends further from
+           the edge than the full-size one does — a single constant tuned for
+           either band strands the other. 580 lands the arm ~32-40px inside
+           the viewport across 1240-1439; 678 does the same from 1440 up,
+           where the stage is full size. Both are max(0px, ...) so they stay
+           no-ops when there is no gutter to bleed into. */
+        "min-[1240px]:translate-x-[calc(max(0px,50vw-580px))]",
+        "min-[1440px]:translate-x-[calc(max(0px,50vw-678px))]",
         isPaused && "reel-stage-paused",
         className,
       )}
