@@ -201,10 +201,7 @@ export default function LandingPage() {
       >
         <div className="mx-auto max-w-7xl px-6">
           <div className="mx-auto max-w-3xl text-center">
-            <p className="text-xs font-black uppercase tracking-[0.2em] text-brand-accent">
-              The formats
-            </p>
-            <h2 className="mt-3 font-display text-3xl font-medium leading-tight tracking-tight text-foreground md:text-4xl lg:text-5xl">
+            <h2 className="font-display text-3xl font-medium leading-tight tracking-tight text-foreground md:text-4xl lg:text-5xl">
               Four ways to start, one finished video
             </h2>
             <p className="mt-4 text-base leading-relaxed text-muted-foreground">
@@ -246,12 +243,14 @@ export default function LandingPage() {
         id="how-it-works"
         className="scroll-mt-20 border-t-2 border-border py-20 md:py-28"
       >
-        <div className="mx-auto grid max-w-7xl gap-12 px-6 lg:grid-cols-2 lg:gap-16">
-          <div>
-            <p className="text-xs font-black uppercase tracking-[0.2em] text-brand-accent">
-              How it works
-            </p>
-            <h2 className="mt-3 font-display text-3xl font-medium leading-tight tracking-tight text-foreground md:text-4xl lg:text-5xl">
+        <div className="mx-auto max-w-7xl px-6">
+          {/* Lifted OUT of the left grid column. Every other section opens
+              with a centred intro above its content, and a heading centred
+              inside one half of a two-column grid is centred on nothing a
+              reader can see — it just looks misplaced. Above the grid it
+              centres on the section, like the rest of the page. */}
+          <div className="mx-auto max-w-3xl text-center">
+            <h2 className="font-display text-3xl font-medium leading-tight tracking-tight text-foreground md:text-4xl lg:text-5xl">
               From what you have to a finished video
             </h2>
             <p className="mt-4 text-base leading-relaxed text-muted-foreground">
@@ -259,54 +258,58 @@ export default function LandingPage() {
               one picks up where the last finished, and you can change anything
               before the next one runs.
             </p>
-
-            {/* THE_FLOW_IS_AN_ORDER: rendered straight off PROJECT_FLOW_STEPS,
-                the same list the in-app project nav renders, so the walkthrough
-                sold here is the walkthrough shipped. */}
-            <ol className="mt-10 flex flex-col gap-8">
-              {PROJECT_FLOW_STEPS.map((step, index) => {
-                const Icon = step.icon;
-
-                return (
-                  <li key={step.key} className="flex gap-5">
-                    <span className="brutal-border flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand-accent font-display text-lg font-black text-brand-accent-foreground">
-                      {index + 1}
-                    </span>
-                    <div className="flex flex-col gap-1">
-                      <h3 className="flex items-center gap-2 text-lg font-extrabold tracking-tight text-foreground">
-                        <Icon
-                          className="size-4 text-brand"
-                          aria-hidden="true"
-                        />
-                        {step.label}
-                      </h3>
-                      <p className="text-sm leading-relaxed text-muted-foreground">
-                        {STEP_BLURBS[step.key] ?? ""}
-                      </p>
-                    </div>
-                  </li>
-                );
-              })}
-            </ol>
           </div>
 
-          <aside className="brutal-border brutal-shadow self-start rounded-2xl bg-card p-7">
-            <p className="text-xs font-black uppercase tracking-[0.2em] text-brand-accent">
-              Handled for you
-            </p>
-            <ul className="mt-5 divide-y divide-border">
-              {HANDLED_FOR_YOU.map((row) => (
-                <li key={row.label} className="flex gap-4 py-3.5">
-                  <span className="w-24 shrink-0 text-sm font-extrabold text-foreground">
-                    {row.label}
-                  </span>
-                  <span className="text-sm leading-relaxed text-muted-foreground">
-                    {row.detail}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </aside>
+          <div className="mt-12 grid gap-12 lg:grid-cols-2 lg:gap-16">
+            <div>
+              {/* THE_FLOW_IS_AN_ORDER: rendered straight off PROJECT_FLOW_STEPS,
+                  the same list the in-app project nav renders, so the walkthrough
+                  sold here is the walkthrough shipped. */}
+              <ol className="mt-10 flex flex-col gap-8">
+                {PROJECT_FLOW_STEPS.map((step, index) => {
+                  const Icon = step.icon;
+
+                  return (
+                    <li key={step.key} className="flex gap-5">
+                      <span className="brutal-border flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand-accent font-display text-lg font-black text-brand-accent-foreground">
+                        {index + 1}
+                      </span>
+                      <div className="flex flex-col gap-1">
+                        <h3 className="flex items-center gap-2 text-lg font-extrabold tracking-tight text-foreground">
+                          <Icon
+                            className="size-4 text-brand"
+                            aria-hidden="true"
+                          />
+                          {step.label}
+                        </h3>
+                        <p className="text-sm leading-relaxed text-muted-foreground">
+                          {STEP_BLURBS[step.key] ?? ""}
+                        </p>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ol>
+            </div>
+
+            <aside className="brutal-border brutal-shadow self-start rounded-2xl bg-card p-7">
+              <p className="text-xs font-black uppercase tracking-[0.2em] text-brand-accent">
+                Handled for you
+              </p>
+              <ul className="mt-5 divide-y divide-border">
+                {HANDLED_FOR_YOU.map((row) => (
+                  <li key={row.label} className="flex gap-4 py-3.5">
+                    <span className="w-24 shrink-0 text-sm font-extrabold text-foreground">
+                      {row.label}
+                    </span>
+                    <span className="text-sm leading-relaxed text-muted-foreground">
+                      {row.detail}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </aside>
+          </div>
         </div>
       </section>
 
@@ -317,10 +320,7 @@ export default function LandingPage() {
       >
         <div className="mx-auto max-w-7xl px-6">
           <div className="mx-auto max-w-3xl text-center">
-            <p className="text-xs font-black uppercase tracking-[0.2em] text-brand-accent">
-              What you get
-            </p>
-            <h2 className="mt-3 font-display text-3xl font-medium leading-tight tracking-tight text-foreground md:text-4xl lg:text-5xl">
+            <h2 className="font-display text-3xl font-medium leading-tight tracking-tight text-foreground md:text-4xl lg:text-5xl">
               The tools that make it look deliberate
             </h2>
             <p className="mt-4 text-base leading-relaxed text-muted-foreground">
@@ -373,10 +373,7 @@ export default function LandingPage() {
       <section className="border-t-2 border-border py-20 md:py-28">
         <div className="mx-auto max-w-7xl px-6">
           <div className="mx-auto max-w-3xl text-center">
-            <p className="text-xs font-black uppercase tracking-[0.2em] text-brand-accent">
-              Simple pricing
-            </p>
-            <h2 className="mt-3 font-display text-3xl font-medium leading-tight tracking-tight text-foreground md:text-4xl lg:text-5xl">
+            <h2 className="font-display text-3xl font-medium leading-tight tracking-tight text-foreground md:text-4xl lg:text-5xl">
               Pick your plan
             </h2>
             <p className="mt-4 text-base leading-relaxed text-muted-foreground">
