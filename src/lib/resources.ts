@@ -29,6 +29,7 @@ import type { Route } from "next";
 
 import {
   PLAN_KEYS,
+  PLAN_ORDER,
   PLANS,
   getNextPlan,
   type PlanKey,
@@ -648,7 +649,7 @@ export const RESOURCES = {
    */
   captionStyles: {
     name: "Caption styles",
-    description: "The caption style library",
+    description: "Apply a caption style and time it to the voice",
     permissions: ["read", "apply", "align"],
     audit: {
       describe: {
@@ -703,7 +704,7 @@ export const RESOURCES = {
    */
   backgroundLibrary: {
     name: "Background library",
-    description: "The curated background catalogue",
+    description: "Drop in a background without sourcing footage",
     permissions: ["read", "apply", "sync"],
     limit: {
       perPlan: {
@@ -816,7 +817,7 @@ export const RESOURCES = {
    */
   avatars: {
     name: "Characters",
-    description: "The illustrated character catalogue",
+    description: "Cast an illustrated character for each speaker",
     permissions: ["read", "assign", "sync"],
     audit: {
       describe: {
@@ -1060,7 +1061,7 @@ export const RESOURCES = {
    */
   motionStudio: {
     name: "Motion studio",
-    description: "AI-designed animated explainer videos",
+    description: "Generate an animated explainer instead of stock footage",
     flag: {
       perPlan: {
         free: false,
@@ -1680,6 +1681,50 @@ export function getResourceFlagForPlan(
   plan: PlanKey,
 ): boolean {
   return RESOURCES[resource].flag.perPlan[plan];
+}
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: getEntryPlanForResource, PLAN_ORDER,
+ *   A_GATE_IS_NOT_A_TICK
+ *
+ * WHAT:  The cheapest purchasable plan that can reach a resource, or null
+ *        when the entry plan already can.
+ *
+ * WHY:   A_GATE_IS_NOT_A_TICK. The landing page advertises eight registry
+ *        entries and used to draw the same tick on all of them, under a
+ *        sentence saying access depends on the plan — a tick means INCLUDED,
+ *        so eight of them promised something the next section took back. The
+ *        three kinds of entry are genuinely different and this is the one
+ *        place that reads the difference: a `flag` is on or off per plan, a
+ *        `limit` is reachable wherever its allowance is above zero, and an
+ *        entry with neither is not plan-gated at all.
+ *
+ *        Returning NULL for the entry plan is what makes the absence of a
+ *        badge meaningful on a page: no badge reads as "everyone gets this",
+ *        which is true precisely when the first plan in PLAN_ORDER can reach
+ *        it. A resource no plan can reach also returns null — it should not
+ *        be advertised at all, and a badge cannot say that.
+ *
+ *        PLAN_ORDER and not PLAN_KEYS: `portal` is the hidden platform-admin
+ *        tier that grants everything, so reading it would report every
+ *        resource as free.
+ * WHERE: The feature grid on src/app/(marketing)/page.tsx.
+ */
+export function getEntryPlanForResource(resource: ResourceKey): PlanKey | null {
+  const definition: ResourceDefinition = RESOURCES[resource];
+
+  const isReachableOn = (plan: PlanKey): boolean => {
+    if (definition.flag !== undefined) return definition.flag.perPlan[plan];
+    if (definition.limit !== undefined) {
+      const allowance = definition.limit.perPlan[plan];
+      return allowance === "unlimited" || allowance > 0;
+    }
+    return true;
+  };
+
+  const cheapest = PLAN_ORDER.find(isReachableOn);
+  if (cheapest === undefined) return null;
+  return cheapest === PLAN_ORDER[0] ? null : cheapest;
 }
 
 /**

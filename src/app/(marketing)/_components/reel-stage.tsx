@@ -33,6 +33,10 @@
  *        `LANDING_REELS` from ./landing-content.ts.
  */
 
+"use client";
+
+import * as React from "react";
+
 import type { ReelShowcaseItem } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -56,6 +60,49 @@ export function ReelStage({
   feedLabel,
   className,
 }: ReelStageProps) {
+  /* LOOPS_PAUSE_WHEN_NOBODY_IS_WATCHING. Three infinite animations run here,
+     and the hero is the top of a 6,500px page — without this they keep
+     repainting for the whole scroll and behind a hidden tab. Same pair as
+     AuthShowcase: an IntersectionObserver for off-screen, `visibilitychange`
+     for a backgrounded tab, and `animation-play-state: paused` rather than
+     unmounting, so the feed resumes mid-swipe instead of snapping to slide
+     one. The ref goes on the element this component ALREADY renders, so
+     nothing is added to the layout. */
+  const stageRef = React.useRef<HTMLDivElement | null>(null);
+  const [isPaused, setIsPaused] = React.useState(false);
+
+  React.useEffect(() => {
+    const stage = stageRef.current;
+    if (!stage) return;
+
+    let isTabVisible = true;
+    let isOnScreen = true;
+    const sync = () => setIsPaused(!(isTabVisible && isOnScreen));
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        if (!entry) return;
+        isOnScreen = entry.isIntersecting;
+        sync();
+      },
+      { threshold: 0 },
+    );
+    observer.observe(stage);
+
+    const onVisibility = () => {
+      isTabVisible = document.visibilityState === "visible";
+      sync();
+    };
+    onVisibility();
+    document.addEventListener("visibilitychange", onVisibility);
+
+    return () => {
+      observer.disconnect();
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, []);
+
   return (
     /* TWO BOXES, both load-bearing. The inner one is a FIXED 620×660 stage the
      * composition is positioned against in absolute pixels, and it is 700 wide
@@ -86,11 +133,28 @@ export function ReelStage({
      * viewport at every width, and the `max(0px, …)` makes it a no-op as soon
      * as the stage is already overflowing — which it is at 1440px and below.
      * Moving by the WHOLE gutter instead, the obvious first guess, overshot by
-     * ~130px at 1900px and cut the sleeve and the yellow pill in half. */
+     * ~130px at 1900px and cut the sleeve and the yellow pill in half.
+     *
+     * 678 AND NOT 758, re-derived when the hand was scaled to 0.8: the arm
+     * used to end at x=692 inside the 700px box and now ends at 618, so the
+     * old constant left the composition stranded 88-129px short of the edge
+     * instead of the 24px it was tuned for. Shrinking the art moved this
+     * number — if the hand is ever resized again, this is the second place
+     * to change. */
     <div
+      ref={stageRef}
       className={cn(
         "relative h-[356px] min-[900px]:h-[409px] min-[1024px]:h-[462px] min-[1240px]:h-[561px] min-[1440px]:h-[660px]",
-        "min-[1240px]:translate-x-[calc(max(0px,50vw-758px))]",
+        /* TWO CONSTANTS, ONE PER SCALE STEP. 1240-1439 runs the stage at
+           scale .85, so the composition is 15% narrower and ends further from
+           the edge than the full-size one does — a single constant tuned for
+           either band strands the other. 580 lands the arm ~32-40px inside
+           the viewport across 1240-1439; 678 does the same from 1440 up,
+           where the stage is full size. Both are max(0px, ...) so they stay
+           no-ops when there is no gutter to bleed into. */
+        "min-[1240px]:translate-x-[calc(max(0px,50vw-580px))]",
+        "min-[1440px]:translate-x-[calc(max(0px,50vw-678px))]",
+        isPaused && "reel-stage-paused",
         className,
       )}
     >
@@ -143,9 +207,25 @@ function ReelHand() {
   return (
     <div
       aria-hidden="true"
-      className="reel-hand absolute left-[222px] top-[318px] z-[3] w-[400px]"
+      /* SCALED 0.8 ABOUT THE TOUCH POINT, not simply made smaller. At 400px
+         the hand was 413px against a 286px phone — half again as wide as the
+         device it is swiping, which reads as a stock illustration dropped on
+         top rather than a hand using the thing. It also put the sleeve 5px
+         past the viewport at 1440.
+
+         The contact point is (30, 125) in this box: the halo's centre and
+         `reel-hand`'s transform-origin both sit there, and the swipe pivots
+         about it. Scaling the art alone would drag the fingertip up and left
+         off the screen it is meant to be touching, so left and top are
+         shifted by the fifth of that offset the scale removes (30*0.2 = 6,
+         125*0.2 = 25) and the finger lands exactly where it did before.
+         The halo, the origin and the swipe keyframes are the other three
+         places that know this number — the first two are moved with it, the
+         keyframes are not: they are the gesture's travel across the PHONE,
+         which has not changed size. */
+      className="reel-hand absolute left-[228px] top-[343px] z-[3] w-[320px]"
     >
-      <span className="reel-touch absolute left-3 top-[107px] size-9 rounded-full bg-foreground/55" />
+      <span className="reel-touch absolute left-[10px] top-[86px] size-[29px] rounded-full bg-foreground/55" />
       <svg viewBox="0 0 300 200" className="block h-auto w-full">
         <path
           d="M226 54 L322 44 L322 172 L230 164 Z"

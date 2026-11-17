@@ -65,7 +65,7 @@
  */
 
 import Link from "next/link";
-import { ArrowRightIcon, CheckIcon, PlayIcon } from "lucide-react";
+import { ArrowRightIcon, PlayIcon } from "lucide-react";
 
 /* Leaf import, not the barrel: `@/components/global/project-steps` also
  * exports the ProjectSteps client component, and this page needs only the
@@ -75,8 +75,12 @@ import { FaqAccordion } from "@/components/global/faq-accordion";
 import { buttonVariants } from "@/components/ui/button";
 import { AUTH_ROUTES } from "@/lib/config/auth-routes";
 import { APP_NAME } from "@/lib/config/branding";
-import { PLANS, PLAN_ORDER } from "@/lib/config/plans";
-import { RESOURCES } from "@/lib/resources";
+import {
+  PLANS,
+  PLAN_ORDER,
+  PLAN_PRICE_CURRENCY_SYMBOL,
+} from "@/lib/config/plans";
+import { RESOURCES, getEntryPlanForResource } from "@/lib/resources";
 import { cn } from "@/lib/utils";
 import { HighlightHeading } from "@/components/global/highlight-heading";
 
@@ -98,7 +102,7 @@ import {
  * button so the page has ONE loud orange action. It is a LINK here — see
  * AUTH_IS_A_CLICK_NOT_A_REDIRECT. */
 const PRIMARY_CTA =
-  "brutal-shadow-brand h-12 rounded-xl bg-brand px-6 text-base font-bold text-brand-foreground hover:bg-brand/90";
+  "brutal-shadow-brand group h-12 rounded-xl bg-brand px-6 text-base font-bold text-brand-foreground hover:bg-brand/90";
 
 export default function LandingPage() {
   /* `showPlan` is the registry's own switch for a tier that exists but is not
@@ -127,8 +131,16 @@ export default function LandingPage() {
               proof line, while the stage is a fixed-size object that does not
               benefit from more room. Below 900px the phones stack under the
               words: there is no width at which two columns of this fit. */}
-          <div className="grid items-center gap-10 min-[900px]:grid-cols-[1.05fr_1fr]">
-            <div className="flex flex-col items-start text-left">
+          {/* The column gap widens once there is room for it: at 1240px and
+              up the words and the phone are two separate objects and 40px
+              reads as a seam between them, not a gap. Below that the stage is
+              already overflowing its column and extra gap only squeezes the
+              headline. */}
+          <div className="grid items-center gap-10 min-[900px]:grid-cols-[1.05fr_1fr] min-[1240px]:gap-16">
+            {/* hero-enter owns the one page-load sequence: its children rise
+                and fade in reading order, delays set by nth-child in
+                globals.css so this markup stays a plain column. */}
+            <div className="hero-enter flex flex-col items-start text-left">
               <span className="brutal-border brutal-shadow-sm mb-8 inline-flex items-center gap-2 rounded-full bg-brand-accent px-4 py-1.5 text-sm font-bold tracking-tight text-brand-accent-foreground">
                 <PlayIcon
                   className="size-3.5 fill-current"
@@ -183,6 +195,7 @@ export default function LandingPage() {
               items={LANDING_REELS}
               badge={HERO_COPY.renderedBadge}
               footnote={HERO_COPY.showcaseFootnote}
+              className="hero-stage-enter"
             />
           </div>
 
@@ -197,10 +210,7 @@ export default function LandingPage() {
       >
         <div className="mx-auto max-w-7xl px-6">
           <div className="mx-auto max-w-3xl text-center">
-            <p className="text-xs font-black uppercase tracking-[0.2em] text-brand-accent">
-              The formats
-            </p>
-            <h2 className="mt-3 font-display text-3xl font-medium leading-tight tracking-tight text-foreground md:text-4xl lg:text-5xl">
+            <h2 className="font-display text-3xl font-medium leading-tight tracking-tight text-foreground md:text-4xl lg:text-5xl">
               Four ways to start, one finished video
             </h2>
             <p className="mt-4 text-base leading-relaxed text-muted-foreground">
@@ -242,12 +252,14 @@ export default function LandingPage() {
         id="how-it-works"
         className="scroll-mt-20 border-t-2 border-border py-20 md:py-28"
       >
-        <div className="mx-auto grid max-w-7xl gap-12 px-6 lg:grid-cols-2 lg:gap-16">
-          <div>
-            <p className="text-xs font-black uppercase tracking-[0.2em] text-brand-accent">
-              How it works
-            </p>
-            <h2 className="mt-3 font-display text-3xl font-medium leading-tight tracking-tight text-foreground md:text-4xl lg:text-5xl">
+        <div className="mx-auto max-w-7xl px-6">
+          {/* Lifted OUT of the left grid column. Every other section opens
+              with a centred intro above its content, and a heading centred
+              inside one half of a two-column grid is centred on nothing a
+              reader can see — it just looks misplaced. Above the grid it
+              centres on the section, like the rest of the page. */}
+          <div className="mx-auto max-w-3xl text-center">
+            <h2 className="font-display text-3xl font-medium leading-tight tracking-tight text-foreground md:text-4xl lg:text-5xl">
               From what you have to a finished video
             </h2>
             <p className="mt-4 text-base leading-relaxed text-muted-foreground">
@@ -255,54 +267,58 @@ export default function LandingPage() {
               one picks up where the last finished, and you can change anything
               before the next one runs.
             </p>
-
-            {/* THE_FLOW_IS_AN_ORDER: rendered straight off PROJECT_FLOW_STEPS,
-                the same list the in-app project nav renders, so the walkthrough
-                sold here is the walkthrough shipped. */}
-            <ol className="mt-10 flex flex-col gap-8">
-              {PROJECT_FLOW_STEPS.map((step, index) => {
-                const Icon = step.icon;
-
-                return (
-                  <li key={step.key} className="flex gap-5">
-                    <span className="brutal-border flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand-accent font-display text-lg font-black text-brand-accent-foreground">
-                      {index + 1}
-                    </span>
-                    <div className="flex flex-col gap-1">
-                      <h3 className="flex items-center gap-2 text-lg font-extrabold tracking-tight text-foreground">
-                        <Icon
-                          className="size-4 text-brand"
-                          aria-hidden="true"
-                        />
-                        {step.label}
-                      </h3>
-                      <p className="text-sm leading-relaxed text-muted-foreground">
-                        {STEP_BLURBS[step.key] ?? ""}
-                      </p>
-                    </div>
-                  </li>
-                );
-              })}
-            </ol>
           </div>
 
-          <aside className="brutal-border brutal-shadow self-start rounded-2xl bg-card p-7">
-            <p className="text-xs font-black uppercase tracking-[0.2em] text-brand-accent">
-              Handled for you
-            </p>
-            <ul className="mt-5 divide-y divide-border">
-              {HANDLED_FOR_YOU.map((row) => (
-                <li key={row.label} className="flex gap-4 py-3.5">
-                  <span className="w-24 shrink-0 text-sm font-extrabold text-foreground">
-                    {row.label}
-                  </span>
-                  <span className="text-sm leading-relaxed text-muted-foreground">
-                    {row.detail}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </aside>
+          <div className="mt-12 grid gap-12 lg:grid-cols-2 lg:gap-16">
+            <div>
+              {/* THE_FLOW_IS_AN_ORDER: rendered straight off PROJECT_FLOW_STEPS,
+                  the same list the in-app project nav renders, so the walkthrough
+                  sold here is the walkthrough shipped. */}
+              <ol className="mt-10 flex flex-col gap-8">
+                {PROJECT_FLOW_STEPS.map((step, index) => {
+                  const Icon = step.icon;
+
+                  return (
+                    <li key={step.key} className="flex gap-5">
+                      <span className="brutal-border flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand-accent font-display text-lg font-black text-brand-accent-foreground">
+                        {index + 1}
+                      </span>
+                      <div className="flex flex-col gap-1">
+                        <h3 className="flex items-center gap-2 text-lg font-extrabold tracking-tight text-foreground">
+                          <Icon
+                            className="size-4 text-brand"
+                            aria-hidden="true"
+                          />
+                          {step.label}
+                        </h3>
+                        <p className="text-sm leading-relaxed text-muted-foreground">
+                          {STEP_BLURBS[step.key] ?? ""}
+                        </p>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ol>
+            </div>
+
+            <aside className="brutal-border brutal-shadow self-start rounded-2xl bg-card p-7">
+              <p className="text-xs font-black uppercase tracking-[0.2em] text-brand-accent">
+                Handled for you
+              </p>
+              <ul className="mt-5 divide-y divide-border">
+                {HANDLED_FOR_YOU.map((row) => (
+                  <li key={row.label} className="flex gap-4 py-3.5">
+                    <span className="w-24 shrink-0 text-sm font-extrabold text-foreground">
+                      {row.label}
+                    </span>
+                    <span className="text-sm leading-relaxed text-muted-foreground">
+                      {row.detail}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </aside>
+          </div>
         </div>
       </section>
 
@@ -313,10 +329,7 @@ export default function LandingPage() {
       >
         <div className="mx-auto max-w-7xl px-6">
           <div className="mx-auto max-w-3xl text-center">
-            <p className="text-xs font-black uppercase tracking-[0.2em] text-brand-accent">
-              What you get
-            </p>
-            <h2 className="mt-3 font-display text-3xl font-medium leading-tight tracking-tight text-foreground md:text-4xl lg:text-5xl">
+            <h2 className="font-display text-3xl font-medium leading-tight tracking-tight text-foreground md:text-4xl lg:text-5xl">
               The tools that make it look deliberate
             </h2>
             <p className="mt-4 text-base leading-relaxed text-muted-foreground">
@@ -328,25 +341,36 @@ export default function LandingPage() {
             {LANDING_FEATURE_KEYS.map((key) => {
               /* COPY_IS_REGISTRY_DERIVED — the gate's own words, not ours. */
               const definition = RESOURCES[key];
+              /* A_GATE_IS_NOT_A_TICK. Every card used to wear the same brand
+                 tick directly under a sentence saying reach depends on the
+                 plan — a tick reads as INCLUDED, so the grid promised eight
+                 things the pricing section then took back. Three of these
+                 eight are not plan-gated at all, three need Starter and two
+                 need Pro, and the badge is the only thing that says so.
+                 null means the entry plan already reaches it, so an absent
+                 badge is itself the claim "everyone gets this". */
+              const entryPlan = getEntryPlanForResource(key);
 
               return (
                 <li
                   key={key}
                   className="brutal-border brutal-shadow brutal-hover flex flex-col gap-2.5 rounded-2xl bg-card p-5"
                 >
-                  <span className="brutal-border flex size-5 items-center justify-center rounded-md bg-brand">
-                    <CheckIcon
-                      className="size-3 text-brand-foreground"
-                      strokeWidth={3}
-                      aria-hidden="true"
-                    />
-                  </span>
                   <h3 className="font-display text-base font-extrabold tracking-tight text-foreground">
                     {definition.name}
                   </h3>
                   <p className="text-sm leading-relaxed text-muted-foreground">
                     {definition.description}
                   </p>
+                  {entryPlan === null ? null : (
+                    /* Pushed to the bottom so the badge lines up across a row
+                       whatever the blurb's length, and quiet rather than
+                       brand-filled: it is a condition on the feature, not an
+                       action to take. */
+                    <span className="mt-auto w-fit rounded-full border border-border bg-surface-raised px-2.5 py-1 text-xs font-semibold text-muted-foreground">
+                      {`${PLANS[entryPlan].name} and up`}
+                    </span>
+                  )}
                 </li>
               );
             })}
@@ -358,10 +382,7 @@ export default function LandingPage() {
       <section className="border-t-2 border-border py-20 md:py-28">
         <div className="mx-auto max-w-7xl px-6">
           <div className="mx-auto max-w-3xl text-center">
-            <p className="text-xs font-black uppercase tracking-[0.2em] text-brand-accent">
-              Simple pricing
-            </p>
-            <h2 className="mt-3 font-display text-3xl font-medium leading-tight tracking-tight text-foreground md:text-4xl lg:text-5xl">
+            <h2 className="font-display text-3xl font-medium leading-tight tracking-tight text-foreground md:text-4xl lg:text-5xl">
               Pick your plan
             </h2>
             <p className="mt-4 text-base leading-relaxed text-muted-foreground">
@@ -406,6 +427,25 @@ export default function LandingPage() {
                     </p>
                   </div>
 
+                  {/* A NUMBER, not "see checkout". Four plans with no figure
+                      on them asked a visitor to start a signup to learn the
+                      price, which is where most of them stopped. `free` shows
+                      the word rather than "$0" — zero priced like a product
+                      reads as a discount on something, not as free. */}
+                  <p className="font-display text-3xl font-extrabold tracking-tight text-foreground">
+                    {definition.monthlyAmount === 0 ? (
+                      "Free"
+                    ) : (
+                      <>
+                        {`${PLAN_PRICE_CURRENCY_SYMBOL}${definition.monthlyAmount}`}
+                        <span className="text-base font-semibold text-muted-foreground">
+                          {" "}
+                          /month
+                        </span>
+                      </>
+                    )}
+                  </p>
+
                   {definition.trialDays > 0 ? (
                     <p className="brutal-border-thin w-fit rounded-full bg-muted px-2.5 py-0.5 text-[10px] font-black uppercase tracking-[0.12em] text-muted-foreground">
                       {definition.trialDays}-day free trial
@@ -430,7 +470,7 @@ export default function LandingPage() {
           </ul>
 
           <p className="mt-8 text-center text-xs text-muted-foreground">
-            Prices are shown at checkout.{" "}
+            Billed monthly. Cancel any time.{" "}
             <Link
               href="/pricing"
               className="font-semibold underline underline-offset-4 hover:text-foreground"
@@ -482,7 +522,10 @@ export default function LandingPage() {
               className={cn(buttonVariants({ size: "lg" }), PRIMARY_CTA)}
             >
               Get started
-              <ArrowRightIcon className="size-4" aria-hidden="true" />
+              <ArrowRightIcon
+                className="size-4 transition-transform duration-150 ease-[var(--ease-settle)] group-hover:translate-x-0.5 motion-reduce:transition-none motion-reduce:group-hover:translate-x-0"
+                aria-hidden="true"
+              />
             </Link>
             <Link
               href={AUTH_ROUTES.signIn}

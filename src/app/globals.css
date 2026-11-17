@@ -249,11 +249,37 @@ html:has([data-app-banner]) {
   --shadow-lg: var(--shadow-lg);
   --shadow-xl: var(--shadow-xl);
   --shadow-2xl: var(--shadow-2xl);
+
+  /* ONE_DECELERATION_CURVE. The hero feed already eases with this exact
+     cubic-bezier (`reel-feed` below), so this is not a new curve invented for
+     a hover — it is the one the page already moves with, promoted to a token
+     so the second and third caller cannot drift a control point away from it.
+
+     Named `settle` rather than overriding Tailwind's own `--ease-out`: that
+     one is referenced by every `ease-out` utility in the product, and a hover
+     polish pass has no business re-timing the dashboard. */
+  --ease-settle: cubic-bezier(0.3, 0.7, 0.2, 1);
 }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
+  }
+
+  /* SMOOTH ONLY WHERE THE PAGE IS A DOCUMENT. The marketing nav points at
+     in-page anchors (#formats, #how-it-works, #faq) and a jump cut loses the
+     reader: they arrive with no idea whether the page moved up or down.
+     Scoped with :has() to surfaces that mount `.marketing-canvas` rather than
+     set on <html> globally, because the product scrolls panels and lists
+     programmatically and those should land instantly, not glide.
+
+     Inside prefers-reduced-motion: no-preference, so a visitor who asked for
+     less movement keeps the instant jump — this is exactly the vestibular
+     case the setting exists for. */
+  @media (prefers-reduced-motion: no-preference) {
+    html:has(.marketing-canvas) {
+      scroll-behavior: smooth;
+    }
   }
   body {
     @apply bg-background text-foreground;
@@ -353,6 +379,20 @@ html:has([data-app-banner]) {
     --secondary: oklch(0.244 0.0159 269);
     --border: oklch(0.2524 0.0158 269);
     --input: oklch(0.226 0.009 265);
+    /* FOCUS_RING_IS_THE_HIGHLIGHT, the one token this block used to leave
+       behind. Every other surface colour is re-pointed above, so a field on
+       this canvas comes out in the brand palette — but `--ring` kept falling
+       through to the app’s neutral grey (oklch(0.72 0 0)): the auth screens
+       drew a grey focus outline on a near-black page, while auth-design.md
+       §4 and §7 both ask for `2px --hi`.
+
+       --brand-accent (the yellow) and NOT --brand (the orange) that the app
+       canvas uses: on this surface the orange IS the primary button, so an
+       orange ring around a focused CTA is drawn in the colour it has to be
+       visible against. The yellow is the brightest value in the palette and
+       is already this screen’s “selected” signal on the mode tabs, so focus
+       and selection read as one idea. */
+    --ring: var(--brand-accent);
     /* The filled-heart red on the phone mockups' action rail. A FIXED signal
        colour like --alert-banner, not a themed one: it is part of a simulated
        feed UI, and a like that changed colour with our theme would stop
@@ -476,20 +516,63 @@ html:has([data-app-banner]) {
       0 12px 40px -10px color-mix(in oklab, var(--brand) 35%, transparent);
   }
 
+  /* 180ms and a named curve, not a bare `0.2s`. A duration with no
+     timing function falls back to `ease`, which spends its first frames
+     accelerating — on a 1px lift that is the whole motion, so the card
+     appeared to answer late. `--ease-settle` moves on the first frame and
+     decelerates into place, which is what makes a hover feel answered.
+
+     `box-shadow` is kept in the list although nothing currently changes it:
+     the shadow is what should animate the day a card gains a hover shadow,
+     and a transition on an unchanging property costs nothing. */
   .brutal-hover {
     transition:
-      transform 0.2s,
-      box-shadow 0.2s,
-      border-color 0.2s;
+      transform 180ms var(--ease-settle),
+      box-shadow 180ms var(--ease-settle),
+      border-color 180ms var(--ease-settle);
   }
 
-  .brutal-hover:hover {
-    border-color: color-mix(in oklab, var(--foreground) 18%, transparent);
-    transform: translateY(-1px);
+  /* HOVER_IS_A_CAPABILITY, not a state every device can leave. A touch
+     browser has no pointer to move away, so it fakes the hover on tap and
+     holds it until something else is tapped: without this gate, tapping a
+     format card on a phone leaves it lifted a pixel with a brightened border
+     for as long as the visitor reads it. Tailwind's own `hover:` variant
+     compiles to this query in v4 — this rule is hand-written, so it has to
+     say so itself.
+
+     Both halves matter: `hover: hover` means the primary input can hover at
+     all, and `pointer: fine` rules out the coarse pointers (some Android
+     browsers, a TV remote) that claim hover and cannot aim at a 1px lift. */
+  @media (hover: hover) and (pointer: fine) {
+    .brutal-hover:hover {
+      border-color: color-mix(in oklab, var(--foreground) 18%, transparent);
+      transform: translateY(-1px);
+    }
   }
 
-  .brutal-hover:active {
-    transform: translateY(0);
+  /* PRESS_IS_FOR_THINGS_THAT_PRESS. The old rule was `.brutal-hover:active
+     { transform: translateY(0) }` — it only CANCELLED the hover lift, so a
+     tapped card answered by going still, which reads as nothing happening.
+
+     The three selectors are the three shapes this class actually appears in:
+     the element IS the control (format-card's <button>), the control is
+     INSIDE it (the FAQ row, whose CollapsibleTrigger is a child), or the
+     control is AROUND it (the dashboard video tile, a <span> inside a
+     <Link>). Everything else wearing `brutal-hover` is a static <li> — the
+     marketing format and feature cards and the proof strip — and `:active`
+     matches those on press too. A card that shrinks under a finger and then
+     does nothing is a promise the markup cannot keep, which is why this is
+     scoped rather than applied to the class.
+
+     translateY(1px) and not scale(0.97): every Button in the product already
+     presses with `active:translate-y-px`, so this is the press language the
+     app HAS. It is also size-independent — one scale value cannot serve a
+     60px FAQ row and a 240px video tile, where 3% is 2px and 7px of travel
+     respectively. Hover lifts a pixel, press puts it a pixel down. */
+  .brutal-hover:is(a, button, [role="button"]):active,
+  .brutal-hover:has(:is(a, button, [role="button"]):active),
+  :is(a, button, [role="button"]):active > .brutal-hover {
+    transform: translateY(1px);
   }
 
   /* REDUCED_MOTION_IS_NOT_OPTIONAL: the lift is decoration, so it is the first
@@ -636,19 +719,126 @@ html:has([data-app-banner]) {
   }
 }
 
+/* SOURCE OF TRUTH KEYWORDS: hero-enter, hero-enter-fade, hero-stage-enter,
+ * ONE_ENTRANCE_PER_CONTAINER, ENTRANCE_IS_SEEN_ONCE
+ *
+ * WHAT:  The hero's one page-load entrance — the badge, headline, lead,
+ *        prompt card and proof line rise 8px and fade in behind each other,
+ *        and the stage fades in beside them.
+ *
+ * WHY:   ENTRANCE_IS_SEEN_ONCE, which is what earns it. Everything else on
+ *        this page is motion a visitor meets repeatedly, where the right
+ *        amount is none; a landing hero is met once per visit, so it is the
+ *        one place a flourish is not a tax. Before this the whole hero
+ *        simply existed, fully formed, on the first frame.
+ *
+ *        ONE_ENTRANCE_PER_CONTAINER: the delays live on the CONTAINER's
+ *        children via nth-child, not on five hand-tagged elements, so the
+ *        order cannot drift from the reading order, and a sixth child
+ *        inherits the base beat instead of appearing instantly out of turn.
+ *
+ *        Non-uniform and short — 0/50/100/150/190ms, closing up as it goes
+ *        rather than marching at a fixed interval, because an even cadence
+ *        reads as a machine dealing cards. The whole sequence is over in
+ *        ~510ms; a hero that is still assembling after half a second is a
+ *        hero the visitor is waiting on.
+ *
+ *        CSS and not JS: this fires while the browser is still parsing and
+ *        hydrating the page, which is exactly when a main-thread animation
+ *        drops frames. transform and opacity only, so it runs on the
+ *        compositor.
+ *
+ *        The stage gets opacity ALONE. Its wrapper already carries the
+ *        gutter-bleed translate and the fit scale, and an animation that
+ *        touches transform would overwrite both mid-flight.
+ *
+ *        Reduced motion keeps the fade and drops the travel — fewer and
+ *        gentler, not nothing, so the page still assembles rather than
+ *        snapping into place. The nth-child delays deliberately SURVIVE it
+ *        (they out-specify the override), so the order still reads; what the
+ *        setting removes is the 8px of movement, which is the part that
+ *        causes trouble, not the sequence.
+ * WHERE: The hero in src/app/(marketing)/page.tsx. */
+@keyframes hero-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes hero-enter-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@layer components {
+  .hero-enter > * {
+    animation: hero-enter 320ms var(--ease-settle) both;
+  }
+
+  .hero-enter > *:nth-child(2) {
+    animation-delay: 50ms;
+  }
+
+  .hero-enter > *:nth-child(3) {
+    animation-delay: 100ms;
+  }
+
+  .hero-enter > *:nth-child(4) {
+    animation-delay: 150ms;
+  }
+
+  .hero-enter > *:nth-child(n + 5) {
+    animation-delay: 190ms;
+  }
+
+  .hero-stage-enter {
+    animation: hero-enter-fade 420ms var(--ease-settle) 100ms both;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .hero-enter > *,
+    .hero-stage-enter {
+      animation: hero-enter-fade 200ms both;
+    }
+  }
+}
+
 @layer components {
   .reel-feed {
     animation: reel-feed 9s infinite;
   }
 
   .reel-hand {
-    transform-origin: 30px 125px;
+    /* The touch point, and the same point ReelHand positions the halo on.
+       Scaled with the hand (0.8 of 30px/125px) so the swipe still pivots
+       about the fingertip rather than about a spot in mid-air. */
+    transform-origin: 24px 100px;
     animation: reel-swipe 3s infinite;
     filter: drop-shadow(-10px 18px 20px oklch(0 0 0 / 0.45));
   }
 
   .reel-touch {
     animation: reel-touch 3s infinite;
+  }
+
+  /* Off-screen, or a hidden tab. `paused` rather than unmounted, so the feed
+     resumes on the frame it stopped on rather than snapping back to slide one
+     when the visitor scrolls up again — a loop that restarts is a loop they
+     can see is fake. The class is set by ReelStage from an IntersectionObserver
+     and `visibilitychange`, the same pair AuthShowcase uses: three infinite
+     animations repainting 6,000px above the fold, or behind a hidden tab, is a
+     battery cost with nobody watching. */
+  .reel-stage-paused :is(.reel-feed, .reel-hand, .reel-touch) {
+    animation-play-state: paused;
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -1513,15 +1703,27 @@ html:has([data-app-banner]) {
     text-shadow: var(--tactile-primary-text-shadow);
   }
 
-  .tactile-primary:hover:not(:disabled) {
-    background-image:
-      linear-gradient(var(--tactile-hover-wash), var(--tactile-hover-wash)),
-      linear-gradient(
-        180deg,
-        color-mix(in srgb, white var(--tactile-sheen), transparent) 0%,
-        transparent 48%,
-        color-mix(in srgb, black var(--tactile-shade), transparent) 100%
-      );
+  /* HOVER_IS_A_CAPABILITY, the same gate `.brutal-hover` carries and for the
+     same reason: a touch browser fakes the hover on tap and holds it, so
+     without this the button a visitor just pressed stays lit with the hover
+     wash until they tap somewhere else. Every Button in the app wears this
+     class (see button.tsx `default`), so the stuck highlight was not a
+     landing-page problem — it was every primary button on every screen.
+
+     The press state below is deliberately NOT gated: `:active` fires on
+     touch, it is the feedback a finger should get, and it ends when the
+     finger lifts. */
+  @media (hover: hover) and (pointer: fine) {
+    .tactile-primary:hover:not(:disabled) {
+      background-image:
+        linear-gradient(var(--tactile-hover-wash), var(--tactile-hover-wash)),
+        linear-gradient(
+          180deg,
+          color-mix(in srgb, white var(--tactile-sheen), transparent) 0%,
+          transparent 48%,
+          color-mix(in srgb, black var(--tactile-shade), transparent) 100%
+        );
+    }
   }
 
   /* Pressed = the wash flips and the depth turns inward. Pairs with the
@@ -1549,15 +1751,19 @@ html:has([data-app-banner]) {
     box-shadow: var(--tactile-highlight-soft), var(--shadow-xs);
   }
 
-  .tactile-surface:hover:not(:disabled) {
-    background-image:
-      linear-gradient(var(--tactile-hover-wash), var(--tactile-hover-wash)),
-      linear-gradient(
-        180deg,
-        color-mix(in srgb, white var(--tactile-sheen-soft), transparent) 0%,
-        transparent 55%,
-        color-mix(in srgb, black var(--tactile-shade-soft), transparent) 100%
-      );
+  /* Gated like `.tactile-primary` above — this is the outline/secondary
+     Button, so the same stuck wash applied to every one of them. */
+  @media (hover: hover) and (pointer: fine) {
+    .tactile-surface:hover:not(:disabled) {
+      background-image:
+        linear-gradient(var(--tactile-hover-wash), var(--tactile-hover-wash)),
+        linear-gradient(
+          180deg,
+          color-mix(in srgb, white var(--tactile-sheen-soft), transparent) 0%,
+          transparent 55%,
+          color-mix(in srgb, black var(--tactile-shade-soft), transparent) 100%
+        );
+    }
   }
 
   /* A trigger holding its popup open stays visibly pressed. Matched here and
