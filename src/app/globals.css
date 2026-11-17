@@ -802,7 +802,10 @@ html:has([data-app-banner]) {
   }
 
   .reel-hand {
-    transform-origin: 30px 125px;
+    /* The touch point, and the same point ReelHand positions the halo on.
+       Scaled with the hand (0.8 of 30px/125px) so the swipe still pivots
+       about the fingertip rather than about a spot in mid-air. */
+    transform-origin: 24px 100px;
     animation: reel-swipe 3s infinite;
     filter: drop-shadow(-10px 18px 20px oklch(0 0 0 / 0.45));
   }

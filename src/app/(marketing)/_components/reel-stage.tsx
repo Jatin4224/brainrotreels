@@ -192,9 +192,25 @@ function ReelHand() {
   return (
     <div
       aria-hidden="true"
-      className="reel-hand absolute left-[222px] top-[318px] z-[3] w-[400px]"
+      /* SCALED 0.8 ABOUT THE TOUCH POINT, not simply made smaller. At 400px
+         the hand was 413px against a 286px phone — half again as wide as the
+         device it is swiping, which reads as a stock illustration dropped on
+         top rather than a hand using the thing. It also put the sleeve 5px
+         past the viewport at 1440.
+
+         The contact point is (30, 125) in this box: the halo's centre and
+         `reel-hand`'s transform-origin both sit there, and the swipe pivots
+         about it. Scaling the art alone would drag the fingertip up and left
+         off the screen it is meant to be touching, so left and top are
+         shifted by the fifth of that offset the scale removes (30*0.2 = 6,
+         125*0.2 = 25) and the finger lands exactly where it did before.
+         The halo, the origin and the swipe keyframes are the other three
+         places that know this number — the first two are moved with it, the
+         keyframes are not: they are the gesture's travel across the PHONE,
+         which has not changed size. */
+      className="reel-hand absolute left-[228px] top-[343px] z-[3] w-[320px]"
     >
-      <span className="reel-touch absolute left-3 top-[107px] size-9 rounded-full bg-foreground/55" />
+      <span className="reel-touch absolute left-[10px] top-[86px] size-[29px] rounded-full bg-foreground/55" />
       <svg viewBox="0 0 300 200" className="block h-auto w-full">
         <path
           d="M226 54 L322 44 L322 172 L230 164 Z"
