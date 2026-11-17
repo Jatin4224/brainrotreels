@@ -353,6 +353,20 @@ html:has([data-app-banner]) {
     --secondary: oklch(0.244 0.0159 269);
     --border: oklch(0.2524 0.0158 269);
     --input: oklch(0.226 0.009 265);
+    /* FOCUS_RING_IS_THE_HIGHLIGHT, the one token this block used to leave
+       behind. Every other surface colour is re-pointed above, so a field on
+       this canvas comes out in the brand palette — but `--ring` kept falling
+       through to the app’s neutral grey (oklch(0.72 0 0)): the auth screens
+       drew a grey focus outline on a near-black page, while auth-design.md
+       §4 and §7 both ask for `2px --hi`.
+
+       --brand-accent (the yellow) and NOT --brand (the orange) that the app
+       canvas uses: on this surface the orange IS the primary button, so an
+       orange ring around a focused CTA is drawn in the colour it has to be
+       visible against. The yellow is the brightest value in the palette and
+       is already this screen’s “selected” signal on the mode tabs, so focus
+       and selection read as one idea. */
+    --ring: var(--brand-accent);
     /* The filled-heart red on the phone mockups' action rail. A FIXED signal
        colour like --alert-banner, not a themed one: it is part of a simulated
        feed UI, and a like that changed colour with our theme would stop
