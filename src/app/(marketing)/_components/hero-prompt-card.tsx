@@ -287,10 +287,13 @@ export function HeroPromptCard({ className }: { className?: string }) {
                 <Button
                   type="submit"
                   size="lg"
-                  className="brutal-shadow-brand h-11 shrink-0 rounded-xl bg-brand px-5 text-sm font-bold text-brand-foreground hover:bg-brand/90"
+                  className="brutal-shadow-brand group h-11 shrink-0 rounded-xl bg-brand px-5 text-sm font-bold text-brand-foreground hover:bg-brand/90"
                 >
                   Generate
-                  <ArrowRightIcon className="size-4" aria-hidden="true" />
+                  <ArrowRightIcon
+                    className="size-4 transition-transform duration-150 ease-[var(--ease-settle)] group-hover:translate-x-0.5 motion-reduce:transition-none motion-reduce:group-hover:translate-x-0"
+                    aria-hidden="true"
+                  />
                 </Button>
               </div>
               <FormMessage className="px-3 pb-1" />

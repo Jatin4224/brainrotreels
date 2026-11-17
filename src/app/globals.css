@@ -265,6 +265,22 @@ html:has([data-app-banner]) {
   * {
     @apply border-border outline-ring/50;
   }
+
+  /* SMOOTH ONLY WHERE THE PAGE IS A DOCUMENT. The marketing nav points at
+     in-page anchors (#formats, #how-it-works, #faq) and a jump cut loses the
+     reader: they arrive with no idea whether the page moved up or down.
+     Scoped with :has() to surfaces that mount `.marketing-canvas` rather than
+     set on <html> globally, because the product scrolls panels and lists
+     programmatically and those should land instantly, not glide.
+
+     Inside prefers-reduced-motion: no-preference, so a visitor who asked for
+     less movement keeps the instant jump — this is exactly the vestibular
+     case the setting exists for. */
+  @media (prefers-reduced-motion: no-preference) {
+    html:has(.marketing-canvas) {
+      scroll-behavior: smooth;
+    }
+  }
   body {
     @apply bg-background text-foreground;
   }

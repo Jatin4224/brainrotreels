@@ -102,7 +102,7 @@ import {
  * button so the page has ONE loud orange action. It is a LINK here — see
  * AUTH_IS_A_CLICK_NOT_A_REDIRECT. */
 const PRIMARY_CTA =
-  "brutal-shadow-brand h-12 rounded-xl bg-brand px-6 text-base font-bold text-brand-foreground hover:bg-brand/90";
+  "brutal-shadow-brand group h-12 rounded-xl bg-brand px-6 text-base font-bold text-brand-foreground hover:bg-brand/90";
 
 export default function LandingPage() {
   /* `showPlan` is the registry's own switch for a tier that exists but is not
@@ -522,7 +522,10 @@ export default function LandingPage() {
               className={cn(buttonVariants({ size: "lg" }), PRIMARY_CTA)}
             >
               Get started
-              <ArrowRightIcon className="size-4" aria-hidden="true" />
+              <ArrowRightIcon
+                className="size-4 transition-transform duration-150 ease-[var(--ease-settle)] group-hover:translate-x-0.5 motion-reduce:transition-none motion-reduce:group-hover:translate-x-0"
+                aria-hidden="true"
+              />
             </Link>
             <Link
               href={AUTH_ROUTES.signIn}
