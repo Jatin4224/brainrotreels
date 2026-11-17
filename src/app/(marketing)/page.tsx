@@ -128,7 +128,10 @@ export default function LandingPage() {
               benefit from more room. Below 900px the phones stack under the
               words: there is no width at which two columns of this fit. */}
           <div className="grid items-center gap-10 min-[900px]:grid-cols-[1.05fr_1fr]">
-            <div className="flex flex-col items-start text-left">
+            {/* hero-enter owns the one page-load sequence: its children rise
+                and fade in reading order, delays set by nth-child in
+                globals.css so this markup stays a plain column. */}
+            <div className="hero-enter flex flex-col items-start text-left">
               <span className="brutal-border brutal-shadow-sm mb-8 inline-flex items-center gap-2 rounded-full bg-brand-accent px-4 py-1.5 text-sm font-bold tracking-tight text-brand-accent-foreground">
                 <PlayIcon
                   className="size-3.5 fill-current"
@@ -183,6 +186,7 @@ export default function LandingPage() {
               items={LANDING_REELS}
               badge={HERO_COPY.renderedBadge}
               footnote={HERO_COPY.showcaseFootnote}
+              className="hero-stage-enter"
             />
           </div>
 

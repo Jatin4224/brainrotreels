@@ -703,6 +703,99 @@ html:has([data-app-banner]) {
   }
 }
 
+/* SOURCE OF TRUTH KEYWORDS: hero-enter, hero-enter-fade, hero-stage-enter,
+ * ONE_ENTRANCE_PER_CONTAINER, ENTRANCE_IS_SEEN_ONCE
+ *
+ * WHAT:  The hero's one page-load entrance — the badge, headline, lead,
+ *        prompt card and proof line rise 8px and fade in behind each other,
+ *        and the stage fades in beside them.
+ *
+ * WHY:   ENTRANCE_IS_SEEN_ONCE, which is what earns it. Everything else on
+ *        this page is motion a visitor meets repeatedly, where the right
+ *        amount is none; a landing hero is met once per visit, so it is the
+ *        one place a flourish is not a tax. Before this the whole hero
+ *        simply existed, fully formed, on the first frame.
+ *
+ *        ONE_ENTRANCE_PER_CONTAINER: the delays live on the CONTAINER's
+ *        children via nth-child, not on five hand-tagged elements, so the
+ *        order cannot drift from the reading order, and a sixth child
+ *        inherits the base beat instead of appearing instantly out of turn.
+ *
+ *        Non-uniform and short — 0/50/100/150/190ms, closing up as it goes
+ *        rather than marching at a fixed interval, because an even cadence
+ *        reads as a machine dealing cards. The whole sequence is over in
+ *        ~510ms; a hero that is still assembling after half a second is a
+ *        hero the visitor is waiting on.
+ *
+ *        CSS and not JS: this fires while the browser is still parsing and
+ *        hydrating the page, which is exactly when a main-thread animation
+ *        drops frames. transform and opacity only, so it runs on the
+ *        compositor.
+ *
+ *        The stage gets opacity ALONE. Its wrapper already carries the
+ *        gutter-bleed translate and the fit scale, and an animation that
+ *        touches transform would overwrite both mid-flight.
+ *
+ *        Reduced motion keeps the fade and drops the travel — fewer and
+ *        gentler, not nothing, so the page still assembles rather than
+ *        snapping into place. The nth-child delays deliberately SURVIVE it
+ *        (they out-specify the override), so the order still reads; what the
+ *        setting removes is the 8px of movement, which is the part that
+ *        causes trouble, not the sequence.
+ * WHERE: The hero in src/app/(marketing)/page.tsx. */
+@keyframes hero-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes hero-enter-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@layer components {
+  .hero-enter > * {
+    animation: hero-enter 320ms var(--ease-settle) both;
+  }
+
+  .hero-enter > *:nth-child(2) {
+    animation-delay: 50ms;
+  }
+
+  .hero-enter > *:nth-child(3) {
+    animation-delay: 100ms;
+  }
+
+  .hero-enter > *:nth-child(4) {
+    animation-delay: 150ms;
+  }
+
+  .hero-enter > *:nth-child(n + 5) {
+    animation-delay: 190ms;
+  }
+
+  .hero-stage-enter {
+    animation: hero-enter-fade 420ms var(--ease-settle) 100ms both;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .hero-enter > *,
+    .hero-stage-enter {
+      animation: hero-enter-fade 200ms both;
+    }
+  }
+}
+
 @layer components {
   .reel-feed {
     animation: reel-feed 9s infinite;
