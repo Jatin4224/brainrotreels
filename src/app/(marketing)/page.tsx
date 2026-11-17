@@ -65,7 +65,7 @@
  */
 
 import Link from "next/link";
-import { ArrowRightIcon, CheckIcon, PlayIcon } from "lucide-react";
+import { ArrowRightIcon, PlayIcon } from "lucide-react";
 
 /* Leaf import, not the barrel: `@/components/global/project-steps` also
  * exports the ProjectSteps client component, and this page needs only the
@@ -76,7 +76,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { AUTH_ROUTES } from "@/lib/config/auth-routes";
 import { APP_NAME } from "@/lib/config/branding";
 import { PLANS, PLAN_ORDER } from "@/lib/config/plans";
-import { RESOURCES } from "@/lib/resources";
+import { RESOURCES, getEntryPlanForResource } from "@/lib/resources";
 import { cn } from "@/lib/utils";
 import { HighlightHeading } from "@/components/global/highlight-heading";
 
@@ -332,25 +332,36 @@ export default function LandingPage() {
             {LANDING_FEATURE_KEYS.map((key) => {
               /* COPY_IS_REGISTRY_DERIVED — the gate's own words, not ours. */
               const definition = RESOURCES[key];
+              /* A_GATE_IS_NOT_A_TICK. Every card used to wear the same brand
+                 tick directly under a sentence saying reach depends on the
+                 plan — a tick reads as INCLUDED, so the grid promised eight
+                 things the pricing section then took back. Three of these
+                 eight are not plan-gated at all, three need Starter and two
+                 need Pro, and the badge is the only thing that says so.
+                 null means the entry plan already reaches it, so an absent
+                 badge is itself the claim "everyone gets this". */
+              const entryPlan = getEntryPlanForResource(key);
 
               return (
                 <li
                   key={key}
                   className="brutal-border brutal-shadow brutal-hover flex flex-col gap-2.5 rounded-2xl bg-card p-5"
                 >
-                  <span className="brutal-border flex size-5 items-center justify-center rounded-md bg-brand">
-                    <CheckIcon
-                      className="size-3 text-brand-foreground"
-                      strokeWidth={3}
-                      aria-hidden="true"
-                    />
-                  </span>
                   <h3 className="font-display text-base font-extrabold tracking-tight text-foreground">
                     {definition.name}
                   </h3>
                   <p className="text-sm leading-relaxed text-muted-foreground">
                     {definition.description}
                   </p>
+                  {entryPlan === null ? null : (
+                    /* Pushed to the bottom so the badge lines up across a row
+                       whatever the blurb's length, and quiet rather than
+                       brand-filled: it is a condition on the feature, not an
+                       action to take. */
+                    <span className="mt-auto w-fit rounded-full border border-border bg-surface-raised px-2.5 py-1 text-xs font-semibold text-muted-foreground">
+                      {`${PLANS[entryPlan].name} and up`}
+                    </span>
+                  )}
                 </li>
               );
             })}
