@@ -534,8 +534,29 @@ html:has([data-app-banner]) {
     }
   }
 
-  .brutal-hover:active {
-    transform: translateY(0);
+  /* PRESS_IS_FOR_THINGS_THAT_PRESS. The old rule was `.brutal-hover:active
+     { transform: translateY(0) }` — it only CANCELLED the hover lift, so a
+     tapped card answered by going still, which reads as nothing happening.
+
+     The three selectors are the three shapes this class actually appears in:
+     the element IS the control (format-card's <button>), the control is
+     INSIDE it (the FAQ row, whose CollapsibleTrigger is a child), or the
+     control is AROUND it (the dashboard video tile, a <span> inside a
+     <Link>). Everything else wearing `brutal-hover` is a static <li> — the
+     marketing format and feature cards and the proof strip — and `:active`
+     matches those on press too. A card that shrinks under a finger and then
+     does nothing is a promise the markup cannot keep, which is why this is
+     scoped rather than applied to the class.
+
+     translateY(1px) and not scale(0.97): every Button in the product already
+     presses with `active:translate-y-px`, so this is the press language the
+     app HAS. It is also size-independent — one scale value cannot serve a
+     60px FAQ row and a 240px video tile, where 3% is 2px and 7px of travel
+     respectively. Hover lifts a pixel, press puts it a pixel down. */
+  .brutal-hover:is(a, button, [role="button"]):active,
+  .brutal-hover:has(:is(a, button, [role="button"]):active),
+  :is(a, button, [role="button"]):active > .brutal-hover {
+    transform: translateY(1px);
   }
 
   /* REDUCED_MOTION_IS_NOT_OPTIONAL: the lift is decoration, so it is the first
