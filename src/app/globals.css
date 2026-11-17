@@ -1540,15 +1540,27 @@ html:has([data-app-banner]) {
     text-shadow: var(--tactile-primary-text-shadow);
   }
 
-  .tactile-primary:hover:not(:disabled) {
-    background-image:
-      linear-gradient(var(--tactile-hover-wash), var(--tactile-hover-wash)),
-      linear-gradient(
-        180deg,
-        color-mix(in srgb, white var(--tactile-sheen), transparent) 0%,
-        transparent 48%,
-        color-mix(in srgb, black var(--tactile-shade), transparent) 100%
-      );
+  /* HOVER_IS_A_CAPABILITY, the same gate `.brutal-hover` carries and for the
+     same reason: a touch browser fakes the hover on tap and holds it, so
+     without this the button a visitor just pressed stays lit with the hover
+     wash until they tap somewhere else. Every Button in the app wears this
+     class (see button.tsx `default`), so the stuck highlight was not a
+     landing-page problem — it was every primary button on every screen.
+
+     The press state below is deliberately NOT gated: `:active` fires on
+     touch, it is the feedback a finger should get, and it ends when the
+     finger lifts. */
+  @media (hover: hover) and (pointer: fine) {
+    .tactile-primary:hover:not(:disabled) {
+      background-image:
+        linear-gradient(var(--tactile-hover-wash), var(--tactile-hover-wash)),
+        linear-gradient(
+          180deg,
+          color-mix(in srgb, white var(--tactile-sheen), transparent) 0%,
+          transparent 48%,
+          color-mix(in srgb, black var(--tactile-shade), transparent) 100%
+        );
+    }
   }
 
   /* Pressed = the wash flips and the depth turns inward. Pairs with the
@@ -1576,15 +1588,19 @@ html:has([data-app-banner]) {
     box-shadow: var(--tactile-highlight-soft), var(--shadow-xs);
   }
 
-  .tactile-surface:hover:not(:disabled) {
-    background-image:
-      linear-gradient(var(--tactile-hover-wash), var(--tactile-hover-wash)),
-      linear-gradient(
-        180deg,
-        color-mix(in srgb, white var(--tactile-sheen-soft), transparent) 0%,
-        transparent 55%,
-        color-mix(in srgb, black var(--tactile-shade-soft), transparent) 100%
-      );
+  /* Gated like `.tactile-primary` above — this is the outline/secondary
+     Button, so the same stuck wash applied to every one of them. */
+  @media (hover: hover) and (pointer: fine) {
+    .tactile-surface:hover:not(:disabled) {
+      background-image:
+        linear-gradient(var(--tactile-hover-wash), var(--tactile-hover-wash)),
+        linear-gradient(
+          180deg,
+          color-mix(in srgb, white var(--tactile-sheen-soft), transparent) 0%,
+          transparent 55%,
+          color-mix(in srgb, black var(--tactile-shade-soft), transparent) 100%
+        );
+    }
   }
 
   /* A trigger holding its popup open stays visibly pressed. Matched here and
