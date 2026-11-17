@@ -249,6 +249,16 @@ html:has([data-app-banner]) {
   --shadow-lg: var(--shadow-lg);
   --shadow-xl: var(--shadow-xl);
   --shadow-2xl: var(--shadow-2xl);
+
+  /* ONE_DECELERATION_CURVE. The hero feed already eases with this exact
+     cubic-bezier (`reel-feed` below), so this is not a new curve invented for
+     a hover — it is the one the page already moves with, promoted to a token
+     so the second and third caller cannot drift a control point away from it.
+
+     Named `settle` rather than overriding Tailwind's own `--ease-out`: that
+     one is referenced by every `ease-out` utility in the product, and a hover
+     polish pass has no business re-timing the dashboard. */
+  --ease-settle: cubic-bezier(0.3, 0.7, 0.2, 1);
 }
 
 @layer base {
@@ -490,11 +500,20 @@ html:has([data-app-banner]) {
       0 12px 40px -10px color-mix(in oklab, var(--brand) 35%, transparent);
   }
 
+  /* 180ms and a named curve, not a bare `0.2s`. A duration with no
+     timing function falls back to `ease`, which spends its first frames
+     accelerating — on a 1px lift that is the whole motion, so the card
+     appeared to answer late. `--ease-settle` moves on the first frame and
+     decelerates into place, which is what makes a hover feel answered.
+
+     `box-shadow` is kept in the list although nothing currently changes it:
+     the shadow is what should animate the day a card gains a hover shadow,
+     and a transition on an unchanging property costs nothing. */
   .brutal-hover {
     transition:
-      transform 0.2s,
-      box-shadow 0.2s,
-      border-color 0.2s;
+      transform 180ms var(--ease-settle),
+      box-shadow 180ms var(--ease-settle),
+      border-color 180ms var(--ease-settle);
   }
 
   /* HOVER_IS_A_CAPABILITY, not a state every device can leave. A touch
