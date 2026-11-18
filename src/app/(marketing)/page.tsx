@@ -81,6 +81,7 @@ import {
   PLAN_PRICE_CURRENCY_SYMBOL,
 } from "@/lib/config/plans";
 import { RESOURCES, getEntryPlanForResource } from "@/lib/resources";
+import type { ProjectKind } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { HighlightHeading } from "@/components/global/highlight-heading";
 
@@ -103,6 +104,24 @@ import {
  * AUTH_IS_A_CLICK_NOT_A_REDIRECT. */
 const PRIMARY_CTA =
   "brutal-shadow-brand group h-12 rounded-xl bg-brand px-6 text-base font-bold text-brand-foreground hover:bg-brand/90";
+
+/* THE FORMAT CARD SHOWS THE FORMAT. The four cards were a title and three
+   lines of prose each — the section announced "four ways to start" and then
+   showed nothing, directly beneath a strip of five frames that prove exactly
+   these formats.
+
+   The frame is LOOKED UP from the proof clips rather than listed again here,
+   because landing-content.ts already states which poster belongs to which
+   kind, and a fifth list of filenames is a fifth thing to forget when a
+   frame is re-exported. First match wins: voiceover has two clips and either
+   one is a true example of the format.
+
+   Returns undefined when a kind has no clip or an operator has cleared the
+   poster, and the card renders text-only — the same graceful path ProofStrip
+   takes. */
+function formatPoster(kind: ProjectKind): string | undefined {
+  return LANDING_PROOF_CLIPS.find((clip) => clip.kind === kind)?.poster;
+}
 
 export default function LandingPage() {
   /* `showPlan` is the registry's own switch for a tier that exists but is not
@@ -212,14 +231,14 @@ export default function LandingPage() {
       {/* ── Formats ──────────────────────────────────────────────────────── */}
       <section
         id="formats"
-        className="scroll-mt-20 border-t-2 border-border py-20 md:py-28"
+        className="scroll-mt-20 border-t-2 border-border py-16 md:py-24"
       >
         <div className="safe-x mx-auto max-w-7xl">
           <div className="mx-auto max-w-3xl text-center">
-            <h2 className="font-display text-3xl font-medium leading-tight tracking-tight text-foreground md:text-4xl lg:text-5xl">
+            <h2 className="font-display text-3xl font-medium leading-tight tracking-tight text-balance text-foreground md:text-4xl lg:text-5xl">
               Four ways to start, one finished video
             </h2>
-            <p className="mt-4 text-base leading-relaxed text-muted-foreground">
+            <p className="mx-auto mt-4 max-w-xl text-pretty text-base leading-relaxed text-muted-foreground">
               Pick the format that fits what you already have. Each one has its
               own writer, so the script is built for the shape of the video —
               not pasted into a template.
@@ -227,28 +246,67 @@ export default function LandingPage() {
           </div>
 
           <ul className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-            {LANDING_FORMATS.map((format) => (
-              <li
-                key={format.kind}
-                className="brutal-border brutal-shadow brutal-hover flex flex-col gap-3 rounded-2xl bg-card p-5"
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <h3 className="font-display text-lg font-extrabold tracking-tight text-foreground">
-                    {format.label}
-                  </h3>
-                  {/* Shown rather than hidden, and labelled honestly — see
+            {LANDING_FORMATS.map((format) => {
+              const poster = formatPoster(format.kind);
+
+              return (
+                <li
+                  key={format.kind}
+                  className="brutal-border brutal-shadow brutal-hover flex flex-col overflow-hidden rounded-2xl bg-card"
+                >
+                  {/* A WIDE CROP, TOP-ANCHORED — not the whole 9:16 frame.
+                    The proof strip above already shows these five whole; a
+                    second full set of verticals 400px later would read as
+                    the same row twice. These frames carry their headline in
+                    the upper third (the same fact auth-showcase relies on
+                    for `objectPosition: center top`), so a 16:10 crop from
+                    the top shows what this format WRITES, in its own voice,
+                    while reading as a different object from the strip.
+
+                    A plain <img> for the same reason ProofStrip uses one:
+                    posters are operator-supplied and may be off-domain,
+                    which next/image refuses without a remotePatterns entry
+                    per deployment. Lazy, because this sits below the fold.
+
+                    alt="" — the heading beside it names the format, so a
+                    screen reader announcing the frame again is noise. */}
+                  {poster === undefined ? null : (
+                    <div className="relative aspect-[16/10] overflow-hidden border-b border-border bg-secondary">
+                      {/* eslint-disable-next-line @next/next/no-img-element -- Same
+                        reason as ProofStrip: poster URLs are OPERATOR-supplied
+                        and may be off-domain, which next/image refuses without a
+                        `remotePatterns` entry per deployment. Lazy +
+                        async-decoding keeps the LCP cost the rule protects. */}
+                    <img
+                        src={poster}
+                        alt=""
+                        loading="lazy"
+                        decoding="async"
+                        className="size-full object-cover object-top"
+                      />
+                    </div>
+                  )}
+
+                  <div className="flex flex-1 flex-col gap-3 p-5">
+                    <div className="flex items-center justify-between gap-2">
+                      <h3 className="font-display text-lg font-extrabold tracking-tight text-foreground">
+                        {format.label}
+                      </h3>
+                      {/* Shown rather than hidden, and labelled honestly — see
                       CREATABLE_PROJECT_KINDS. */}
-                  {"comingSoon" in format && format.comingSoon ? (
-                    <span className="brutal-border-thin rounded-full bg-muted px-2.5 py-0.5 text-[10px] font-black uppercase tracking-[0.12em] text-muted-foreground">
-                      Soon
-                    </span>
-                  ) : null}
-                </div>
-                <p className="text-sm leading-relaxed text-muted-foreground">
-                  {format.description}
-                </p>
-              </li>
-            ))}
+                      {"comingSoon" in format && format.comingSoon ? (
+                        <span className="brutal-border-thin rounded-full bg-muted px-2.5 py-0.5 text-[10px] font-black uppercase tracking-[0.12em] text-muted-foreground">
+                          Soon
+                        </span>
+                      ) : null}
+                    </div>
+                    <p className="text-sm leading-relaxed text-muted-foreground">
+                      {format.description}
+                    </p>
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         </div>
       </section>
@@ -265,10 +323,10 @@ export default function LandingPage() {
               reader can see — it just looks misplaced. Above the grid it
               centres on the section, like the rest of the page. */}
           <div className="mx-auto max-w-3xl text-center">
-            <h2 className="font-display text-3xl font-medium leading-tight tracking-tight text-foreground md:text-4xl lg:text-5xl">
+            <h2 className="font-display text-3xl font-medium leading-tight tracking-tight text-balance text-foreground md:text-4xl lg:text-5xl">
               From what you have to a finished video
             </h2>
-            <p className="mt-4 text-base leading-relaxed text-muted-foreground">
+            <p className="mx-auto mt-4 max-w-xl text-pretty text-base leading-relaxed text-muted-foreground">
               Every project moves through the same steps, in this order — each
               one picks up where the last finished, and you can change anything
               before the next one runs.
@@ -368,24 +426,24 @@ export default function LandingPage() {
         className="scroll-mt-20 border-y-2 border-border bg-card py-20 md:py-28"
       >
         <div className="safe-x mx-auto max-w-7xl">
-          <div className="grid gap-10 lg:grid-cols-[minmax(0,20rem)_1fr] lg:gap-16">
+          <div className="grid gap-10 lg:grid-cols-[minmax(0,22rem)_1fr] lg:gap-16">
             {/* Sticky, so the claim stays on screen while the list of what
                 backs it scrolls past. top-24 clears the 56px sticky header
                 with room to spare. */}
             <div className="lg:sticky lg:top-24 lg:self-start">
-              <h2 className="font-display text-3xl font-medium leading-tight tracking-tight text-foreground md:text-4xl lg:text-5xl">
+              <h2 className="font-display text-3xl font-medium leading-tight tracking-tight text-balance text-foreground md:text-4xl lg:text-5xl">
                 The tools that make it look deliberate
               </h2>
-              <p className="mt-4 text-base leading-relaxed text-muted-foreground">
+              <p className="mt-4 text-pretty text-base leading-relaxed text-muted-foreground">
                 {`The formats and tools ${APP_NAME} ships with. Which of them your workspace can reach depends on your plan.`}
               </p>
             </div>
 
             <ul className="divide-y divide-border border-t border-border">
-            {LANDING_FEATURE_KEYS.map((key) => {
-              /* COPY_IS_REGISTRY_DERIVED — the gate's own words, not ours. */
-              const definition = RESOURCES[key];
-              /* A_GATE_IS_NOT_A_TICK. Every card used to wear the same brand
+              {LANDING_FEATURE_KEYS.map((key) => {
+                /* COPY_IS_REGISTRY_DERIVED — the gate's own words, not ours. */
+                const definition = RESOURCES[key];
+                /* A_GATE_IS_NOT_A_TICK. Every card used to wear the same brand
                  tick directly under a sentence saying reach depends on the
                  plan — a tick reads as INCLUDED, so the grid promised eight
                  things the pricing section then took back. Three of these
@@ -393,35 +451,35 @@ export default function LandingPage() {
                  need Pro, and the badge is the only thing that says so.
                  null means the entry plan already reaches it, so an absent
                  badge is itself the claim "everyone gets this". */
-              const entryPlan = getEntryPlanForResource(key);
+                const entryPlan = getEntryPlanForResource(key);
 
-              return (
-                /* A row, not a card. The name column is fixed so eight names
+                return (
+                  /* A row, not a card. The name column is fixed so eight names
                    form a readable left edge; the badge is pushed to the far
                    right where the eye can scan which rows carry a condition
                    without reading any of them. */
-                <li
-                  key={key}
-                  className="grid gap-x-6 gap-y-1.5 py-5 sm:grid-cols-[minmax(0,11rem)_1fr_auto] sm:items-baseline"
-                >
-                  <h3 className="font-display text-base font-extrabold tracking-tight text-foreground">
-                    {definition.name}
-                  </h3>
-                  <p className="text-sm leading-relaxed text-muted-foreground">
-                    {definition.description}
-                  </p>
-                  {/* A_GATE_IS_NOT_A_TICK, unchanged: quiet rather than
+                  <li
+                    key={key}
+                    className="grid gap-x-6 gap-y-1.5 py-5 sm:grid-cols-[minmax(0,11rem)_1fr_auto] sm:items-baseline"
+                  >
+                    <h3 className="font-display text-base font-extrabold tracking-tight text-foreground">
+                      {definition.name}
+                    </h3>
+                    <p className="text-sm leading-relaxed text-muted-foreground">
+                      {definition.description}
+                    </p>
+                    {/* A_GATE_IS_NOT_A_TICK, unchanged: quiet rather than
                       brand-filled, because it is a condition on the feature
                       and not an action to take. An absent badge is itself
                       the claim "everyone gets this". */}
-                  {entryPlan === null ? null : (
-                    <span className="w-fit whitespace-nowrap rounded-full border border-border bg-surface-raised px-2.5 py-1 text-xs font-semibold text-muted-foreground sm:justify-self-end">
-                      {`${PLANS[entryPlan].name} and up`}
-                    </span>
-                  )}
-                </li>
-              );
-            })}
+                    {entryPlan === null ? null : (
+                      <span className="w-fit whitespace-nowrap rounded-full border border-border bg-surface-raised px-2.5 py-1 text-xs font-semibold text-muted-foreground sm:justify-self-end">
+                        {`${PLANS[entryPlan].name} and up`}
+                      </span>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           </div>
         </div>
@@ -430,13 +488,13 @@ export default function LandingPage() {
       {/* ── Plans ────────────────────────────────────────────────────────── */}
       {/* No border-t: the features band above closes with border-y-2, and two
           2px borders meeting would read as one 4px line. */}
-      <section className="py-20 md:py-28">
+      <section className="py-16 md:py-24">
         <div className="safe-x mx-auto max-w-7xl">
           <div className="mx-auto max-w-3xl text-center">
-            <h2 className="font-display text-3xl font-medium leading-tight tracking-tight text-foreground md:text-4xl lg:text-5xl">
+            <h2 className="font-display text-3xl font-medium leading-tight tracking-tight text-balance text-foreground md:text-4xl lg:text-5xl">
               Pick your plan
             </h2>
-            <p className="mt-4 text-base leading-relaxed text-muted-foreground">
+            <p className="mx-auto mt-4 max-w-xl text-pretty text-base leading-relaxed text-muted-foreground">
               Every plan includes the whole pipeline. They differ in how much
               you can hold and how much you can make.
             </p>
@@ -540,10 +598,13 @@ export default function LandingPage() {
       >
         <div className="safe-x mx-auto max-w-3xl">
           <div className="text-center">
-            <h2 className="font-display text-3xl font-medium leading-tight tracking-tight text-foreground md:text-4xl">
+            {/* lg:text-5xl like every other section heading. At 36px against
+              their 48px it read as an oversight rather than as deliberate
+              de-emphasis — too close to be a different size on purpose. */}
+            <h2 className="font-display text-3xl font-medium leading-tight tracking-tight text-balance text-foreground md:text-4xl lg:text-5xl">
               Got questions?
             </h2>
-            <p className="mt-4 text-base leading-relaxed text-muted-foreground">
+            <p className="mx-auto mt-4 max-w-xl text-pretty text-base leading-relaxed text-muted-foreground">
               The ones people ask before they sign up, answered the way the
               product actually behaves.
             </p>
@@ -560,7 +621,7 @@ export default function LandingPage() {
       {/* ── Closing CTA ──────────────────────────────────────────────────── */}
       <section className="border-t-2 border-border bg-card py-24 md:py-28">
         <div className="safe-x mx-auto flex max-w-4xl flex-col items-center gap-6 text-center">
-          <h2 className="font-display text-4xl font-medium leading-[0.95] tracking-tight text-foreground md:text-5xl lg:text-6xl">
+          <h2 className="font-display text-4xl font-medium leading-[0.95] tracking-tight text-balance text-foreground md:text-5xl lg:text-6xl">
             Your next video starts with one sentence
           </h2>
           <p className="max-w-xl text-base leading-relaxed text-muted-foreground">
