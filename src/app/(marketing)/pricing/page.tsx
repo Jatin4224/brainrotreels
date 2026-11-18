@@ -82,7 +82,7 @@ export default function PricingPage() {
     <div className="safe-x mx-auto flex max-w-6xl flex-col gap-14 py-16 md:py-24">
       <header className="flex flex-col gap-4 text-center">
         <h1 className="font-display text-3xl font-medium leading-tight tracking-tight text-balance text-foreground md:text-4xl lg:text-5xl">
-          Pick your plan
+          Pricing
         </h1>
         <p className="mx-auto max-w-xl text-pretty text-base leading-relaxed text-muted-foreground">
           Every plan includes the whole pipeline — script, narration, captions

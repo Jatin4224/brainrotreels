@@ -113,9 +113,16 @@ export const LANDING_FORMATS = [
    choice. Typing it exhaustively turns "somebody added a kind and forgot the
    art" into a build error. */
 export const FORMAT_CARD_ART: Record<ProjectKind, string> = {
-  /* A text-message drama: the closest frame to a story told in posts and
-     replies, which is what the Reddit format reads aloud. */
-  "reddit-story": "/formats/chat-story.png",
+  /* THE STILL MUST MATCH THE LABEL. This card is headed "Reddit stories"
+     and briefly showed /formats/chat-story.png — a text-message drama,
+     which is a different format wearing this one's name. A visitor cannot
+     be told the product makes Reddit videos and shown an iMessage thread.
+     Back to the real Reddit frame, cropped from the top like the rest.
+
+     chat-story.png stays in public/formats/ unused ON PURPOSE: it is the
+     art for a Chat stories format, and the day that becomes a ProjectKind
+     it is already here. */
+  "reddit-story": "/auth-reels/01-reddit-story.png",
   /* Waveform, episode chip and word-timed caption — a narrated cut. */
   voiceover: "/formats/podcast-clip.png",
   /* A split-screen dilemma with the crowd's vote: a question with an answer
