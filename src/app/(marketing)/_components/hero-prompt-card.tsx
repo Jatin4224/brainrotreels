@@ -291,7 +291,7 @@ export function HeroPromptCard({ className }: { className?: string }) {
                 >
                   Generate
                   <ArrowRightIcon
-                    className="size-4 transition-transform duration-150 ease-[var(--ease-settle)] group-hover:translate-x-0.5 motion-reduce:transition-none motion-reduce:group-hover:translate-x-0"
+                    className="size-4 transition-transform duration-150 ease-[var(--ease-settle)] pointer-fine:group-hover:translate-x-0.5 motion-reduce:transition-none motion-reduce:group-hover:translate-x-0"
                     aria-hidden="true"
                   />
                 </Button>

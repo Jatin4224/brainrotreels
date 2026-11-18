@@ -95,7 +95,19 @@ export function ProofStrip({ clips, className }: ProofStripProps) {
                 visitor has an account, and a dead button is worse than none. */}
             <span
               aria-hidden="true"
-              className="absolute inset-0 flex items-center justify-center opacity-0 transition-opacity group-hover:opacity-100 motion-reduce:transition-none"
+              /* pointer-fine supplies the HALF OF THE QUERY group-hover is
+                 missing. Tailwind compiles group-hover: inside
+                 `@media (hover: hover)` already, but not
+                 `(pointer: fine)` — and both halves are the rule, exactly as
+                 HOVER_IS_A_CAPABILITY in globals.css argues for
+                 .brutal-hover: a coarse pointer that CLAIMS hover (some
+                 Android browsers, a TV remote) fakes it on tap and holds it.
+                 On those, tapping a card left this badge showing until
+                 something else was tapped — worse than never showing it,
+                 since the badge is decoration and there is nothing to play.
+                 Stacked, the two variants compile to the same nested
+                 `(pointer: fine)` + `(hover: hover)` query. */
+              className="absolute inset-0 flex items-center justify-center opacity-0 transition-opacity duration-150 ease-[var(--ease-settle)] pointer-fine:group-hover:opacity-100 motion-reduce:transition-none"
             >
               <span className="brutal-border flex size-11 items-center justify-center rounded-full bg-brand-accent text-brand-accent-foreground">
                 <PlayIcon className="size-4" />

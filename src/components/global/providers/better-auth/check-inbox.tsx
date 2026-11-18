@@ -144,7 +144,12 @@ export function CheckInbox({
         type="button"
         onClick={onChangeEmail}
         aria-label="Back to create account"
-        className="brutal-border flex size-11 items-center justify-center rounded-2xl bg-surface-raised text-foreground outline-none transition-colors hover:bg-muted focus-ring motion-reduce:transition-none"
+        /* The only control on the auth screens that is neither a <Button>
+           nor wearing brutal-hover, so it was the only one that answered a
+           press with nothing at all. Same 1px, same 160ms, same curve as
+           every other pressable thing in the product — this is joining the
+           press language, not adding one. */
+        className="brutal-border flex size-11 items-center justify-center rounded-2xl bg-surface-raised text-foreground outline-none transition-[transform,background-color] duration-[160ms] ease-[var(--ease-settle)] hover:bg-muted active:translate-y-px focus-ring motion-reduce:transition-none"
       >
         <ArrowLeftIcon className="size-5" aria-hidden="true" />
       </button>

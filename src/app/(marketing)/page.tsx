@@ -529,7 +529,9 @@ export default function LandingPage() {
             >
               Get started
               <ArrowRightIcon
-                className="size-4 transition-transform duration-150 ease-[var(--ease-settle)] group-hover:translate-x-0.5 motion-reduce:transition-none motion-reduce:group-hover:translate-x-0"
+                /* pointer-fine: see the proof strip's note — group-hover
+                   carries (hover: hover) but not (pointer: fine). */
+                className="size-4 transition-transform duration-150 ease-[var(--ease-settle)] pointer-fine:group-hover:translate-x-0.5 motion-reduce:transition-none motion-reduce:group-hover:translate-x-0"
                 aria-hidden="true"
               />
             </Link>
