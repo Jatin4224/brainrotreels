@@ -28,6 +28,7 @@ export { ReelPhone, type ReelPhoneProps } from "./reel-phone";
 export { ReelStage, type ReelStageProps } from "./reel-stage";
 export { ProofStrip, type ProofStripProps } from "./proof-strip";
 export {
+  FORMAT_CARD_ART,
   HANDLED_FOR_YOU,
   HERO_COPY,
   LANDING_FAQ,

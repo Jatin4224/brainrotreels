@@ -64,6 +64,7 @@
  *        ./_components/landing-content.ts; CTAs target AUTH_ROUTES.
  */
 
+import Image from "next/image";
 import Link from "next/link";
 import { ArrowRightIcon, PlayIcon } from "lucide-react";
 
@@ -81,7 +82,6 @@ import {
   PLAN_PRICE_CURRENCY_SYMBOL,
 } from "@/lib/config/plans";
 import { RESOURCES, getEntryPlanForResource } from "@/lib/resources";
-import type { ProjectKind } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { HighlightHeading } from "@/components/global/highlight-heading";
 
@@ -91,6 +91,7 @@ import {
   HeroPromptCard,
   LANDING_FAQ,
   LANDING_FEATURE_KEYS,
+  FORMAT_CARD_ART,
   LANDING_FORMATS,
   LANDING_PROOF_CLIPS,
   LANDING_REELS,
@@ -104,24 +105,6 @@ import {
  * AUTH_IS_A_CLICK_NOT_A_REDIRECT. */
 const PRIMARY_CTA =
   "brutal-shadow-brand group h-12 rounded-xl bg-brand px-6 text-base font-bold text-brand-foreground hover:bg-brand/90";
-
-/* THE FORMAT CARD SHOWS THE FORMAT. The four cards were a title and three
-   lines of prose each — the section announced "four ways to start" and then
-   showed nothing, directly beneath a strip of five frames that prove exactly
-   these formats.
-
-   The frame is LOOKED UP from the proof clips rather than listed again here,
-   because landing-content.ts already states which poster belongs to which
-   kind, and a fifth list of filenames is a fifth thing to forget when a
-   frame is re-exported. First match wins: voiceover has two clips and either
-   one is a true example of the format.
-
-   Returns undefined when a kind has no clip or an operator has cleared the
-   poster, and the card renders text-only — the same graceful path ProofStrip
-   takes. */
-function formatPoster(kind: ProjectKind): string | undefined {
-  return LANDING_PROOF_CLIPS.find((clip) => clip.kind === kind)?.poster;
-}
 
 export default function LandingPage() {
   /* `showPlan` is the registry's own switch for a tier that exists but is not
@@ -247,42 +230,51 @@ export default function LandingPage() {
 
           <ul className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
             {LANDING_FORMATS.map((format) => {
-              const poster = formatPoster(format.kind);
+              /* FORMAT_CARD_ART, not the proof strip's posters: the strip
+                 shows what the product HAS MADE, these show what each
+                 format IS. Absent art renders the card text-only. */
+              const poster = FORMAT_CARD_ART[format.kind];
 
               return (
                 <li
                   key={format.kind}
                   className="brutal-border brutal-shadow brutal-hover flex flex-col overflow-hidden rounded-2xl bg-card"
                 >
-                  {/* A WIDE CROP, TOP-ANCHORED — not the whole 9:16 frame.
-                    The proof strip above already shows these five whole; a
-                    second full set of verticals 400px later would read as
-                    the same row twice. These frames carry their headline in
-                    the upper third (the same fact auth-showcase relies on
-                    for `objectPosition: center top`), so a 16:10 crop from
-                    the top shows what this format WRITES, in its own voice,
-                    while reading as a different object from the strip.
+                  {/* 16:10 AND TOP-ANCHORED. These stills are purpose-made
+                      at 1215x762, so the box matches the file and nothing is
+                      cropped by accident; object-top is the insurance, since
+                      every one of them carries its headline in the upper
+                      half and a nudge to the aspect must eat the bottom.
 
-                    A plain <img> for the same reason ProofStrip uses one:
-                    posters are operator-supplied and may be off-domain,
-                    which next/image refuses without a remotePatterns entry
-                    per deployment. Lazy, because this sits below the fold.
-
-                    alt="" — the heading beside it names the format, so a
-                    screen reader announcing the frame again is noise. */}
+                      Landscape on purpose, against a product that makes
+                      9:16: the proof strip above is already a row of whole
+                      verticals, and a second row of them here would read as
+                      the same row twice. A wide still of the same work is a
+                      different object on the page. */}
                   {poster === undefined ? null : (
                     <div className="relative aspect-[16/10] overflow-hidden border-b border-border bg-secondary">
-                      {/* eslint-disable-next-line @next/next/no-img-element -- Same
-                        reason as ProofStrip: poster URLs are OPERATOR-supplied
-                        and may be off-domain, which next/image refuses without a
-                        `remotePatterns` entry per deployment. Lazy +
-                        async-decoding keeps the LCP cost the rule protects. */}
-                    <img
+                      {/* next/image here and a plain <img> in ProofStrip, and
+                          the difference is ownership: a proof clip poster is
+                          OPERATOR-supplied and may be off-domain, which
+                          next/image refuses without a per-deployment
+                          `remotePatterns` entry. These four ship in this repo,
+                          so there is nothing to configure and no reason to
+                          decline the resizing and the modern formats.
+
+                          `sizes` is measured, not guessed: the grid is 4-up
+                          from lg (~288px), 2-up from sm, one card wide below
+                          that. Without it Next hands a phone the 1215px source
+                          for a 342px box.
+
+                          alt="" — the heading beside it names the format, so a
+                          screen reader announcing the still as well is noise.
+                          No `priority`: this sits below the fold. */}
+                      <Image
                         src={poster}
                         alt=""
-                        loading="lazy"
-                        decoding="async"
-                        className="size-full object-cover object-top"
+                        fill
+                        sizes="(min-width: 1024px) 288px, (min-width: 640px) 50vw, 100vw"
+                        className="object-cover object-top"
                       />
                     </div>
                   )}
