@@ -61,6 +61,30 @@ export const PLAN_PRICE_CURRENCY_SYMBOL = envString(
   "$",
 );
 
+/**
+ * SOURCE OF TRUTH KEYWORDS: formatPlanAmount, AMOUNTS_ARE_FORMATTED
+ *
+ * WHAT:  A plan's monthly amount as it is shown to a visitor.
+ * WHY:   AMOUNTS_ARE_FORMATTED. The amount is `envInteger`, which accepts any
+ *        non-negative integer with no upper bound, and both public pages
+ *        printed it raw inside a template string — so a four-figure tier
+ *        rendered "1299". A price is a number people compare, and a grouping
+ *        separator is the whole reason they can.
+ *
+ *        en-US explicitly, not the runtime default: this would otherwise be
+ *        resolved from the server's locale during SSR and the browser's on
+ *        hydration, which is a mismatch on exactly the string a visitor is
+ *        reading most carefully. The product's copy is en, so the number
+ *        matches the words around it. A real locale system replaces this
+ *        argument, not the function.
+ * WHERE: The plan cards on / and /pricing.
+ */
+const AMOUNT_FORMAT = new Intl.NumberFormat("en-US");
+
+export function formatPlanAmount(amount: number): string {
+  return AMOUNT_FORMAT.format(amount);
+}
+
 export const PLAN_KEYS = [
   "free",
   "starter",

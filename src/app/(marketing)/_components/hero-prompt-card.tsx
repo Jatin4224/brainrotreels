@@ -212,10 +212,10 @@ export function HeroPromptCard({ className }: { className?: string }) {
                       onClick={() => field.onChange(option)}
                       className={cn(
                         TAB_SHAPE,
-                        "relative z-10 transition-colors outline-none focus-ring motion-reduce:transition-none",
+                        "relative z-10 outline-none transition-[color,transform] duration-100 ease-[var(--ease-settle)] active:translate-y-px focus-ring motion-reduce:transition-none",
                         isActive
                           ? "text-foreground"
-                          : "text-muted-foreground hover:text-foreground",
+                          : "text-muted-foreground hover:text-foreground active:text-foreground",
                         isActive && highlight !== null
                           ? "text-brand-accent-foreground"
                           : "",
@@ -291,7 +291,7 @@ export function HeroPromptCard({ className }: { className?: string }) {
                 >
                   Generate
                   <ArrowRightIcon
-                    className="size-4 transition-transform duration-150 ease-[var(--ease-settle)] group-hover:translate-x-0.5 motion-reduce:transition-none motion-reduce:group-hover:translate-x-0"
+                    className="size-4 transition-transform duration-150 ease-[var(--ease-settle)] pointer-fine:group-hover:translate-x-0.5 motion-reduce:transition-none motion-reduce:group-hover:translate-x-0"
                     aria-hidden="true"
                   />
                 </Button>

@@ -23,7 +23,7 @@
  *        TRPCReactProvider from src/trpc/react-provider.
  */
 
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import {
   Bricolage_Grotesque,
   DM_Sans,
@@ -111,6 +111,50 @@ export const metadata: Metadata = {
     template: `%s — ${BRANDING.appName}`,
   },
   description: BRANDING.appDescription,
+};
+
+/* SOURCE OF TRUTH KEYWORDS: viewport, viewportFit, interactiveWidget,
+ *   themeColor, ZOOM_IS_NEVER_DISABLED, NATIVE_ON_TOUCH
+ *
+ * WHAT:  The viewport and status-bar colour for every route. Next's default
+ *        viewport is `width=device-width, initial-scale=1` and nothing else,
+ *        which is why this export exists.
+ * WHY:   `viewportFit: "cover"` lets the page paint under the notch and the
+ *        home indicator instead of being letterboxed inside the safe area.
+ *        Without it a notched phone draws a strip of plain body background
+ *        above the landing page's translucent sticky header — the single
+ *        clearest "this is a web page" tell on the whole surface — AND every
+ *        `env(safe-area-inset-*)` in the stylesheet resolves to 0px, so the
+ *        insets cannot be paid back. `.safe-x` / `.auth-safe-bottom` in
+ *        globals.css are the other half of this line: cover mode makes
+ *        keeping content out of those zones the page's job.
+ *
+ *        `interactiveWidget: "resizes-content"` makes Android Chrome's
+ *        software keyboard shrink the layout viewport rather than slide over
+ *        it, which is what lets the auth screens' `min-h-svh` column and
+ *        their bottom-pinned CTA react to the keyboard instead of being
+ *        covered by it.
+ *
+ *        ZOOM_IS_NEVER_DISABLED: no `maximumScale`, no `userScalable: false`.
+ *        Those are the usual reflex for stopping iOS zooming into a focused
+ *        input, and they fix it by taking pinch-zoom away from every visitor.
+ *        The cause is the field's font size, and it is fixed there — see
+ *        FOCUS_MUST_NOT_ZOOM in globals.css.
+ *
+ *        ONE `themeColor`, not one per colour scheme, because ThemeProvider
+ *        below sets `forcedTheme="dark"`: this product has exactly one theme,
+ *        so a `prefers-color-scheme: light` variant would be a colour no
+ *        surface ever renders. It matches `--background` in `.dark`
+ *        (oklch(0 0 0)), i.e. the colour at the very top of the page, rather
+ *        than the brand orange — the status bar continues the header, it is
+ *        not a logo. */
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  interactiveWidget: "resizes-content",
+  themeColor: "#000000",
+  colorScheme: "dark",
 };
 
 export default function RootLayout({

@@ -69,6 +69,17 @@ export type PublicRouteKey = keyof typeof PUBLIC_ROUTES;
 export function isPublicRoute(pathname: string): boolean {
   if (pathname === PUBLIC_ROUTES.home) return true;
 
+  /* DEV_FIXTURE_ROUTES. /dev/* renders real pages against worst-case
+     fixtures (see (marketing)/dev/landing). Without this the auth observer
+     treats them as protected and pushes the reviewer to /sign-in a second
+     after the page paints, which is maddening and looks like a bug in the
+     page under test. NODE_ENV is inlined at build time, so this whole branch
+     is dead code in a production bundle — and those routes notFound() there
+     anyway. */
+  if (process.env.NODE_ENV !== "production" && pathname.startsWith("/dev/")) {
+    return true;
+  }
+
   return Object.entries(PUBLIC_ROUTES).some(([key, route]) => {
     if (key === "home") return false;
     return pathname === route || pathname.startsWith(`${route}/`);

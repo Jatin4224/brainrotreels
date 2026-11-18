@@ -34,6 +34,7 @@
 import Link from "next/link";
 
 import { PlatformLogo } from "@/components/global/platform-logo";
+import { MarketingMobileNav } from "./marketing-mobile-nav";
 import { buttonVariants } from "@/components/ui/button";
 import { AUTH_ROUTES } from "@/lib/config/auth-routes";
 import type { MarketingLink } from "@/lib/types";
@@ -58,7 +59,7 @@ const MARKETING_NAV_LINKS: readonly MarketingLink[] = [
 export function MarketingHeader() {
   return (
     <header className="sticky top-0 z-40 border-b border-border/60 bg-background/70 backdrop-blur-xl">
-      <nav className="mx-auto flex h-14 max-w-7xl items-center justify-between gap-4 px-6">
+      <nav className="safe-x mx-auto flex h-14 max-w-7xl items-center justify-between gap-4">
         <PlatformLogo href="/" size="md" />
 
         <div className="flex items-center gap-6">
@@ -75,9 +76,13 @@ export function MarketingHeader() {
           </div>
 
           <div className="flex items-center gap-3">
+            {/* Below md this moves into the sheet — see
+                SIGN_IN_MOVES_IN in marketing-mobile-nav.tsx. The bar cannot
+                hold the wordmark, a menu button, Sign in AND Get started at
+                390px, and Get started is the one action the page is for. */}
             <Link
               href={AUTH_ROUTES.signIn}
-              className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+              className="hidden text-sm font-medium text-muted-foreground transition-colors hover:text-foreground md:inline-flex"
             >
               Sign in
             </Link>
@@ -91,6 +96,11 @@ export function MarketingHeader() {
             >
               Get started
             </Link>
+
+            {/* NAV_IS_REACHABLE_ON_A_PHONE. The link row above is
+                `hidden md:flex` and nothing replaced it below that, so four
+                destinations were unreachable from the header on a phone. */}
+            <MarketingMobileNav links={MARKETING_NAV_LINKS} />
           </div>
         </div>
       </nav>

@@ -6,7 +6,8 @@
 
 /**
  * SOURCE OF TRUTH KEYWORDS: ResetPasswordForm, AUTH_SURFACE, AuthError,
- *   AUTH_CTA_CLASS, AUTH_FIELD_CLASS, AUTH_LABEL_CLASS, AUTH_LINK_CLASS
+ *   AUTH_CTA_CLASS,
+  AUTH_SECRET_INPUT_PROPS, AUTH_FIELD_CLASS, AUTH_LABEL_CLASS, AUTH_LINK_CLASS
  *
  * WHAT:  Sets a new password using the token from the reset-link email. Reads
  *        the token from the URL (Better Auth appends ?token=...). Handles the
@@ -44,6 +45,7 @@ import { Input } from "@/components/ui/input";
 import { AuthError } from "@/components/global/auth/auth-error";
 import {
   AUTH_CTA_CLASS,
+  AUTH_SECRET_INPUT_PROPS,
   AUTH_FIELD_CLASS,
   AUTH_LABEL_CLASS,
   AUTH_LINK_CLASS,
@@ -119,7 +121,10 @@ export function ResetPasswordForm() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col items-center gap-2 text-center">
+      {/* Left, like AuthHero beside it in the same split shell — see the
+          note in forgot-password-form.tsx. The states with an illustration
+          stay centred. */}
+      <div className="flex flex-col gap-2">
         <h1 className="font-display text-3xl font-extrabold tracking-tight">
           Reset your password
         </h1>
@@ -144,6 +149,8 @@ export function ResetPasswordForm() {
                   <Input
                     type="password"
                     autoComplete="new-password"
+                    {...AUTH_SECRET_INPUT_PROPS}
+                    enterKeyHint="next"
                     placeholder="At least 8 characters"
                     disabled={isBusy}
                     className={AUTH_FIELD_CLASS}
@@ -166,6 +173,7 @@ export function ResetPasswordForm() {
                   <Input
                     type="password"
                     autoComplete="new-password"
+                    {...AUTH_SECRET_INPUT_PROPS}
                     placeholder="Type it once more"
                     disabled={isBusy}
                     className={AUTH_FIELD_CLASS}
@@ -190,7 +198,7 @@ export function ResetPasswordForm() {
           </Button>
         </form>
       </Form>
-      <p className="text-center text-base text-muted-foreground">
+      <p className="text-base text-muted-foreground">
         <Link href={AUTH_ROUTES.signIn} className={AUTH_LINK_CLASS}>
           Back to sign in
         </Link>

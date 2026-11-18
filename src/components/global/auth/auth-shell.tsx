@@ -109,7 +109,7 @@ export function AuthShell({ children, aside, headerTag }: AuthShellProps) {
        minimum height again and simply scrolls. */
     <div
       className={cn(
-        "marketing-canvas auth-typography flex min-h-svh flex-col bg-background p-6 lg:p-8",
+        "marketing-canvas auth-typography safe-x auth-safe-bottom flex min-h-svh flex-col bg-background pt-6 lg:pt-8 lg:[--safe-b:2rem] lg:[--safe-x:2rem]",
         isSplit ? "auth-split-lock" : "",
       )}
     >

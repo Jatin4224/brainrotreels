@@ -59,9 +59,23 @@ export function LegalDocument({
   children,
 }: LegalDocumentProps) {
   return (
-    <article className="mx-auto flex max-w-3xl flex-col gap-6 px-4 py-12">
+    /* ONE MARKETING SURFACE, AT A DOCUMENT'S SIZE. These pages wore the
+       dashboard's type — a semibold h1 in the UI face — one click from a
+       landing page set in Bricolage, so a reader crossing from the footer
+       landed somewhere that looked like a different product. The display
+       face comes across; the 48px display SIZE does not, because this is
+       prose to read rather than a headline to be sold by.
+
+       max-w-[38rem], down from max-w-3xl: 768px of 14px text is about 110
+       characters per line, half as long again as anything is comfortable to
+       read. 608px of 16px text is ~72, the same measure the landing page's
+       prose now uses. A legal document is the last place to make someone
+       work for a line. */
+    <article className="safe-x mx-auto flex max-w-[38rem] flex-col gap-6 py-16 md:py-20">
       <header className="flex flex-col gap-2">
-        <h1 className="text-3xl font-semibold tracking-tight">{title}</h1>
+        <h1 className="font-display text-3xl font-extrabold tracking-tight text-balance text-foreground md:text-4xl">
+          {title}
+        </h1>
         <p className="text-xs text-muted-foreground">Last updated {updated}</p>
       </header>
 
@@ -72,7 +86,7 @@ export function LegalDocument({
           have that plugin installed — and adding a dependency to format four
           documents would be the wrong trade. Every colour is a theme token, so
           the documents read in both themes like every other surface. */}
-      <div className="flex flex-col gap-4 text-sm leading-relaxed text-muted-foreground [&_a]:underline [&_h2]:mt-4 [&_h2]:text-base [&_h2]:font-semibold [&_h2]:tracking-tight [&_h2]:text-foreground [&_li]:ml-4 [&_li]:list-disc [&_strong]:text-foreground [&_ul]:flex [&_ul]:flex-col [&_ul]:gap-1.5">
+      <div className="flex flex-col gap-4 text-base leading-relaxed text-pretty text-muted-foreground [&_a]:underline [&_h2]:mt-6 [&_h2]:font-display [&_h2]:text-lg [&_h2]:font-extrabold [&_h2]:tracking-tight [&_h2]:text-foreground [&_li]:ml-4 [&_li]:list-disc [&_strong]:text-foreground [&_ul]:flex [&_ul]:flex-col [&_ul]:gap-1.5">
         {children}
       </div>
 

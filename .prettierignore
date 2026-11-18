@@ -1,0 +1,13 @@
+# LITERAL_ENV_READ. Prettier rewrites process.env['KEY'] to process.env["KEY"],
+# and Next only inlines a NEXT_PUBLIC_* variable into the client bundle for a
+# literal member or index access it can match. Reformatted, every public env
+# var silently falls back to its default in the browser while still being
+# correct on the server — the exact failure src/lib/config/env.public.test.ts
+# exists to catch. That test catches it after the fact; this stops it happening.
+src/lib/config/env.public.ts
+
+# Generated or vendored output.
+.next/
+out/
+node_modules/
+package-lock.json

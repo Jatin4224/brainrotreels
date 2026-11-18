@@ -284,6 +284,84 @@ html:has([data-app-banner]) {
   body {
     @apply bg-background text-foreground;
   }
+
+  /* SOURCE OF TRUTH KEYWORDS: NATIVE_ON_TOUCH, touch-action,
+   * TAP_IS_NOT_A_CLICK, CONTROLS_ARE_NOT_COPY, FOCUS_MUST_NOT_ZOOM,
+   * PRESS_IS_THE_ONLY_FEEDBACK_LEFT
+   *
+   * WHAT:  The platform-layer baseline that separates "a website rendered in
+   *        a browser" from something that feels installed. None of it
+   *        reproduces in a desktop browser's device toolbar, which is why
+   *        none of it was here.
+   *
+   * WHY:   TAP_IS_NOT_A_CLICK. `touch-action: manipulation` drops the ~300ms
+   *        a touch browser spends after a tap waiting to see whether a second
+   *        one is coming (double-tap zoom). These elements never
+   *        double-tap-zoom, so `click` fires on release instead of a third of
+   *        a second after it. This is the usual cause of "the app feels laggy
+   *        on my phone", and it is NOT an animation problem — which is why
+   *        retuning a press transition never finds it.
+   *
+   *        PRESS_IS_THE_ONLY_FEEDBACK_LEFT, and that is the half of this
+   *        worth writing down. Tailwind's preflight already sets
+   *        `-webkit-tap-highlight-color: transparent` and
+   *        `-webkit-text-size-adjust: 100%` on `html`, so the grey box the
+   *        browser paints over a tapped element has been gone here from the
+   *        start — which means a control with only a `hover:` state has been
+   *        answering a finger with NOTHING, and `hover:` on touch is worse
+   *        than nothing: it latches on the last thing tapped and stays.
+   *        Everything built on `Button` is fine (`active:translate-y-px`);
+   *        the bare `<button>`s are not, and are fixed at their own call
+   *        sites. Do not re-declare the two preflight lines here — a second
+   *        copy in `@layer base` reads as the thing that made them true.
+   * WHERE: Every surface. Marketing- and auth-scoped touch rules sit with
+   *        their own components further down. */
+  button,
+  a,
+  label,
+  summary,
+  [role="button"],
+  [role="radio"],
+  [role="tab"] {
+    touch-action: manipulation;
+  }
+
+  /* CONTROLS_ARE_NOT_COPY. Long-pressing a web button selects its label, or
+     pops iOS's copy/share callout on an anchor — a native control does
+     neither. Scoped to controls and deliberately NOT `body`: operators copy
+     error messages, render ids and API keys out of this product, and that is
+     content. `Button` already carries `select-none`; these are the bare
+     `<button>`s it does not cover — the hero's mode tabs, the password
+     field's Show/Hide — and the anchors styled as buttons. */
+  button,
+  [role="button"],
+  [role="radio"],
+  [role="tab"] {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+
+  /* FOCUS_MUST_NOT_ZOOM. iOS Safari zooms the page in when focus lands on a
+     field whose text is under 16px, and does not zoom back out on blur — the
+     visitor is left on a cropped, drifted layout, mid-signup. Every field in
+     the product is `text-base md:text-sm`, and `md` is a WIDTH: an iPad in
+     portrait and a 768px Android tablet both take the 14px branch and both
+     zoom. Gating on the POINTER rather than the width is what makes the rule
+     match the devices that actually have the behaviour, and it leaves the
+     14px desktop density alone.
+
+     The alternative is `maximum-scale=1` in the viewport meta, which is an
+     accessibility failure: it takes pinch-zoom away from everybody to hide a
+     font-size bug. See the `viewport` export in src/app/layout.tsx, which
+     deliberately does not set it. */
+  @media (pointer: coarse) {
+    input:not([type="checkbox"]):not([type="radio"]),
+    textarea,
+    select {
+      font-size: 16px;
+    }
+  }
 }
 
 /* SOURCE OF TRUTH KEYWORDS: --brand, --brand-accent, MARKETING_DESIGN_LANGUAGE,
@@ -369,6 +447,61 @@ html:has([data-app-banner]) {
      foreground` and simply come out in the marketing palette — no component on
      this page knows there are two palettes, and nothing in the product shifts
      by a pixel. */
+  /* SOURCE OF TRUTH KEYWORDS: safe-x, auth-safe-bottom, SAFE_AREA_IS_THE
+   * PAGE'S_JOB, env(), viewport-fit
+   *
+   * WHAT:  The horizontal page gutter for every public surface — the landing
+   *        page's sections, the marketing header and footer, and the auth
+   *        shell. 1.5rem (the `px-6` it replaces) or the device's own inset,
+   *        whichever is larger.
+   * WHY:   src/app/layout.tsx ships `viewport-fit=cover`, which lets the page
+   *        paint edge to edge instead of being letterboxed inside the safe
+   *        area — that is what stops a notched phone drawing a strip of body
+   *        background above the sticky, translucent header. The trade is that
+   *        the page becomes responsible for keeping its CONTENT out of those
+   *        zones, and in landscape on a notched iPhone the left inset is ~47px
+   *        against a 24px gutter, so the first character of every heading
+   *        would sit under the sensor housing.
+   *
+   *        `max()` and not `calc(1.5rem + env(...))`: the gutter should not
+   *        grow to 71px on a phone, it should simply never be SMALLER than the
+   *        inset. On a device with no insets `env()` resolves to 0px and this
+   *        is byte-for-byte the `px-6` it replaced, which is why it is safe to
+   *        apply unconditionally. The `0px` fallback matters because a browser
+   *        that does not know the variable at all would otherwise invalidate
+   *        the whole `max()` and leave the gutter at zero.
+   * WHERE: src/app/(marketing)/page.tsx, marketing-header, marketing-footer,
+   *        and src/components/global/auth/auth-shell.tsx. */
+  .safe-x {
+    padding-inline: max(var(--safe-x, 1.5rem), env(safe-area-inset-left, 0px))
+      max(var(--safe-x, 1.5rem), env(safe-area-inset-right, 0px));
+  }
+
+  /* The bottom half of the same argument, for the one surface that pins a
+     control to the floor of the viewport. CTA_PINS_TO_THE_BOTTOM puts the
+     primary auth action in the thumb zone below `lg`, and on a modern phone
+     the thumb zone is also where the home indicator lives: without this the
+     submit button sits under it, and the system's swipe-up gesture owns that
+     strip rather than the button. */
+  .auth-safe-bottom {
+    padding-bottom: max(var(--safe-b, 1.5rem), env(safe-area-inset-bottom, 0px));
+  }
+
+  /* PULL_TO_REFRESH_IS_FOR_DOCUMENTS. The auth screens are a form, not a page
+     to re-read — dragging down from the top of a half-filled signup form and
+     having the browser reload it is a platform gesture answering on the app's
+     behalf, and it answers wrong. The landing page is deliberately NOT
+     included: it IS a scrolling document, where pull-to-refresh is the
+     expected behaviour and taking it away would be the defect.
+
+     `overscroll-behavior` and never a non-passive `touchmove` +
+     `preventDefault()` listener: that blocks scrolling outright and costs
+     frames on every drag. Keyed off `.auth-typography`, which AuthShell is
+     the only thing that mounts. */
+  html:has(.auth-typography) {
+    overscroll-behavior-y: none;
+  }
+
   .marketing-canvas {
     --background: oklch(0.1598 0.0132 270.5);
     --foreground: oklch(0.9693 0.004 106.5);
@@ -804,8 +937,48 @@ html:has([data-app-banner]) {
     animation: hero-enter-fade 420ms var(--ease-settle) 100ms both;
   }
 
+  /* THE SEQUENCE FINISHES. The hero's words rise in reading order and the
+     stage fades in beside them, and then the five proof cards in the same
+     section were simply THERE — the one page-load sequence stopped one
+     element short of the last thing in its own section.
+
+     Deliberately the SAME keyframes and the same curve as the column above,
+     not a second entrance invented for this strip: it is the tail of one
+     motion, so it has to be made of the same parts. The delays pick up where
+     the column's last child left off (190ms) and step 60ms per card — inside
+     the 30-80ms stagger band, and the gap between 190ms and 260ms is what
+     reads as "the strip follows" rather than "the strip is part of the
+     headline".
+
+     Capped at nth-child(n + 5) for the same reason .hero-enter is: an
+     operator who adds a sixth clip must not push the last card most of a
+     second into the page's life.
+
+     Decorative and non-blocking by construction — the cards are <li>s with
+     no controls in them, so nothing here delays an interaction. */
+  .proof-enter > * {
+    animation: hero-enter 320ms var(--ease-settle) 260ms both;
+  }
+
+  .proof-enter > *:nth-child(2) {
+    animation-delay: 320ms;
+  }
+
+  .proof-enter > *:nth-child(3) {
+    animation-delay: 380ms;
+  }
+
+  .proof-enter > *:nth-child(4) {
+    animation-delay: 440ms;
+  }
+
+  .proof-enter > *:nth-child(n + 5) {
+    animation-delay: 500ms;
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .hero-enter > *,
+    .proof-enter > *,
     .hero-stage-enter {
       animation: hero-enter-fade 200ms both;
     }
@@ -1335,13 +1508,39 @@ html:has([data-app-banner]) {
     .auth-split-lock .auth-form-column {
       min-height: 0;
       overflow-y: auto;
+      /* SCROLL_STOPS_AT_THE_EDGE. The column is the only scroller on a page
+         that is otherwise locked to the viewport, so a flick that reaches its
+         end must not chain outwards and rubber-band the locked page behind it
+         — which reads as the layout coming unstuck. `contain` keeps the
+         column's own bounce, which is the part that feels native. */
+      overscroll-behavior: contain;
     }
   }
 
   .auth-showcase {
     /* The loop every layer below shares. Override it on the panel to slow the
-       whole composition down without changing the shape of the motion. */
-    --auth-loop: 1.17s;
+       whole composition down without changing the shape of the motion.
+
+       3.4s, raised from 1.17s. The panel's job is EXPLANATION — one document
+       in, five reels out — and at 1.17s the whole three-beat story (the doc
+       falls, the cursor presses, the strip fans) completed about fifty-one
+       times a minute. Nobody can follow a narrative at that rate: it read as
+       flicker, not as a pipeline, and it ran in the corner of the eye of
+       somebody typing a password.
+
+       Marketing and explanatory motion is the one tier allowed to be long.
+       3.4s gives the document ~200ms to fall and the strip about a second to
+       fan, which is slow enough to read and still a loop rather than a film.
+
+       Raising the VARIABLE and not the keyframes is the whole point of the
+       variable: every stop below is a percentage of it, so the eight layers
+       stay in sync and the shape of the motion is untouched. The keyframes
+       were measured frame by frame from the reference recording and must not
+       be re-timed — which is also why there is no hold on the full strip at
+       the end of the cycle, tempting as it is: a pause means compressing all
+       eight measured lists into the first n%, and that is a rewrite of the
+       motion rather than a change of pace. */
+    --auth-loop: 3.4s;
     /* Two fit factors, min()-ed: neither axis may overflow the panel. */
     --auth-fit-w: 1;
     --auth-fit-h: 1;
@@ -2074,4 +2273,143 @@ html:has([data-app-banner]) {
   --color-cat-music: var(--cat-music);
   --color-badge-new: var(--badge-new);
   --color-pro: var(--pro);
+}
+
+/* SOURCE OF TRUTH KEYWORDS: collapsible-content, --collapsible-panel-height,
+ * FaqAccordion, PANEL_HEIGHT_IS_MEASURED_BY_BASE_UI, HEIGHT_IS_THE_EXCEPTION
+ *
+ * WHAT:  The open/close motion on every Base UI collapsible panel — today
+ *        that is the landing page's FAQ rows, and nothing else in the product
+ *        renders this slot.
+ *
+ * WHY:   The trigger's chevron already rotated over a panel that TELEPORTED,
+ *        so the one animated part of the row contradicted the thing it points
+ *        at: the arrow said "this is opening" while the answer was already
+ *        there.
+ *
+ *        HEIGHT_IS_THE_EXCEPTION. Everything else in this file animates
+ *        transform or opacity. An accordion is the one documented case where
+ *        height is the property: there is no transform that reveals content
+ *        without scaling the text inside it.
+ *
+ *        PANEL_HEIGHT_IS_MEASURED_BY_BASE_UI, which is what makes that legal
+ *        here with no JS. The primitive measures the panel and publishes
+ *        --collapsible-panel-height on it, so the transition runs between two
+ *        real lengths; height: auto does not interpolate, and that is why a
+ *        hand-rolled accordion needs a ResizeObserver. data-starting-style
+ *        and data-ending-style are the primitive's own enter/exit hooks — it
+ *        keeps the panel mounted for the exit.
+ *
+ *        240ms matches the chevron's own transition, so the arrow and the
+ *        answer land on the same frame. Opacity is shorter (160ms) so the
+ *        words have finished arriving while the box is still growing — two
+ *        durations that end TOGETHER read as two animations, not one reveal.
+ *
+ *        Reduced motion keeps the OPACITY and drops the height: the box
+ *        snaps, but the answer still fades in rather than appearing
+ *        mid-sentence. Fewer and gentler, not nothing.
+ * WHERE: the data-slot in src/components/ui/collapsible.tsx, rendered by
+ *        src/components/global/faq-accordion/faq-accordion.tsx. */
+@layer components {
+  [data-slot="collapsible-content"] {
+    height: var(--collapsible-panel-height);
+    overflow: hidden;
+    transition:
+      height 240ms var(--ease-settle),
+      opacity 160ms var(--ease-settle);
+  }
+
+  [data-slot="collapsible-content"][data-starting-style],
+  [data-slot="collapsible-content"][data-ending-style] {
+    height: 0;
+    opacity: 0;
+  }
+
+  /* Only the transition list is dropped. The height above still goes to 0 on
+     both edges — with nothing transitioning it, that is an instant open and
+     close, which is the point. */
+  @media (prefers-reduced-motion: reduce) {
+    [data-slot="collapsible-content"] {
+      transition: opacity 120ms var(--ease-settle);
+    }
+  }
+}
+
+/* SOURCE OF TRUTH KEYWORDS: auth-inbox-enter, auth-inbox-pill, CheckInbox,
+ * THE_ONE_EARNED_OVERSHOOT, STARTING_STYLE_NEEDS_NO_JS
+ *
+ * WHAT:  The arrival of the "Check your inbox" screen after a sign-up
+ *        submits, and the "1 new" sticker that lands on its envelope a beat
+ *        later.
+ *
+ * WHY:   The form does not fade out and the screen does not cross-fade: a
+ *        four-field form was replaced by an envelope in ONE FRAME, which
+ *        reads as a glitch at the single highest-emotion moment on the auth
+ *        surface — the account now exists. So the new screen ARRIVES, and the
+ *        old one is simply gone; the form leaving is not the story.
+ *
+ *        THE_ONE_EARNED_OVERSHOOT. Nothing else on these screens bounces, and
+ *        that is deliberate — a form is not a toy. The sticker is the
+ *        exception the delight budget exists for: it is seen once, by
+ *        somebody who has just succeeded, and overshoot is what makes a
+ *        sticker read as stuck ON rather than faded IN. 1.3 on the third
+ *        control point is one small overshoot, not a wobble.
+ *
+ *        The 180ms delay is what makes it a SECOND event. Fired with the
+ *        panel it is just one more thing fading; after it, the envelope has
+ *        already landed and the sticker answers it.
+ *
+ *        STARTING_STYLE_NEEDS_NO_JS: CheckInbox mounts on a state change, so
+ *        the browser's own first-style hook is the whole mechanism — no
+ *        AnimatePresence, no mount effect, and a browser without
+ *        @starting-style shows the screen instantly, which is exactly the
+ *        behaviour this replaces.
+ *
+ *        Tailwind v4 compiles rotate and scale utilities to the INDEPENDENT
+ *        transform properties, so these transition translate and scale BY
+ *        NAME and leave the sticker's resting rotate: 8deg alone — a
+ *        transform shorthand here would have to restate the rotation or lose
+ *        it.
+ *
+ *        Reduced motion drops both the travel and the overshoot and keeps the
+ *        fades. The start values stay, but with nothing transitioning them
+ *        they are never painted.
+ * WHERE: src/components/global/providers/better-auth/check-inbox.tsx. */
+@layer components {
+  .auth-inbox-enter {
+    opacity: 1;
+    translate: 0 0;
+    transition:
+      opacity 260ms var(--ease-settle),
+      translate 300ms var(--ease-settle);
+  }
+
+  @starting-style {
+    .auth-inbox-enter {
+      opacity: 0;
+      translate: 0 10px;
+    }
+  }
+
+  .auth-inbox-pill {
+    opacity: 1;
+    scale: 1;
+    transition:
+      opacity 200ms var(--ease-settle) 180ms,
+      scale 320ms cubic-bezier(0.3, 1.3, 0.4, 1) 180ms;
+  }
+
+  @starting-style {
+    .auth-inbox-pill {
+      opacity: 0;
+      scale: 0.9;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .auth-inbox-enter,
+    .auth-inbox-pill {
+      transition: opacity 200ms var(--ease-settle);
+    }
+  }
 }

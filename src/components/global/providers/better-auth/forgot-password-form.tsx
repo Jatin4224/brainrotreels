@@ -6,7 +6,8 @@
 
 /**
  * SOURCE OF TRUTH KEYWORDS: ForgotPasswordForm, AUTH_SURFACE, AuthError,
- *   AUTH_CTA_CLASS, AUTH_FIELD_CLASS, AUTH_LABEL_CLASS, AUTH_LINK_CLASS
+ *   AUTH_CTA_CLASS,
+  AUTH_EMAIL_INPUT_PROPS, AUTH_FIELD_CLASS, AUTH_LABEL_CLASS, AUTH_LINK_CLASS
  *
  * WHAT:  Requests a password-reset email. On success shows a
  *        "check your email" screen (shown regardless of whether the address
@@ -46,6 +47,7 @@ import { Input } from "@/components/ui/input";
 import { AuthError } from "@/components/global/auth/auth-error";
 import {
   AUTH_CTA_CLASS,
+  AUTH_EMAIL_INPUT_PROPS,
   AUTH_FIELD_CLASS,
   AUTH_LABEL_CLASS,
   AUTH_LINK_CLASS,
@@ -102,7 +104,13 @@ export function ForgotPasswordForm() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col items-center gap-2 text-center">
+      {/* Left, not centred: this now sits in the split shell's form column
+          beside the panel, where AuthHero's heading on /sign-in and /sign-up
+          is left-aligned. A centred heading in a 26rem column next to a
+          left-aligned one on the previous screen is a jump the reader sees.
+          The SUCCESS state below stays centred — it has an illustration to
+          sit under, exactly like CheckInbox. */}
+      <div className="flex flex-col gap-2">
         <h1 className="font-display text-3xl font-extrabold tracking-tight">
           Forgot your password?
         </h1>
@@ -128,6 +136,8 @@ export function ForgotPasswordForm() {
                   <Input
                     type="email"
                     autoComplete="email"
+                    {...AUTH_EMAIL_INPUT_PROPS}
+                    enterKeyHint="send"
                     placeholder="you@example.com"
                     disabled={isBusy}
                     className={AUTH_FIELD_CLASS}
@@ -152,7 +162,7 @@ export function ForgotPasswordForm() {
           </Button>
         </form>
       </Form>
-      <div className="text-center text-sm">
+      <div className="text-sm">
         Remember your password?{" "}
         <Link
           href={AUTH_ROUTES.signIn}

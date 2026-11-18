@@ -123,19 +123,28 @@ export default function ApiDocsPage() {
   const reference = buildApiReference(APP_URL);
 
   return (
-    <div className="mx-auto flex max-w-4xl flex-col gap-10 px-4 py-12">
+    /* The display face and the marketing surface's gutter, like every
+       other public page. The CONTAINER stays max-w-4xl because the code
+       samples below need the width — only the prose is capped, at the same
+       ~72-character measure the rest of the surface uses, so a sentence does
+       not run the full width of a curl command. */
+    <div className="safe-x mx-auto flex max-w-4xl flex-col gap-10 py-16 md:py-20">
       <header className="flex flex-col gap-3">
-        <div className="flex items-center gap-3">
-          <h1 className="text-3xl font-semibold tracking-tight">
+        <div className="flex flex-wrap items-center gap-3">
+          <h1 className="font-display text-3xl font-extrabold tracking-tight text-balance text-foreground md:text-4xl">
             {reference.title}
           </h1>
           <Badge variant="outline">v{reference.version}</Badge>
         </div>
-        <p className="text-muted-foreground">{reference.description}</p>
+        <p className="max-w-[38rem] text-pretty text-muted-foreground">
+          {reference.description}
+        </p>
       </header>
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-xl font-semibold tracking-tight">Authentication</h2>
+        <h2 className="font-display text-xl font-extrabold tracking-tight text-foreground">
+          Authentication
+        </h2>
         <p className="text-muted-foreground text-sm">
           {reference.authDescription}
         </p>
@@ -158,7 +167,9 @@ export default function ApiDocsPage() {
       <Separator />
 
       <section className="flex flex-col gap-4">
-        <h2 className="text-xl font-semibold tracking-tight">Conventions</h2>
+        <h2 className="font-display text-xl font-extrabold tracking-tight text-foreground">
+          Conventions
+        </h2>
         <div className="grid gap-3 sm:grid-cols-2">
           {CONVENTIONS.map((convention) => (
             <Card key={convention.title}>
@@ -177,7 +188,9 @@ export default function ApiDocsPage() {
 
       <section className="flex flex-col gap-6">
         <div className="flex flex-col gap-1">
-          <h2 className="text-xl font-semibold tracking-tight">Endpoints</h2>
+          <h2 className="font-display text-xl font-extrabold tracking-tight text-foreground">
+            Endpoints
+          </h2>
           <p className="text-muted-foreground text-sm">
             In the order you would use them: create a project, write a script,
             cast the voices, render, collect the file. The catalogues tell you
@@ -198,7 +211,9 @@ export default function ApiDocsPage() {
 
       <section className="flex flex-col gap-4">
         <div className="flex flex-col gap-1">
-          <h2 className="text-xl font-semibold tracking-tight">Errors</h2>
+          <h2 className="font-display text-xl font-extrabold tracking-tight text-foreground">
+            Errors
+          </h2>
           <p className="text-muted-foreground text-sm">
             Branch on <code className="font-mono text-xs">error.code</code>, not
             on the status or the message. A code is stable; the copy is written
@@ -243,7 +258,7 @@ export default function ApiDocsPage() {
           an agent author and an API author are the same reader. */}
       <section className="flex flex-col gap-4">
         <div className="flex flex-col gap-1">
-          <h2 className="text-xl font-semibold tracking-tight">
+          <h2 className="font-display text-xl font-extrabold tracking-tight text-foreground">
             Agents (MCP)
           </h2>
           <p className="text-muted-foreground text-sm">
@@ -278,14 +293,13 @@ export default function ApiDocsPage() {
       <Separator />
 
       <section className="flex flex-col gap-2">
-        <h2 className="text-xl font-semibold tracking-tight">
+        <h2 className="font-display text-xl font-extrabold tracking-tight text-foreground">
           Generate a client
         </h2>
         <p className="text-muted-foreground text-sm">
           The OpenAPI 3.1 description is generated from the same schemas the
           endpoints validate with, so a generated client cannot disagree with
-          the server. Point your generator at it rather than hand-writing
-          types.
+          the server. Point your generator at it rather than hand-writing types.
         </p>
         <CodeBlock
           language="http"

@@ -33,6 +33,8 @@
 import { PlayIcon } from "lucide-react";
 
 import type { MarketingProofClip, ProjectKind } from "@/lib/types";
+
+import { ProofPoster } from "./proof-poster";
 import { cn } from "@/lib/utils";
 
 export interface ProofStripProps {
@@ -57,11 +59,28 @@ const FORMAT_TAG_LABELS: Record<ProjectKind, string> = {
   motion: "Motion",
 };
 
+const CLIP_GRID_CLASS: Record<number, string> = {
+  1: "max-w-[14rem] grid-cols-1",
+  2: "max-w-[28rem]",
+  3: "max-w-[42rem] sm:grid-cols-3",
+  4: "max-w-[56rem] sm:grid-cols-3 lg:grid-cols-4",
+  5: "sm:grid-cols-3 lg:grid-cols-5",
+};
+
 export function ProofStrip({ clips, className }: ProofStripProps) {
+  /* An empty strip is an empty <ul> with a top margin — a gap under the hero
+     that reads as a layout fault rather than as "no clips". Render nothing. */
+  if (clips.length === 0) return null;
+
   return (
+    /* Columns capped at the clip count, so a deployment with three real
+       exports gets three columns rather than three cards and two holes.
+       Below sm it is two up whatever the count, because one 9:16 card
+       across a phone is a poster, not a strip. */
     <ul
       className={cn(
-        "grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5 lg:gap-6",
+        "mx-auto grid grid-cols-2 gap-4 lg:gap-6",
+        CLIP_GRID_CLASS[Math.min(clips.length, 5)],
         className,
       )}
     >
@@ -72,44 +91,71 @@ export function ProofStrip({ clips, className }: ProofStripProps) {
         >
           <div className="relative aspect-[9/16] bg-secondary">
             {clip.poster === undefined ? null : (
-              /* eslint-disable-next-line @next/next/no-img-element -- Poster
-                 URLs are OPERATOR-supplied and may be off-domain, which
-                 next/image refuses without a `remotePatterns` entry per
-                 deployment; a fork would have to edit next.config.ts before
-                 its own landing page would render. Lazy + async-decoding keeps
-                 the LCP cost the rule is protecting. */
-              <img
+              /* A_POSTER_URL_CAN_404 — the fallback lives in ProofPoster, and
+                 is this same box with no image in it. */
+              <ProofPoster
                 src={clip.poster}
                 alt={`${FORMAT_TAG_LABELS[clip.kind]} — ${clip.title}`}
-                loading="lazy"
-                decoding="async"
-                className="size-full object-cover"
               />
             )}
-
-            <span className="brutal-border-thin absolute left-2 top-2 rounded-full bg-background/80 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-[0.12em] text-brand-accent backdrop-blur-sm">
-              {FORMAT_TAG_LABELS[clip.kind]}
-            </span>
 
             {/* Decoration, not a control — there is nothing to play until the
                 visitor has an account, and a dead button is worse than none. */}
             <span
               aria-hidden="true"
-              className="absolute inset-0 flex items-center justify-center opacity-0 transition-opacity group-hover:opacity-100 motion-reduce:transition-none"
+              /* pointer-fine supplies the HALF OF THE QUERY group-hover is
+                 missing. Tailwind compiles group-hover: inside
+                 `@media (hover: hover)` already, but not
+                 `(pointer: fine)` — and both halves are the rule, exactly as
+                 HOVER_IS_A_CAPABILITY in globals.css argues for
+                 .brutal-hover: a coarse pointer that CLAIMS hover (some
+                 Android browsers, a TV remote) fakes it on tap and holds it.
+                 On those, tapping a card left this badge showing until
+                 something else was tapped — worse than never showing it,
+                 since the badge is decoration and there is nothing to play.
+                 Stacked, the two variants compile to the same nested
+                 `(pointer: fine)` + `(hover: hover)` query. */
+              className="absolute inset-0 flex items-center justify-center opacity-0 transition-opacity duration-150 ease-[var(--ease-settle)] pointer-fine:group-hover:opacity-100 motion-reduce:transition-none"
             >
               <span className="brutal-border flex size-11 items-center justify-center rounded-full bg-brand-accent text-brand-accent-foreground">
                 <PlayIcon className="size-4" />
               </span>
             </span>
+          </div>
 
-            <div className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-2 bg-gradient-to-t from-background via-background/80 to-transparent px-3 pb-3 pt-14">
-              <p className="line-clamp-2 text-xs font-semibold leading-snug text-foreground">
-                {clip.title}
-              </p>
+          {/* NOTHING IS OVERLAID ON THE FRAME ANY MORE. The tag used to float
+              at top-left and the title over a scrim at the bottom, and both
+              collided with the covers' OWN design: every one of these five
+              frames carries its own burned-in label ("PART 1/5",
+              "Q3 IN 60 SECONDS") at the top and a caption line at the
+              bottom, because they are real exports, not placeholders. Two
+              label systems fighting for the same two corners read as a
+              rendering bug on the one strip that is doing the selling.
+
+              There is no corner that is safe across five different covers,
+              so the metadata moved OUT of the frame and became the card's
+              footer — the same anatomy as the format and plan cards, where
+              text sits on the card surface rather than on an image. The
+              poster is now shown whole, which is the point of showing it. */}
+          <div className="flex flex-col gap-1 px-3 pb-3 pt-2.5">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[10px] font-black uppercase tracking-[0.12em] text-brand-accent">
+                {FORMAT_TAG_LABELS[clip.kind]}
+              </span>
               <span className="font-mono text-[11px] tabular-nums text-muted-foreground">
                 {clip.duration}
               </span>
             </div>
+            {/* overflow-wrap: anywhere, because a title is not always a
+                sentence. A thread permalink or a slug
+                ("r/AmItheAsshole/comments/1d9x2kq/aita_for_...") has no space
+                to break at, so line-clamp had nothing to clamp and the text
+                ran 198px past its own box at 1440 — clipped mid-token with no
+                ellipsis to say so. `anywhere` breaks only when it must, and
+                only then does the clamp get to do its job. */}
+            <p className="line-clamp-2 text-xs font-semibold leading-snug [overflow-wrap:anywhere] text-foreground">
+              {clip.title}
+            </p>
           </div>
         </li>
       ))}

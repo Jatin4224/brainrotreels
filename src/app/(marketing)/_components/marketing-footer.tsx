@@ -76,7 +76,7 @@ const FOOTER_COLUMNS: readonly MarketingNavColumn[] = [
 export function MarketingFooter() {
   return (
     <footer className="border-t-2 border-border">
-      <div className="mx-auto max-w-7xl px-6 py-14">
+      <div className="safe-x mx-auto max-w-7xl py-14">
         {/* Six units: the brand block takes two, the four link columns one each.
             A 5-column grid wrapped the last column onto its own row. */}
         <div className="mb-12 grid gap-12 sm:grid-cols-2 lg:grid-cols-6 lg:gap-8">

@@ -171,12 +171,18 @@ export function ReelStage({
           nothing can push a horizontal scrollbar onto the page. Below 900px
           there is one column and no corner to sit in, so it centres. */}
       <div className="absolute left-1/2 top-0 h-[660px] w-[700px] origin-top -translate-x-1/2 scale-[0.54] min-[900px]:left-0 min-[900px]:origin-top-left min-[900px]:translate-x-0 min-[900px]:scale-[0.62] min-[1024px]:scale-[0.7] min-[1240px]:scale-[0.85] min-[1440px]:scale-100">
-        <span className="brutal-shadow absolute left-0 top-[120px] z-[4] inline-flex -rotate-[5deg] items-center gap-2 rounded-full bg-foreground px-4 py-2 text-sm font-medium text-background">
+        {/* max-w, because these two sit at fixed coordinates inside a
+            fixed 700x660 canvas: text longer than the demo string ran out of
+            the canvas and was clipped by the hero's overflow-hidden. A cap
+            lets it wrap inside the composition instead. The values are what
+            each badge's own x-offset leaves: 0 + 17rem and 402 + 15rem both
+            land inside 700. */}
+        <span className="brutal-shadow absolute left-0 top-[120px] z-[4] inline-flex max-w-[17rem] -rotate-[5deg] items-center gap-2 rounded-full bg-foreground px-4 py-2 text-sm font-medium text-background">
           <span aria-hidden="true" className="size-1.5 rounded-full bg-brand" />
           {badge}
         </span>
 
-        <span className="brutal-shadow absolute left-[402px] top-[590px] z-[4] inline-block rotate-[4deg] rounded-full bg-brand-accent px-4 py-2 text-sm font-medium text-brand-accent-foreground">
+        <span className="brutal-shadow absolute left-[402px] top-[590px] z-[4] inline-block max-w-[15rem] rotate-[4deg] rounded-full bg-brand-accent px-4 py-2 text-sm font-medium text-brand-accent-foreground">
           {footnote}
         </span>
 

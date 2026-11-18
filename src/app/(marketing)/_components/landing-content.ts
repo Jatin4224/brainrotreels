@@ -40,6 +40,7 @@ import type {
   MarketingProofClip,
 } from "@/lib/types";
 import type { ResourceKey } from "@/lib/resources";
+import type { ProjectKind } from "@/lib/types";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: LANDING_FORMATS, CREATABLE_PROJECT_KINDS
@@ -79,6 +80,57 @@ export const LANDING_FORMATS = [
     comingSoon: true,
   },
 ] as const satisfies readonly MarketingFormat[];
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: FORMAT_CARD_ART, LANDING_FORMATS,
+ *   A_FORMAT_IS_A_PROJECT_KIND, THE_CARD_SHOWS_WHAT_IT_MAKES
+ *
+ * WHAT:  One still per format card — a frame of the kind of video that
+ *        format produces, 1215x762 (16:10), shipped in public/formats/.
+ *
+ * WHY:   THE_CARD_SHOWS_WHAT_IT_MAKES. The four cards were a title and three
+ *        lines of prose each: the section announced "four ways to start" and
+ *        then showed nothing, directly under a strip of frames proving the
+ *        product's output. A format is a LOOK, and a look has to be seen.
+ *
+ *        A separate map rather than a field on LANDING_FORMATS, because the
+ *        two answer to different owners: the format list is constrained by
+ *        ProjectKind and changing it is a product decision, while the art is
+ *        a file somebody re-exports. Keyed by ProjectKind so the compiler
+ *        still catches a retired kind (A_FORMAT_IS_A_PROJECT_KIND), and
+ *        Partial so a new kind can ship before its still exists — the card
+ *        renders text-only until the file lands.
+ *
+ *        ⚠ EACH STILL MUST BE A FRAME OF ITS OWN FORMAT. Pairing is by what
+ *        the frame SHOWS, not by filename: a podcast waveform under
+ *        "Voiceover videos" is a promise the product keeps, the same frame
+ *        under "Quiz videos" is a lie the reader can see. Re-export a still
+ *        and check it still belongs to the kind it is filed under.
+ * WHERE: Rendered by the formats section in src/app/(marketing)/page.tsx.
+ */
+/* Record, not Partial: a format with no still renders a text-only card in
+   a row of illustrated ones, which reads as a missing file rather than as a
+   choice. Typing it exhaustively turns "somebody added a kind and forgot the
+   art" into a build error. */
+export const FORMAT_CARD_ART: Record<ProjectKind, string> = {
+  /* THE STILL MUST MATCH THE LABEL. This card is headed "Reddit stories"
+     and briefly showed /formats/chat-story.png — a text-message drama,
+     which is a different format wearing this one's name. A visitor cannot
+     be told the product makes Reddit videos and shown an iMessage thread.
+     Back to the real Reddit frame, cropped from the top like the rest.
+
+     chat-story.png stays in public/formats/ unused ON PURPOSE: it is the
+     art for a Chat stories format, and the day that becomes a ProjectKind
+     it is already here. */
+  "reddit-story": "/auth-reels/01-reddit-story.png",
+  /* Waveform, episode chip and word-timed caption — a narrated cut. */
+  voiceover: "/formats/podcast-clip.png",
+  /* A split-screen dilemma with the crowd's vote: a question with an answer
+     that lands on a beat. */
+  quiz: "/formats/would-you-rather.png",
+  /* An animated countdown built from primitives rather than footage. */
+  motion: "/formats/rankings.png",
+};
 
 /**
  * SOURCE OF TRUTH KEYWORDS: LANDING_FEATURE_KEYS, ResourceKey, RESOURCES,

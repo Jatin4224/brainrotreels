@@ -62,6 +62,20 @@ async function appProxy(request: NextRequest): Promise<NextResponse> {
    * the user sees a sensible page instead of an auth.ts error. The DB-level
    * hook in `auth.ts` is the real enforcement; this redirect just makes the
    * UX cleaner. Toggled by NEXT_PUBLIC_REGISTRATION_OPEN. */
+  /* DEV_FIXTURE_ROUTES NEVER ANSWER IN PRODUCTION. /dev/* renders real
+     pages against worst-case fixtures — invented plan names, invented
+     prices — and must not be reachable on a deployment. The route itself
+     calls notFound(), but that renders the 404 BODY with a 200 status here,
+     which is still an indexable page. The middleware is the layer that can
+     answer with the status as well, so the guard lives here and the one in
+     the route stays as the second lock. */
+  if (
+    process.env.NODE_ENV === "production" &&
+    (pathname === "/dev" || pathname.startsWith("/dev/"))
+  ) {
+    return new NextResponse(null, { status: 404 });
+  }
+
   if (
     !REGISTRATION_OPEN &&
     (pathname === AUTH_ROUTES.signUp ||

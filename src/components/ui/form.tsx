@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion"
 import * as LabelPrimitive from "@radix-ui/react-label"
 import { Slot } from "@radix-ui/react-slot"
 import {
@@ -135,23 +136,63 @@ function FormDescription({ className, ...props }: React.ComponentProps<"p">) {
   )
 }
 
+// A validation message used to MOUNT, which shoved every field below it —
+// and the submit button — down a line at the exact moment somebody was
+// looking at the field they got wrong. Its height is animated for the same
+// reason an accordion's is: there is no transform that makes room.
+//
+// This is deliberately the SAME recipe as AuthError (see
+// components/global/auth/auth-error.tsx) rather than a second idiom — one
+// auth screen renders both, and two ways of saying "something is wrong"
+// arriving at two speeds is what reads as sloppy.
+//
+// initial={false} is the part that is easy to drop: a form rendered with an
+// error already in it (a server-returned error, or a re-mount) must not play
+// an entrance, because that claims the error just happened.
+//
+// transform as a STRING, not framer-motion's y shorthand: on framer-motion 13
+// the shorthands animate on the main thread.
 function FormMessage({ className, ...props }: React.ComponentProps<"p">) {
   const { error, formMessageId } = useFormField()
   const body = error ? String(error?.message ?? "") : props.children
-
-  if (!body) {
-    return null
-  }
+  // Reduced motion keeps the height and the fade — they are what stop the
+  // jump — and drops the 4px of travel, which is the vestibular part.
+  const reduce = useReducedMotion()
+  const offset = reduce ? "translateY(0px)" : "translateY(-4px)"
 
   return (
-    <p
-      data-slot="form-message"
-      id={formMessageId}
-      className={cn("text-destructive text-sm", className)}
-      {...props}
-    >
-      {body}
-    </p>
+    <AnimatePresence initial={false}>
+      {body ? (
+        <motion.div
+          key="form-message"
+          initial={{ opacity: 0, height: 0, transform: offset }}
+          animate={{
+            opacity: 1,
+            height: "auto",
+            transform: "translateY(0px)",
+          }}
+          exit={{ opacity: 0, height: 0, transform: offset }}
+          // 180ms in, with the opacity shorter again so the words are legible
+          // before the box has finished opening. The curve is --ease-settle's
+          // control points: this file cannot read the CSS token.
+          transition={{
+            duration: 0.18,
+            ease: [0.3, 0.7, 0.2, 1],
+            opacity: { duration: 0.14 },
+          }}
+          style={{ overflow: "hidden" }}
+        >
+          <p
+            data-slot="form-message"
+            id={formMessageId}
+            className={cn("text-destructive text-sm", className)}
+            {...props}
+          >
+            {body}
+          </p>
+        </motion.div>
+      ) : null}
+    </AnimatePresence>
   )
 }
 

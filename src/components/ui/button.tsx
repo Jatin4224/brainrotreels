@@ -3,8 +3,27 @@ import { cva, type VariantProps } from "class-variance-authority"
 
 import { cn } from "@/lib/utils"
 
+// PRESS_IS_NAMED_PROPERTIES. This was `transition-all`, which is the one
+// transition value that can never be correct: it animates every property that
+// happens to change, so swapping a label for a spinner (AuthSubmit does
+// exactly that) animated the button's WIDTH for 150ms, and a size variant
+// change animated its height. The press is `transform`; the skins are colour
+// and shadow; nothing else here should move at all.
+//
+// 160ms is the top of the press-feedback band — the same 1px answer, now on a
+// curve that moves on the first frame instead of easing into it. --ease-settle
+// is the product's one deceleration curve, not a second one invented here.
+//
+// The 1px press (`active:translate-y-px`) is kept exactly as it was:
+// PRESS_IS_FOR_THINGS_THAT_PRESS in globals.css documents 1px as this app's
+// press language, sized independently of the control, and a scale(0.97) here
+// would fork it for every button in the product.
+//
+// motion-reduce drops the easing rather than the feedback: the press and the
+// hover still happen, they just arrive instantly. Fewer and gentler, not
+// nothing — a control that stops answering is not an accessibility win.
 const buttonVariants = cva(
-  "group/button inline-flex shrink-0 items-center justify-center rounded-lg border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-ring active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive dark:aria-invalid:border-destructive/50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  "group/button inline-flex shrink-0 items-center justify-center rounded-lg border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-[transform,background-color,border-color,color,box-shadow,opacity] duration-[160ms] ease-[var(--ease-settle)] outline-none select-none focus-ring active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 motion-reduce:transition-none aria-invalid:border-destructive dark:aria-invalid:border-destructive/50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {
     variants: {
       variant: {
