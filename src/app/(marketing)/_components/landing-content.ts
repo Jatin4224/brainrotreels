@@ -108,7 +108,11 @@ export const LANDING_FORMATS = [
  *        and check it still belongs to the kind it is filed under.
  * WHERE: Rendered by the formats section in src/app/(marketing)/page.tsx.
  */
-export const FORMAT_CARD_ART: Partial<Record<ProjectKind, string>> = {
+/* Record, not Partial: a format with no still renders a text-only card in
+   a row of illustrated ones, which reads as a missing file rather than as a
+   choice. Typing it exhaustively turns "somebody added a kind and forgot the
+   art" into a build error. */
+export const FORMAT_CARD_ART: Record<ProjectKind, string> = {
   /* A text-message drama: the closest frame to a story told in posts and
      replies, which is what the Reddit format reads aloud. */
   "reddit-story": "/formats/chat-story.png",

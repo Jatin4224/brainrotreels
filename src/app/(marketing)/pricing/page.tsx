@@ -51,6 +51,7 @@ import {
   PLANS,
   PLAN_ORDER,
   PLAN_PRICE_CURRENCY_SYMBOL,
+  formatPlanAmount,
 } from "@/lib/config/plans";
 import { getPlanFeatureRows } from "@/lib/resources";
 import { buttonVariants } from "@/components/ui/button";
@@ -143,7 +144,7 @@ export default function PricingPage() {
                   "Free"
                 ) : (
                   <>
-                    {`${PLAN_PRICE_CURRENCY_SYMBOL}${definition.monthlyAmount}`}
+                    {`${PLAN_PRICE_CURRENCY_SYMBOL}${formatPlanAmount(definition.monthlyAmount)}`}
                     <span className="text-base font-semibold text-muted-foreground">
                       {" "}
                       /month

@@ -33,6 +33,8 @@
 import { PlayIcon } from "lucide-react";
 
 import type { MarketingProofClip, ProjectKind } from "@/lib/types";
+
+import { ProofPoster } from "./proof-poster";
 import { cn } from "@/lib/utils";
 
 export interface ProofStripProps {
@@ -57,11 +59,28 @@ const FORMAT_TAG_LABELS: Record<ProjectKind, string> = {
   motion: "Motion",
 };
 
+const CLIP_GRID_CLASS: Record<number, string> = {
+  1: "max-w-[14rem] grid-cols-1",
+  2: "max-w-[28rem]",
+  3: "max-w-[42rem] sm:grid-cols-3",
+  4: "max-w-[56rem] sm:grid-cols-3 lg:grid-cols-4",
+  5: "sm:grid-cols-3 lg:grid-cols-5",
+};
+
 export function ProofStrip({ clips, className }: ProofStripProps) {
+  /* An empty strip is an empty <ul> with a top margin — a gap under the hero
+     that reads as a layout fault rather than as "no clips". Render nothing. */
+  if (clips.length === 0) return null;
+
   return (
+    /* Columns capped at the clip count, so a deployment with three real
+       exports gets three columns rather than three cards and two holes.
+       Below sm it is two up whatever the count, because one 9:16 card
+       across a phone is a poster, not a strip. */
     <ul
       className={cn(
-        "grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5 lg:gap-6",
+        "mx-auto grid grid-cols-2 gap-4 lg:gap-6",
+        CLIP_GRID_CLASS[Math.min(clips.length, 5)],
         className,
       )}
     >
@@ -72,21 +91,13 @@ export function ProofStrip({ clips, className }: ProofStripProps) {
         >
           <div className="relative aspect-[9/16] bg-secondary">
             {clip.poster === undefined ? null : (
-              /* eslint-disable-next-line @next/next/no-img-element -- Poster
-                 URLs are OPERATOR-supplied and may be off-domain, which
-                 next/image refuses without a `remotePatterns` entry per
-                 deployment; a fork would have to edit next.config.ts before
-                 its own landing page would render. Lazy + async-decoding keeps
-                 the LCP cost the rule is protecting. */
-              <img
+              /* A_POSTER_URL_CAN_404 — the fallback lives in ProofPoster, and
+                 is this same box with no image in it. */
+              <ProofPoster
                 src={clip.poster}
                 alt={`${FORMAT_TAG_LABELS[clip.kind]} — ${clip.title}`}
-                loading="lazy"
-                decoding="async"
-                className="size-full object-cover"
               />
             )}
-
 
             {/* Decoration, not a control — there is nothing to play until the
                 visitor has an account, and a dead button is worse than none. */}
@@ -110,7 +121,6 @@ export function ProofStrip({ clips, className }: ProofStripProps) {
                 <PlayIcon className="size-4" />
               </span>
             </span>
-
           </div>
 
           {/* NOTHING IS OVERLAID ON THE FRAME ANY MORE. The tag used to float
@@ -136,7 +146,14 @@ export function ProofStrip({ clips, className }: ProofStripProps) {
                 {clip.duration}
               </span>
             </div>
-            <p className="line-clamp-2 text-xs font-semibold leading-snug text-foreground">
+            {/* overflow-wrap: anywhere, because a title is not always a
+                sentence. A thread permalink or a slug
+                ("r/AmItheAsshole/comments/1d9x2kq/aita_for_...") has no space
+                to break at, so line-clamp had nothing to clamp and the text
+                ran 198px past its own box at 1440 — clipped mid-token with no
+                ellipsis to say so. `anywhere` breaks only when it must, and
+                only then does the clamp get to do its job. */}
+            <p className="line-clamp-2 text-xs font-semibold leading-snug [overflow-wrap:anywhere] text-foreground">
               {clip.title}
             </p>
           </div>

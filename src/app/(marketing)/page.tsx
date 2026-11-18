@@ -75,42 +75,65 @@ import { PROJECT_FLOW_STEPS } from "@/components/global/project-steps/steps";
 import { FaqAccordion } from "@/components/global/faq-accordion";
 import { buttonVariants } from "@/components/ui/button";
 import { AUTH_ROUTES } from "@/lib/config/auth-routes";
-import { APP_NAME } from "@/lib/config/branding";
-import {
-  PLANS,
-  PLAN_ORDER,
-  PLAN_PRICE_CURRENCY_SYMBOL,
-} from "@/lib/config/plans";
-import { RESOURCES, getEntryPlanForResource } from "@/lib/resources";
+import { formatPlanAmount } from "@/lib/config/plans";
 import { cn } from "@/lib/utils";
 import { HighlightHeading } from "@/components/global/highlight-heading";
+import {
+  DEMO_LANDING_DATA,
+  type LandingData,
+} from "./_components/landing-fixtures";
 
 import {
-  HANDLED_FOR_YOU,
-  HERO_COPY,
   HeroPromptCard,
-  LANDING_FAQ,
-  LANDING_FEATURE_KEYS,
-  FORMAT_CARD_ART,
-  LANDING_FORMATS,
-  LANDING_PROOF_CLIPS,
   LANDING_REELS,
   ProofStrip,
   ReelStage,
-  STEP_BLURBS,
 } from "./_components";
 
 /* The primary CTA skin, written once and shared with the hero card's submit
  * button so the page has ONE loud orange action. It is a LINK here — see
  * AUTH_IS_A_CLICK_NOT_A_REDIRECT. */
+/* Literal class strings per plan count, not a CSS variable in a style
+   attribute: Tailwind only compiles classes it can SEE in the source, and a
+   grid built from a runtime var would also have to carry the max-width as a
+   calc() nobody can read. One row per count, and the width cap is what keeps
+   a single plan a card rather than a 1280px banner. */
+const FORMAT_GRID_CLASS: Record<number, string> = {
+  1: "max-w-[22rem]",
+  2: "max-w-[46rem] sm:grid-cols-2",
+  3: "max-w-[70rem] sm:grid-cols-2 lg:grid-cols-3",
+  4: "sm:grid-cols-2 lg:grid-cols-4",
+};
+
+const PLAN_GRID_CLASS: Record<number, string> = {
+  1: "max-w-[22rem]",
+  2: "max-w-[46rem] sm:grid-cols-2",
+  3: "max-w-[70rem] sm:grid-cols-2 xl:grid-cols-3",
+  4: "sm:grid-cols-2 xl:grid-cols-4",
+};
+
 const PRIMARY_CTA =
   "brutal-shadow-brand group h-12 rounded-xl bg-brand px-6 text-base font-bold text-brand-foreground hover:bg-brand/90";
 
-export default function LandingPage() {
+/* THE CONTENT IS A PROP, WITH THE REAL REGISTRIES AS ITS DEFAULT.
+   `/` renders exactly what it rendered before — DEMO_LANDING_DATA is built
+   from PLANS, RESOURCES and landing-content, read the same way this file
+   used to read them — and it still takes no searchParams, so it still
+   prerenders. What the prop buys is a seam: /dev/landing can hand the same
+   component a worst-case, empty or single-item fixture without a line of
+   this file changing, which is the only way to see this layout meet data no
+   demo set contains. See ./_components/landing-fixtures.ts. */
+export default function LandingPage({
+  data = DEMO_LANDING_DATA,
+}: {
+  data?: LandingData;
+}) {
   /* `showPlan` is the registry's own switch for a tier that exists but is not
    * sold. Honouring it means a plan can be withdrawn from the public page
    * without a code change. */
-  const teaserPlans = PLAN_ORDER.filter((plan) => PLANS[plan].showPlan);
+  /* Resolved in the fixture module now, so a fixture can state a plan list
+     the registry could produce but this deployment's env does not. */
+  const teaserPlans = data.plans;
 
   return (
     <div className="flex flex-col">
@@ -148,7 +171,7 @@ export default function LandingPage() {
                   className="size-3.5 fill-current"
                   aria-hidden="true"
                 />
-                {HERO_COPY.eyebrow}
+                {data.hero.eyebrow}
               </span>
 
               {/* Extrabold, not the light display weight the rest of the page
@@ -158,9 +181,9 @@ export default function LandingPage() {
               {/* HIGHLIGHT_IS_A_BLOCK — see the component for why the block
                   is sized from the word and hidden from assistive tech. */}
               <HighlightHeading
-                before={HERO_COPY.headlineBefore}
-                highlight={HERO_COPY.headlineHighlight}
-                after={HERO_COPY.headlineAfter}
+                before={data.hero.headlineBefore}
+                highlight={data.hero.headlineHighlight}
+                after={data.hero.headlineAfter}
                 className="font-display text-5xl font-extrabold leading-[0.95] tracking-tight text-foreground md:text-6xl"
               />
 
@@ -169,7 +192,7 @@ export default function LandingPage() {
                   more than APP_DESCRIPTION can carry as a <meta> description
                   too. Metadata still inherits APP_DESCRIPTION. */}
               <p className="mt-6 max-w-xl text-lg leading-relaxed text-muted-foreground">
-                {HERO_COPY.lead}
+                {data.hero.lead}
               </p>
 
               {/* THE_FIELD_IS_THE_PITCH — the hero's action is the control
@@ -188,15 +211,15 @@ export default function LandingPage() {
                   <span className="-ml-2.5 size-7 rounded-full border-2 border-background bg-foreground" />
                 </span>
                 <p className="text-sm font-semibold text-muted-foreground">
-                  {HERO_COPY.socialProof}
+                  {data.hero.socialProof}
                 </p>
               </div>
             </div>
 
             <ReelStage
               items={LANDING_REELS}
-              badge={HERO_COPY.renderedBadge}
-              footnote={HERO_COPY.showcaseFootnote}
+              badge={data.hero.renderedBadge}
+              footnote={data.hero.showcaseFootnote}
               className="hero-stage-enter"
             />
           </div>
@@ -204,43 +227,51 @@ export default function LandingPage() {
           {/* proof-enter is the TAIL of the hero sequence, not a second one —
               see the class in globals.css. It lands on the <ul>, whose
               children are the five cards the delays step through. */}
-          <ProofStrip
-            clips={LANDING_PROOF_CLIPS}
-            className="proof-enter mt-20"
-          />
+          <ProofStrip clips={data.proofClips} className="proof-enter mt-20" />
         </div>
       </section>
 
       {/* ── Formats ──────────────────────────────────────────────────────── */}
-      <section
-        id="formats"
-        className="scroll-mt-20 border-t-2 border-border py-16 md:py-24"
-      >
-        <div className="safe-x mx-auto max-w-7xl">
-          <div className="mx-auto max-w-3xl text-center">
-            <h2 className="font-display text-3xl font-medium leading-tight tracking-tight text-balance text-foreground md:text-4xl lg:text-5xl">
-              Four ways to start, one finished video
-            </h2>
-            <p className="mx-auto mt-4 max-w-xl text-pretty text-base leading-relaxed text-muted-foreground">
-              Pick the format that fits what you already have. Each one has its
-              own writer, so the script is built for the shape of the video —
-              not pasted into a template.
-            </p>
-          </div>
+      {/* A section that announces "four ways to start" and then shows none is
+          worse than no section: the heading makes a promise the body does not
+          keep. Every collection below is guarded the same way. */}
+      {data.formats.length === 0 ? null : (
+        <section
+          id="formats"
+          className="scroll-mt-20 border-t-2 border-border py-16 md:py-24"
+        >
+          <div className="safe-x mx-auto max-w-7xl">
+            <div className="mx-auto max-w-3xl text-center">
+              <h2 className="font-display text-3xl font-medium leading-tight tracking-tight text-balance text-foreground md:text-4xl lg:text-5xl">
+                Four ways to start, one finished video
+              </h2>
+              <p className="mx-auto mt-4 max-w-xl text-pretty text-base leading-relaxed text-muted-foreground">
+                Pick the format that fits what you already have. Each one has
+                its own writer, so the script is built for the shape of the
+                video — not pasted into a template.
+              </p>
+            </div>
 
-          <ul className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-            {LANDING_FORMATS.map((format) => {
-              /* FORMAT_CARD_ART, not the proof strip's posters: the strip
+            {/* Same reason as the plan grid: a fork that ships two formats
+                should get two columns, not two cards and two holes. */}
+            <ul
+              className={cn(
+                "mx-auto mt-12 grid gap-6",
+                FORMAT_GRID_CLASS[Math.min(data.formats.length, 4)],
+              )}
+            >
+              {data.formats.map((format) => {
+                /* FORMAT_CARD_ART, not the proof strip's posters: the strip
                  shows what the product HAS MADE, these show what each
                  format IS. Absent art renders the card text-only. */
-              const poster = FORMAT_CARD_ART[format.kind];
+                const poster = data.formatArt[format.kind];
 
-              return (
-                <li
-                  key={format.kind}
-                  className="brutal-border brutal-shadow brutal-hover flex flex-col overflow-hidden rounded-2xl bg-card"
-                >
-                  {/* 16:10 AND TOP-ANCHORED. These stills are purpose-made
+                return (
+                  <li
+                    key={format.kind}
+                    className="brutal-border brutal-shadow brutal-hover flex flex-col overflow-hidden rounded-2xl bg-card"
+                  >
+                    {/* 16:10 AND TOP-ANCHORED. These stills are purpose-made
                       at 1215x762, so the box matches the file and nothing is
                       cropped by accident; object-top is the insurance, since
                       every one of them carries its headline in the upper
@@ -251,9 +282,9 @@ export default function LandingPage() {
                       verticals, and a second row of them here would read as
                       the same row twice. A wide still of the same work is a
                       different object on the page. */}
-                  {poster === undefined ? null : (
-                    <div className="relative aspect-[16/10] overflow-hidden border-b border-border bg-secondary">
-                      {/* next/image here and a plain <img> in ProofStrip, and
+                    {poster === undefined ? null : (
+                      <div className="relative aspect-[16/10] overflow-hidden border-b border-border bg-secondary">
+                        {/* next/image here and a plain <img> in ProofStrip, and
                           the difference is ownership: a proof clip poster is
                           OPERATOR-supplied and may be off-domain, which
                           next/image refuses without a per-deployment
@@ -269,39 +300,40 @@ export default function LandingPage() {
                           alt="" — the heading beside it names the format, so a
                           screen reader announcing the still as well is noise.
                           No `priority`: this sits below the fold. */}
-                      <Image
-                        src={poster}
-                        alt=""
-                        fill
-                        sizes="(min-width: 1024px) 288px, (min-width: 640px) 50vw, 100vw"
-                        className="object-cover object-top"
-                      />
-                    </div>
-                  )}
+                        <Image
+                          src={poster}
+                          alt=""
+                          fill
+                          sizes="(min-width: 1024px) 288px, (min-width: 640px) 50vw, 100vw"
+                          className="object-cover object-top"
+                        />
+                      </div>
+                    )}
 
-                  <div className="flex flex-1 flex-col gap-3 p-5">
-                    <div className="flex items-center justify-between gap-2">
-                      <h3 className="font-display text-lg font-extrabold tracking-tight text-foreground">
-                        {format.label}
-                      </h3>
-                      {/* Shown rather than hidden, and labelled honestly — see
+                    <div className="flex flex-1 flex-col gap-3 p-5">
+                      <div className="flex items-center justify-between gap-2">
+                        <h3 className="font-display text-lg font-extrabold tracking-tight text-foreground">
+                          {format.label}
+                        </h3>
+                        {/* Shown rather than hidden, and labelled honestly — see
                       CREATABLE_PROJECT_KINDS. */}
-                      {"comingSoon" in format && format.comingSoon ? (
-                        <span className="brutal-border-thin rounded-full bg-muted px-2.5 py-0.5 text-[10px] font-black uppercase tracking-[0.12em] text-muted-foreground">
-                          Soon
-                        </span>
-                      ) : null}
+                        {"comingSoon" in format && format.comingSoon ? (
+                          <span className="brutal-border-thin rounded-full bg-muted px-2.5 py-0.5 text-[10px] font-black uppercase tracking-[0.12em] text-muted-foreground">
+                            Soon
+                          </span>
+                        ) : null}
+                      </div>
+                      <p className="text-sm leading-relaxed text-muted-foreground">
+                        {format.description}
+                      </p>
                     </div>
-                    <p className="text-sm leading-relaxed text-muted-foreground">
-                      {format.description}
-                    </p>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      </section>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        </section>
+      )}
 
       {/* ── How it works ─────────────────────────────────────────────────── */}
       <section
@@ -352,7 +384,7 @@ export default function LandingPage() {
                           {step.label}
                         </h3>
                         <p className="text-sm leading-relaxed text-muted-foreground">
-                          {STEP_BLURBS[step.key] ?? ""}
+                          {data.stepBlurbs[step.key] ?? ""}
                         </p>
                       </div>
                     </li>
@@ -377,12 +409,16 @@ export default function LandingPage() {
                 Handled for you
               </p>
               <ul className="mt-5 divide-y divide-border lg:flex lg:flex-1 lg:flex-col">
-                {HANDLED_FOR_YOU.map((row) => (
+                {data.handled.map((row) => (
                   <li
                     key={row.label}
                     className="flex gap-4 py-3.5 lg:flex-1 lg:items-center"
                   >
-                    <span className="w-24 shrink-0 text-sm font-extrabold text-foreground">
+                    {/* w-28, up from w-24. The column is fixed so seven
+                        labels form one readable edge, which is right — but
+                        96px fits "Captions" and not "Captions & subtitles",
+                        and a pipeline stage is allowed to be two words. */}
+                    <span className="w-28 shrink-0 text-sm font-extrabold text-foreground">
                       {row.label}
                     </span>
                     <span className="text-sm leading-relaxed text-muted-foreground">
@@ -413,29 +449,32 @@ export default function LandingPage() {
 
           border-y-2 and the neighbouring Plans section drops its border-t:
           two adjacent 2px borders would stack into a 4px line. */}
-      <section
-        id="features"
-        className="scroll-mt-20 border-y-2 border-border bg-card py-20 md:py-28"
-      >
-        <div className="safe-x mx-auto max-w-7xl">
-          <div className="grid gap-10 lg:grid-cols-[minmax(0,22rem)_1fr] lg:gap-16">
-            {/* Sticky, so the claim stays on screen while the list of what
+      {data.features.length === 0 ? null : (
+        <section
+          id="features"
+          className="scroll-mt-20 border-y-2 border-border bg-card py-20 md:py-28"
+        >
+          <div className="safe-x mx-auto max-w-7xl">
+            <div className="grid gap-10 lg:grid-cols-[minmax(0,22rem)_1fr] lg:gap-16">
+              {/* Sticky, so the claim stays on screen while the list of what
                 backs it scrolls past. top-24 clears the 56px sticky header
                 with room to spare. */}
-            <div className="lg:sticky lg:top-24 lg:self-start">
-              <h2 className="font-display text-3xl font-medium leading-tight tracking-tight text-balance text-foreground md:text-4xl lg:text-5xl">
-                The tools that make it look deliberate
-              </h2>
-              <p className="mt-4 text-pretty text-base leading-relaxed text-muted-foreground">
-                {`The formats and tools ${APP_NAME} ships with. Which of them your workspace can reach depends on your plan.`}
-              </p>
-            </div>
+              <div className="lg:sticky lg:top-24 lg:self-start">
+                <h2 className="font-display text-3xl font-medium leading-tight tracking-tight text-balance text-foreground md:text-4xl lg:text-5xl">
+                  The tools that make it look deliberate
+                </h2>
+                <p className="mt-4 text-pretty text-base leading-relaxed text-muted-foreground">
+                  {`The formats and tools ${data.appName} ships with. Which of them your workspace can reach depends on your plan.`}
+                </p>
+              </div>
 
-            <ul className="divide-y divide-border border-t border-border">
-              {LANDING_FEATURE_KEYS.map((key) => {
-                /* COPY_IS_REGISTRY_DERIVED — the gate's own words, not ours. */
-                const definition = RESOURCES[key];
-                /* A_GATE_IS_NOT_A_TICK. Every card used to wear the same brand
+              <ul className="divide-y divide-border border-t border-border">
+                {data.features.map((definition) => {
+                  /* COPY_IS_REGISTRY_DERIVED still — the registry read moved to
+                   the fixture module so a fixture can state a row the
+                   registry could produce. */
+                  const key = definition.key;
+                  /* A_GATE_IS_NOT_A_TICK. Every card used to wear the same brand
                  tick directly under a sentence saying reach depends on the
                  plan — a tick reads as INCLUDED, so the grid promised eight
                  things the pricing section then took back. Three of these
@@ -443,172 +482,192 @@ export default function LandingPage() {
                  need Pro, and the badge is the only thing that says so.
                  null means the entry plan already reaches it, so an absent
                  badge is itself the claim "everyone gets this". */
-                const entryPlan = getEntryPlanForResource(key);
+                  const entryPlan = definition.entryPlanName;
 
-                return (
-                  /* A row, not a card. The name column is fixed so eight names
+                  return (
+                    /* A row, not a card. The name column is fixed so eight names
                    form a readable left edge; the badge is pushed to the far
                    right where the eye can scan which rows carry a condition
                    without reading any of them. */
-                  <li
-                    key={key}
-                    className="grid gap-x-6 gap-y-1.5 py-5 sm:grid-cols-[minmax(0,11rem)_1fr_auto] sm:items-baseline"
-                  >
-                    <h3 className="font-display text-base font-extrabold tracking-tight text-foreground">
-                      {definition.name}
-                    </h3>
-                    <p className="text-sm leading-relaxed text-muted-foreground">
-                      {definition.description}
-                    </p>
-                    {/* A_GATE_IS_NOT_A_TICK, unchanged: quiet rather than
+                    <li
+                      key={key}
+                      className="grid gap-x-6 gap-y-1.5 py-5 sm:grid-cols-[minmax(0,11rem)_1fr_auto] sm:items-baseline"
+                    >
+                      <h3 className="font-display text-base font-extrabold tracking-tight text-foreground">
+                        {definition.name}
+                      </h3>
+                      <p className="text-sm leading-relaxed text-muted-foreground">
+                        {definition.description}
+                      </p>
+                      {/* A_GATE_IS_NOT_A_TICK, unchanged: quiet rather than
                       brand-filled, because it is a condition on the feature
                       and not an action to take. An absent badge is itself
                       the claim "everyone gets this". */}
-                    {entryPlan === null ? null : (
-                      <span className="w-fit whitespace-nowrap rounded-full border border-border bg-surface-raised px-2.5 py-1 text-xs font-semibold text-muted-foreground sm:justify-self-end">
-                        {`${PLANS[entryPlan].name} and up`}
-                      </span>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
+                      {entryPlan === null ? null : (
+                        <span className="w-fit whitespace-nowrap rounded-full border border-border bg-surface-raised px-2.5 py-1 text-xs font-semibold text-muted-foreground sm:justify-self-end">
+                          {entryPlan}
+                        </span>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* ── Plans ────────────────────────────────────────────────────────── */}
       {/* No border-t: the features band above closes with border-y-2, and two
           2px borders meeting would read as one 4px line. */}
-      <section className="py-16 md:py-24">
-        <div className="safe-x mx-auto max-w-7xl">
-          <div className="mx-auto max-w-3xl text-center">
-            <h2 className="font-display text-3xl font-medium leading-tight tracking-tight text-balance text-foreground md:text-4xl lg:text-5xl">
-              Pick your plan
-            </h2>
-            <p className="mx-auto mt-4 max-w-xl text-pretty text-base leading-relaxed text-muted-foreground">
-              Every plan includes the whole pipeline. They differ in how much
-              you can hold and how much you can make.
-            </p>
-          </div>
+      {teaserPlans.length === 0 ? null : (
+        <section className="py-16 md:py-24">
+          <div className="safe-x mx-auto max-w-7xl">
+            <div className="mx-auto max-w-3xl text-center">
+              <h2 className="font-display text-3xl font-medium leading-tight tracking-tight text-balance text-foreground md:text-4xl lg:text-5xl">
+                Pick your plan
+              </h2>
+              <p className="mx-auto mt-4 max-w-xl text-pretty text-base leading-relaxed text-muted-foreground">
+                Every plan includes the whole pipeline. They differ in how much
+                you can hold and how much you can make.
+              </p>
+            </div>
 
-          {/* PRICING_IS_REGISTRY_DERIVED. Amounts are deliberately absent —
+            {/* PRICING_IS_REGISTRY_DERIVED. Amounts are deliberately absent —
               AMOUNTS_LIVE_IN_STRIPE, so the figure is stated at checkout and
               the full comparison lives on /pricing. */}
-          {/* Four sold tiers today, so the grid goes 1 → 2 → 4 rather than
+            {/* Four sold tiers today, so the grid goes 1 → 2 → 4 rather than
               stopping at 3 and stranding the last plan alone on its own row.
               `items-stretch` keeps the featured card's lift from shortening
               its neighbours. */}
-          <ul className="mt-12 grid items-stretch gap-6 sm:grid-cols-2 xl:grid-cols-4">
-            {teaserPlans.map((plan) => {
-              const definition = PLANS[plan];
-              const isFeatured = plan === "pro";
+            {/* THE GRID IS SIZED BY THE DATA, not by the four tiers that
+              happen to be sold today. `showPlan` is env-driven PER TIER, so a
+              deployment selling one plan rendered a single card in the first
+              of four columns with three empty ones beside it — the same fault
+              /pricing had, arrived at from the other direction. Columns are
+              capped at 2 from sm and at the plan count from xl, and the list
+              is capped in width and centred so one plan is a card rather than
+              a banner. */}
+            <ul
+              className={cn(
+                "mx-auto mt-12 grid items-stretch gap-6",
+                PLAN_GRID_CLASS[Math.min(teaserPlans.length, 4)],
+              )}
+            >
+              {teaserPlans.map((definition) => {
+                const plan = definition.key;
+                /* "Best value" against a single plan is a comparison with
+                 nothing, so the badge and the lift need a row to sit in. */
+                const isFeatured = plan === "pro" && teaserPlans.length > 1;
 
-              return (
-                <li
-                  key={plan}
-                  className={cn(
-                    "brutal-border brutal-shadow relative flex h-full flex-col gap-5 rounded-2xl bg-card p-6",
-                    isFeatured &&
-                      "brutal-shadow-brand border-brand/60 lg:-translate-y-2",
-                  )}
-                >
-                  {isFeatured ? (
-                    <span className="brutal-shadow-brand absolute left-1/2 -top-3.5 -translate-x-1/2 rounded-full bg-brand px-3.5 py-1 text-xs font-semibold text-brand-foreground">
-                      Best value
-                    </span>
-                  ) : null}
+                return (
+                  <li
+                    key={plan}
+                    className={cn(
+                      "brutal-border brutal-shadow relative flex h-full flex-col gap-5 rounded-2xl bg-card p-6",
+                      isFeatured &&
+                        "brutal-shadow-brand border-brand/60 lg:-translate-y-2",
+                    )}
+                  >
+                    {isFeatured ? (
+                      <span className="brutal-shadow-brand absolute left-1/2 -top-3.5 -translate-x-1/2 rounded-full bg-brand px-3.5 py-1 text-xs font-semibold text-brand-foreground">
+                        Best value
+                      </span>
+                    ) : null}
 
-                  <div className="flex flex-col gap-1.5">
-                    <h3 className="font-display text-lg font-extrabold tracking-tight text-foreground">
-                      {definition.name}
-                    </h3>
-                    <p className="text-sm leading-relaxed text-muted-foreground">
-                      {definition.description}
-                    </p>
-                  </div>
+                    <div className="flex flex-col gap-1.5">
+                      <h3 className="font-display text-lg font-extrabold tracking-tight text-foreground">
+                        {definition.name}
+                      </h3>
+                      <p className="text-sm leading-relaxed text-muted-foreground">
+                        {definition.description}
+                      </p>
+                    </div>
 
-                  {/* A NUMBER, not "see checkout". Four plans with no figure
+                    {/* A NUMBER, not "see checkout". Four plans with no figure
                       on them asked a visitor to start a signup to learn the
                       price, which is where most of them stopped. `free` shows
                       the word rather than "$0" — zero priced like a product
                       reads as a discount on something, not as free. */}
-                  <p className="font-display text-3xl font-extrabold tracking-tight text-foreground">
-                    {definition.monthlyAmount === 0 ? (
-                      "Free"
-                    ) : (
-                      <>
-                        {`${PLAN_PRICE_CURRENCY_SYMBOL}${definition.monthlyAmount}`}
-                        <span className="text-base font-semibold text-muted-foreground">
-                          {" "}
-                          /month
-                        </span>
-                      </>
-                    )}
-                  </p>
-
-                  {definition.trialDays > 0 ? (
-                    <p className="brutal-border-thin w-fit rounded-full bg-muted px-2.5 py-0.5 text-[10px] font-black uppercase tracking-[0.12em] text-muted-foreground">
-                      {definition.trialDays}-day free trial
+                    <p className="font-display text-3xl font-extrabold tracking-tight text-foreground">
+                      {definition.monthlyAmount === 0 ? (
+                        "Free"
+                      ) : (
+                        <>
+                          {`${data.currencySymbol}${formatPlanAmount(definition.monthlyAmount)}`}
+                          <span className="text-base font-semibold text-muted-foreground">
+                            {" "}
+                            /month
+                          </span>
+                        </>
+                      )}
                     </p>
-                  ) : null}
 
-                  <Link
-                    href={AUTH_ROUTES.signUp}
-                    className={cn(
-                      buttonVariants({ size: "lg" }),
-                      "brutal-border mt-auto h-11 w-full rounded-full font-semibold",
-                      isFeatured
-                        ? "bg-brand text-brand-foreground hover:bg-brand/90"
-                        : "bg-card text-foreground hover:bg-muted",
-                    )}
-                  >
-                    Get started
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
+                    {definition.trialDays > 0 ? (
+                      <p className="brutal-border-thin w-fit rounded-full bg-muted px-2.5 py-0.5 text-[10px] font-black uppercase tracking-[0.12em] text-muted-foreground">
+                        {definition.trialDays}-day free trial
+                      </p>
+                    ) : null}
 
-          <p className="mt-8 text-center text-xs text-muted-foreground">
-            Billed monthly. Cancel any time.{" "}
-            <Link
-              href="/pricing"
-              className="font-semibold underline underline-offset-4 hover:text-foreground"
-            >
-              Compare every plan
-            </Link>
-            .
-          </p>
-        </div>
-      </section>
+                    <Link
+                      href={AUTH_ROUTES.signUp}
+                      className={cn(
+                        buttonVariants({ size: "lg" }),
+                        "brutal-border mt-auto h-11 w-full rounded-full font-semibold",
+                        isFeatured
+                          ? "bg-brand text-brand-foreground hover:bg-brand/90"
+                          : "bg-card text-foreground hover:bg-muted",
+                      )}
+                    >
+                      Get started
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
 
-      {/* ── FAQ ──────────────────────────────────────────────────────────── */}
-      <section
-        id="faq"
-        className="scroll-mt-20 border-t-2 border-border bg-card py-20 md:py-28"
-      >
-        <div className="safe-x mx-auto max-w-3xl">
-          <div className="text-center">
-            {/* lg:text-5xl like every other section heading. At 36px against
-              their 48px it read as an oversight rather than as deliberate
-              de-emphasis — too close to be a different size on purpose. */}
-            <h2 className="font-display text-3xl font-medium leading-tight tracking-tight text-balance text-foreground md:text-4xl lg:text-5xl">
-              Got questions?
-            </h2>
-            <p className="mx-auto mt-4 max-w-xl text-pretty text-base leading-relaxed text-muted-foreground">
-              The ones people ask before they sign up, answered the way the
-              product actually behaves.
+            <p className="mt-8 text-center text-xs text-muted-foreground">
+              Billed monthly. Cancel any time.{" "}
+              <Link
+                href="/pricing"
+                className="font-semibold underline underline-offset-4 hover:text-foreground"
+              >
+                Compare every plan
+              </Link>
+              .
             </p>
           </div>
+        </section>
+      )}
 
-          <FaqAccordion
-            items={LANDING_FAQ}
-            defaultOpenId={LANDING_FAQ[0]?.id}
-            className="mt-12"
-          />
-        </div>
-      </section>
+      {/* ── FAQ ──────────────────────────────────────────────────────────── */}
+      {data.faq.length === 0 ? null : (
+        <section
+          id="faq"
+          className="scroll-mt-20 border-t-2 border-border bg-card py-20 md:py-28"
+        >
+          <div className="safe-x mx-auto max-w-3xl">
+            <div className="text-center">
+              {/* lg:text-5xl like every other section heading. At 36px against
+              their 48px it read as an oversight rather than as deliberate
+              de-emphasis — too close to be a different size on purpose. */}
+              <h2 className="font-display text-3xl font-medium leading-tight tracking-tight text-balance text-foreground md:text-4xl lg:text-5xl">
+                Got questions?
+              </h2>
+              <p className="mx-auto mt-4 max-w-xl text-pretty text-base leading-relaxed text-muted-foreground">
+                The ones people ask before they sign up, answered the way the
+                product actually behaves.
+              </p>
+            </div>
+
+            <FaqAccordion
+              items={data.faq}
+              defaultOpenId={data.faq[0]?.id}
+              className="mt-12"
+            />
+          </div>
+        </section>
+      )}
 
       {/* ── Closing CTA ──────────────────────────────────────────────────── */}
       <section className="border-t-2 border-border bg-card py-24 md:py-28">
