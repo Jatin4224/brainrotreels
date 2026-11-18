@@ -280,7 +280,11 @@ export default function LandingPage() {
               {/* THE_FLOW_IS_AN_ORDER: rendered straight off PROJECT_FLOW_STEPS,
                   the same list the in-app project nav renders, so the walkthrough
                   sold here is the walkthrough shipped. */}
-              <ol className="mt-10 flex flex-col gap-8">
+              {/* No top margin. The aside beside this list starts at the
+                  grid's top edge, so an mt-10 here put the first step 40px
+                  below the card it is paired with — two columns that read as
+                  a pair, misaligned by exactly the margin. */}
+              <ol className="flex flex-col gap-8">
                 {PROJECT_FLOW_STEPS.map((step, index) => {
                   const Icon = step.icon;
 
@@ -307,13 +311,27 @@ export default function LandingPage() {
               </ol>
             </div>
 
-            <aside className="brutal-border brutal-shadow self-start rounded-2xl bg-card p-7">
+            {/* THE_CARD_FILLS_ITS_COLUMN. This was `self-start`, so a
+                460px card sat beside a 600px list and left most of the
+                section's bottom-right quadrant as empty black — the one
+                place on the page that read as unfinished rather than quiet.
+                Stretching it is not enough on its own (a tall card with its
+                content bunched at the top is worse), so the rows below grow
+                with it: each one takes an equal share of the extra height
+                and centres its text in that share, which keeps the hairline
+                dividers evenly spaced instead of crowding the text.
+                lg-only — in the single-column stack there is no second
+                column to match. */}
+            <aside className="brutal-border brutal-shadow rounded-2xl bg-card p-7 lg:flex lg:flex-col">
               <p className="text-xs font-black uppercase tracking-[0.2em] text-brand-accent">
                 Handled for you
               </p>
-              <ul className="mt-5 divide-y divide-border">
+              <ul className="mt-5 divide-y divide-border lg:flex lg:flex-1 lg:flex-col">
                 {HANDLED_FOR_YOU.map((row) => (
-                  <li key={row.label} className="flex gap-4 py-3.5">
+                  <li
+                    key={row.label}
+                    className="flex gap-4 py-3.5 lg:flex-1 lg:items-center"
+                  >
                     <span className="w-24 shrink-0 text-sm font-extrabold text-foreground">
                       {row.label}
                     </span>
@@ -329,21 +347,41 @@ export default function LandingPage() {
       </section>
 
       {/* ── Features ─────────────────────────────────────────────────────── */}
+      {/* ONE_BAND_BREAKS_THE_SLABS. Formats, this section and Plans were
+          three consecutive repeats of ONE shape — centred heading, muted
+          subhead, grid of bordered rounded cards — sixteen near-identical
+          cards between the hero and the FAQ. No single card was wrong; the
+          REPETITION was, and that is what makes a page read as generated
+          rather than designed.
+
+          So this one is the page's band: it runs edge to edge on `bg-card`
+          (the section is full-width, only its contents are held at
+          max-w-7xl), its heading is LEFT-aligned and sticks beside the list
+          instead of sitting centred above it, and the eight features are
+          rows on hairlines rather than eight boxes. Same eight facts, a
+          shape the reader has not already seen twice.
+
+          border-y-2 and the neighbouring Plans section drops its border-t:
+          two adjacent 2px borders would stack into a 4px line. */}
       <section
         id="features"
-        className="scroll-mt-20 border-t-2 border-border py-20 md:py-28"
+        className="scroll-mt-20 border-y-2 border-border bg-card py-20 md:py-28"
       >
         <div className="safe-x mx-auto max-w-7xl">
-          <div className="mx-auto max-w-3xl text-center">
-            <h2 className="font-display text-3xl font-medium leading-tight tracking-tight text-foreground md:text-4xl lg:text-5xl">
-              The tools that make it look deliberate
-            </h2>
-            <p className="mt-4 text-base leading-relaxed text-muted-foreground">
-              {`The formats and tools ${APP_NAME} ships with. Which of them your workspace can reach depends on your plan.`}
-            </p>
-          </div>
+          <div className="grid gap-10 lg:grid-cols-[minmax(0,20rem)_1fr] lg:gap-16">
+            {/* Sticky, so the claim stays on screen while the list of what
+                backs it scrolls past. top-24 clears the 56px sticky header
+                with room to spare. */}
+            <div className="lg:sticky lg:top-24 lg:self-start">
+              <h2 className="font-display text-3xl font-medium leading-tight tracking-tight text-foreground md:text-4xl lg:text-5xl">
+                The tools that make it look deliberate
+              </h2>
+              <p className="mt-4 text-base leading-relaxed text-muted-foreground">
+                {`The formats and tools ${APP_NAME} ships with. Which of them your workspace can reach depends on your plan.`}
+              </p>
+            </div>
 
-          <ul className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            <ul className="divide-y divide-border border-t border-border">
             {LANDING_FEATURE_KEYS.map((key) => {
               /* COPY_IS_REGISTRY_DERIVED — the gate's own words, not ours. */
               const definition = RESOURCES[key];
@@ -358,9 +396,13 @@ export default function LandingPage() {
               const entryPlan = getEntryPlanForResource(key);
 
               return (
+                /* A row, not a card. The name column is fixed so eight names
+                   form a readable left edge; the badge is pushed to the far
+                   right where the eye can scan which rows carry a condition
+                   without reading any of them. */
                 <li
                   key={key}
-                  className="brutal-border brutal-shadow brutal-hover flex flex-col gap-2.5 rounded-2xl bg-card p-5"
+                  className="grid gap-x-6 gap-y-1.5 py-5 sm:grid-cols-[minmax(0,11rem)_1fr_auto] sm:items-baseline"
                 >
                   <h3 className="font-display text-base font-extrabold tracking-tight text-foreground">
                     {definition.name}
@@ -368,24 +410,27 @@ export default function LandingPage() {
                   <p className="text-sm leading-relaxed text-muted-foreground">
                     {definition.description}
                   </p>
+                  {/* A_GATE_IS_NOT_A_TICK, unchanged: quiet rather than
+                      brand-filled, because it is a condition on the feature
+                      and not an action to take. An absent badge is itself
+                      the claim "everyone gets this". */}
                   {entryPlan === null ? null : (
-                    /* Pushed to the bottom so the badge lines up across a row
-                       whatever the blurb's length, and quiet rather than
-                       brand-filled: it is a condition on the feature, not an
-                       action to take. */
-                    <span className="mt-auto w-fit rounded-full border border-border bg-surface-raised px-2.5 py-1 text-xs font-semibold text-muted-foreground">
+                    <span className="w-fit whitespace-nowrap rounded-full border border-border bg-surface-raised px-2.5 py-1 text-xs font-semibold text-muted-foreground sm:justify-self-end">
                       {`${PLANS[entryPlan].name} and up`}
                     </span>
                   )}
                 </li>
               );
             })}
-          </ul>
+            </ul>
+          </div>
         </div>
       </section>
 
       {/* ── Plans ────────────────────────────────────────────────────────── */}
-      <section className="border-t-2 border-border py-20 md:py-28">
+      {/* No border-t: the features band above closes with border-y-2, and two
+          2px borders meeting would read as one 4px line. */}
+      <section className="py-20 md:py-28">
         <div className="safe-x mx-auto max-w-7xl">
           <div className="mx-auto max-w-3xl text-center">
             <h2 className="font-display text-3xl font-medium leading-tight tracking-tight text-foreground md:text-4xl lg:text-5xl">

@@ -87,9 +87,6 @@ export function ProofStrip({ clips, className }: ProofStripProps) {
               />
             )}
 
-            <span className="brutal-border-thin absolute left-2 top-2 rounded-full bg-background/80 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-[0.12em] text-brand-accent backdrop-blur-sm">
-              {FORMAT_TAG_LABELS[clip.kind]}
-            </span>
 
             {/* Decoration, not a control — there is nothing to play until the
                 visitor has an account, and a dead button is worse than none. */}
@@ -114,14 +111,34 @@ export function ProofStrip({ clips, className }: ProofStripProps) {
               </span>
             </span>
 
-            <div className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-2 bg-gradient-to-t from-background via-background/80 to-transparent px-3 pb-3 pt-14">
-              <p className="line-clamp-2 text-xs font-semibold leading-snug text-foreground">
-                {clip.title}
-              </p>
+          </div>
+
+          {/* NOTHING IS OVERLAID ON THE FRAME ANY MORE. The tag used to float
+              at top-left and the title over a scrim at the bottom, and both
+              collided with the covers' OWN design: every one of these five
+              frames carries its own burned-in label ("PART 1/5",
+              "Q3 IN 60 SECONDS") at the top and a caption line at the
+              bottom, because they are real exports, not placeholders. Two
+              label systems fighting for the same two corners read as a
+              rendering bug on the one strip that is doing the selling.
+
+              There is no corner that is safe across five different covers,
+              so the metadata moved OUT of the frame and became the card's
+              footer — the same anatomy as the format and plan cards, where
+              text sits on the card surface rather than on an image. The
+              poster is now shown whole, which is the point of showing it. */}
+          <div className="flex flex-col gap-1 px-3 pb-3 pt-2.5">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[10px] font-black uppercase tracking-[0.12em] text-brand-accent">
+                {FORMAT_TAG_LABELS[clip.kind]}
+              </span>
               <span className="font-mono text-[11px] tabular-nums text-muted-foreground">
                 {clip.duration}
               </span>
             </div>
+            <p className="line-clamp-2 text-xs font-semibold leading-snug text-foreground">
+              {clip.title}
+            </p>
           </div>
         </li>
       ))}
