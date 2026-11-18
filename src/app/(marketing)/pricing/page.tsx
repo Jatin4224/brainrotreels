@@ -47,10 +47,14 @@ import Link from "next/link";
 import { FeatureComparisonTable } from "@/components/global/upgrade-modal";
 import { AUTH_ROUTES } from "@/lib/config/auth-routes";
 import { APP_NAME } from "@/lib/config/branding";
-import { PLANS, PLAN_ORDER } from "@/lib/config/plans";
+import {
+  PLANS,
+  PLAN_ORDER,
+  PLAN_PRICE_CURRENCY_SYMBOL,
+} from "@/lib/config/plans";
 import { getPlanFeatureRows } from "@/lib/resources";
 import { buttonVariants } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = {
   title: "Pricing",
@@ -64,75 +68,142 @@ export default function PricingPage() {
   const plans = PLAN_ORDER.filter((plan) => PLANS[plan].showPlan);
 
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-10 px-4 py-12">
-      <header className="flex flex-col gap-3 text-center">
-        <h1 className="text-3xl font-semibold tracking-tight">Pricing</h1>
-        <p className="mx-auto max-w-2xl text-sm text-muted-foreground">
+    /* ONE MARKETING SURFACE. This page sat on the DASHBOARD's type scale —
+       a 30px semibold h1 in the UI face — one nav click from a landing page
+       whose headings are 48px Bricolage. A visitor crossed from a designed
+       page to what looked like an internal settings screen at the exact
+       moment they were deciding to pay. Same scale, same display face, same
+       text-balance and same 72-character measure as every other heading on
+       the marketing surface.
+
+       max-w-6xl, up from max-w-5xl: four plan cards need the room, and the
+       comparison table below was already scrolling horizontally inside it. */
+    <div className="safe-x mx-auto flex max-w-6xl flex-col gap-14 py-16 md:py-24">
+      <header className="flex flex-col gap-4 text-center">
+        <h1 className="font-display text-3xl font-medium leading-tight tracking-tight text-balance text-foreground md:text-4xl lg:text-5xl">
+          Pick your plan
+        </h1>
+        <p className="mx-auto max-w-xl text-pretty text-base leading-relaxed text-muted-foreground">
           Every plan includes the whole pipeline — script, narration, captions
           and rendering. The plans differ in how much you can hold and how much
           you can make.
         </p>
       </header>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {/* FOUR PLANS, FOUR COLUMNS. This was lg:grid-cols-3 against four sold
+          tiers, so Enterprise wrapped onto a row of its own with two thirds
+          of it empty — the most visible layout fault on the marketing
+          surface, on the page where people decide to pay. The landing page
+          already does 1 → 2 → 4 for the same four; this now matches it.
+
+          items-stretch so the featured card's lift cannot shorten its
+          neighbours. */}
+      <ul className="grid items-stretch gap-6 sm:grid-cols-2 xl:grid-cols-4">
         {plans.map((plan) => {
           const definition = PLANS[plan];
           /* PRICING_IS_REGISTRY_DERIVED — the same read the gate uses. */
           const rows = getPlanFeatureRows(plan).filter((row) => row.isIncluded);
+          const isFeatured = plan === "pro";
 
           return (
-            <Card key={plan} className="flex flex-col">
-              <CardHeader>
-                <CardTitle className="text-base">{definition.name}</CardTitle>
-                <p className="text-sm text-muted-foreground">
+            <li
+              key={plan}
+              className={cn(
+                "brutal-border brutal-shadow relative flex h-full flex-col gap-5 rounded-2xl bg-card p-6",
+                isFeatured &&
+                  "brutal-shadow-brand border-brand/60 xl:-translate-y-2",
+              )}
+            >
+              {isFeatured ? (
+                <span className="brutal-shadow-brand absolute left-1/2 -top-3.5 -translate-x-1/2 rounded-full bg-brand px-3.5 py-1 text-xs font-semibold text-brand-foreground">
+                  Best value
+                </span>
+              ) : null}
+
+              <div className="flex flex-col gap-1.5">
+                <h2 className="font-display text-lg font-extrabold tracking-tight text-foreground">
+                  {definition.name}
+                </h2>
+                <p className="text-sm leading-relaxed text-muted-foreground">
                   {definition.description}
                 </p>
-              </CardHeader>
-              <CardContent className="flex flex-1 flex-col justify-between gap-6">
-                <ul className="flex flex-col gap-1.5 text-sm">
-                  {rows.slice(0, 6).map((row) => (
-                    <li key={row.resource} className="text-muted-foreground">
-                      {row.label}
-                    </li>
-                  ))}
-                </ul>
+              </div>
 
-                <div className="flex flex-col gap-2">
-                  {definition.trialDays > 0 ? (
-                    <p className="text-xs text-muted-foreground">
-                      {definition.trialDays}-day free trial
-                    </p>
-                  ) : null}
-                  <Link
-                    href={AUTH_ROUTES.signUp}
-                    className={buttonVariants({
-                      variant: plan === "pro" ? "default" : "outline",
-                    })}
-                  >
-                    Get started
-                  </Link>
-                </div>
-              </CardContent>
-            </Card>
+              {/* THE FIGURE, ON THE PRICING PAGE. The landing page's plan row
+                  prints $19 / $49 / $149 and its CTA says "Compare every
+                  plan" — and this, the page it points at, printed no amount
+                  at all. Whichever way round that is read, one of the two
+                  pages was wrong; the page called Pricing is not the one that
+                  should be missing the price. Same registry read and the same
+                  treatment as the landing row, including `free` showing the
+                  WORD rather than "$0", which reads as a discount on
+                  something rather than as free. */}
+              <p className="font-display text-3xl font-extrabold tracking-tight text-foreground">
+                {definition.monthlyAmount === 0 ? (
+                  "Free"
+                ) : (
+                  <>
+                    {`${PLAN_PRICE_CURRENCY_SYMBOL}${definition.monthlyAmount}`}
+                    <span className="text-base font-semibold text-muted-foreground">
+                      {" "}
+                      /month
+                    </span>
+                  </>
+                )}
+              </p>
+
+              <ul className="flex flex-col gap-1.5 text-sm">
+                {rows.slice(0, 6).map((row) => (
+                  <li key={row.resource} className="text-muted-foreground">
+                    {row.label}
+                  </li>
+                ))}
+              </ul>
+
+              {definition.trialDays > 0 ? (
+                <p className="brutal-border-thin w-fit rounded-full bg-muted px-2.5 py-0.5 text-[10px] font-black uppercase tracking-[0.12em] text-muted-foreground">
+                  {definition.trialDays}-day free trial
+                </p>
+              ) : null}
+
+              <Link
+                href={AUTH_ROUTES.signUp}
+                className={cn(
+                  buttonVariants({ size: "lg" }),
+                  "brutal-border mt-auto h-11 w-full rounded-full font-semibold",
+                  isFeatured
+                    ? "bg-brand text-brand-foreground hover:bg-brand/90"
+                    : "bg-card text-foreground hover:bg-muted",
+                )}
+              >
+                Get started
+              </Link>
+            </li>
           );
         })}
-      </div>
+      </ul>
 
+      {/* No heading here. FeatureComparisonTable renders its own centred
+          title, so the page's left-aligned "Everything compared" sat
+          directly on top of it — two titles for one table, in two
+          alignments and two sizes. The component's own title is the one that
+          travels with it into the upgrade modal, so the page's is the one
+          that goes. */}
       <section className="flex flex-col gap-4">
-        <h2 className="text-xl font-semibold tracking-tight">
-          Everything compared
-        </h2>
         {/* REUSES_THE_COMPARISON_TABLE — the authenticated upgrade modal and
             this public page render the SAME component over the same registry,
             so the two can never describe different products. */}
         <FeatureComparisonTable planKeys={plans} />
       </section>
 
-      {/* AMOUNTS_LIVE_IN_STRIPE — see the file header for why no figures are
-          printed here. */}
+      {/* The monthly figure is printed on the cards above; what is still
+          settled at checkout is tax, currency and proration, and what the
+          credits do is the part people actually ask about. The old line said
+          "Prices are shown at checkout", which contradicts the cards now
+          that they carry the amount. */}
       <p className="text-center text-xs text-muted-foreground">
-        Prices are shown at checkout. Credits are consumed by generating and
-        rendering — see the{" "}
+        Billed monthly and cancellable any time. Taxes are settled at checkout.
+        Credits are consumed by generating and rendering — see the{" "}
         <Link href="/legal/refunds" className="underline">
           refund policy
         </Link>{" "}

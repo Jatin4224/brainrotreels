@@ -119,7 +119,16 @@ const APPLE_OAUTH_ENABLED = Boolean(
  * the CTA pin to the bottom; at `lg` the message panel beside it is the only
  * bordered thing on screen, and a card around the fields as well would make
  * the page read as two competing panels instead of one pitch and one form. */
-const AUTH_CARD_CLASS = "flex flex-1 flex-col gap-5 lg:flex-none";
+/* gap-6 below lg, gap-5 from lg up. CTA_PINS_TO_THE_BOTTOM leaves the
+   phone layout with the fields bunched at the top and the button at the
+   thumb, and the space between them read as a hole rather than as intent.
+   The pin is right — it is the reachable place for the one action — so the
+   fix is to let the fields breathe into the gap, not to unpin the button.
+   Deliberately a small change: with the OAuth row and its divider present
+   (they are hidden only because no provider is configured) that space is
+   already mostly spoken for, and a bigger rhythm here would overflow the
+   phone layout in the configuration most deployments actually ship. */
+const AUTH_CARD_CLASS = "flex flex-1 flex-col gap-6 lg:flex-none lg:gap-5";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: AuthForm

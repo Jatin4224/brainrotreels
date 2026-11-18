@@ -1519,8 +1519,28 @@ html:has([data-app-banner]) {
 
   .auth-showcase {
     /* The loop every layer below shares. Override it on the panel to slow the
-       whole composition down without changing the shape of the motion. */
-    --auth-loop: 1.17s;
+       whole composition down without changing the shape of the motion.
+
+       3.4s, raised from 1.17s. The panel's job is EXPLANATION — one document
+       in, five reels out — and at 1.17s the whole three-beat story (the doc
+       falls, the cursor presses, the strip fans) completed about fifty-one
+       times a minute. Nobody can follow a narrative at that rate: it read as
+       flicker, not as a pipeline, and it ran in the corner of the eye of
+       somebody typing a password.
+
+       Marketing and explanatory motion is the one tier allowed to be long.
+       3.4s gives the document ~200ms to fall and the strip about a second to
+       fan, which is slow enough to read and still a loop rather than a film.
+
+       Raising the VARIABLE and not the keyframes is the whole point of the
+       variable: every stop below is a percentage of it, so the eight layers
+       stay in sync and the shape of the motion is untouched. The keyframes
+       were measured frame by frame from the reference recording and must not
+       be re-timed — which is also why there is no hold on the full strip at
+       the end of the cycle, tempting as it is: a pause means compressing all
+       eight measured lists into the first n%, and that is a rewrite of the
+       motion rather than a change of pace. */
+    --auth-loop: 3.4s;
     /* Two fit factors, min()-ed: neither axis may overflow the panel. */
     --auth-fit-w: 1;
     --auth-fit-h: 1;
