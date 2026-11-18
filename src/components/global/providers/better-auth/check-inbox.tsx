@@ -139,7 +139,7 @@ export function CheckInbox({
     /* Bare at every width, like the forms it replaces — AUTH_SURFACE in
        auth-shell.tsx. The message panel beside it is the only bordered thing
        on the screen. */
-    <div className="flex flex-1 flex-col lg:flex-none">
+    <div className="auth-inbox-enter flex flex-1 flex-col lg:flex-none">
       <button
         type="button"
         onClick={onChangeEmail}
@@ -160,7 +160,7 @@ export function CheckInbox({
               strokeWidth={2.25}
             />
           </div>
-          <span className="brutal-shadow absolute -right-6 -top-3 rotate-[8deg] rounded-full bg-brand px-3.5 py-1.5 text-sm font-bold text-brand-foreground">
+          <span className="auth-inbox-pill brutal-shadow absolute -right-6 -top-3 rotate-[8deg] rounded-full bg-brand px-3.5 py-1.5 text-sm font-bold text-brand-foreground">
             1 new
           </span>
         </div>

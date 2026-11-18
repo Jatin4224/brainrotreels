@@ -33,7 +33,7 @@
 | `--popover` | `#191c22` | |
 | `--primary` | `#fa5f29` | CTAs, "Best Value", check icons, savings pills |
 | `--primary-foreground` | `#ffffff` | |
-| `--accent` | `#f2cf3b` | Eyebrow pills, H1 highlight bar, step numbers, active chip, section kicker text |
+| `--accent` | `#f2cf3b` | Eyebrow pills, H1 highlight bar, step numbers, active chip, panel label text |
 | `--accent-foreground` | `#0b0d13` | Text on yellow |
 | `--secondary` | `#1e2026` | |
 | `--muted` | `#212328` | "20% OFF" pill background |
@@ -89,7 +89,7 @@ Hero halo, placed behind the headline:
 | Body | Geist | 16px | 400 | 1.5 | — |
 | Nav links | Geist | 14px | 500 | — | — |
 | Step title | Geist | 20px | 800 | — | tight |
-| Section kicker (eyebrow text) | Geist | 12px | 900 | — | **0.2em**, UPPERCASE, `text-accent` |
+| Panel label (ex-"section kicker") | Geist | 12px | 900 | — | **0.2em**, UPPERCASE, `text-accent`. Labels a panel that has no heading of its own. Not used above a section H2 — see 2.6. |
 | Gallery heading | Geist | 14px | 900 | — | 0.14em, UPPERCASE |
 | Micro pills | Geist | 10–11px | 900 | — | 0.12em, UPPERCASE |
 | Timecodes | Geist Mono | 12px | 400 | — | `tabular-nums`, white/75 |
@@ -130,15 +130,64 @@ Load the fonts with Google Fonts or `next/font`: `Geist`, `Geist Mono`, `DM Sans
 - Container: `mx-auto max-w-7xl px-6` (1280px max, 24px gutters).
 - Section vertical padding: `py-20 md:py-28` (80 → 112px) or `py-24 md:py-32` (96 → 128px) for pricing.
 - Section separators: `border-t-2 border-border`.
-- Section heading block: centered, `max-w-3xl`, kicker → H2 (`mb-4`) → lead paragraph (muted).
+- Section heading block: centered on the page axis, `max-w-3xl`, H2 → lead
+  paragraph (muted). **No kicker.** Four consecutive sections used to open with
+  a tracked all-caps label above an H2 that already said the same thing; they
+  were removed on 2026-11-18. The only survivor is "Handled for you", which is
+  the sole heading its panel has — a kicker is now a panel LABEL, not part of a
+  section heading.
+- **The hero is the one left-aligned block on the page. Every section below it
+  centres on the page axis.**
+  Why (*inferred* — not stated by the user): the hero earns left alignment by
+  being a two-column composition with a stage beside the words, and one axis
+  running down the rest of the page reads as one page rather than six centred
+  boxes that happen to sit near each other.
+  <!-- 2026-11-18: "no i want all center axis aligned except hero" — reversing
+       an all-left pass. Confirm the why before extending it to a new
+       two-column section. -->
+- Every section below it
+  centres. A two-column section lifts its heading OUT of the column so it
+  centres on the section rather than on half a grid (see How it works).
+- Sections whose content needs a narrower measure (FAQ, closing CTA) still use
+  the page container and constrain an INNER column, so every heading starts on
+  the same axis instead of each centring its own narrower box.
 - Card grid gaps: 24px (`gap-6`). Two-column splits use `gap-12 lg:gap-16`.
 
 ### 2.7 Motion
 
-- Hover: 1px lift plus a brighter border (`brutal-hover`), 200ms.
+One deceleration curve for the whole page: `--ease-settle`
+(`cubic-bezier(0.3, 0.7, 0.2, 1)`), the curve the hero feed already eased with,
+promoted to a token. Do not add a second curve without a reason that names this
+one.
+
+- Hover: 1px lift plus a brighter border (`brutal-hover`), **180ms
+  `var(--ease-settle)`**. A bare duration falls back to `ease`, which spends its
+  first 60ms accelerating — on a 1px lift that is the whole motion.
+- Press: `translateY(1px)`, matching the `active:translate-y-px` every Button
+  uses. Scoped to elements that are actually controls — a static `<li>` matches
+  `:active` too and must not appear pressable.
+- **Every hand-written `:hover` rule is gated behind**
+  `@media (hover: hover) and (pointer: fine)`. Touch fakes hover on tap and
+  holds it; Tailwind's own `hover:` variant compiles to this query, hand-written
+  CSS has to say so itself.
+- Hero: one staggered entrance on page load (0/50/100/150/190ms, 320ms each),
+  and the stage fades in with opacity ALONE because its wrapper already carries
+  a transform.
+- Hero prompt tabs: the active pill SLIDES between tabs — a duplicate row
+  carrying the active skin, clipped with `clip-path` to the active tab, 200ms.
+- In-page anchors scroll smoothly, scoped with `html:has(.marketing-canvas)` so
+  the product's own programmatic scrolling still lands instantly.
+- CTA arrows nudge 2px toward the action on hover, 150ms.
 - FAQ: Radix accordion `accordion-down` / `accordion-up` height animations.
+- The hero phone loop pauses off-screen and in hidden tabs
+  (IntersectionObserver + `visibilitychange`), as the auth showcase does.
 - Optional extras defined on the site: `v2-halo-pulse` (opacity .55→.9, scale 1→1.12, 3.2s loop) for the hero halo, and `skin-shimmer` for loading states.
-- Respect `prefers-reduced-motion`.
+- Respect `prefers-reduced-motion` — gentler, not zero. Keep the fade, drop the
+  travel.
+- Motion stays in CSS on this page. It runs on the compositor and survives
+  hydration; a JS animation library on the LCP route does neither.
+  framer-motion is used only where CSS structurally cannot help — an EXIT
+  animation (see `AuthError`).
 
 ---
 
@@ -215,21 +264,28 @@ On `sm` and up the textarea and button sit in a row (`sm:flex-row sm:items-end`)
 - **Thumbnail strip** below: 5 video cards in a row (`grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-6`), each 9:16 (~217×385 at desktop), alternating Motion Graphics / Explainer tags.
 
 ### 4.3 Real outputs / featured player (`#examples`, `border-t-2`)
-- Centered header: kicker `REAL OUTPUTS` (yellow) → H2 "Watch a few all the way through" → muted lead.
+- Centered header: H2 "Watch a few all the way through" → muted lead. No kicker — see 2.6.
 - `mt-12 grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px]`
   - **Left:** large player `rounded-2xl bg-black brutal-border brutal-shadow-lg` (~828×646). The vertical video is centered and letterboxed, with a big yellow circular play button. Bottom bar: title (white, semibold) + one-line description (muted) on the left and a yellow category pill on the right.
   - **Right (380px):** playlist panel (bg card, rounded-2xl, brutal-border). Grouped lists with headers (`MOTION GRAPHICS` / `EXPLAINER VIDEOS`, 14px/900 uppercase 0.14em, plus a "More" link). Rows: small square thumbnail (~40px, rounded-lg), title 14px/600, duration in mono on the right. The active row is highlighted (bg muted). Rows are `flex flex-col gap-1`.
 
 ### 4.4 How it works (`#how-it-works`, `border-t-2`)
 - `grid lg:grid-cols-2 gap-12 lg:gap-16`, `py-20 md:py-28`
-- **Left:** kicker `HOW IT WORKS` → H2 "From what you have to a finished video" → `<ol class="mt-10 flex flex-col gap-8">`, 3 steps, each `flex gap-5` with a yellow step badge, a 20px/800 title and a muted description.
+- **Centred intro ABOVE the grid:** H2 "From what you have to a finished video"
+  → muted lead. It is lifted out of the left column on purpose — a heading
+  centred inside one half of a two-column grid is centred on nothing a reader
+  can see. No kicker; see 2.6.
+- **Left column:** `<ol class="mt-10 flex flex-col gap-8">`, 3 steps, each
+  `flex gap-5` with a yellow step badge, a 20px/800 title and a muted
+  description.
   1. Give it what you have
   2. It makes the whole video
   3. Watch it, change it, post it
 - **Right:** "Handled for you" card (`self-start rounded-2xl bg-card p-7 brutal-border brutal-shadow`). Small uppercase heading, then `<ul class="mt-5 divide-y divide-border">`. Each `li` is `flex gap-4 py-3.5` with a fixed-width label (`w-24 font-extrabold`) and a muted one-liner. Rows: Script · Design · Animation · Voice · Sound · Captions · Editing.
 
 ### 4.5 Pricing (`#pricing`, `border-t-2`, `py-24 md:py-32`)
-- Centered header: kicker "Simple pricing" → H2 "Pick your plan" → muted lead.
+- Centered header: H2 "Pick your plan" → muted lead. No kicker; see 2.6.
+- Each card shows its monthly price (`monthlyAmount`, env-driven). `free` shows the word "Free", not "$0".
 - **Billing toggle** (`mt-8`): pill track `bg-card p-1 brutal-border brutal-shadow-sm`. The segments are pills (`px-4 py-2 text-sm font-bold`). The active one is bg primary + white. Each segment holds an inline "SAVE x%" micro pill. Options: Monthly · Every 3 Months (SAVE 20%) · Yearly (SAVE UP TO 48%).
 - **Promo banner** below: yellow pill "Save 20% — up to $180 every 3 months" plus a muted 14px line about bonus credits.
 - **Plan grid:** `mt-12 grid items-stretch gap-6 sm:grid-cols-2 xl:grid-cols-4`. Card = `relative flex h-full flex-col gap-5 rounded-2xl p-5 bg-card brutal-border brutal-shadow`.

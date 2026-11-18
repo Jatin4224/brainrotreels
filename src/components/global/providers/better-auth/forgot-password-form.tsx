@@ -6,7 +6,8 @@
 
 /**
  * SOURCE OF TRUTH KEYWORDS: ForgotPasswordForm, AUTH_SURFACE, AuthError,
- *   AUTH_CTA_CLASS, AUTH_FIELD_CLASS, AUTH_LABEL_CLASS, AUTH_LINK_CLASS
+ *   AUTH_CTA_CLASS,
+  AUTH_EMAIL_INPUT_PROPS, AUTH_FIELD_CLASS, AUTH_LABEL_CLASS, AUTH_LINK_CLASS
  *
  * WHAT:  Requests a password-reset email. On success shows a
  *        "check your email" screen (shown regardless of whether the address
@@ -46,6 +47,7 @@ import { Input } from "@/components/ui/input";
 import { AuthError } from "@/components/global/auth/auth-error";
 import {
   AUTH_CTA_CLASS,
+  AUTH_EMAIL_INPUT_PROPS,
   AUTH_FIELD_CLASS,
   AUTH_LABEL_CLASS,
   AUTH_LINK_CLASS,
@@ -128,6 +130,8 @@ export function ForgotPasswordForm() {
                   <Input
                     type="email"
                     autoComplete="email"
+                    {...AUTH_EMAIL_INPUT_PROPS}
+                    enterKeyHint="send"
                     placeholder="you@example.com"
                     disabled={isBusy}
                     className={AUTH_FIELD_CLASS}

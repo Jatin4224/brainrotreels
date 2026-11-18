@@ -125,7 +125,7 @@ export default function LandingPage() {
             claim and the evidence land in the same glance. One column below
             `lg`, where there is no room for two and the showcase follows the
             words rather than fighting them. */}
-        <div className="mx-auto max-w-[1240px] px-6 pb-20 pt-16 md:pt-24">
+        <div className="safe-x mx-auto max-w-[1240px] pb-20 pt-16 md:pt-24">
           {/* 1.05fr / 1fr at 900px and up — the text column is given the extra
               fraction because it carries the headline, the field and the
               proof line, while the stage is a fixed-size object that does not
@@ -199,7 +199,13 @@ export default function LandingPage() {
             />
           </div>
 
-          <ProofStrip clips={LANDING_PROOF_CLIPS} className="mt-20" />
+          {/* proof-enter is the TAIL of the hero sequence, not a second one —
+              see the class in globals.css. It lands on the <ul>, whose
+              children are the five cards the delays step through. */}
+          <ProofStrip
+            clips={LANDING_PROOF_CLIPS}
+            className="proof-enter mt-20"
+          />
         </div>
       </section>
 
@@ -208,7 +214,7 @@ export default function LandingPage() {
         id="formats"
         className="scroll-mt-20 border-t-2 border-border py-20 md:py-28"
       >
-        <div className="mx-auto max-w-7xl px-6">
+        <div className="safe-x mx-auto max-w-7xl">
           <div className="mx-auto max-w-3xl text-center">
             <h2 className="font-display text-3xl font-medium leading-tight tracking-tight text-foreground md:text-4xl lg:text-5xl">
               Four ways to start, one finished video
@@ -252,7 +258,7 @@ export default function LandingPage() {
         id="how-it-works"
         className="scroll-mt-20 border-t-2 border-border py-20 md:py-28"
       >
-        <div className="mx-auto max-w-7xl px-6">
+        <div className="safe-x mx-auto max-w-7xl">
           {/* Lifted OUT of the left grid column. Every other section opens
               with a centred intro above its content, and a heading centred
               inside one half of a two-column grid is centred on nothing a
@@ -327,7 +333,7 @@ export default function LandingPage() {
         id="features"
         className="scroll-mt-20 border-t-2 border-border py-20 md:py-28"
       >
-        <div className="mx-auto max-w-7xl px-6">
+        <div className="safe-x mx-auto max-w-7xl">
           <div className="mx-auto max-w-3xl text-center">
             <h2 className="font-display text-3xl font-medium leading-tight tracking-tight text-foreground md:text-4xl lg:text-5xl">
               The tools that make it look deliberate
@@ -380,7 +386,7 @@ export default function LandingPage() {
 
       {/* ── Plans ────────────────────────────────────────────────────────── */}
       <section className="border-t-2 border-border py-20 md:py-28">
-        <div className="mx-auto max-w-7xl px-6">
+        <div className="safe-x mx-auto max-w-7xl">
           <div className="mx-auto max-w-3xl text-center">
             <h2 className="font-display text-3xl font-medium leading-tight tracking-tight text-foreground md:text-4xl lg:text-5xl">
               Pick your plan
@@ -487,7 +493,7 @@ export default function LandingPage() {
         id="faq"
         className="scroll-mt-20 border-t-2 border-border bg-card py-20 md:py-28"
       >
-        <div className="mx-auto max-w-3xl px-6">
+        <div className="safe-x mx-auto max-w-3xl">
           <div className="text-center">
             <h2 className="font-display text-3xl font-medium leading-tight tracking-tight text-foreground md:text-4xl">
               Got questions?
@@ -508,7 +514,7 @@ export default function LandingPage() {
 
       {/* ── Closing CTA ──────────────────────────────────────────────────── */}
       <section className="border-t-2 border-border bg-card py-24 md:py-28">
-        <div className="mx-auto flex max-w-4xl flex-col items-center gap-6 px-6 text-center">
+        <div className="safe-x mx-auto flex max-w-4xl flex-col items-center gap-6 text-center">
           <h2 className="font-display text-4xl font-medium leading-[0.95] tracking-tight text-foreground md:text-5xl lg:text-6xl">
             Your next video starts with one sentence
           </h2>

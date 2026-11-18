@@ -66,6 +66,19 @@ Add ordinary inline comments too, but keep them minimal and outcome-based — do
 
 ## 7. UI
 
+**Before building or changing any UI, read the design docs at the repo root:**
+`design.md` (landing page), `design-buttons.md` (buttons and controls),
+`auth-design.md` + `auth-design_1.md` (auth screens), and
+`00-dashboard-foundations.md` (app shell). They hold the tokens, the type
+scale, the motion rules and the per-section specs. They are not optional
+background reading: every one of them is a decision already made, and work
+that skips them re-litigates settled questions and ships contradictions.
+
+When you change UI in a way those docs do not describe, update the doc in the
+same change. A spec that disagrees with the code is worse than no spec — the
+next agent reads it and reverts you.
+
+
 Before creating any component, check whether a reusable one already exists and use it if so. Never duplicate a component with similar functionality — extend or compose what's there. If you notice yourself copying the pattern of another component, that's the signal to globalize it instead.
 
 Place a component that's reusable across routes or features in `components/global/COMPONENT_NAME_FOLDER`; a component used only inside one route goes in `THE_ROUTE/_components`.
@@ -78,7 +91,33 @@ shadcn components and blocks often arrive with outdated copy that doesn't match 
 
 Never hardcode theme colors (no hex values, `text-white`, `bg-[#...]`, or forced `dark` classes). Always use the theme tokens — `bg-background`, `text-foreground`, `text-muted-foreground`, `bg-card`, `bg-primary`, `border` — so everything follows the app theme.
 
-## 8. Delivery
+## 8. Placeholder values
+
+When a real value is not available — a price, a count, a piece of copy the
+business has not decided — ship a plausible placeholder rather than blocking
+on it or leaving the UI empty. Put it behind config (an env var with a
+default) and mark the default `PLACEHOLDER` in the code comment AND in
+`.env.example`, so it is one variable to set and impossible to ship by
+accident unnoticed.
+
+Never present a placeholder as real: no invented figure in a heading, no
+fabricated testimonial, no made-up metric. The point is to see the finished
+layout without waiting on a decision, not to pretend the decision is made.
+
+<!-- 2026-11-18: "keep dummy values monthly any" — asked for the pricing
+     cards to render with stand-in prices rather than stay numberless. -->
+
+## 9. Verifying UI
+
+Check your work at **1280px wide first**. It is the width the user reviews at,
+and a layout tuned at 1440 or 1880 can be visibly wrong there — a bleed that
+is clamped to zero, a column gap that never opens. Check the other widths
+after, not instead.
+
+<!-- 2026-11-18: inferred from two screenshots the user shared, both ~1280 CSS
+     px. Not stated outright — correct this line if it is wrong. -->
+
+## 10. Delivery
 
 Keep everything production-grade: never create scripts, Prisma scripts, seed files, or probe/tester files, or anything else that couldn't be pushed to production. Ask my permission before creating any script that performs a manual action.
 

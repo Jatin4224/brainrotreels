@@ -99,7 +99,12 @@ export function FaqAccordion({
               <ChevronDownIcon
                 aria-hidden="true"
                 className={cn(
-                  "size-4 shrink-0 text-muted-foreground transition-transform duration-200 motion-reduce:transition-none",
+                  /* 240ms and --ease-settle, not 200ms and the default
+                     `ease`: the panel below transitions its height over
+                     240ms with that curve (see collapsible-content in
+                     globals.css), and an arrow that finishes 40ms early
+                     reads as two animations instead of one row opening. */
+                  "size-4 shrink-0 text-muted-foreground transition-transform duration-[240ms] ease-[var(--ease-settle)] motion-reduce:transition-none",
                   isOpen && "rotate-180",
                 )}
               />

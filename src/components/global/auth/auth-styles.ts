@@ -69,6 +69,53 @@ export const AUTH_FIELD_CLASS =
 /** The visible label above a field. */
 export const AUTH_LABEL_CLASS = "text-sm font-semibold text-foreground";
 
+/**
+ * SOURCE OF TRUTH KEYWORDS: AUTH_EMAIL_INPUT_PROPS, AUTH_SECRET_INPUT_PROPS,
+ *   THE_KEYBOARD_IS_PART_OF_THE_FIELD
+ *
+ * WHAT: The software-keyboard contract for the auth fields — which keyboard
+ *       opens, what it does to what is typed, and what the return key says.
+ *       Spread onto the field, beside its `type` and `autoComplete`.
+ *
+ * WHY:  THE_KEYBOARD_IS_PART_OF_THE_FIELD. `type="email"` alone is a
+ *       validation hint; on a phone the thing the visitor actually touches is
+ *       a keyboard, and left unspecified it arrives shifted, autocorrecting
+ *       and underlining in red. The compound failure is the one worth naming:
+ *       iOS capitalises the first letter of an email and Android's
+ *       autocorrect rewrites an unfamiliar domain, so the visitor types their
+ *       address, gets "Invalid email" back, retypes it, and gets the same
+ *       error — the field is fighting them and nothing on screen says so.
+ *
+ *       `enterKeyHint` is the small half: a return key that says "Next" or
+ *       "Go" tells the visitor the form is nearly done without them having to
+ *       look for the button, which on a screen where the CTA is pinned below
+ *       the keyboard is the only cue they have.
+ *
+ *       AUTH_SECRET_INPUT_PROPS exists for the same reason but a narrower
+ *       one: a `type="password"` field is exempt from autocorrect and
+ *       capitalisation, and AuthPasswordField's Show button flips it to
+ *       `type="text"`, where it is not. Without these a revealed password
+ *       picks up a capital first letter and a red underline, and the visitor
+ *       is left reading a password that is not the one being submitted.
+ *
+ * WHERE: Spread by auth-form.tsx (sign-in, sign-up, AuthPasswordField),
+ *        forgot-password-form.tsx and reset-password-form.tsx.
+ */
+export const AUTH_EMAIL_INPUT_PROPS = {
+  inputMode: "email",
+  autoCapitalize: "none",
+  autoCorrect: "off",
+  spellCheck: false,
+  enterKeyHint: "next",
+} as const;
+
+export const AUTH_SECRET_INPUT_PROPS = {
+  autoCapitalize: "none",
+  autoCorrect: "off",
+  spellCheck: false,
+  enterKeyHint: "go",
+} as const;
+
 /** One of the OAuth buttons in the row above the divider. */
 export const AUTH_SOCIAL_BUTTON_CLASS =
   "brutal-hover h-12 w-full gap-2.5 rounded-xl border-border bg-surface-raised text-base font-semibold text-foreground";

@@ -58,7 +58,7 @@ const MARKETING_NAV_LINKS: readonly MarketingLink[] = [
 export function MarketingHeader() {
   return (
     <header className="sticky top-0 z-40 border-b border-border/60 bg-background/70 backdrop-blur-xl">
-      <nav className="mx-auto flex h-14 max-w-7xl items-center justify-between gap-4 px-6">
+      <nav className="safe-x mx-auto flex h-14 max-w-7xl items-center justify-between gap-4">
         <PlatformLogo href="/" size="md" />
 
         <div className="flex items-center gap-6">

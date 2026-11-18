@@ -67,6 +67,8 @@ import { AuthError } from "@/components/global/auth/auth-error";
 import { AuthModeTabs } from "@/components/global/auth/auth-mode-switch";
 import {
   AUTH_CTA_CLASS,
+  AUTH_EMAIL_INPUT_PROPS,
+  AUTH_SECRET_INPUT_PROPS,
   AUTH_DIVIDER_CLASS,
   AUTH_FIELD_CLASS,
   AUTH_LABEL_CLASS,
@@ -204,6 +206,7 @@ function SignInForm({ callbackURL }: { callbackURL: Route }) {
                 <Input
                   type="email"
                   autoComplete="email"
+                  {...AUTH_EMAIL_INPUT_PROPS}
                   placeholder="you@example.com"
                   disabled={isBusy}
                   className={AUTH_FIELD_CLASS}
@@ -362,6 +365,8 @@ function SignUpForm({ callbackURL }: { callbackURL: Route }) {
                 <Input
                   type="text"
                   autoComplete="name"
+                  autoCapitalize="words"
+                  enterKeyHint="next"
                   placeholder="How your channel is known"
                   disabled={isBusy}
                   className={AUTH_FIELD_CLASS}
@@ -383,6 +388,7 @@ function SignUpForm({ callbackURL }: { callbackURL: Route }) {
                 <Input
                   type="email"
                   autoComplete="email"
+                  {...AUTH_EMAIL_INPUT_PROPS}
                   placeholder="you@example.com"
                   disabled={isBusy}
                   className={AUTH_FIELD_CLASS}
@@ -497,6 +503,7 @@ const AuthPasswordField = React.forwardRef<
       <Input
         ref={ref}
         type={visible ? "text" : "password"}
+        {...AUTH_SECRET_INPUT_PROPS}
         className={cn(AUTH_FIELD_CLASS, "pr-20", className)}
         {...props}
       />
@@ -506,7 +513,7 @@ const AuthPasswordField = React.forwardRef<
         onClick={() => setVisible((current) => !current)}
         aria-label={visible ? "Hide password" : "Show password"}
         aria-pressed={visible}
-        className="absolute inset-y-0 right-0 flex min-w-11 items-center justify-center rounded-r-xl px-4 text-base font-medium text-muted-foreground outline-none transition-colors hover:text-foreground focus-ring motion-reduce:transition-none"
+        className="absolute inset-y-0 right-0 flex min-w-11 items-center justify-center rounded-r-xl px-4 text-base font-medium text-muted-foreground outline-none transition-colors hover:text-foreground active:text-foreground focus-ring motion-reduce:transition-none"
       >
         {/* A WORD, NOT AN ICON. The artboard spells it out, and it is the
             right call: a crossed-out eye is read as both "it is hidden" and

@@ -6,7 +6,8 @@
 
 /**
  * SOURCE OF TRUTH KEYWORDS: ResetPasswordForm, AUTH_SURFACE, AuthError,
- *   AUTH_CTA_CLASS, AUTH_FIELD_CLASS, AUTH_LABEL_CLASS, AUTH_LINK_CLASS
+ *   AUTH_CTA_CLASS,
+  AUTH_SECRET_INPUT_PROPS, AUTH_FIELD_CLASS, AUTH_LABEL_CLASS, AUTH_LINK_CLASS
  *
  * WHAT:  Sets a new password using the token from the reset-link email. Reads
  *        the token from the URL (Better Auth appends ?token=...). Handles the
@@ -44,6 +45,7 @@ import { Input } from "@/components/ui/input";
 import { AuthError } from "@/components/global/auth/auth-error";
 import {
   AUTH_CTA_CLASS,
+  AUTH_SECRET_INPUT_PROPS,
   AUTH_FIELD_CLASS,
   AUTH_LABEL_CLASS,
   AUTH_LINK_CLASS,
@@ -144,6 +146,8 @@ export function ResetPasswordForm() {
                   <Input
                     type="password"
                     autoComplete="new-password"
+                    {...AUTH_SECRET_INPUT_PROPS}
+                    enterKeyHint="next"
                     placeholder="At least 8 characters"
                     disabled={isBusy}
                     className={AUTH_FIELD_CLASS}
@@ -166,6 +170,7 @@ export function ResetPasswordForm() {
                   <Input
                     type="password"
                     autoComplete="new-password"
+                    {...AUTH_SECRET_INPUT_PROPS}
                     placeholder="Type it once more"
                     disabled={isBusy}
                     className={AUTH_FIELD_CLASS}
