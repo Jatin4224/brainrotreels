@@ -7,7 +7,8 @@
 /**
  * SOURCE OF TRUTH KEYWORDS: DashboardHomeScreen, HOME_IS_A_FORMAT_PICKER,
  * FORMATS, FORMAT_CATEGORIES, FEATURED_FORMAT_KIND, COMPOSER_ROUTE,
- * FeatureGate, GREETING_IS_LOCAL, FILTER_IS_CLIENT_STATE
+ * FeatureGate, GREETING_IS_LOCAL, FILTER_IS_CLIENT_STATE,
+ * DASHBOARD_ASSEMBLES, FILTER_IS_A_TRANSITION
  *
  * WHAT: The dashboard home screen — a greeting and credit balance, the
  * "What are you making?" headline, category filter chips, the
@@ -40,6 +41,15 @@
  * in, which is why it is the one thing on the screen allowed to
  * appear a frame late.
  *
+ * DASHBOARD_ASSEMBLES and FILTER_IS_A_TRANSITION: the screen rises in
+ * reading order on mount (`.app-enter`), and the format region
+ * re-plays that entrance whenever the filter changes (`.dash-enter`
+ * on a wrapper keyed by `filter`). Both reuse the marketing hero's
+ * keyframes and curve on a faster schedule — one product, one way of
+ * arriving, said quickly on a screen somebody opens every day. The
+ * delay schedule and the reduced-motion fallback live with the CSS in
+ * globals.css.
+ *
  * STARTING IS STILL GATED. Every CTA routes through one
  * <FeatureGate resource="projects">-wrapped handler, so a workspace at
  * its plan cap gets the upgrade modal instead of a form the server
@@ -52,6 +62,7 @@
  */
 
 import * as React from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRightIcon, ZapIcon } from "lucide-react";
 
@@ -64,10 +75,10 @@ import {
   type FormatCategoryKey,
 } from "@/lib/config";
 import { permissions } from "@/lib/permissions";
-import {
-  PROJECT_KINDS,
-  type ProjectKind,
-} from "@/lib/types";
+/* THE_REGISTRY_OWNS_THE_PATH — the credits pill links where the sidebar
+ * links, from the same declaration. See THE_PILL_IS_THE_LINK below. */
+import { RESOURCES } from "@/lib/resources";
+import { PROJECT_KINDS, type ProjectKind } from "@/lib/types";
 import {
   useActiveOrganization,
   useActiveOrganizationId,
@@ -157,62 +168,87 @@ export function DashboardHomeScreen() {
 
   return (
     <div className="flex flex-col gap-7">
-      <HomeHeader greeting={greeting} name={profile?.name ?? null} />
+      {/* DASHBOARD_ASSEMBLES — the screen's first half steps down in reading
+          order (greeting, headline, chips). `.app-enter` wants the animated
+          blocks as its DIRECT children, which is why this group is its own
+          element rather than the class living on the root: the root also holds
+          the format region below, and a region that animates itself while its
+          children animate too is two entrances where there should be one. */}
+      <div className="app-enter flex flex-col gap-7">
+        <HomeHeader greeting={greeting} name={profile?.name ?? null} />
 
-      <div>
-        <HighlightHeading
-          before="What are you"
-          highlight="making"
-          trailing="?"
-          radius="xl"
-          className="font-display text-[2.75rem] font-extrabold leading-none tracking-tight text-foreground lg:text-[3.25rem]"
-        />
-        <p className="mt-3 max-w-2xl text-base leading-relaxed text-muted-foreground">
-          Pick by what you&apos;re starting from. Every format writes its own
-          script, casts a voice and captions itself.
-        </p>
+        <div>
+          <HighlightHeading
+            before="What are you"
+            highlight="making"
+            trailing="?"
+            radius="xl"
+            className="font-display text-[2.75rem] font-extrabold leading-none tracking-tight text-foreground lg:text-[3.25rem]"
+          />
+          <p className="mt-3 max-w-2xl text-base leading-relaxed text-muted-foreground">
+            Pick by what you&apos;re starting from. Every format writes its own
+            script, casts a voice and captions itself.
+          </p>
+        </div>
+
+        <CategoryChips value={filter} onChange={setFilter} />
       </div>
 
-      <CategoryChips value={filter} onChange={setFilter} />
+      {/* FILTER_IS_A_TRANSITION — `key={filter}` is the whole mechanism. The
+          formats this region shows change the instant a chip is pressed, and
+          they used to change in ONE FRAME: cards vanished and others appeared
+          in their place with nothing in between, which is the jarring swap an
+          animation actually exists to soften. Re-keying on the filter makes
+          React remount the region, which replays `.dash-enter` from the top —
+          no transition state to track, no AnimatePresence, and it stays on the
+          compositor, which matters on a screen that animates while it is still
+          hydrating.
 
-      {featuredVisible ? (
-        <FeaturedFormat
-          kind={FEATURED_FORMAT_KIND}
-          canCreate={canCreate}
-          onStart={handleStart}
-        />
-      ) : null}
+          The remount is free here: everything below is derived from `filter`
+          and the format registry, so there is no local state, no focus and no
+          scroll position inside it for a remount to throw away. The pressed
+          chip lives ABOVE this boundary and keeps its focus ring. */}
+      <div key={filter} className="dash-enter flex flex-col gap-7">
+        {featuredVisible ? (
+          <FeaturedFormat
+            kind={FEATURED_FORMAT_KIND}
+            canCreate={canCreate}
+            onStart={handleStart}
+          />
+        ) : null}
 
-      {CATEGORY_ORDER.map((category) => {
-        const kinds = formatsByCategory(category).filter((kind) =>
-          gridKinds.includes(kind),
-        );
-        if (kinds.length === 0) return null;
-        const classes = CATEGORY_CLASSES[category];
+        {CATEGORY_ORDER.map((category) => {
+          const kinds = formatsByCategory(category).filter((kind) =>
+            gridKinds.includes(kind),
+          );
+          if (kinds.length === 0) return null;
+          const classes = CATEGORY_CLASSES[category];
 
-        return (
-          <section key={category} className="flex flex-col gap-3.5">
-            <h2 className="mt-2 flex items-center gap-2.5 text-lg font-bold text-foreground">
-              <span
-                aria-hidden="true"
-                className={cn("size-2.5 rounded-[3px]", classes.dot)}
-              />
-              {FORMAT_CATEGORIES[category].label}
-            </h2>
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {kinds.map((kind) => (
-                <FormatCard key={kind} kind={kind} onStart={handleStart} />
-              ))}
-            </div>
-          </section>
-        );
-      })}
+          return (
+            <section key={category} className="flex flex-col gap-3.5">
+              <h2 className="mt-2 flex items-center gap-2.5 text-lg font-bold text-foreground">
+                <span
+                  aria-hidden="true"
+                  className={cn("size-2.5 rounded-[3px]", classes.dot)}
+                />
+                {FORMAT_CATEGORIES[category].label}
+              </h2>
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {kinds.map((kind) => (
+                  <FormatCard key={kind} kind={kind} onStart={handleStart} />
+                ))}
+              </div>
+            </section>
+          );
+        })}
+      </div>
     </div>
   );
 }
 
 /**
- * SOURCE OF TRUTH KEYWORDS: HomeHeader, CREDITS_PILL, PERMISSION_GATED_READ
+ * SOURCE OF TRUTH KEYWORDS: HomeHeader, CREDITS_PILL, PERMISSION_GATED_READ,
+ * THE_PILL_IS_THE_LINK, THE_CHROME_OUTLIVES_THE_NUMBER, TABULAR_FIGURES
  *
  * WHAT: The thin row above the headline — who is being greeted, and what
  * they have left to spend.
@@ -259,22 +295,62 @@ function HomeHeader({
         ) : null}
       </p>
 
+      {/* THE_PILL_IS_THE_LINK — it was a <span>, while the comment above this
+          component had already promised a link to the credits screen. It wears
+          `tactile-raised`, a border and a 44px height, so it READS as
+          pressable; a surface that looks like a control and does nothing is
+          worse than no control at all. `brutal-hover` supplies the pair the
+          rest of the app uses — a 1px lift on a real pointer, a 1px press —
+          and does it for an <a> by its own selector.
+
+          The href comes from the RESOURCES registry, not a literal: the same
+          declaration that puts Credits in the sidebar and gates it behind
+          `credits:read` is the one that says where it lives, so the pill
+          cannot drift from the nav the day that path changes.
+
+          THE_CHROME_OUTLIVES_THE_NUMBER. The loading state used to be a
+          Skeleton standing in for the WHOLE pill — a 128px rounded block
+          replaced in one frame by a ~150px pill, so the row jumped twice,
+          once in content and once in geometry, and `justify-between` passed
+          the shift along to the greeting. Only the BALANCE is unknown on
+          first paint; the border, the icon and the word "credits" are known
+          immediately. So the pill renders whole and the skeleton shrinks to
+          the width of the digits inside it. Nothing moves when the number
+          lands, which is why no crossfade is needed here.
+
+          TABULAR_FIGURES — the balance is the one number on this screen a
+          creator watches go DOWN, and proportional digits change width as it
+          does (1,200 → 980 is narrower). `tabular-nums` fixes the advance
+          width so a spend cannot nudge the layout. */}
       {canReadCredits ? (
-        credits ? (
-          <span className="tactile-raised inline-flex h-11 items-center gap-2 rounded-xl border border-border bg-card px-3.5 text-sm font-medium text-foreground">
-            <ZapIcon className="size-4 text-brand-accent" aria-hidden="true" />
-            {credits.balance.toLocaleString()} credits
-          </span>
-        ) : (
-          <Skeleton className="h-11 w-32 rounded-xl" />
-        )
+        <Link
+          href={RESOURCES.credits.nav.href}
+          className="tactile-raised brutal-hover inline-flex h-11 items-center gap-2 rounded-xl border border-border bg-card px-3.5 text-sm font-medium text-foreground outline-none focus-ring"
+        >
+          <ZapIcon className="size-4 text-brand-accent" aria-hidden="true" />
+          {credits ? (
+            <span>
+              <span className="tabular-nums">
+                {credits.balance.toLocaleString()}
+              </span>{" "}
+              credits
+            </span>
+          ) : (
+            <>
+              <Skeleton className="h-3.5 w-10 rounded-sm" />
+              <span className="sr-only">Loading credit balance</span>
+              <span aria-hidden="true">credits</span>
+            </>
+          )}
+        </Link>
       ) : null}
     </header>
   );
 }
 
 /**
- * SOURCE OF TRUTH KEYWORDS: CategoryChips, FILTER_IS_CLIENT_STATE, radiogroup
+ * SOURCE OF TRUTH KEYWORDS: CategoryChips, FILTER_IS_CLIENT_STATE, radiogroup,
+ * HALF_A_STATE_CHANGE, PRESS_IS_THE_APP_LANGUAGE
  *
  * WHAT: The "All formats / Explain / Entertain / …" filter row.
  * WHY: A `radiogroup` of buttons, not a tablist: these select the MEANING
@@ -322,8 +398,35 @@ function CategoryChips({
             role="radio"
             aria-checked={active}
             onClick={() => onChange(chip.id)}
+            /* HALF_A_STATE_CHANGE was the bug. `transition-colors` covers
+               colour, background-colour, border-colour, fill and stroke —
+               and `.tactile-control[aria-checked="true"]` changes NEITHER of
+               the two things that actually make the chip look selected: it
+               swaps `box-shadow` and `background-image`. So the text and fill
+               eased over 150ms while the raised ring and sheen appeared in
+               frame one. One state change arriving in two instalments is
+               what made the press read as slightly broken rather than
+               slightly slow.
+
+               `box-shadow` is now in the list and `background-image` is
+               deliberately NOT: `.tactile-control` declares nothing at rest,
+               so the gradient goes `none` → `linear-gradient(…)`, which is
+               not an interpolable pair in any browser. Naming it would read
+               as a fix and do nothing. It still snaps — invisibly, because
+               the sheen is white at 14-22% alpha and the checked chip is
+               `bg-foreground`, i.e. white on near-white. If that sheen ever
+               lands on a dark checked surface, the fix is a resting gradient
+               with zero-alpha stops on `.tactile-control` itself, which
+               touches every checkbox, switch, tab and nav row in the app.
+
+               PRESS and HEIGHT, for the same reasons as the featured CTA and
+               the credits pill: 160ms/--ease-settle/1px is the app's control
+               language from <Button>, these are the most-pressed controls on
+               the screen and had no `:active` at all, and `min-h-11` puts
+               them on the pill's 44px — one small-control height per screen,
+               and the touch minimum rather than 4px under it. */
             className={cn(
-              "tactile-control inline-flex min-h-10 items-center gap-2 rounded-full border px-4 text-sm font-medium outline-none transition-colors focus-ring motion-reduce:transition-none",
+              "tactile-control inline-flex min-h-11 items-center gap-2 rounded-full border px-4 text-sm font-medium outline-none transition-[color,background-color,border-color,box-shadow] duration-[160ms] ease-[var(--ease-settle)] active:translate-y-px focus-ring motion-reduce:transition-none",
               active
                 ? "border-foreground bg-foreground text-background"
                 : "border-border-strong bg-transparent text-foreground-2 hover:text-foreground",
@@ -345,7 +448,7 @@ function CategoryChips({
 
 /**
  * SOURCE OF TRUTH KEYWORDS: FeaturedFormat, FEATURED_FORMAT_KIND,
- * CTA_IS_LARGE_TEXT, FeatureGate
+ * CTA_IS_LARGE_TEXT, FeatureGate, PRESS_IS_THE_APP_LANGUAGE
  *
  * WHAT: The large panel for the one format the product is pushing.
  * WHY: CTA_IS_LARGE_TEXT — the button is 18px/700, which is what keeps
@@ -411,10 +514,28 @@ function FeaturedFormat({
         {canCreate ? (
           <div className="mt-2">
             <FeatureGate resource="projects">
+              {/* PRESS_IS_THE_APP_LANGUAGE. This is the highest-intent
+                  control on the screen and it was the one that answered
+                  nothing: no `:active`, and `hover:bg-brand/90` with no
+                  transition declared, so the brand orange snapped.
+
+                  The transition list, the 160ms, the curve and the 1px press
+                  are copied from <Button>'s base class rather than chosen
+                  again here. This button is hand-rolled because of
+                  CTA_IS_LARGE_TEXT — 18px/700 is what keeps white on the
+                  brand orange inside WCAG's large-text allowance, which the
+                  `lg` variant does not give — but being hand-rolled is a
+                  reason to restate the app's press language verbatim, not a
+                  licence to invent a second one. A creator who presses this
+                  and presses a <Button> should feel the same button.
+
+                  `box-shadow` is in the list for `brutal-shadow-brand`'s
+                  brand glow, which is the thing that should settle the day
+                  this button gains a hover shadow. */}
               <button
                 type="button"
                 onClick={() => onStart(kind)}
-                className="brutal-shadow-brand inline-flex min-h-[52px] cursor-pointer items-center gap-2.5 rounded-2xl bg-brand px-[22px] text-lg font-bold text-brand-foreground outline-none hover:bg-brand/90 focus-ring"
+                className="brutal-shadow-brand inline-flex min-h-[52px] cursor-pointer items-center gap-2.5 rounded-2xl bg-brand px-[22px] text-lg font-bold text-brand-foreground outline-none transition-[transform,background-color,box-shadow] duration-[160ms] ease-[var(--ease-settle)] hover:bg-brand/90 active:translate-y-px focus-ring motion-reduce:transition-none"
               >
                 {format.cta}
                 <ArrowRightIcon className="size-[18px]" aria-hidden="true" />

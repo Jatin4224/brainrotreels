@@ -259,6 +259,26 @@ html:has([data-app-banner]) {
      one is referenced by every `ease-out` utility in the product, and a hover
      polish pass has no business re-timing the dashboard. */
   --ease-settle: cubic-bezier(0.3, 0.7, 0.2, 1);
+
+  /* SOURCE OF TRUTH KEYWORDS: SPINNER_IS_FAST, --animate-spin
+     Tailwind ships `animate-spin` at 1s. A spinner's speed changes how long
+     the WAIT feels, not how long it takes: the same request behind a faster
+     spinner reads as a quicker app, which is free perceived performance on
+     every render, upload and save in the product.
+
+     0.6s is the floor worth having — past roughly 0.5s the ring stops
+     reading as rotation and starts reading as a flicker, and on a 2px
+     stroke it strobes.
+
+     Overridden HERE rather than at the call sites, which is the whole
+     reason it is worth doing: there are three dozen `animate-spin`s across
+     the app and no shared Spinner component to put it in. One token moves
+     all of them and cannot drift, and `animate-spin` keeps working as the
+     thing every one of those call sites already says. Unlike `--ease-out`,
+     which is deliberately NOT overridden above, re-timing this affects only
+     loading indicators — there is no second meaning of "spin" in the
+     product to collaterally re-time. */
+  --animate-spin: spin 0.6s linear infinite;
 }
 
 @layer base {
@@ -981,6 +1001,435 @@ html:has([data-app-banner]) {
     .proof-enter > *,
     .hero-stage-enter {
       animation: hero-enter-fade 200ms both;
+    }
+  }
+}
+
+/* SOURCE OF TRUTH KEYWORDS: app-enter, dash-enter, DASHBOARD_ASSEMBLES,
+ * ENTRANCE_PER_CONTAINER, FILTER_IS_A_TRANSITION, hero-enter
+ *
+ * WHAT:  The dashboard home screen's mount sequence (`.app-enter` on the
+ *        outer stack) and the re-played entrance its format region runs when
+ *        the category filter changes (`.dash-enter`).
+ *
+ * WHY:   DASHBOARD_ASSEMBLES. The marketing hero rises in reading order and
+ *        the authenticated home — the screen a paying creator opens every
+ *        day — was simply THERE, fully formed, in one frame. The difference
+ *        between a poster and a product is 300ms of assembly.
+ *
+ *        Deliberately the SAME keyframes and the same curve as `.hero-enter`,
+ *        not a second entrance invented for the app: one product, one way of
+ *        arriving. What changes is the SPEED — 220ms against the hero's
+ *        320ms, and a schedule that finishes in ~310ms rather than ~500ms.
+ *        A landing page is seen once and can afford to be savoured; this
+ *        screen is seen every session, and at hero timings the daily visit
+ *        would start to feel slow. Same language, said faster.
+ *
+ *        ENTRANCE_PER_CONTAINER. Two schedules, not one per card. The upper
+ *        block (greeting, headline, chips) steps 0/50/90ms; the format region
+ *        beneath it treats the featured panel and each category SECTION as
+ *        one unit. Staggering the individual cards inside a section as well
+ *        would nest a second entrance inside the first, and a category here
+ *        holds one to three cards — the per-card version is almost
+ *        indistinguishable from the block fading up, at the cost of reading
+ *        as two motions instead of one.
+ *
+ *        FILTER_IS_A_TRANSITION, which is the half of this that earns its
+ *        keep. Pressing a chip used to TELEPORT: cards vanished and appeared
+ *        in the same frame, which is the "jarring change" an animation is
+ *        actually for. `.dash-enter` sits on a wrapper the screen re-keys on
+ *        the filter, so React remounts the region and the CSS animation plays
+ *        again from the top — no state, no library, and it runs on the
+ *        compositor, which matters because this screen animates while it is
+ *        still hydrating.
+ *
+ *        The 90ms base delay is doing real work in both directions: on mount
+ *        it holds the format region until the chips above have landed, so the
+ *        screen assembles DOWNWARD and never backwards; on a chip press it is
+ *        still inside the ~100ms window that reads as instant, so the delay
+ *        buys ordering without costing responsiveness.
+ *
+ *        Both schedules are capped (`nth-child(n + 4)` / `(n + 5)`) for the
+ *        reason `.hero-enter` is: the day a fifth category is registered, its
+ *        section must not arrive most of a second into the screen's life.
+ *
+ *        Reduced motion keeps the fade and drops the 8px of travel — fewer
+ *        and gentler, not nothing. The delays survive it on purpose (they
+ *        out-specify the override), so the order still reads; what the
+ *        setting removes is the movement, which is the part that causes
+ *        trouble, not the sequence.
+ *
+ * WHERE: src/app/(dashboard)/dashboard/_components/home-screen.tsx —
+ *        `.app-enter` on the screen's root stack, `.dash-enter` on the
+ *        filter-keyed wrapper around the featured panel and the category
+ *        sections. Keyframes from the hero block above. */
+@layer components {
+  .app-enter > * {
+    animation: hero-enter 220ms var(--ease-settle) both;
+  }
+
+  .app-enter > *:nth-child(2) {
+    animation-delay: 50ms;
+  }
+
+  .app-enter > *:nth-child(3) {
+    animation-delay: 90ms;
+  }
+
+  .app-enter > *:nth-child(n + 4) {
+    animation-delay: 130ms;
+  }
+
+  .dash-enter > * {
+    animation: hero-enter 220ms var(--ease-settle) 90ms both;
+  }
+
+  .dash-enter > *:nth-child(2) {
+    animation-delay: 150ms;
+  }
+
+  .dash-enter > *:nth-child(3) {
+    animation-delay: 200ms;
+  }
+
+  .dash-enter > *:nth-child(4) {
+    animation-delay: 240ms;
+  }
+
+  .dash-enter > *:nth-child(n + 5) {
+    animation-delay: 280ms;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .app-enter > *,
+    .dash-enter > * {
+      animation: hero-enter-fade 180ms both;
+    }
+  }
+}
+
+/* SOURCE OF TRUTH KEYWORDS: block-enter, EVERY_ROUTE_ARRIVES, hero-enter,
+ * ENTRANCE_PER_CONTAINER, ONE_SCHEDULE_PER_SHAPE, ContentLayout, MintedKey
+ *
+ * WHAT:  The entrance for ONE element arriving on its own — no stagger,
+ *        because there is nothing to stagger. The dashboard's content column
+ *        on every route mount, and any single panel that appears after a wait.
+ *
+ * WHY:   EVERY_ROUTE_ARRIVES. `DASHBOARD_ASSEMBLES` gave the home screen an
+ *        entrance and left every other authenticated screen — projects,
+ *        media, credits, team, the composer, the whole project pipeline —
+ *        swapping in a single frame. The shell does not move during a
+ *        navigation: the sidebar, the trigger and the title row all stay
+ *        exactly where they were, so the only thing that changes is the
+ *        content, and it changed by teleporting. That is the jarring swap an
+ *        animation is actually for, and it was happening on every link in the
+ *        product except one.
+ *
+ *        Deliberately ONE block and not `.app-enter`'s stagger.
+ *        ENTRANCE_PER_CONTAINER: a page is an arbitrary tree this class knows
+ *        nothing about, so stepping its direct children would stagger
+ *        whatever the page happened to put first — a filter bar, a card, a
+ *        <form> — and any screen with its own choreography inside would then
+ *        animate twice. The page RISES; what is inside it is the page's own
+ *        business. `<ContentLayout enter={false}>` is the opt-out, and both
+ *        the home screen and the script editor take it because they own their
+ *        own arrival (`.app-enter`/`.dash-enter` and `.list-enter`).
+ *
+ *        ONE_SCHEDULE_PER_SHAPE — it was `.page-enter` until a second caller
+ *        wanted the same thing for something that is not a page. The shape it
+ *        serves is "one element, arriving", so it is named for that and not
+ *        for the first place it was needed. See `.list-enter` for the
+ *        many-small-items schedule and the rest of that rule.
+ *
+ *        Same keyframes, same curve and the same 220ms as the home screen,
+ *        for the reason stated there: one product, one way of arriving. No
+ *        delay — this plays on a navigation the user just asked for, and a
+ *        delay before the thing they clicked for is latency, not rhythm.
+ *
+ *        The HEADER is outside it on purpose. The sidebar trigger and the
+ *        page title occupy the same pixels before and after a navigation;
+ *        fading them up would animate chrome that did not move, which reads
+ *        as the app being slow to respond rather than as the page assembling.
+ *
+ *        Reduced motion keeps the fade and drops the travel — fewer and
+ *        gentler, not nothing, exactly as `.app-enter` does.
+ *
+ * WHERE: src/components/global/page-header.tsx wraps <ContentLayout>'s
+ *        children in it, keyed on the pathname so a navigation that React
+ *        would otherwise reconcile in place still replays it. Also the
+ *        one-time API key panel (MintedKey in the developers screen), which
+ *        appears mid-page the moment a key is minted. Keyframes from the hero
+ *        block above. */
+@layer components {
+  /* SOURCE OF TRUTH KEYWORDS: FILL_BACKWARDS_NOT_BOTH
+   *
+   * `backwards` and NOT the `both` the hero and `.app-enter` use, for a
+   * reason specific to this class: it wraps the content of EVERY dashboard
+   * page, permanently. `both` includes `forwards`, which leaves the final
+   * keyframe — `transform: translateY(0)` — applied for the lifetime of the
+   * element, and a non-`none` transform makes the wrapper a containing block
+   * for every `position: fixed` descendant under it, forever. No page does
+   * that today; the class would be a trap for the first one that tries.
+   * `backwards` covers the only thing `forwards` was buying here (no flash
+   * of the finished state before the animation starts) and lets the element
+   * fall back to its own styles — which are the finished state anyway — the
+   * moment it lands. */
+  .block-enter {
+    animation: hero-enter 220ms var(--ease-settle) backwards;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .block-enter {
+      animation: hero-enter-fade 180ms backwards;
+    }
+  }
+}
+
+/* SOURCE OF TRUTH KEYWORDS: list-enter, stage-connector-fill,
+ * PROGRESS_FLOWS_DOWNWARD, THE_PIPELINE_IS_THE_SCREEN, StageProgress,
+ * ONE_SCHEDULE_PER_SHAPE, hero-enter, --ease-settle
+ *
+ * WHAT:  The mount stagger for a list of MANY SMALL ROWS (`.list-enter`) and
+ *        the connector between two pipeline stages filling in as the upper
+ *        one finishes (`.stage-connector-fill`).
+ *
+ * WHY:   THE_PIPELINE_IS_THE_SCREEN. A generation runs for MINUTES and this
+ *        list is the entire answer to "where is it". Every stage transition
+ *        arrived as an instant repaint: the ring, the glyph and the status
+ *        word all changed in one frame, and the 1px rule between two rows was
+ *        a static grey line that said nothing about having been crossed. The
+ *        one surface in the product whose whole job is state indication was
+ *        the one with no motion in it at all.
+ *
+ *        PROGRESS_FLOWS_DOWNWARD is the part that earns its keep. The
+ *        connector is now a grey track with a brand fill scaled from
+ *        `transform-origin: top`, so finishing a stage sends a line DOWN into
+ *        the next one. It is the cheapest possible honest signal — progress
+ *        has a direction, and the list now shows it travelling rather than
+ *        leaving the reader to diff two frames of colour. `transform` and
+ *        nothing else: this runs on the compositor while the page is holding
+ *        a websocket open and polling, which is precisely when a
+ *        layout-triggering `height` animation would drop frames.
+ *
+ *        260ms, inside the 300ms UI budget, on `--ease-settle` like
+ *        everything else that moves in this app. Longer would be a progress
+ *        bar pretending the work takes as long as the animation; shorter and
+ *        the direction stops reading.
+ *
+ *        `.list-enter` staggers the ROWS on mount, 35ms apart, and was
+ *        `.stage-enter` until it had a third caller. ONE_SCHEDULE_PER_SHAPE:
+ *        this app now has exactly TWO stagger schedules and they are chosen
+ *        by the SHAPE of what is entering, not by which screen it is on.
+ *
+ *        `.dash-enter` is for A FEW LARGE BLOCKS — 60ms steps behind a 90ms
+ *        base, because there its delay holds the region until the chips above
+ *        it have landed, so the home screen assembles downward.
+ *
+ *        `.list-enter` is for MANY SMALL ITEMS: 35ms steps and NO base delay.
+ *        Both halves of that matter. 35ms because a dozen rows at 60ms is
+ *        most of a second of introduction, and no base delay because every
+ *        caller plays this the instant something the user waited for arrives
+ *        — a finished script, a finished render, a re-filtered catalogue. A
+ *        90ms hold there is not rhythm, it is latency on the payoff.
+ *
+ *        Capped at the sixth item (`nth-child(n + 7)`) for `.hero-enter`'s
+ *        reason, and the cap is what makes it safe on a FORTY-item grid: the
+ *        first six step, the rest land together at 210ms. Mount only — every
+ *        caller keys its items stably, so a re-render or a poll re-renders
+ *        them without re-animating anything.
+ *
+ *        Reduced motion: the fill FADES in at full height instead of growing,
+ *        and the rows lose their 8px of travel but keep their order. Fewer
+ *        and gentler — the state change still has to be visible, because for
+ *        this screen the state change is the content.
+ *
+ * WHERE: `.stage-connector-fill` is used only by
+ *        src/components/global/stage-progress/stage-progress.tsx, on the span
+ *        inside each row's connector track, toggled by `data-filled`.
+ *        `.list-enter` has four callers, all of them a list arriving after a
+ *        wait: that same file's stage <ol>, the script editor's block list
+ *        (the reveal at the end of "Writing your script…"), the footage
+ *        studio's generated clip grid, and the voice catalogue's grid on a
+ *        filter change. */
+@layer components {
+  /* FILL_BACKWARDS_NOT_BOTH — see `.page-enter` above. Here `backwards` is
+     also what holds a delayed row invisible until its turn. */
+  .list-enter > * {
+    animation: hero-enter 220ms var(--ease-settle) backwards;
+  }
+
+  .list-enter > *:nth-child(2) {
+    animation-delay: 35ms;
+  }
+
+  .list-enter > *:nth-child(3) {
+    animation-delay: 70ms;
+  }
+
+  .list-enter > *:nth-child(4) {
+    animation-delay: 105ms;
+  }
+
+  .list-enter > *:nth-child(5) {
+    animation-delay: 140ms;
+  }
+
+  .list-enter > *:nth-child(6) {
+    animation-delay: 175ms;
+  }
+
+  .list-enter > *:nth-child(n + 7) {
+    animation-delay: 210ms;
+  }
+
+  /* Scaled, not grown: `scaleY` from the top edge is the one way to draw this
+     without touching layout. The track above it supplies the unfilled grey,
+     so the fill never has to animate a colour. */
+  .stage-connector-fill {
+    transform: scaleY(0);
+    transform-origin: top;
+    transition: transform 260ms var(--ease-settle);
+  }
+
+  .stage-connector-fill[data-filled="true"] {
+    transform: scaleY(1);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .list-enter > * {
+      animation: hero-enter-fade 180ms backwards;
+    }
+
+    /* Full height from the start; the state arrives as opacity instead of as
+       travel. The signal survives, the movement does not. */
+    .stage-connector-fill {
+      transform: scaleY(1);
+      opacity: 0;
+      transition: opacity 180ms linear;
+    }
+
+    .stage-connector-fill[data-filled="true"] {
+      opacity: 1;
+    }
+  }
+}
+
+/* SOURCE OF TRUTH KEYWORDS: overlay-pop, POPUPS_TRANSITION_NOT_KEYFRAME,
+ * EXIT_IS_FASTER, ORIGIN_CARRIES_THE_DIRECTION, data-instant,
+ * --ease-settle
+ *
+ * WHAT:  The enter/exit for every ANCHORED overlay — dropdown menus, selects,
+ *        popovers and tooltips. One class on the popup element replaces the
+ *        fifteen `animate-in` / `slide-in-from-*` utilities each of them used
+ *        to carry.
+ *
+ * WHY:   POPUPS_TRANSITION_NOT_KEYFRAME. These were `animate-in`/`animate-out`
+ *        keyframes, and a keyframe cannot be interrupted — it restarts from
+ *        its first frame. Reopening a dropdown while it is still closing
+ *        replayed the entrance from zero instead of turning round from where
+ *        it had got to, and these are precisely the surfaces somebody opens,
+ *        dismisses and reopens in a second. A transition retargets from the
+ *        CURRENT value, which is the whole reason to prefer it here.
+ *        `sheet.tsx` in this same codebase already did it this way, so this
+ *        is one mechanism for the job rather than two.
+ *
+ *        Written as a class and not as inline utilities because all four
+ *        primitives are vendored shadcn files: the day somebody re-runs the
+ *        generator, one class name per file is a smaller thing to notice and
+ *        restore than fifteen, and the reasoning cannot be lost with them.
+ *
+ *        THE PROPERTIES ARE `opacity`, `scale` and `translate` — the separate
+ *        CSS properties, not a packed `transform` string. Tailwind v4 already
+ *        drives its scale and translate utilities through them, so this
+ *        composes with whatever else the element sets instead of fighting it,
+ *        and all three stay off the main thread.
+ *
+ *        EXIT_IS_FASTER: 160ms in, 120ms out. Opening is a request and wants
+ *        to feel answered; closing is a decision the user has already made,
+ *        and anything that lingers after a dismissal reads as the UI arguing.
+ *
+ *        ORIGIN_CARRIES_THE_DIRECTION. The popup already scales from
+ *        `--transform-origin`, so it grows out of its own trigger. The 8px of
+ *        directional travel is kept anyway — it is what the overlays did
+ *        before and it survives a trigger at a screen edge, where the origin
+ *        alone is ambiguous. Both `inline-*` sides are mapped as well as the
+ *        physical ones, so this does not quietly stop working in a RTL
+ *        locale.
+ *
+ *        `data-instant` is Base UI's own signal that a tooltip opened inside
+ *        a delay group's grace period — the second tooltip in a toolbar,
+ *        where the person is already reading tooltips and a fade just slows
+ *        them down. Zeroing the duration there is what makes a whole icon row
+ *        feel instant, and it costs one selector because the library already
+ *        emits the attribute.
+ *
+ *        Reduced motion keeps the fade and drops BOTH the scale and the
+ *        travel — gentler, not absent, so a popup still announces itself.
+ *
+ * WHERE: src/components/ui/{dropdown-menu,popover,select,tooltip}.tsx, on the
+ *        Base UI popup element that carries `origin-(--transform-origin)`.
+ *        Modals are deliberately NOT in this list: dialog and alert-dialog
+ *        centre themselves with the `translate` property, which this would
+ *        overwrite, and a modal is not rapidly re-triggered, so it has
+ *        nothing to gain from interruptibility. */
+@layer components {
+  .overlay-pop {
+    transition-property: opacity, scale, translate;
+    transition-duration: 160ms;
+    transition-timing-function: var(--ease-settle);
+  }
+
+  .overlay-pop[data-starting-style],
+  .overlay-pop[data-ending-style] {
+    opacity: 0;
+    scale: 0.95;
+  }
+
+  .overlay-pop[data-ending-style] {
+    transition-duration: 120ms;
+  }
+
+  /* The side is where the popup sits RELATIVE TO ITS TRIGGER, so the travel
+     runs the opposite way: a popup below its trigger enters from above it. */
+  .overlay-pop[data-side="bottom"][data-starting-style],
+  .overlay-pop[data-side="bottom"][data-ending-style] {
+    translate: 0 -8px;
+  }
+
+  .overlay-pop[data-side="top"][data-starting-style],
+  .overlay-pop[data-side="top"][data-ending-style] {
+    translate: 0 8px;
+  }
+
+  .overlay-pop[data-side="left"][data-starting-style],
+  .overlay-pop[data-side="left"][data-ending-style],
+  .overlay-pop[data-side="inline-start"][data-starting-style],
+  .overlay-pop[data-side="inline-start"][data-ending-style] {
+    translate: 8px 0;
+  }
+
+  .overlay-pop[data-side="right"][data-starting-style],
+  .overlay-pop[data-side="right"][data-ending-style],
+  .overlay-pop[data-side="inline-end"][data-starting-style],
+  .overlay-pop[data-side="inline-end"][data-ending-style] {
+    translate: -8px 0;
+  }
+
+  /* Base UI sets this when a delay group is already open. No delay was spent
+     getting here, so no time is spent animating either. */
+  .overlay-pop[data-instant] {
+    transition-duration: 0ms;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .overlay-pop {
+      transition-property: opacity;
+    }
+
+    .overlay-pop[data-starting-style],
+    .overlay-pop[data-ending-style] {
+      scale: 1;
+      translate: none;
     }
   }
 }

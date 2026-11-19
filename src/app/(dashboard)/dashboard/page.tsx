@@ -35,7 +35,13 @@ export const metadata: Metadata = {
 
 export default function DashboardHomePage() {
   return (
-    <ContentLayout title="Home" width="full">
+    /* ENTRANCE_PER_CONTAINER — `enter={false}` because
+       <DashboardHomeScreen> owns its own arrival (`.app-enter` on the upper
+       block, `.dash-enter` on the filter-keyed format region). Letting
+       ContentLayout's `.block-enter` play as well would fade the whole column
+       up WHILE the blocks inside it stepped down through it — two entrances
+       where the screen is deliberately one. */
+    <ContentLayout title="Home" width="full" enter={false}>
       {/* POST_SIGNUP_PLAN_STEP — the plan choice that used to be step two of
           onboarding. Renders nothing once dismissed or on a paid plan. */}
       <PlanSetupCard />

@@ -7,7 +7,7 @@
 /**
  * SOURCE OF TRUTH KEYWORDS: FormatCard, FormatCardProps, FORMATS,
  * CATEGORY_CLASSES, isStartableFormat, COMING_SOON_IS_NOT_A_BUTTON,
- * CARD_IS_ONE_TARGET
+ * CARD_IS_ONE_TARGET, COMING_SOON_LOOKS_UNAVAILABLE, THE_ARROW_ANSWERS
  *
  * WHAT: One horizontal format card — a tinted media column with the format's
  * two-character mark, then its eyebrow, title, two-line pitch and the
@@ -59,11 +59,19 @@ export function FormatCard({ kind, onStart, className }: FormatCardProps) {
 
   const body = (
     <>
+      {/* COMING_SOON_LOOKS_UNAVAILABLE — `opacity-50` rather than a fifth
+          entry in CATEGORY_CLASSES. The tint and the glyph are one token pair
+          (a `/15` alpha tint under the accent glyph), so dimming the whole
+          column keeps them in
+          proportion and cannot drift from the accent; a hand-mixed "muted
+          explain" would be a fifth value to maintain per category and the one
+          most likely to be forgotten when a category is re-skinned. */}
       <span
         aria-hidden="true"
         className={cn(
           "flex w-[104px] shrink-0 items-center justify-center font-display text-[2.125rem] font-extrabold tracking-tight",
           category.media,
+          !startable && "opacity-50",
         )}
       >
         {format.mono}
@@ -90,7 +98,21 @@ export function FormatCard({ kind, onStart, className }: FormatCardProps) {
           {startable ? (
             <>
               {format.cta}
-              <ArrowRightIcon className="size-3.5" aria-hidden="true" />
+              {/* THE_ARROW_ANSWERS. The card lifted a pixel on hover and the
+                  one glyph that means "go" sat still — the cheapest premium
+                  signal on the screen, unused. 2px of travel, on the same
+                  160ms/--ease-settle the app's controls use.
+
+                  `group-hover` and not a hand-written rule: verified to
+                  compile inside `@media (hover: hover)` on this Tailwind
+                  (4.3), so a tap on a phone cannot leave the arrow parked
+                  forward the way an ungated hover would. The `group` class
+                  lives only on the startable <button>, so this is inert in
+                  the coming-soon branch that shares this markup. */}
+              <ArrowRightIcon
+                className="size-3.5 transition-transform duration-[160ms] ease-[var(--ease-settle)] group-hover:translate-x-0.5 motion-reduce:transition-none motion-reduce:group-hover:translate-x-0"
+                aria-hidden="true"
+              />
             </>
           ) : (
             <span className="rounded-full border border-border-strong px-2.5 py-1 text-xs font-semibold text-muted-foreground">
@@ -103,10 +125,22 @@ export function FormatCard({ kind, onStart, className }: FormatCardProps) {
   );
 
   const shell =
-    "tactile-raised flex min-h-[180px] overflow-hidden rounded-[20px] border border-border bg-card";
+    "flex min-h-[180px] overflow-hidden rounded-[20px] border border-border";
 
+  /* COMING_SOON_LOOKS_UNAVAILABLE. `COMING_SOON_IS_NOT_A_BUTTON` above was
+     right about the MARKUP and the visuals never followed: an unstartable
+     format wore the identical `tactile-raised … bg-card` as its neighbours,
+     so it had the same lit top edge, the same contact shadow and the same
+     full-contrast glyph as a card that navigates. People aim at it and get
+     nothing — the exact failure a disabled button causes, just quieter,
+     because here there is not even a cursor change to warn them.
+     `tactile-raised` is what makes a surface look picked up off the page, so
+     it is the thing to drop; `bg-secondary/40` recedes behind `bg-card`
+     rather than standing level with it, and the badge keeps saying why. */
   if (!startable) {
-    return <div className={cn(shell, className)}>{body}</div>;
+    return (
+      <div className={cn(shell, "bg-secondary/40", className)}>{body}</div>
+    );
   }
 
   return (
@@ -117,10 +151,13 @@ export function FormatCard({ kind, onStart, className }: FormatCardProps) {
       /* Hover per the spec: the border steps up to `--line-strong` and the
          card lifts a hair. `brutal-hover` already owns that pair, including
          its prefers-reduced-motion opt-out, so it is reused rather than
-         restated. */
+         restated.
+         `group` is for the CTA arrow inside `body` — see THE_ARROW_ANSWERS.
+         It is on this branch only, which is what keeps the nudge from firing
+         on a card that cannot be started. */
       className={cn(
         shell,
-        "brutal-hover cursor-pointer text-left outline-none focus-ring",
+        "tactile-raised brutal-hover group cursor-pointer bg-card text-left outline-none focus-ring",
         className,
       )}
     >

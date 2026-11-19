@@ -388,8 +388,26 @@ function VoicePicker({
               : "The voice catalogue is empty. An operator needs to sync it from the portal."}
           </p>
         ) : (
+          /* SOURCE OF TRUTH KEYWORDS: CATALOGUE_IS_A_TRANSITION, list-enter,
+             TYPING_IS_NOT_AN_OCCASION
+             Up to forty cards used to teleport on every filter change: the
+             grid you were reading vanished and a different one took its place
+             in the same frame, which is the jarring swap FILTER_IS_A_TRANSITION
+             already solved once on the home screen. Same mechanism — a `key`
+             React remounts on, replaying `.list-enter` from the top — and
+             `.list-enter`'s cap is what makes it safe at this size: the first
+             six cards step, the remaining thirty-four land together at 210ms.
+
+             TYPING_IS_NOT_AN_OCCASION, and it is the whole reason the key is
+             built from the three SELECTS and not from `filters`. The search
+             box is undebounced and feeds the query directly, so keying on it
+             would replay the stagger on every character and restart it
+             mid-flight — a keystroke is a hundred-times-a-day action and must
+             not animate. Choosing a gender, an accent or a tone is the
+             occasional, deliberate act that earns the transition. */
           <div
-            className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
+            key={`${filters.gender}|${filters.accent}|${filters.tone}`}
+            className="list-enter grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
             role="radiogroup"
             aria-label="Voice catalogue"
           >

@@ -45,6 +45,7 @@ import {
   workspaceNameFor,
 } from "@/services/organization.service";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppSidebar } from "@/components/global/sidebar";
 import { PlanOverageBanner } from "@/components/global/plan-overage-banner";
 import { AppCanvasBodyClass } from "@/components/global/app-canvas";
@@ -219,10 +220,26 @@ export default async function DashboardLayout({
           render preview must keep their own colours. Every component inside
           still uses plain `bg-card` / `border-border` / `bg-primary` and
           simply comes out in this palette. */}
-      <SidebarProvider className="app-canvas">
-        <AppSidebar orgSwitcher={<OrgSwitcher />} userMenu={<UserMenu />} />
-        <SidebarInset>{children}</SidebarInset>
-      </SidebarProvider>
+      {/* DELAY_THEN_INSTANT — <TooltipProvider> existed and was exported from
+          the start and NOTHING EVER RENDERED IT, so every tooltip in the app
+          was its own island: each one waited out its full delay from scratch,
+          and moving along a toolbar meant waiting again at every icon. The
+          provider is what groups them, and the group is the whole feature —
+          delay before the first, instant for the rest, which `.overlay-pop`
+          finishes by zeroing its transition on Base UI's `data-instant`.
+
+          Mounted at the SHELL and not per screen: the point is one shared
+          group, and a provider per page or per toolbar would recreate exactly
+          the islands this removes. Here rather than in the root layout
+          because these are the authenticated app's tooltips; the marketing
+          and auth trees keep their own behaviour, the same boundary
+          `.app-canvas` draws one line below. */}
+      <TooltipProvider>
+        <SidebarProvider className="app-canvas">
+          <AppSidebar orgSwitcher={<OrgSwitcher />} userMenu={<UserMenu />} />
+          <SidebarInset>{children}</SidebarInset>
+        </SidebarProvider>
+      </TooltipProvider>
     </HydrationBoundary>
   );
 }

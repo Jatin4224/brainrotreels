@@ -64,6 +64,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { useReducedMotion } from "framer-motion";
+
 import { StatePanel } from "@/components/global/state-panel";
 import {
   Form,
@@ -585,15 +587,47 @@ function ScriptBlockList({
   canWrite: boolean;
 }) {
   const utils = trpc.useUtils();
+  const reduceMotion = useReducedMotion();
 
   const invalidate = React.useCallback(() => {
     void utils.scripts.list.invalidate();
   }, [utils]);
 
+  /* SOURCE OF TRUTH KEYWORDS: REORDER_IS_A_MOVE, FLIP, cardRefs, pendingFlip
+   *
+   * WHAT:  What the two reordered cards need in order to animate from their
+   *        OLD position to their new one.
+   *
+   * WHY:   REORDER_IS_A_MOVE. Pressing the arrow sends a mutation, waits for
+   *        the server, refetches, and the two cards swap places in a single
+   *        frame — the one interaction in this editor with a genuine spatial
+   *        story, told by teleporting. A reader who moved the wrong block
+   *        could not see WHICH two had traded places.
+   *
+   *        FLIP by hand, over framer-motion's `layout` prop. Three reasons
+   *        and the third is the real one: this app is on framer-motion 13,
+   *        where layout animations measure on the MAIN THREAD; `layout` on
+   *        these cards would re-measure on every render of a list whose
+   *        children are live textareas (DRAFT_IS_LOCAL_UNTIL_BLUR re-renders
+   *        a card per keystroke); and `move` already knows exactly WHICH TWO
+   *        elements change place, so measuring all of them to discover it is
+   *        work with no buyer. What is left is two rects and one
+   *        `element.animate()` on `transform`, which the compositor runs.
+   *
+   *        Keyed by block id and not by index, because the index is
+   *        precisely what the operation changes. */
+  const cardRefs = React.useRef(new Map<string, HTMLDivElement>());
+  const pendingFlip = React.useRef<Map<string, number> | null>(null);
+
   const reorder = trpc.scripts.reorder.useMutation({
     onSuccess: invalidate,
-    onError: (error) =>
-      toast.error("That move did not stick", { description: error.message }),
+    onError: (error) => {
+      /* The order did not change, so the layout effect below will never fire
+       * to consume these rects. Dropping them here is what stops a failed
+       * move from animating the NEXT successful one from stale coordinates. */
+      pendingFlip.current = null;
+      toast.error("That move did not stick", { description: error.message });
+    },
   });
 
   const addBlock = trpc.scripts.addBlock.useMutation({
@@ -615,8 +649,66 @@ function ScriptBlockList({
     ordered[index] = displaced;
     ordered[next] = moved;
 
+    /* FLIP's "First": where these two sit BEFORE the server confirms. Only
+     * `top` is recorded — the cards are full-width rows in a column, so a
+     * reorder never moves them horizontally and a left delta would always be
+     * zero. */
+    const firstTops = new Map<string, number>();
+    for (const id of [moved, displaced]) {
+      const element = cardRefs.current.get(id);
+      if (element !== undefined) {
+        firstTops.set(id, element.getBoundingClientRect().top);
+      }
+    }
+    pendingFlip.current = firstTops;
+
     reorder.mutate({ organizationId, projectId, orderedIds: ordered });
   }
+
+  /* The order as a string, so the effect below depends on the SEQUENCE rather
+   * than on the array identity every refetch replaces. */
+  const orderSignature = blocks.map((block) => block.id).join("|");
+
+  /* FLIP's "Last, Invert, Play". A LAYOUT effect and not an effect: this
+   * reads geometry and must do it in the same frame the browser committed the
+   * new order, before it paints the cards in their new places.
+   *
+   * `--ease-settle` is READ from the document rather than written out as
+   * literal control points — one curve, one definition. 220ms on the app's own
+   * curve rather than the `ease-in-out` a pure on-screen movement would take:
+   * this codebase deliberately has exactly ONE easing token, and a second
+   * curve for a single call site is the parallel system that rule exists to
+   * prevent. */
+  React.useLayoutEffect(() => {
+    const firstTops = pendingFlip.current;
+    if (firstTops === null) return;
+    pendingFlip.current = null;
+
+    /* Reduced motion gets the instant swap. There is no gentler version of
+     * "these two changed place" — the movement IS the message, so unlike a
+     * fade this one is honestly better off absent than softened. */
+    if (reduceMotion === true) return;
+
+    const easing =
+      getComputedStyle(document.documentElement)
+        .getPropertyValue("--ease-settle")
+        .trim() || "ease-out";
+
+    for (const [id, firstTop] of firstTops) {
+      const element = cardRefs.current.get(id);
+      if (element === undefined) continue;
+      const delta = firstTop - element.getBoundingClientRect().top;
+      if (delta === 0) continue;
+
+      element.animate(
+        [
+          { transform: "translateY(" + delta + "px)" },
+          { transform: "translateY(0)" },
+        ],
+        { duration: 220, easing },
+      );
+    }
+  }, [orderSignature, reduceMotion]);
 
   return (
     <div className="flex flex-col gap-4">
@@ -660,19 +752,59 @@ function ScriptBlockList({
         </Alert>
       ) : null}
 
-      {blocks.map((block, index) => (
-        <ScriptBlockCard
-          key={block.id}
-          organizationId={organizationId}
-          block={block}
-          canWrite={canWrite}
-          isFirst={index === 0}
-          isLast={index === blocks.length - 1}
-          onMoveUp={() => move(index, -1)}
-          onMoveDown={() => move(index, 1)}
-          onChanged={invalidate}
-        />
-      ))}
+      {/* SOURCE OF TRUTH KEYWORDS: THE_SCRIPT_IS_THE_PAYOFF, list-enter,
+          ENTRANCE_PER_CONTAINER
+
+          The blocks are wrapped rather than left as siblings of the count row
+          and the pacing alert for two reasons: `.list-enter` steps its DIRECT
+          children, so without the wrapper the schedule would be spent on the
+          chrome above and the first block would start three steps in — and
+          the wrapper is also what each card's FLIP ref hangs on. `gap-4`
+          restates what these elements already had from the parent, so the
+          spacing is unchanged.
+
+          THE_SCRIPT_IS_THE_PAYOFF. This list arrives at the end of
+          "Writing your script…" — up to a minute of waiting, and then the
+          whole script used to appear in one frame. It is the biggest single
+          block of content in the product and the moment a creator finds out
+          whether what they paid for is any good. Stepping it 35ms a card
+          reads as the script being laid down rather than pasted.
+
+          A plain mount animation covers BOTH arrivals with no state to
+          track: React swaps <StatePanel> for this component when
+          `generating` goes false, which is a mount, and a page visit to an
+          existing script is also a mount. The script page passes
+          `enter={false}` to <ContentLayout> so this is the screen's ONE
+          entrance (ENTRANCE_PER_CONTAINER) rather than a second one playing
+          inside the column's. */}
+      <div className="list-enter flex flex-col gap-4">
+        {blocks.map((block, index) => (
+          <div
+            key={block.id}
+            ref={(element) => {
+              /* A cleanup-returning ref callback, so an unmounted card does
+               * not sit in the map as a detached node the FLIP would measure
+               * at 0. */
+              if (element === null) return;
+              cardRefs.current.set(block.id, element);
+              return () => {
+                cardRefs.current.delete(block.id);
+              };
+            }}
+          >
+            <ScriptBlockCard
+              organizationId={organizationId}
+              block={block}
+              canWrite={canWrite}
+              isFirst={index === 0}
+              isLast={index === blocks.length - 1}
+              onMoveUp={() => move(index, -1)}
+              onMoveDown={() => move(index, 1)}
+              onChanged={invalidate}
+            />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

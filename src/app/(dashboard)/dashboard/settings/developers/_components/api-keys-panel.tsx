@@ -472,7 +472,22 @@ function MintedKey({
   };
 
   return (
-    <div className="tactile-raised flex flex-col gap-3 rounded-lg border bg-card p-4">
+    /* SOURCE OF TRUTH KEYWORDS: THE_KEY_IS_SHOWN_ONCE, block-enter
+       A panel saying "this is the only time this key is shown" used to pop
+       into the middle of the page with no bridge at all, which is the worst
+       case for a teleport: the reader has to NOTICE it to act on it, and a
+       surface that simply becomes present is the easiest kind to miss.
+       `.block-enter` is the app's single-element arrival, the same 220ms rise
+       every dashboard route plays, so the panel reads as having been handed
+       over rather than having always been there. Rare tier — a key is minted
+       a handful of times in a workspace's life — so this is affordable
+       without being showy.
+
+       Entrance only, and that asymmetry is deliberate rather than an
+       oversight: `onDismiss` unmounts this immediately, and giving it a real
+       exit would mean holding it mounted through a close just to animate
+       something the customer has already finished with. */
+    <div className="block-enter tactile-raised flex flex-col gap-3 rounded-lg border bg-card p-4">
       <div>
         <p className="text-sm font-medium">{name} is ready</p>
         <p className="text-muted-foreground text-sm">

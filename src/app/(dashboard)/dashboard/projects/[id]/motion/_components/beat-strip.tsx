@@ -193,7 +193,21 @@ export function BeatStrip({ projectId }: { projectId: string }) {
               type="button"
               onClick={() => setSelected(position)}
               aria-current={beat.index === current.index}
-              className={`tactile-control flex shrink-0 flex-col gap-1 rounded-md border p-1 text-left transition-colors outline-none focus-ring ${
+              /* HALF_A_STATE_CHANGE, the defect the home screen's category
+                 chips name and fix. This was `transition-colors`, which does
+                 NOT cover `box-shadow` — and `box-shadow` is one of the two
+                 things `.tactile-control[aria-current]` actually changes. So
+                 selecting a beat eased its border and background over 150ms
+                 while the raised ring appeared in frame one: one state change
+                 arriving in two instalments, which is what made the press read
+                 as slightly broken rather than slightly slow.
+
+                 `background-image` is deliberately still absent: the utility
+                 declares no gradient at rest, so the pair is `none` →
+                 `linear-gradient(…)`, which no browser can interpolate.
+                 Naming it would read as a fix and do nothing. 160ms on
+                 `--ease-settle` is the app's control language from <Button>. */
+              className={`tactile-control flex shrink-0 flex-col gap-1 rounded-md border p-1 text-left transition-[color,background-color,border-color,box-shadow] duration-[160ms] ease-[var(--ease-settle)] outline-none focus-ring motion-reduce:transition-none ${
                 beat.index === current.index
                   ? "border-primary bg-accent"
                   : "hover:bg-accent/50"
