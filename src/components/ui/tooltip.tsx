@@ -4,14 +4,41 @@ import { Tooltip as TooltipPrimitive } from "@base-ui/react/tooltip"
 
 import { cn } from "@/lib/utils"
 
+/* SOURCE OF TRUTH KEYWORDS: TooltipProvider, DELAY_THEN_INSTANT,
+ * data-instant, overlay-pop
+ *
+ * THE DELAY IS THE POINT, and this defaulted to 0 — which is to say it
+ * defaulted to no delay at all. A tooltip with no delay fires on every
+ * incidental pass of the mouse, so dragging the pointer across a toolbar
+ * leaves a trail of popups nobody asked to read. The delay exists to tell
+ * "resting on this" apart from "moving past it".
+ *
+ * DELAY_THEN_INSTANT is the other half, and it is what makes the delay
+ * affordable. Once ONE tooltip in the group is open, the person has
+ * demonstrably decided to read tooltips, and making them wait another 600ms
+ * per icon is the thing that makes a toolbar feel slow. `timeout` is Base
+ * UI's grace period: inside it the next tooltip opens immediately, and the
+ * library marks it `data-instant`, which `.overlay-pop` answers by zeroing
+ * the transition. Delay once, then instant — the whole row feels quick
+ * without ever firing by accident.
+ *
+ * `closeDelay: 0` because leaving is unambiguous: the pointer has gone, and
+ * a tooltip that hangs around afterwards is just occlusion.
+ *
+ * Base UI's own `timeout` default is 400ms; it is stated here anyway, since
+ * the three numbers only make sense read together. */
 function TooltipProvider({
-  delay = 0,
+  delay = 600,
+  closeDelay = 0,
+  timeout = 400,
   ...props
 }: TooltipPrimitive.Provider.Props) {
   return (
     <TooltipPrimitive.Provider
       data-slot="tooltip-provider"
       delay={delay}
+      closeDelay={closeDelay}
+      timeout={timeout}
       {...props}
     />
   )
@@ -50,7 +77,7 @@ function TooltipContent({
         <TooltipPrimitive.Popup
           data-slot="tooltip-content"
           className={cn(
-            "z-50 inline-flex w-fit max-w-xs origin-(--transform-origin) items-center gap-1.5 rounded-md bg-foreground px-3 py-1.5 text-xs text-background tactile-panel-sm has-data-[slot=kbd]:pr-1.5 data-[side=bottom]:slide-in-from-top-2 data-[side=inline-end]:slide-in-from-left-2 data-[side=inline-start]:slide-in-from-right-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 **:data-[slot=kbd]:relative **:data-[slot=kbd]:isolate **:data-[slot=kbd]:z-50 **:data-[slot=kbd]:rounded-sm data-[state=delayed-open]:animate-in data-[state=delayed-open]:fade-in-0 data-[state=delayed-open]:zoom-in-95 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
+            "z-50 inline-flex w-fit max-w-xs overlay-pop origin-(--transform-origin) items-center gap-1.5 rounded-md bg-foreground px-3 py-1.5 text-xs text-background tactile-panel-sm has-data-[slot=kbd]:pr-1.5 **:data-[slot=kbd]:relative **:data-[slot=kbd]:isolate **:data-[slot=kbd]:z-50 **:data-[slot=kbd]:rounded-sm",
             className
           )}
           {...props}

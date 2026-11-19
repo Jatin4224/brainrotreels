@@ -1108,6 +1108,126 @@ html:has([data-app-banner]) {
   }
 }
 
+/* SOURCE OF TRUTH KEYWORDS: overlay-pop, POPUPS_TRANSITION_NOT_KEYFRAME,
+ * EXIT_IS_FASTER, ORIGIN_CARRIES_THE_DIRECTION, data-instant,
+ * --ease-settle
+ *
+ * WHAT:  The enter/exit for every ANCHORED overlay — dropdown menus, selects,
+ *        popovers and tooltips. One class on the popup element replaces the
+ *        fifteen `animate-in` / `slide-in-from-*` utilities each of them used
+ *        to carry.
+ *
+ * WHY:   POPUPS_TRANSITION_NOT_KEYFRAME. These were `animate-in`/`animate-out`
+ *        keyframes, and a keyframe cannot be interrupted — it restarts from
+ *        its first frame. Reopening a dropdown while it is still closing
+ *        replayed the entrance from zero instead of turning round from where
+ *        it had got to, and these are precisely the surfaces somebody opens,
+ *        dismisses and reopens in a second. A transition retargets from the
+ *        CURRENT value, which is the whole reason to prefer it here.
+ *        `sheet.tsx` in this same codebase already did it this way, so this
+ *        is one mechanism for the job rather than two.
+ *
+ *        Written as a class and not as inline utilities because all four
+ *        primitives are vendored shadcn files: the day somebody re-runs the
+ *        generator, one class name per file is a smaller thing to notice and
+ *        restore than fifteen, and the reasoning cannot be lost with them.
+ *
+ *        THE PROPERTIES ARE `opacity`, `scale` and `translate` — the separate
+ *        CSS properties, not a packed `transform` string. Tailwind v4 already
+ *        drives its scale and translate utilities through them, so this
+ *        composes with whatever else the element sets instead of fighting it,
+ *        and all three stay off the main thread.
+ *
+ *        EXIT_IS_FASTER: 160ms in, 120ms out. Opening is a request and wants
+ *        to feel answered; closing is a decision the user has already made,
+ *        and anything that lingers after a dismissal reads as the UI arguing.
+ *
+ *        ORIGIN_CARRIES_THE_DIRECTION. The popup already scales from
+ *        `--transform-origin`, so it grows out of its own trigger. The 8px of
+ *        directional travel is kept anyway — it is what the overlays did
+ *        before and it survives a trigger at a screen edge, where the origin
+ *        alone is ambiguous. Both `inline-*` sides are mapped as well as the
+ *        physical ones, so this does not quietly stop working in a RTL
+ *        locale.
+ *
+ *        `data-instant` is Base UI's own signal that a tooltip opened inside
+ *        a delay group's grace period — the second tooltip in a toolbar,
+ *        where the person is already reading tooltips and a fade just slows
+ *        them down. Zeroing the duration there is what makes a whole icon row
+ *        feel instant, and it costs one selector because the library already
+ *        emits the attribute.
+ *
+ *        Reduced motion keeps the fade and drops BOTH the scale and the
+ *        travel — gentler, not absent, so a popup still announces itself.
+ *
+ * WHERE: src/components/ui/{dropdown-menu,popover,select,tooltip}.tsx, on the
+ *        Base UI popup element that carries `origin-(--transform-origin)`.
+ *        Modals are deliberately NOT in this list: dialog and alert-dialog
+ *        centre themselves with the `translate` property, which this would
+ *        overwrite, and a modal is not rapidly re-triggered, so it has
+ *        nothing to gain from interruptibility. */
+@layer components {
+  .overlay-pop {
+    transition-property: opacity, scale, translate;
+    transition-duration: 160ms;
+    transition-timing-function: var(--ease-settle);
+  }
+
+  .overlay-pop[data-starting-style],
+  .overlay-pop[data-ending-style] {
+    opacity: 0;
+    scale: 0.95;
+  }
+
+  .overlay-pop[data-ending-style] {
+    transition-duration: 120ms;
+  }
+
+  /* The side is where the popup sits RELATIVE TO ITS TRIGGER, so the travel
+     runs the opposite way: a popup below its trigger enters from above it. */
+  .overlay-pop[data-side="bottom"][data-starting-style],
+  .overlay-pop[data-side="bottom"][data-ending-style] {
+    translate: 0 -8px;
+  }
+
+  .overlay-pop[data-side="top"][data-starting-style],
+  .overlay-pop[data-side="top"][data-ending-style] {
+    translate: 0 8px;
+  }
+
+  .overlay-pop[data-side="left"][data-starting-style],
+  .overlay-pop[data-side="left"][data-ending-style],
+  .overlay-pop[data-side="inline-start"][data-starting-style],
+  .overlay-pop[data-side="inline-start"][data-ending-style] {
+    translate: 8px 0;
+  }
+
+  .overlay-pop[data-side="right"][data-starting-style],
+  .overlay-pop[data-side="right"][data-ending-style],
+  .overlay-pop[data-side="inline-end"][data-starting-style],
+  .overlay-pop[data-side="inline-end"][data-ending-style] {
+    translate: -8px 0;
+  }
+
+  /* Base UI sets this when a delay group is already open. No delay was spent
+     getting here, so no time is spent animating either. */
+  .overlay-pop[data-instant] {
+    transition-duration: 0ms;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .overlay-pop {
+      transition-property: opacity;
+    }
+
+    .overlay-pop[data-starting-style],
+    .overlay-pop[data-ending-style] {
+      scale: 1;
+      translate: none;
+    }
+  }
+}
+
 @layer components {
   .reel-feed {
     animation: reel-feed 9s infinite;
