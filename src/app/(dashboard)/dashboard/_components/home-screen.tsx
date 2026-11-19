@@ -78,10 +78,7 @@ import { permissions } from "@/lib/permissions";
 /* THE_REGISTRY_OWNS_THE_PATH — the credits pill links where the sidebar
  * links, from the same declaration. See THE_PILL_IS_THE_LINK below. */
 import { RESOURCES } from "@/lib/resources";
-import {
-  PROJECT_KINDS,
-  type ProjectKind,
-} from "@/lib/types";
+import { PROJECT_KINDS, type ProjectKind } from "@/lib/types";
 import {
   useActiveOrganization,
   useActiveOrganizationId,
@@ -352,7 +349,8 @@ function HomeHeader({
 }
 
 /**
- * SOURCE OF TRUTH KEYWORDS: CategoryChips, FILTER_IS_CLIENT_STATE, radiogroup
+ * SOURCE OF TRUTH KEYWORDS: CategoryChips, FILTER_IS_CLIENT_STATE, radiogroup,
+ * HALF_A_STATE_CHANGE, PRESS_IS_THE_APP_LANGUAGE
  *
  * WHAT: The "All formats / Explain / Entertain / …" filter row.
  * WHY: A `radiogroup` of buttons, not a tablist: these select the MEANING
@@ -400,8 +398,35 @@ function CategoryChips({
             role="radio"
             aria-checked={active}
             onClick={() => onChange(chip.id)}
+            /* HALF_A_STATE_CHANGE was the bug. `transition-colors` covers
+               colour, background-colour, border-colour, fill and stroke —
+               and `.tactile-control[aria-checked="true"]` changes NEITHER of
+               the two things that actually make the chip look selected: it
+               swaps `box-shadow` and `background-image`. So the text and fill
+               eased over 150ms while the raised ring and sheen appeared in
+               frame one. One state change arriving in two instalments is
+               what made the press read as slightly broken rather than
+               slightly slow.
+
+               `box-shadow` is now in the list and `background-image` is
+               deliberately NOT: `.tactile-control` declares nothing at rest,
+               so the gradient goes `none` → `linear-gradient(…)`, which is
+               not an interpolable pair in any browser. Naming it would read
+               as a fix and do nothing. It still snaps — invisibly, because
+               the sheen is white at 14-22% alpha and the checked chip is
+               `bg-foreground`, i.e. white on near-white. If that sheen ever
+               lands on a dark checked surface, the fix is a resting gradient
+               with zero-alpha stops on `.tactile-control` itself, which
+               touches every checkbox, switch, tab and nav row in the app.
+
+               PRESS and HEIGHT, for the same reasons as the featured CTA and
+               the credits pill: 160ms/--ease-settle/1px is the app's control
+               language from <Button>, these are the most-pressed controls on
+               the screen and had no `:active` at all, and `min-h-11` puts
+               them on the pill's 44px — one small-control height per screen,
+               and the touch minimum rather than 4px under it. */
             className={cn(
-              "tactile-control inline-flex min-h-10 items-center gap-2 rounded-full border px-4 text-sm font-medium outline-none transition-colors focus-ring motion-reduce:transition-none",
+              "tactile-control inline-flex min-h-11 items-center gap-2 rounded-full border px-4 text-sm font-medium outline-none transition-[color,background-color,border-color,box-shadow] duration-[160ms] ease-[var(--ease-settle)] active:translate-y-px focus-ring motion-reduce:transition-none",
               active
                 ? "border-foreground bg-foreground text-background"
                 : "border-border-strong bg-transparent text-foreground-2 hover:text-foreground",
