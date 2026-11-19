@@ -7,7 +7,8 @@
 /**
  * SOURCE OF TRUTH KEYWORDS: DashboardHomeScreen, HOME_IS_A_FORMAT_PICKER,
  * FORMATS, FORMAT_CATEGORIES, FEATURED_FORMAT_KIND, COMPOSER_ROUTE,
- * FeatureGate, GREETING_IS_LOCAL, FILTER_IS_CLIENT_STATE
+ * FeatureGate, GREETING_IS_LOCAL, FILTER_IS_CLIENT_STATE,
+ * DASHBOARD_ASSEMBLES, FILTER_IS_A_TRANSITION
  *
  * WHAT: The dashboard home screen — a greeting and credit balance, the
  * "What are you making?" headline, category filter chips, the
@@ -39,6 +40,15 @@
  * the world and also a hydration mismatch. It starts empty and fills
  * in, which is why it is the one thing on the screen allowed to
  * appear a frame late.
+ *
+ * DASHBOARD_ASSEMBLES and FILTER_IS_A_TRANSITION: the screen rises in
+ * reading order on mount (`.app-enter`), and the format region
+ * re-plays that entrance whenever the filter changes (`.dash-enter`
+ * on a wrapper keyed by `filter`). Both reuse the marketing hero's
+ * keyframes and curve on a faster schedule — one product, one way of
+ * arriving, said quickly on a screen somebody opens every day. The
+ * delay schedule and the reduced-motion fallback live with the CSS in
+ * globals.css.
  *
  * STARTING IS STILL GATED. Every CTA routes through one
  * <FeatureGate resource="projects">-wrapped handler, so a workspace at
@@ -157,56 +167,80 @@ export function DashboardHomeScreen() {
 
   return (
     <div className="flex flex-col gap-7">
-      <HomeHeader greeting={greeting} name={profile?.name ?? null} />
+      {/* DASHBOARD_ASSEMBLES — the screen's first half steps down in reading
+          order (greeting, headline, chips). `.app-enter` wants the animated
+          blocks as its DIRECT children, which is why this group is its own
+          element rather than the class living on the root: the root also holds
+          the format region below, and a region that animates itself while its
+          children animate too is two entrances where there should be one. */}
+      <div className="app-enter flex flex-col gap-7">
+        <HomeHeader greeting={greeting} name={profile?.name ?? null} />
 
-      <div>
-        <HighlightHeading
-          before="What are you"
-          highlight="making"
-          trailing="?"
-          radius="xl"
-          className="font-display text-[2.75rem] font-extrabold leading-none tracking-tight text-foreground lg:text-[3.25rem]"
-        />
-        <p className="mt-3 max-w-2xl text-base leading-relaxed text-muted-foreground">
-          Pick by what you&apos;re starting from. Every format writes its own
-          script, casts a voice and captions itself.
-        </p>
+        <div>
+          <HighlightHeading
+            before="What are you"
+            highlight="making"
+            trailing="?"
+            radius="xl"
+            className="font-display text-[2.75rem] font-extrabold leading-none tracking-tight text-foreground lg:text-[3.25rem]"
+          />
+          <p className="mt-3 max-w-2xl text-base leading-relaxed text-muted-foreground">
+            Pick by what you&apos;re starting from. Every format writes its own
+            script, casts a voice and captions itself.
+          </p>
+        </div>
+
+        <CategoryChips value={filter} onChange={setFilter} />
       </div>
 
-      <CategoryChips value={filter} onChange={setFilter} />
+      {/* FILTER_IS_A_TRANSITION — `key={filter}` is the whole mechanism. The
+          formats this region shows change the instant a chip is pressed, and
+          they used to change in ONE FRAME: cards vanished and others appeared
+          in their place with nothing in between, which is the jarring swap an
+          animation actually exists to soften. Re-keying on the filter makes
+          React remount the region, which replays `.dash-enter` from the top —
+          no transition state to track, no AnimatePresence, and it stays on the
+          compositor, which matters on a screen that animates while it is still
+          hydrating.
 
-      {featuredVisible ? (
-        <FeaturedFormat
-          kind={FEATURED_FORMAT_KIND}
-          canCreate={canCreate}
-          onStart={handleStart}
-        />
-      ) : null}
+          The remount is free here: everything below is derived from `filter`
+          and the format registry, so there is no local state, no focus and no
+          scroll position inside it for a remount to throw away. The pressed
+          chip lives ABOVE this boundary and keeps its focus ring. */}
+      <div key={filter} className="dash-enter flex flex-col gap-7">
+        {featuredVisible ? (
+          <FeaturedFormat
+            kind={FEATURED_FORMAT_KIND}
+            canCreate={canCreate}
+            onStart={handleStart}
+          />
+        ) : null}
 
-      {CATEGORY_ORDER.map((category) => {
-        const kinds = formatsByCategory(category).filter((kind) =>
-          gridKinds.includes(kind),
-        );
-        if (kinds.length === 0) return null;
-        const classes = CATEGORY_CLASSES[category];
+        {CATEGORY_ORDER.map((category) => {
+          const kinds = formatsByCategory(category).filter((kind) =>
+            gridKinds.includes(kind),
+          );
+          if (kinds.length === 0) return null;
+          const classes = CATEGORY_CLASSES[category];
 
-        return (
-          <section key={category} className="flex flex-col gap-3.5">
-            <h2 className="mt-2 flex items-center gap-2.5 text-lg font-bold text-foreground">
-              <span
-                aria-hidden="true"
-                className={cn("size-2.5 rounded-[3px]", classes.dot)}
-              />
-              {FORMAT_CATEGORIES[category].label}
-            </h2>
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {kinds.map((kind) => (
-                <FormatCard key={kind} kind={kind} onStart={handleStart} />
-              ))}
-            </div>
-          </section>
-        );
-      })}
+          return (
+            <section key={category} className="flex flex-col gap-3.5">
+              <h2 className="mt-2 flex items-center gap-2.5 text-lg font-bold text-foreground">
+                <span
+                  aria-hidden="true"
+                  className={cn("size-2.5 rounded-[3px]", classes.dot)}
+                />
+                {FORMAT_CATEGORIES[category].label}
+              </h2>
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {kinds.map((kind) => (
+                  <FormatCard key={kind} kind={kind} onStart={handleStart} />
+                ))}
+              </div>
+            </section>
+          );
+        })}
+      </div>
     </div>
   );
 }

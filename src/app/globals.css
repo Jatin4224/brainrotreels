@@ -985,6 +985,109 @@ html:has([data-app-banner]) {
   }
 }
 
+/* SOURCE OF TRUTH KEYWORDS: app-enter, dash-enter, DASHBOARD_ASSEMBLES,
+ * ENTRANCE_PER_CONTAINER, FILTER_IS_A_TRANSITION, hero-enter
+ *
+ * WHAT:  The dashboard home screen's mount sequence (`.app-enter` on the
+ *        outer stack) and the re-played entrance its format region runs when
+ *        the category filter changes (`.dash-enter`).
+ *
+ * WHY:   DASHBOARD_ASSEMBLES. The marketing hero rises in reading order and
+ *        the authenticated home — the screen a paying creator opens every
+ *        day — was simply THERE, fully formed, in one frame. The difference
+ *        between a poster and a product is 300ms of assembly.
+ *
+ *        Deliberately the SAME keyframes and the same curve as `.hero-enter`,
+ *        not a second entrance invented for the app: one product, one way of
+ *        arriving. What changes is the SPEED — 220ms against the hero's
+ *        320ms, and a schedule that finishes in ~310ms rather than ~500ms.
+ *        A landing page is seen once and can afford to be savoured; this
+ *        screen is seen every session, and at hero timings the daily visit
+ *        would start to feel slow. Same language, said faster.
+ *
+ *        ENTRANCE_PER_CONTAINER. Two schedules, not one per card. The upper
+ *        block (greeting, headline, chips) steps 0/50/90ms; the format region
+ *        beneath it treats the featured panel and each category SECTION as
+ *        one unit. Staggering the individual cards inside a section as well
+ *        would nest a second entrance inside the first, and a category here
+ *        holds one to three cards — the per-card version is almost
+ *        indistinguishable from the block fading up, at the cost of reading
+ *        as two motions instead of one.
+ *
+ *        FILTER_IS_A_TRANSITION, which is the half of this that earns its
+ *        keep. Pressing a chip used to TELEPORT: cards vanished and appeared
+ *        in the same frame, which is the "jarring change" an animation is
+ *        actually for. `.dash-enter` sits on a wrapper the screen re-keys on
+ *        the filter, so React remounts the region and the CSS animation plays
+ *        again from the top — no state, no library, and it runs on the
+ *        compositor, which matters because this screen animates while it is
+ *        still hydrating.
+ *
+ *        The 90ms base delay is doing real work in both directions: on mount
+ *        it holds the format region until the chips above have landed, so the
+ *        screen assembles DOWNWARD and never backwards; on a chip press it is
+ *        still inside the ~100ms window that reads as instant, so the delay
+ *        buys ordering without costing responsiveness.
+ *
+ *        Both schedules are capped (`nth-child(n + 4)` / `(n + 5)`) for the
+ *        reason `.hero-enter` is: the day a fifth category is registered, its
+ *        section must not arrive most of a second into the screen's life.
+ *
+ *        Reduced motion keeps the fade and drops the 8px of travel — fewer
+ *        and gentler, not nothing. The delays survive it on purpose (they
+ *        out-specify the override), so the order still reads; what the
+ *        setting removes is the movement, which is the part that causes
+ *        trouble, not the sequence.
+ *
+ * WHERE: src/app/(dashboard)/dashboard/_components/home-screen.tsx —
+ *        `.app-enter` on the screen's root stack, `.dash-enter` on the
+ *        filter-keyed wrapper around the featured panel and the category
+ *        sections. Keyframes from the hero block above. */
+@layer components {
+  .app-enter > * {
+    animation: hero-enter 220ms var(--ease-settle) both;
+  }
+
+  .app-enter > *:nth-child(2) {
+    animation-delay: 50ms;
+  }
+
+  .app-enter > *:nth-child(3) {
+    animation-delay: 90ms;
+  }
+
+  .app-enter > *:nth-child(n + 4) {
+    animation-delay: 130ms;
+  }
+
+  .dash-enter > * {
+    animation: hero-enter 220ms var(--ease-settle) 90ms both;
+  }
+
+  .dash-enter > *:nth-child(2) {
+    animation-delay: 150ms;
+  }
+
+  .dash-enter > *:nth-child(3) {
+    animation-delay: 200ms;
+  }
+
+  .dash-enter > *:nth-child(4) {
+    animation-delay: 240ms;
+  }
+
+  .dash-enter > *:nth-child(n + 5) {
+    animation-delay: 280ms;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .app-enter > *,
+    .dash-enter > * {
+      animation: hero-enter-fade 180ms both;
+    }
+  }
+}
+
 @layer components {
   .reel-feed {
     animation: reel-feed 9s infinite;
