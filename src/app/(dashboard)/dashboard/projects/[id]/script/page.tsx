@@ -38,7 +38,13 @@ export default async function ProjectScriptPage({
   const { id } = await params;
 
   return (
-    <ContentLayout title="Script">
+    /* ENTRANCE_PER_CONTAINER — `enter={false}` because the script BLOCKS own
+       this screen's arrival (`.list-enter`, see THE_SCRIPT_IS_THE_PAYOFF in
+       script-editor.tsx). The blocks are the content here; the step nav and
+       the generate form are chrome that is in the same place before and after
+       a navigation. Fading the column up as well would put a second entrance
+       around the only one that carries meaning. */
+    <ContentLayout title="Script" enter={false}>
       <ProjectSteps projectId={id} />
       <ScriptEditor projectId={id} />
     </ContentLayout>

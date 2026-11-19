@@ -1108,6 +1108,212 @@ html:has([data-app-banner]) {
   }
 }
 
+/* SOURCE OF TRUTH KEYWORDS: block-enter, EVERY_ROUTE_ARRIVES, hero-enter,
+ * ENTRANCE_PER_CONTAINER, ONE_SCHEDULE_PER_SHAPE, ContentLayout, MintedKey
+ *
+ * WHAT:  The entrance for ONE element arriving on its own — no stagger,
+ *        because there is nothing to stagger. The dashboard's content column
+ *        on every route mount, and any single panel that appears after a wait.
+ *
+ * WHY:   EVERY_ROUTE_ARRIVES. `DASHBOARD_ASSEMBLES` gave the home screen an
+ *        entrance and left every other authenticated screen — projects,
+ *        media, credits, team, the composer, the whole project pipeline —
+ *        swapping in a single frame. The shell does not move during a
+ *        navigation: the sidebar, the trigger and the title row all stay
+ *        exactly where they were, so the only thing that changes is the
+ *        content, and it changed by teleporting. That is the jarring swap an
+ *        animation is actually for, and it was happening on every link in the
+ *        product except one.
+ *
+ *        Deliberately ONE block and not `.app-enter`'s stagger.
+ *        ENTRANCE_PER_CONTAINER: a page is an arbitrary tree this class knows
+ *        nothing about, so stepping its direct children would stagger
+ *        whatever the page happened to put first — a filter bar, a card, a
+ *        <form> — and any screen with its own choreography inside would then
+ *        animate twice. The page RISES; what is inside it is the page's own
+ *        business. `<ContentLayout enter={false}>` is the opt-out, and both
+ *        the home screen and the script editor take it because they own their
+ *        own arrival (`.app-enter`/`.dash-enter` and `.list-enter`).
+ *
+ *        ONE_SCHEDULE_PER_SHAPE — it was `.page-enter` until a second caller
+ *        wanted the same thing for something that is not a page. The shape it
+ *        serves is "one element, arriving", so it is named for that and not
+ *        for the first place it was needed. See `.list-enter` for the
+ *        many-small-items schedule and the rest of that rule.
+ *
+ *        Same keyframes, same curve and the same 220ms as the home screen,
+ *        for the reason stated there: one product, one way of arriving. No
+ *        delay — this plays on a navigation the user just asked for, and a
+ *        delay before the thing they clicked for is latency, not rhythm.
+ *
+ *        The HEADER is outside it on purpose. The sidebar trigger and the
+ *        page title occupy the same pixels before and after a navigation;
+ *        fading them up would animate chrome that did not move, which reads
+ *        as the app being slow to respond rather than as the page assembling.
+ *
+ *        Reduced motion keeps the fade and drops the travel — fewer and
+ *        gentler, not nothing, exactly as `.app-enter` does.
+ *
+ * WHERE: src/components/global/page-header.tsx wraps <ContentLayout>'s
+ *        children in it, keyed on the pathname so a navigation that React
+ *        would otherwise reconcile in place still replays it. Also the
+ *        one-time API key panel (MintedKey in the developers screen), which
+ *        appears mid-page the moment a key is minted. Keyframes from the hero
+ *        block above. */
+@layer components {
+  /* SOURCE OF TRUTH KEYWORDS: FILL_BACKWARDS_NOT_BOTH
+   *
+   * `backwards` and NOT the `both` the hero and `.app-enter` use, for a
+   * reason specific to this class: it wraps the content of EVERY dashboard
+   * page, permanently. `both` includes `forwards`, which leaves the final
+   * keyframe — `transform: translateY(0)` — applied for the lifetime of the
+   * element, and a non-`none` transform makes the wrapper a containing block
+   * for every `position: fixed` descendant under it, forever. No page does
+   * that today; the class would be a trap for the first one that tries.
+   * `backwards` covers the only thing `forwards` was buying here (no flash
+   * of the finished state before the animation starts) and lets the element
+   * fall back to its own styles — which are the finished state anyway — the
+   * moment it lands. */
+  .block-enter {
+    animation: hero-enter 220ms var(--ease-settle) backwards;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .block-enter {
+      animation: hero-enter-fade 180ms backwards;
+    }
+  }
+}
+
+/* SOURCE OF TRUTH KEYWORDS: list-enter, stage-connector-fill,
+ * PROGRESS_FLOWS_DOWNWARD, THE_PIPELINE_IS_THE_SCREEN, StageProgress,
+ * ONE_SCHEDULE_PER_SHAPE, hero-enter, --ease-settle
+ *
+ * WHAT:  The mount stagger for a list of MANY SMALL ROWS (`.list-enter`) and
+ *        the connector between two pipeline stages filling in as the upper
+ *        one finishes (`.stage-connector-fill`).
+ *
+ * WHY:   THE_PIPELINE_IS_THE_SCREEN. A generation runs for MINUTES and this
+ *        list is the entire answer to "where is it". Every stage transition
+ *        arrived as an instant repaint: the ring, the glyph and the status
+ *        word all changed in one frame, and the 1px rule between two rows was
+ *        a static grey line that said nothing about having been crossed. The
+ *        one surface in the product whose whole job is state indication was
+ *        the one with no motion in it at all.
+ *
+ *        PROGRESS_FLOWS_DOWNWARD is the part that earns its keep. The
+ *        connector is now a grey track with a brand fill scaled from
+ *        `transform-origin: top`, so finishing a stage sends a line DOWN into
+ *        the next one. It is the cheapest possible honest signal — progress
+ *        has a direction, and the list now shows it travelling rather than
+ *        leaving the reader to diff two frames of colour. `transform` and
+ *        nothing else: this runs on the compositor while the page is holding
+ *        a websocket open and polling, which is precisely when a
+ *        layout-triggering `height` animation would drop frames.
+ *
+ *        260ms, inside the 300ms UI budget, on `--ease-settle` like
+ *        everything else that moves in this app. Longer would be a progress
+ *        bar pretending the work takes as long as the animation; shorter and
+ *        the direction stops reading.
+ *
+ *        `.list-enter` staggers the ROWS on mount, 35ms apart, and was
+ *        `.stage-enter` until it had a third caller. ONE_SCHEDULE_PER_SHAPE:
+ *        this app now has exactly TWO stagger schedules and they are chosen
+ *        by the SHAPE of what is entering, not by which screen it is on.
+ *
+ *        `.dash-enter` is for A FEW LARGE BLOCKS — 60ms steps behind a 90ms
+ *        base, because there its delay holds the region until the chips above
+ *        it have landed, so the home screen assembles downward.
+ *
+ *        `.list-enter` is for MANY SMALL ITEMS: 35ms steps and NO base delay.
+ *        Both halves of that matter. 35ms because a dozen rows at 60ms is
+ *        most of a second of introduction, and no base delay because every
+ *        caller plays this the instant something the user waited for arrives
+ *        — a finished script, a finished render, a re-filtered catalogue. A
+ *        90ms hold there is not rhythm, it is latency on the payoff.
+ *
+ *        Capped at the sixth item (`nth-child(n + 7)`) for `.hero-enter`'s
+ *        reason, and the cap is what makes it safe on a FORTY-item grid: the
+ *        first six step, the rest land together at 210ms. Mount only — every
+ *        caller keys its items stably, so a re-render or a poll re-renders
+ *        them without re-animating anything.
+ *
+ *        Reduced motion: the fill FADES in at full height instead of growing,
+ *        and the rows lose their 8px of travel but keep their order. Fewer
+ *        and gentler — the state change still has to be visible, because for
+ *        this screen the state change is the content.
+ *
+ * WHERE: `.stage-connector-fill` is used only by
+ *        src/components/global/stage-progress/stage-progress.tsx, on the span
+ *        inside each row's connector track, toggled by `data-filled`.
+ *        `.list-enter` has four callers, all of them a list arriving after a
+ *        wait: that same file's stage <ol>, the script editor's block list
+ *        (the reveal at the end of "Writing your script…"), the footage
+ *        studio's generated clip grid, and the voice catalogue's grid on a
+ *        filter change. */
+@layer components {
+  /* FILL_BACKWARDS_NOT_BOTH — see `.page-enter` above. Here `backwards` is
+     also what holds a delayed row invisible until its turn. */
+  .list-enter > * {
+    animation: hero-enter 220ms var(--ease-settle) backwards;
+  }
+
+  .list-enter > *:nth-child(2) {
+    animation-delay: 35ms;
+  }
+
+  .list-enter > *:nth-child(3) {
+    animation-delay: 70ms;
+  }
+
+  .list-enter > *:nth-child(4) {
+    animation-delay: 105ms;
+  }
+
+  .list-enter > *:nth-child(5) {
+    animation-delay: 140ms;
+  }
+
+  .list-enter > *:nth-child(6) {
+    animation-delay: 175ms;
+  }
+
+  .list-enter > *:nth-child(n + 7) {
+    animation-delay: 210ms;
+  }
+
+  /* Scaled, not grown: `scaleY` from the top edge is the one way to draw this
+     without touching layout. The track above it supplies the unfilled grey,
+     so the fill never has to animate a colour. */
+  .stage-connector-fill {
+    transform: scaleY(0);
+    transform-origin: top;
+    transition: transform 260ms var(--ease-settle);
+  }
+
+  .stage-connector-fill[data-filled="true"] {
+    transform: scaleY(1);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .list-enter > * {
+      animation: hero-enter-fade 180ms backwards;
+    }
+
+    /* Full height from the start; the state arrives as opacity instead of as
+       travel. The signal survives, the movement does not. */
+    .stage-connector-fill {
+      transform: scaleY(1);
+      opacity: 0;
+      transition: opacity 180ms linear;
+    }
+
+    .stage-connector-fill[data-filled="true"] {
+      opacity: 1;
+    }
+  }
+}
+
 /* SOURCE OF TRUTH KEYWORDS: overlay-pop, POPUPS_TRANSITION_NOT_KEYFRAME,
  * EXIT_IS_FASTER, ORIGIN_CARRIES_THE_DIRECTION, data-instant,
  * --ease-settle

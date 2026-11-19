@@ -338,7 +338,18 @@ export function FootageStudio() {
               No clips yet. Describe a scene above and one will appear here.
             </p>
           ) : (
-            <div className="grid gap-4 sm:grid-cols-3">
+            /* SOURCE OF TRUTH KEYWORDS: CLIPS_ARRIVE, list-enter
+               Three skeletons were replaced by N real clips in one frame. The
+               grid mounts when the query resolves, so a plain mount animation
+               lands exactly on that swap and `.list-enter` steps the tiles
+               35ms apart as they take the skeletons' place.
+
+               No `key`, deliberately. A completed generation invalidates and
+               refetches, which re-renders this grid WITHOUT remounting it — so
+               one new clip arriving does not replay the entrance for the dozen
+               that were already on screen. The stagger belongs to the grid
+               appearing, not to the list growing. */
+            <div className="list-enter grid gap-4 sm:grid-cols-3">
               {clips.data.clips.map((clip) => (
                 <div key={clip.id} className="flex flex-col gap-2">
                   <div className="bg-muted relative aspect-[9/16] overflow-hidden rounded-md">

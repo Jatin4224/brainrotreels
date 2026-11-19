@@ -24,7 +24,9 @@
  */
 
 import * as React from "react";
+import { usePathname } from "next/navigation";
 
+import { cn } from "@/lib/utils";
 import { PageContainer } from "@/components/global/page-container";
 import type { PageContainerWidth } from "@/components/global/page-container";
 import { Separator } from "@/components/ui/separator";
@@ -64,6 +66,21 @@ export interface ContentLayoutProps {
    * page (wide tables, boards) so the opt-out stays explicit and greppable.
    */
   width?: PageContainerWidth;
+  /**
+   * SOURCE OF TRUTH KEYWORDS: EVERY_ROUTE_ARRIVES, page-enter,
+   *   ENTRANCE_PER_CONTAINER
+   *
+   * Whether the content column rises on mount (`.block-enter`, globals.css).
+   * Defaults to `true`: the shell does not move during a navigation, so
+   * without it the content is the one thing that changes and it changed by
+   * teleporting.
+   *
+   * Pass `false` from a screen that owns its OWN entrance choreography —
+   * ENTRANCE_PER_CONTAINER, one arrival per screen. The dashboard home does
+   * exactly that with `.app-enter`/`.dash-enter`; nesting this on top of it
+   * would be two entrances where there should be one.
+   */
+  enter?: boolean;
   children: React.ReactNode;
 }
 
@@ -71,8 +88,18 @@ export function ContentLayout({
   title,
   actions,
   width = "default",
+  enter = true,
   children,
 }: ContentLayoutProps) {
+  /* EVERY_ROUTE_ARRIVES — the key, not just the class, is the mechanism. Two
+   * routes both render <ContentLayout> at the same position under
+   * <SidebarInset>, so React reconciles them as the SAME element and a CSS
+   * animation set to run on mount never runs again. Re-keying on the pathname
+   * forces the remount that replays it. The key sits on the inner wrapper
+   * only: remounting the header too would throw away the sidebar trigger on
+   * every navigation for no gain, since nothing in it moves. */
+  const pathname = usePathname();
+
   return (
     /* Padding stays on the OUTER element and centering on the inner one: the
        gutter must survive on narrow screens where the container is already
@@ -84,7 +111,19 @@ export function ContentLayout({
     <div className="flex flex-1 flex-col px-4 py-6 sm:px-6 lg:px-11">
       <PageContainer width={width} className="gap-4">
         <PageHeader title={title} actions={actions} />
-        {children}
+        {/* `flex-1` and the column stack are what the pages were already
+            getting from PageContainer directly, so the wrapper has to carry
+            them or every full-height screen (the timeline editor, the caption
+            studio) loses its growth. */}
+        <div
+          key={enter ? pathname : "static"}
+          className={cn(
+            "flex min-w-0 flex-1 flex-col gap-4",
+            enter && "block-enter",
+          )}
+        >
+          {children}
+        </div>
       </PageContainer>
     </div>
   );

@@ -82,7 +82,23 @@ export function HowItWorksDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <ol className="flex list-none flex-col gap-5 px-6 pb-5">
+        {/* SOURCE OF TRUTH KEYWORDS: EXPLANATION_IS_A_SEQUENCE, list-enter
+            The steps are a SEQUENCE (which is why they are an <ol>), and they
+            used to arrive as one slab — the reader got five numbered things at
+            once and had to find step 1 themselves. Stepping them 35ms apart
+            says "first this, then this" with the motion instead of leaving it
+            entirely to the numerals.
+
+            This is the one surface in the dashboard at the rare/first-time
+            frequency tier, which is where a stagger is unambiguously
+            affordable: a first-run explainer is read once, deliberately, and
+            is the only thing on screen while it is open.
+
+            `.list-enter` as-is rather than a third schedule with a base delay
+            to clear the dialog's own 160ms zoom. ONE_SCHEDULE_PER_SHAPE, and
+            no base delay is the right call for an explainer anyway — step 1
+            should be readable the instant the panel is. */}
+        <ol className="list-enter flex list-none flex-col gap-5 px-6 pb-5">
           {HOW_IT_WORKS_STEPS.map((step, index) => (
             <li key={step.title} className="flex gap-3.5">
               <span

@@ -7,7 +7,9 @@
 /**
  * SOURCE OF TRUTH KEYWORDS: StageProgress, StageProgressProps, StageRow,
  *   ANNOUNCE_TRANSITIONS, STATUS_IS_NOT_ONLY_COLOUR, ELAPSED_TICKS_LOCALLY,
- *   SLOTS_NOT_BRANCHES, STAGE_LABELS_FROM_THE_REGISTRY
+ *   SLOTS_NOT_BRANCHES, STAGE_LABELS_FROM_THE_REGISTRY,
+ *   THE_PIPELINE_IS_THE_SCREEN, PROGRESS_FLOWS_DOWNWARD, list-enter,
+ *   stage-connector-fill
  *
  * WHAT:  A vertical list of pipeline stages — each with its status, its icon
  *        and how long it has taken — plus an aria-live region that announces
@@ -46,6 +48,18 @@
  *        STAGE_LABELS_FROM_THE_REGISTRY: the human names come from
  *        PIPELINE_STAGE_LABELS, so this file contains no copy about what a
  *        stage does and a renamed stage is one edit in one place.
+ *
+ *        THE_PIPELINE_IS_THE_SCREEN and PROGRESS_FLOWS_DOWNWARD. A generation
+ *        runs for MINUTES and this list is the whole answer to "where is it",
+ *        and every transition used to land as an instant repaint — ring, glyph
+ *        and word changing in one frame, with a static grey rule between rows
+ *        that said nothing about having been crossed. Now the status colours
+ *        ease over 200ms and the connector FILLS downward as a stage
+ *        finishes, so progress has a visible direction instead of asking the
+ *        reader to diff two frames. `transform` and colour only, which is
+ *        what keeps it on the compositor while this screen holds a
+ *        subscription open and polls beside it. The timings, the row stagger
+ *        and the reduced-motion fallbacks live with the CSS in globals.css.
  * WHERE: /dashboard/projects/[id]/generate renders it. Available to any screen
  *        watching an ordered pipeline.
  */
@@ -93,7 +107,14 @@ export function StageProgress({
         {announcement}
       </p>
 
-      <ol className="flex flex-col">
+      {/* THE_PIPELINE_IS_THE_SCREEN — `.list-enter` steps the rows 35ms
+          apart on mount so the pipeline lays itself out top to bottom, in the
+          order it is about to run in. Mount only: the rows are keyed by stage,
+          so a stream update re-renders them without re-animating. It is the
+          app's shared many-small-items schedule (ONE_SCHEDULE_PER_SHAPE), so
+          the cap and the reduced-motion fallback live with the CSS in
+          globals.css. */}
+      <ol className="list-enter flex flex-col">
         {stages.map((stage, index) => (
           <StageRow
             key={stage.stage}
@@ -126,30 +147,67 @@ function StageRow({
   const label = PIPELINE_STAGE_LABELS[stage.stage];
   const look = STATUS_LOOK[stage.status];
 
+  /* PROGRESS_FLOWS_DOWNWARD — whether this row's connector is full, i.e.
+   * whether the pipeline got PAST this stage. `completed` and `skipped`
+   * both let the run continue, so both fill. `failed` deliberately does NOT:
+   * nothing flowed onward, and a filled line under a failed stage would say
+   * the opposite of the red ring above it. */
+  const flowed = stage.status === "completed" || stage.status === "skipped";
+
   return (
     <li className="flex gap-3">
       <div className="flex flex-col items-center">
+        {/* A stage transition used to be an instant repaint — ring, glyph and
+            word all changing in one frame on the one surface in the product
+            whose entire job is state indication. The properties are named
+            rather than `transition-colors`, which would quietly cover `fill`
+            and `stroke` and miss nothing that matters here; 200ms sits inside
+            the UI budget and on the app's own `--ease-settle`. */}
         <span
           className={cn(
-            "flex size-7 shrink-0 items-center justify-center rounded-full border",
+            "flex size-7 shrink-0 items-center justify-center rounded-full border transition-[color,background-color,border-color] duration-200 ease-[var(--ease-settle)] motion-reduce:transition-none",
             look.ring,
           )}
           /* The glyph is decoration: the row's accessible content is its text,
            * and the status word below says the same thing in words. */
           aria-hidden
         >
-          <look.Icon className={cn("size-3.5", look.icon, look.spin && "animate-spin")} />
+          <look.Icon
+            className={cn(
+              "size-3.5 transition-colors duration-200 ease-[var(--ease-settle)] motion-reduce:transition-none",
+              look.icon,
+              look.spin && "animate-spin",
+            )}
+          />
         </span>
         {isLast ? null : (
-          <span aria-hidden className="my-1 w-px flex-1 bg-border" />
+          /* PROGRESS_FLOWS_DOWNWARD. The track holds the unfilled grey and the
+              span inside it scales from its top edge, so finishing a stage
+              sends a brand line DOWN into the next one — `transform` only, no
+              colour to interpolate and no layout to recompute while this page
+              is holding a subscription open and polling beside it.
+              `overflow-hidden` is load-bearing: without it the collapsed
+              `scaleY(0)` fill still paints its 1px seam at the top. */
+          <span
+            aria-hidden
+            className="relative my-1 w-px flex-1 overflow-hidden bg-border"
+          >
+            <span
+              data-filled={flowed}
+              className="stage-connector-fill absolute inset-0 bg-primary"
+            />
+          </span>
         )}
       </div>
 
       <div className={cn("flex-1 pb-5", isLast && "pb-0")}>
         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+          {/* The label brightens as its stage wakes up, and it is the same
+              200ms as the ring beside it on purpose: one state change must not
+              arrive in two instalments. */}
           <p
             className={cn(
-              "text-sm font-medium",
+              "text-sm font-medium transition-colors duration-200 ease-[var(--ease-settle)] motion-reduce:transition-none",
               stage.status === "pending" || stage.status === "skipped"
                 ? "text-muted-foreground"
                 : "text-foreground",
@@ -157,8 +215,18 @@ function StageRow({
           >
             {label.label}
           </p>
-          {/* STATUS_IS_NOT_ONLY_COLOUR — the state in words, always. */}
-          <p className={cn("text-xs", look.text)}>{look.word}</p>
+          {/* STATUS_IS_NOT_ONLY_COLOUR — the state in words, always. The WORD
+              swaps instantly and should: it is content, and crossfading a
+              one-word status is how you make a reader wait to find out. Only
+              its colour eases. */}
+          <p
+            className={cn(
+              "text-xs transition-colors duration-200 ease-[var(--ease-settle)] motion-reduce:transition-none",
+              look.text,
+            )}
+          >
+            {look.word}
+          </p>
           {stage.elapsedMs === null ? null : (
             /* Keyed on the server's reading, which is what RESETS the local
              * tick count: a remount starts it at zero, so the two can never
