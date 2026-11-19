@@ -72,7 +72,7 @@ export function ComposerSettingPill({
             type="button"
             disabled={disabled}
             aria-label={`${label}, currently ${value}`}
-            className="inline-flex h-9 items-center gap-2 rounded-lg border border-border-strong px-3 text-sm outline-none transition-colors hover:border-foreground/25 focus-ring disabled:pointer-events-none disabled:opacity-50 motion-reduce:transition-none"
+            className="inline-flex h-9 items-center gap-2 rounded-lg border border-border-strong px-3 text-sm outline-none transition-[color,background-color,border-color,box-shadow] duration-[160ms] ease-[var(--ease-settle)] hover:border-foreground/25 active:translate-y-px focus-ring disabled:pointer-events-none disabled:opacity-50 motion-reduce:transition-none"
           />
         }
       >

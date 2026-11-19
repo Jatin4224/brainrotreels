@@ -35,6 +35,18 @@ const SIDEBAR_WIDTH_MOBILE = "18rem"
 const SIDEBAR_WIDTH_ICON = "3rem"
 const SIDEBAR_KEYBOARD_SHORTCUT = "b"
 
+/* SOURCE OF TRUTH KEYWORDS: SidebarToggleSource, KEYBOARD_TOGGLE_IS_INSTANT
+ *
+ * WHICH INPUT ASKED matters here, which is why the toggle carries it. A
+ * sidebar collapse has to animate for a POINTER — the whole page reflows
+ * around it, and a reflow with no transition reads as a glitch. The same
+ * collapse must NOT animate for Cmd/Ctrl+B: a shortcut is pressed dozens of
+ * times a day by someone who already knows what it does, and animation on a
+ * keyboard action makes the app feel like it is lagging behind the key rather
+ * than answering it. Same state change, two correct answers, so the handler
+ * says which one it is. */
+type SidebarToggleSource = "pointer" | "keyboard"
+
 type SidebarContextProps = {
   state: "expanded" | "collapsed"
   open: boolean
@@ -42,7 +54,8 @@ type SidebarContextProps = {
   openMobile: boolean
   setOpenMobile: (open: boolean) => void
   isMobile: boolean
-  toggleSidebar: () => void
+  /** Defaults to "pointer" — pass "keyboard" to skip the collapse animation. */
+  toggleSidebar: (source?: SidebarToggleSource) => void
 }
 
 const SidebarContext = React.createContext<SidebarContextProps | null>(null)
@@ -91,10 +104,23 @@ function SidebarProvider({
     [setOpenProp, open]
   )
 
+  /* KEYBOARD_TOGGLE_IS_INSTANT — the source of the LAST toggle, stamped onto
+   * the wrapper so CSS can zero the collapse duration for the keyboard path.
+   * State and not a ref, because it has to be part of the same render that
+   * flips `open`: the attribute must already be on the element in the commit
+   * that changes the width, or the transition reads the old duration and
+   * animates the keypress anyway. */
+  const [toggleSource, setToggleSource] =
+    React.useState<SidebarToggleSource>("pointer")
+
   // Helper to toggle the sidebar.
-  const toggleSidebar = React.useCallback(() => {
-    return isMobile ? setOpenMobile((open) => !open) : setOpen((open) => !open)
-  }, [isMobile, setOpen, setOpenMobile])
+  const toggleSidebar = React.useCallback(
+    (source: SidebarToggleSource = "pointer") => {
+      setToggleSource(source)
+      return isMobile ? setOpenMobile((open) => !open) : setOpen((open) => !open)
+    },
+    [isMobile, setOpen, setOpenMobile]
+  )
 
   // Adds a keyboard shortcut to toggle the sidebar.
   React.useEffect(() => {
@@ -104,7 +130,7 @@ function SidebarProvider({
         (event.metaKey || event.ctrlKey)
       ) {
         event.preventDefault()
-        toggleSidebar()
+        toggleSidebar("keyboard")
       }
     }
 
@@ -133,10 +159,20 @@ function SidebarProvider({
     <SidebarContext.Provider value={contextValue}>
       <div
         data-slot="sidebar-wrapper"
+        data-toggle-source={toggleSource}
         style={
           {
             "--sidebar-width": SIDEBAR_WIDTH,
             "--sidebar-width-icon": SIDEBAR_WIDTH_ICON,
+            /* COLLAPSE_IS_ONE_DURATION — the gap, the fixed panel and the
+             * group labels all move together, so they read one number instead
+             * of each restating 200ms and drifting apart later. 130ms and not
+             * the stock 200ms: this is a "tens of times a day" interaction,
+             * where the rule is to reduce motion rather than style it, and
+             * the collapse animates WIDTH (see the gap below), so every frame
+             * it runs is a full relayout of the page. Fewer frames is both
+             * the faster feel and the cheaper one. */
+            "--sidebar-dur": "130ms",
             ...style,
           } as React.CSSProperties
         }
@@ -145,6 +181,10 @@ function SidebarProvider({
           // banner. --app-banner-height is 0px unless one is showing, so this
           // is `min-h-svh` in the normal case.
           "group/sidebar-wrapper flex min-h-[calc(100svh-var(--app-banner-height))] w-full has-data-[variant=inset]:bg-sidebar",
+          /* KEYBOARD_TOGGLE_IS_INSTANT — zeroed for Cmd/Ctrl+B and inherited
+           * by every collapsing part below, so the rule lives in ONE place
+           * instead of being repeated on each of them. */
+          "data-[toggle-source=keyboard]:[--sidebar-dur:0ms]",
           className
         )}
         {...props}
@@ -220,11 +260,23 @@ function Sidebar({
       data-side={side}
       data-slot="sidebar"
     >
-      {/* This is what handles the sidebar gap on desktop */}
+      {/* This is what handles the sidebar gap on desktop.
+          WIDTH_IS_THE_ONLY_OPTION_HERE. `transform` is the cheap way to move
+          a panel, and it cannot do this job: this element's width is what
+          RESERVES the space the page content flows beside, and a transform
+          moves pixels without changing the box anyone lays out against. An
+          animated content reflow is a layout animation by definition —
+          whether it is driven from here, from `grid-template-columns` or from
+          a margin. So the honest fix is not a cheaper property, it is FEWER
+          FRAMES of the expensive one (--sidebar-dur, 130ms) and none at all
+          when a keyboard asked (KEYBOARD_TOGGLE_IS_INSTANT).
+          `ease-linear` was also wrong on its own terms: linear is for motion
+          that never starts or stops — a marquee, a progress bar — and a panel
+          that does both reads as mechanical on it. */}
       <div
         data-slot="sidebar-gap"
         className={cn(
-          "relative w-(--sidebar-width) bg-transparent transition-[width] duration-200 ease-linear",
+          "relative w-(--sidebar-width) bg-transparent transition-[width] [transition-duration:var(--sidebar-dur)] ease-[var(--ease-settle)] motion-reduce:transition-none",
           "group-data-[collapsible=offcanvas]:w-0",
           "group-data-[side=right]:rotate-180",
           variant === "floating" || variant === "inset"
@@ -240,7 +292,7 @@ function Sidebar({
           // banner in normal flow above the shell would be covered rather than
           // push this down. Top offset + bottom:0 lets the height follow from
           // the box instead of a second hard-coded svh calculation.
-          "fixed top-(--app-banner-height) bottom-0 z-10 hidden w-(--sidebar-width) transition-[left,right,width] duration-200 ease-linear data-[side=left]:left-0 data-[side=left]:group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)] data-[side=right]:right-0 data-[side=right]:group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)] md:flex",
+          "fixed top-(--app-banner-height) bottom-0 z-10 hidden w-(--sidebar-width) transition-[left,right,width] [transition-duration:var(--sidebar-dur)] ease-[var(--ease-settle)] motion-reduce:transition-none data-[side=left]:left-0 data-[side=left]:group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)] data-[side=right]:right-0 data-[side=right]:group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)] md:flex",
           // Adjust the padding for floating and inset variants.
           variant === "floating" || variant === "inset"
             ? "p-2 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4))+2px)]"
@@ -296,10 +348,21 @@ function SidebarRail({ className, ...props }: React.ComponentProps<"button">) {
       data-slot="sidebar-rail"
       aria-label="Toggle Sidebar"
       tabIndex={-1}
-      onClick={toggleSidebar}
+      /* Wrapped, not passed by reference: `toggleSidebar` now takes the input
+         SOURCE as its first argument, and a bare handler reference would hand
+         it the click event instead — a truthy object that is neither
+         "pointer" nor "keyboard". */
+      onClick={() => toggleSidebar()}
       title="Toggle Sidebar"
       className={cn(
-        "absolute inset-y-0 z-20 hidden w-4 transition-all ease-linear group-data-[side=left]:-right-4 group-data-[side=right]:left-0 after:absolute after:inset-y-0 after:start-1/2 after:w-[2px] hover:after:bg-sidebar-border sm:flex ltr:-translate-x-1/2 rtl:-translate-x-1/2",
+        /* `transition-all ease-linear` animated every property this element
+           has, declared or inherited, including the `translate-x` that only
+           changes on collapse — and it still missed the ONE thing that
+           changes on hover, because that is `background-color` on the
+           `::after` hairline, a different element. Scoped to the hairline,
+           and the rail's own collapse translate now snaps, which is invisible
+           on a 16px transparent hit area. */
+        "absolute inset-y-0 z-20 hidden w-4 after:transition-[background-color] after:duration-[120ms] after:ease-[var(--ease-settle)] motion-reduce:after:transition-none group-data-[side=left]:-right-4 group-data-[side=right]:left-0 after:absolute after:inset-y-0 after:start-1/2 after:w-[2px] hover:after:bg-sidebar-border sm:flex ltr:-translate-x-1/2 rtl:-translate-x-1/2",
         "in-data-[side=left]:cursor-w-resize in-data-[side=right]:cursor-e-resize",
         "[[data-side=left][data-state=collapsed]_&]:cursor-e-resize [[data-side=right][data-state=collapsed]_&]:cursor-w-resize",
         "group-data-[collapsible=offcanvas]:translate-x-0 group-data-[collapsible=offcanvas]:after:left-full hover:group-data-[collapsible=offcanvas]:bg-sidebar",
@@ -410,7 +473,7 @@ function SidebarGroupLabel({
     props: mergeProps<"div">(
       {
         className: cn(
-          "flex h-8 shrink-0 items-center rounded-md px-2 text-xs font-medium text-sidebar-foreground/70 ring-sidebar-ring outline-hidden transition-[margin,opacity] duration-200 ease-linear group-data-[collapsible=icon]:-mt-8 group-data-[collapsible=icon]:opacity-0 focus-ring [&>svg]:size-4 [&>svg]:shrink-0",
+          "flex h-8 shrink-0 items-center rounded-md px-2 text-xs font-medium text-sidebar-foreground/70 ring-sidebar-ring outline-hidden transition-[margin,opacity] [transition-duration:var(--sidebar-dur)] ease-[var(--ease-settle)] motion-reduce:transition-none group-data-[collapsible=icon]:-mt-8 group-data-[collapsible=icon]:opacity-0 focus-ring [&>svg]:size-4 [&>svg]:shrink-0",
           className
         ),
       },
@@ -434,7 +497,7 @@ function SidebarGroupAction({
     props: mergeProps<"button">(
       {
         className: cn(
-          "absolute top-3.5 right-3 flex aspect-square w-5 items-center justify-center rounded-md p-0 text-sidebar-foreground ring-sidebar-ring outline-hidden transition-transform group-data-[collapsible=icon]:hidden after:absolute after:-inset-2 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-ring md:after:hidden [&>svg]:size-4 [&>svg]:shrink-0",
+          "absolute top-3.5 right-3 flex aspect-square w-5 items-center justify-center rounded-md p-0 text-sidebar-foreground ring-sidebar-ring outline-hidden transition-[background-color,color,box-shadow] duration-[120ms] ease-[var(--ease-settle)] motion-reduce:transition-none group-data-[collapsible=icon]:hidden after:absolute after:-inset-2 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-ring md:after:hidden [&>svg]:size-4 [&>svg]:shrink-0",
           className
         ),
       },
@@ -484,8 +547,37 @@ function SidebarMenuItem({ className, ...props }: React.ComponentProps<"li">) {
   )
 }
 
+/* SOURCE OF TRUTH KEYWORDS: sidebarMenuButtonVariants, THE_LIST_WAS_INVERTED
+ *
+ * THE_LIST_WAS_INVERTED. This class used to say
+ * `transition-[width,height,padding]`, which is precisely the wrong three
+ * properties on both counts:
+ *
+ *   - They are the LAYOUT properties, and they change on exactly one
+ *     occasion — the collapse — where they now snap inside the panel's own
+ *     130ms and cost nothing to look at.
+ *   - The properties that change CONSTANTLY were not in the list at all.
+ *     `hover:bg-sidebar-accent`, `hover:text-…`, `active:…` and
+ *     `data-active:…` fire on every hover and every navigation in the app,
+ *     and all of them snapped.
+ *
+ * So the most-used control in the product transitioned only what it rarely
+ * changed. It now transitions colour and box-shadow — paint-only, and the
+ * `box-shadow` is `tactile-control`'s raised state, which is what marks the
+ * CURRENT PAGE. Without it the row's selected look arrived in one frame
+ * while its text colour eased: one state change in two instalments, the
+ * same bug the format chips had, on the row that is on screen everywhere.
+ *
+ * `background-image` is deliberately absent for the reason it is absent on
+ * the chips: `.tactile-control` declares no gradient at rest, so there is
+ * no interpolable pair and naming it would read as a fix while doing
+ * nothing.
+ *
+ * 120ms, under the 160ms the app's <Button> uses: a nav row is hovered in
+ * passing on the way to somewhere else, so it has to answer sooner than a
+ * control somebody has stopped to press. */
 const sidebarMenuButtonVariants = cva(
-  "peer/menu-button group/menu-button tactile-control flex w-full items-center gap-2 overflow-hidden rounded-md p-2 text-left text-sm ring-sidebar-ring outline-hidden transition-[width,height,padding] group-has-data-[sidebar=menu-action]/menu-item:pr-8 group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:p-2! hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-ring active:bg-sidebar-accent active:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-open:hover:bg-sidebar-accent data-open:hover:text-sidebar-accent-foreground data-active:bg-sidebar-accent data-active:font-medium data-active:text-sidebar-accent-foreground [&_svg]:size-4 [&_svg]:shrink-0 [&>span:last-child]:truncate",
+  "peer/menu-button group/menu-button tactile-control flex w-full items-center gap-2 overflow-hidden rounded-md p-2 text-left text-sm ring-sidebar-ring outline-hidden transition-[background-color,color,box-shadow] duration-[120ms] ease-[var(--ease-settle)] motion-reduce:transition-none group-has-data-[sidebar=menu-action]/menu-item:pr-8 group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:p-2! hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-ring active:bg-sidebar-accent active:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-open:hover:bg-sidebar-accent data-open:hover:text-sidebar-accent-foreground data-active:bg-sidebar-accent data-active:font-medium data-active:text-sidebar-accent-foreground [&_svg]:size-4 [&_svg]:shrink-0 [&>span:last-child]:truncate",
   {
     variants: {
       variant: {
@@ -574,7 +666,7 @@ function SidebarMenuAction({
     props: mergeProps<"button">(
       {
         className: cn(
-          "absolute top-1.5 right-1 flex aspect-square w-5 items-center justify-center rounded-md p-0 text-sidebar-foreground ring-sidebar-ring outline-hidden transition-transform group-data-[collapsible=icon]:hidden peer-hover/menu-button:text-sidebar-accent-foreground peer-data-[size=default]/menu-button:top-1.5 peer-data-[size=lg]/menu-button:top-2.5 peer-data-[size=sm]/menu-button:top-1 after:absolute after:-inset-2 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-ring md:after:hidden [&>svg]:size-4 [&>svg]:shrink-0",
+          "absolute top-1.5 right-1 flex aspect-square w-5 items-center justify-center rounded-md p-0 text-sidebar-foreground ring-sidebar-ring outline-hidden transition-[background-color,color,box-shadow] duration-[120ms] ease-[var(--ease-settle)] motion-reduce:transition-none group-data-[collapsible=icon]:hidden peer-hover/menu-button:text-sidebar-accent-foreground peer-data-[size=default]/menu-button:top-1.5 peer-data-[size=lg]/menu-button:top-2.5 peer-data-[size=sm]/menu-button:top-1 after:absolute after:-inset-2 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-ring md:after:hidden [&>svg]:size-4 [&>svg]:shrink-0",
           showOnHover &&
             "group-focus-within/menu-item:opacity-100 group-hover/menu-item:opacity-100 peer-data-active/menu-button:text-sidebar-accent-foreground aria-expanded:opacity-100 md:opacity-0",
           className
@@ -689,7 +781,7 @@ function SidebarMenuSubButton({
     props: mergeProps<"a">(
       {
         className: cn(
-          "tactile-control flex h-7 min-w-0 -translate-x-px items-center gap-2 overflow-hidden rounded-md px-2 text-sidebar-foreground ring-sidebar-ring outline-hidden group-data-[collapsible=icon]:hidden hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-ring active:bg-sidebar-accent active:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[size=md]:text-sm data-[size=sm]:text-xs data-active:bg-sidebar-accent data-active:text-sidebar-accent-foreground [&>span:last-child]:truncate [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:text-sidebar-accent-foreground",
+          "tactile-control flex h-7 min-w-0 -translate-x-px items-center gap-2 overflow-hidden rounded-md px-2 text-sidebar-foreground ring-sidebar-ring outline-hidden transition-[background-color,color,box-shadow] duration-[120ms] ease-[var(--ease-settle)] motion-reduce:transition-none group-data-[collapsible=icon]:hidden hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-ring active:bg-sidebar-accent active:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[size=md]:text-sm data-[size=sm]:text-xs data-active:bg-sidebar-accent data-active:text-sidebar-accent-foreground [&>span:last-child]:truncate [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:text-sidebar-accent-foreground",
           className
         ),
       },

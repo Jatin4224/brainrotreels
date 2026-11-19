@@ -430,7 +430,7 @@ export function ComposerScreen({ kind }: ComposerScreenProps) {
                   })
                 }
                 disabled={busy !== null}
-                className="rounded-full border border-border-strong px-4 py-2.5 text-sm text-foreground-2 outline-none transition-colors hover:text-foreground focus-ring motion-reduce:transition-none"
+                className="rounded-full border border-border-strong px-4 py-2.5 text-sm text-foreground-2 outline-none transition-[color,background-color,border-color,box-shadow] duration-[160ms] ease-[var(--ease-settle)] hover:text-foreground active:translate-y-px focus-ring motion-reduce:transition-none"
               >
                 {suggestion}
               </button>

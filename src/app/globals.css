@@ -259,6 +259,26 @@ html:has([data-app-banner]) {
      one is referenced by every `ease-out` utility in the product, and a hover
      polish pass has no business re-timing the dashboard. */
   --ease-settle: cubic-bezier(0.3, 0.7, 0.2, 1);
+
+  /* SOURCE OF TRUTH KEYWORDS: SPINNER_IS_FAST, --animate-spin
+     Tailwind ships `animate-spin` at 1s. A spinner's speed changes how long
+     the WAIT feels, not how long it takes: the same request behind a faster
+     spinner reads as a quicker app, which is free perceived performance on
+     every render, upload and save in the product.
+
+     0.6s is the floor worth having — past roughly 0.5s the ring stops
+     reading as rotation and starts reading as a flicker, and on a 2px
+     stroke it strobes.
+
+     Overridden HERE rather than at the call sites, which is the whole
+     reason it is worth doing: there are three dozen `animate-spin`s across
+     the app and no shared Spinner component to put it in. One token moves
+     all of them and cannot drift, and `animate-spin` keeps working as the
+     thing every one of those call sites already says. Unlike `--ease-out`,
+     which is deliberately NOT overridden above, re-timing this affects only
+     loading indicators — there is no second meaning of "spin" in the
+     product to collaterally re-time. */
+  --animate-spin: spin 0.6s linear infinite;
 }
 
 @layer base {
