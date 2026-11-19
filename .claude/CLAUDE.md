@@ -68,8 +68,9 @@ Add ordinary inline comments too, but keep them minimal and outcome-based — do
 
 **Before building or changing any UI, read the design docs at the repo root:**
 `design.md` (landing page), `design-buttons.md` (buttons and controls),
-`auth-design.md` + `auth-design_1.md` (auth screens), and
-`00-dashboard-foundations.md` (app shell). They hold the tokens, the type
+`auth-design.md` + `auth-design_1.md` (auth screens),
+`00-dashboard-foundations.md` (app shell), and `design-primitives.md`
+(`src/components/ui/**`). They hold the tokens, the type
 scale, the motion rules and the per-section specs. They are not optional
 background reading: every one of them is a decision already made, and work
 that skips them re-litigates settled questions and ships contradictions.
@@ -88,6 +89,8 @@ Design every component for reuse: never hardcode logic, layouts, or data into it
 For a simple new component, follow the design themes already in the app. For a complex one, you have to ask the user for a shadcn UI block link to use as a reference, then rename it to our folder structure and naming conventions and globalize it if needed.
 
 shadcn components and blocks often arrive with outdated copy that doesn't match this app's branding — fix it.
+
+**Never run `shadcn add` for a primitive that already exists in `src/components/ui/`.** It overwrites the file, and roughly 22 of the 31 primitives there have been deliberately modified — tokens, tactile surfaces, the focus ring, the motion rules — so for most of them the command is a silent revert, not an install. That directory is a fork. Read `design-primitives.md` before touching it: it lists what diverges per file, the grep keyword for each, and the conventions a newly ported primitive has to adopt before it can be used.
 
 Never hardcode theme colors (no hex values, `text-white`, `bg-[#...]`, or forced `dark` classes). Always use the theme tokens — `bg-background`, `text-foreground`, `text-muted-foreground`, `bg-card`, `bg-primary`, `border` — so everything follows the app theme.
 
