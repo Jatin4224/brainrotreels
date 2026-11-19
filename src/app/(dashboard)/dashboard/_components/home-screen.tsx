@@ -62,6 +62,7 @@
  */
 
 import * as React from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRightIcon, ZapIcon } from "lucide-react";
 
@@ -74,6 +75,9 @@ import {
   type FormatCategoryKey,
 } from "@/lib/config";
 import { permissions } from "@/lib/permissions";
+/* THE_REGISTRY_OWNS_THE_PATH — the credits pill links where the sidebar
+ * links, from the same declaration. See THE_PILL_IS_THE_LINK below. */
+import { RESOURCES } from "@/lib/resources";
 import {
   PROJECT_KINDS,
   type ProjectKind,
@@ -246,7 +250,8 @@ export function DashboardHomeScreen() {
 }
 
 /**
- * SOURCE OF TRUTH KEYWORDS: HomeHeader, CREDITS_PILL, PERMISSION_GATED_READ
+ * SOURCE OF TRUTH KEYWORDS: HomeHeader, CREDITS_PILL, PERMISSION_GATED_READ,
+ * THE_PILL_IS_THE_LINK, THE_CHROME_OUTLIVES_THE_NUMBER, TABULAR_FIGURES
  *
  * WHAT: The thin row above the headline — who is being greeted, and what
  * they have left to spend.
@@ -293,15 +298,54 @@ function HomeHeader({
         ) : null}
       </p>
 
+      {/* THE_PILL_IS_THE_LINK — it was a <span>, while the comment above this
+          component had already promised a link to the credits screen. It wears
+          `tactile-raised`, a border and a 44px height, so it READS as
+          pressable; a surface that looks like a control and does nothing is
+          worse than no control at all. `brutal-hover` supplies the pair the
+          rest of the app uses — a 1px lift on a real pointer, a 1px press —
+          and does it for an <a> by its own selector.
+
+          The href comes from the RESOURCES registry, not a literal: the same
+          declaration that puts Credits in the sidebar and gates it behind
+          `credits:read` is the one that says where it lives, so the pill
+          cannot drift from the nav the day that path changes.
+
+          THE_CHROME_OUTLIVES_THE_NUMBER. The loading state used to be a
+          Skeleton standing in for the WHOLE pill — a 128px rounded block
+          replaced in one frame by a ~150px pill, so the row jumped twice,
+          once in content and once in geometry, and `justify-between` passed
+          the shift along to the greeting. Only the BALANCE is unknown on
+          first paint; the border, the icon and the word "credits" are known
+          immediately. So the pill renders whole and the skeleton shrinks to
+          the width of the digits inside it. Nothing moves when the number
+          lands, which is why no crossfade is needed here.
+
+          TABULAR_FIGURES — the balance is the one number on this screen a
+          creator watches go DOWN, and proportional digits change width as it
+          does (1,200 → 980 is narrower). `tabular-nums` fixes the advance
+          width so a spend cannot nudge the layout. */}
       {canReadCredits ? (
-        credits ? (
-          <span className="tactile-raised inline-flex h-11 items-center gap-2 rounded-xl border border-border bg-card px-3.5 text-sm font-medium text-foreground">
-            <ZapIcon className="size-4 text-brand-accent" aria-hidden="true" />
-            {credits.balance.toLocaleString()} credits
-          </span>
-        ) : (
-          <Skeleton className="h-11 w-32 rounded-xl" />
-        )
+        <Link
+          href={RESOURCES.credits.nav.href}
+          className="tactile-raised brutal-hover inline-flex h-11 items-center gap-2 rounded-xl border border-border bg-card px-3.5 text-sm font-medium text-foreground outline-none focus-ring"
+        >
+          <ZapIcon className="size-4 text-brand-accent" aria-hidden="true" />
+          {credits ? (
+            <span>
+              <span className="tabular-nums">
+                {credits.balance.toLocaleString()}
+              </span>{" "}
+              credits
+            </span>
+          ) : (
+            <>
+              <Skeleton className="h-3.5 w-10 rounded-sm" />
+              <span className="sr-only">Loading credit balance</span>
+              <span aria-hidden="true">credits</span>
+            </>
+          )}
+        </Link>
       ) : null}
     </header>
   );
@@ -379,7 +423,7 @@ function CategoryChips({
 
 /**
  * SOURCE OF TRUTH KEYWORDS: FeaturedFormat, FEATURED_FORMAT_KIND,
- * CTA_IS_LARGE_TEXT, FeatureGate
+ * CTA_IS_LARGE_TEXT, FeatureGate, PRESS_IS_THE_APP_LANGUAGE
  *
  * WHAT: The large panel for the one format the product is pushing.
  * WHY: CTA_IS_LARGE_TEXT — the button is 18px/700, which is what keeps
@@ -445,10 +489,28 @@ function FeaturedFormat({
         {canCreate ? (
           <div className="mt-2">
             <FeatureGate resource="projects">
+              {/* PRESS_IS_THE_APP_LANGUAGE. This is the highest-intent
+                  control on the screen and it was the one that answered
+                  nothing: no `:active`, and `hover:bg-brand/90` with no
+                  transition declared, so the brand orange snapped.
+
+                  The transition list, the 160ms, the curve and the 1px press
+                  are copied from <Button>'s base class rather than chosen
+                  again here. This button is hand-rolled because of
+                  CTA_IS_LARGE_TEXT — 18px/700 is what keeps white on the
+                  brand orange inside WCAG's large-text allowance, which the
+                  `lg` variant does not give — but being hand-rolled is a
+                  reason to restate the app's press language verbatim, not a
+                  licence to invent a second one. A creator who presses this
+                  and presses a <Button> should feel the same button.
+
+                  `box-shadow` is in the list for `brutal-shadow-brand`'s
+                  brand glow, which is the thing that should settle the day
+                  this button gains a hover shadow. */}
               <button
                 type="button"
                 onClick={() => onStart(kind)}
-                className="brutal-shadow-brand inline-flex min-h-[52px] cursor-pointer items-center gap-2.5 rounded-2xl bg-brand px-[22px] text-lg font-bold text-brand-foreground outline-none hover:bg-brand/90 focus-ring"
+                className="brutal-shadow-brand inline-flex min-h-[52px] cursor-pointer items-center gap-2.5 rounded-2xl bg-brand px-[22px] text-lg font-bold text-brand-foreground outline-none transition-[transform,background-color,box-shadow] duration-[160ms] ease-[var(--ease-settle)] hover:bg-brand/90 active:translate-y-px focus-ring motion-reduce:transition-none"
               >
                 {format.cta}
                 <ArrowRightIcon className="size-[18px]" aria-hidden="true" />
