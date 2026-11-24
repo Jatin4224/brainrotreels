@@ -179,6 +179,8 @@ one.
   the product's own programmatic scrolling still lands instantly.
 - CTA arrows nudge 2px toward the action on hover, 150ms.
 - FAQ: Radix accordion `accordion-down` / `accordion-up` height animations.
+- The hero lamp scene's RAF loop and its in-video CSS loops both pause
+  off-screen and in hidden tabs (§4.2a)
 - The hero phone loop pauses off-screen and in hidden tabs
   (IntersectionObserver + `visibilitychange`), as the auth showcase does.
 - Optional extras defined on the site: `v2-halo-pulse` (opacity .55→.9, scale 1→1.12, 3.2s loop) for the hero halo, and `skin-shimmer` for loading states.
@@ -262,6 +264,55 @@ On `sm` and up the textarea and button sit in a row (`sm:flex-row sm:items-end`)
   4. Input card (`mt-9`, see §3)
   5. Trust microcopy (14px, muted): "Every video on this page was made with the app. No mockups."
 - **Thumbnail strip** below: 5 video cards in a row (`grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-6`), each 9:16 (~217×385 at desktop), alternating Motion Graphics / Explainer tags.
+
+### 4.2a Hero right column — the lamp scene
+
+> Replaced `ReelStage` (one phone being swiped by a drawn thumb) on
+> 2026-11-25. Full spec: `DESIGN_1.md`. Code:
+> `src/components/hero/lamp-scene/`.
+
+A fixed **560 × 760** picture of a phone lying on a walnut table under a
+swinging pendant lamp, with a **3D hand** (three.js) scrolling an
+Instagram-style Reels feed on it. It is the first object on the page a visitor
+can play with.
+
+- **Why a room and not a phone.** The fan of phones became one phone being
+  swiped; this carries the same argument the rest of the way — the product's
+  output is watched on a phone, in somebody's hands, at night. The scene is
+  also the page's one piece of *delight*: the lamp can be grabbed and thrown,
+  the hand flinches when hovered, swats or wags when poked, and gets
+  progressively annoyed if you keep touching its screen (nudge → drags the
+  phone away → impatient taps), calming down after 6s of quiet.
+- **It is an ILLUSTRATION, so it does not use theme tokens.** This is the one
+  deliberate exception to §2's "never hardcode theme colours": the scene is a
+  picture of a dark room lit by a warm bulb, the way a photograph would be. It
+  does not invert with the theme, and every colour in it (walnut `#120c08`,
+  lamp `#ffcf96`, the phone's metal gradients) is a property of the depicted
+  object, not of the UI. Nothing outside the 560×760 frame does this.
+- **Sizing.** The scene is laid out at 560×760 and `scale()`d to its column —
+  never reflowed, which is what keeps the 3D hand registered to the CSS phone
+  at every width. Its wrapper carries `max-width: 560px`, `aspect-ratio:
+  560/760` and `overflow: hidden`, so the box is reserved on the first paint
+  (no layout shift) and the full-size layout box cannot push the grid column
+  wider than its share.
+- **Loading.** three.js and the 4.6MB hand model are dynamically imported,
+  gated on an IntersectionObserver *and* idle time, so they are absent from the
+  landing route's initial JS entirely. A still poster
+  (`/hero/lamp-poster.png`) holds the frame until then, and a drawn 2D hand
+  stands in if WebGL is unavailable.
+- **Motion.** One `requestAnimationFrame` loop owns the pendulum, the scroll
+  timeline, the reactions and the renderer, writing to refs — **never
+  `setState` per frame**. React state is two things: `glReady` and the speech
+  bubble's text. The in-video loops (bobbing octopus, swaying cat) are CSS, are
+  video *content* rather than page animation, and pause with the scene.
+- **Reduced motion:** no scrolling (reel A holds at 40%), the hand rests, the
+  pendulum is heavily damped with no entry swing, reactions run at 35%
+  amplitude, no panel shake, bubble and ripple fade only, in-video loops off.
+- **Accessibility:** the visuals are `aria-hidden`. Three real buttons carry
+  the interactions for a keyboard — "Swing the lamp", "Poke the hand", "Touch
+  the phone screen" — with a visible `#ffd9a0` focus ring.
+- **Attribution:** the hand model is CC BY 4.0 and the credit in the marketing
+  footer is a licence term, not a courtesy. Do not remove it.
 
 ### 4.3 Real outputs / featured player (`#examples`, `border-t-2`)
 - Centered header: H2 "Watch a few all the way through" → muted lead. No kicker — see 2.6.

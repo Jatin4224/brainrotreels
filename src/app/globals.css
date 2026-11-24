@@ -2862,3 +2862,103 @@ html:has([data-app-banner]) {
     }
   }
 }
+
+/* SOURCE OF TRUTH KEYWORDS: lampScene, reelBob, reelWave, reelSway,
+ * lampSwingBtn, lampHitBtn, THE_REELS_ARE_VIDEO, LAMP_SCENE_MOTION
+ *
+ * WHAT:  The lamp scene's two kinds of CSS motion — the loops INSIDE the
+ *        reels playing on the phone, and the focus rings on its three real
+ *        controls — plus the reduced-motion rules for both.
+ *
+ * WHY:   THE_REELS_ARE_VIDEO. Everything else in that scene is driven by one
+ *        RAF loop in LampScene.tsx, and these three classes are the
+ *        deliberate exception: an octopus bobbing and a cat swaying are the
+ *        CONTENT of the clips the phone is playing, not animation of the
+ *        page. They loop forever for the same reason a video does, they are
+ *        compositor-only, and they are paused with the rest of the scene when
+ *        it leaves the screen — see .lampScene[data-paused].
+ *
+ *        LAMP_SCENE_MOTION. The focus rings are here rather than inline
+ *        because `:focus-visible` cannot be expressed as a style prop, and
+ *        the scene's three controls are the only way a keyboard reaches it:
+ *        an invisible button with no visible ring is a trap, so the ring is
+ *        the warm `#ffd9a0` the lamp itself throws, which is legible against
+ *        the dark wood and belongs to the picture.
+ *
+ *        Reduced motion stops the in-video loops dead. They are decorative
+ *        content with no information in them, so there is nothing to preserve
+ *        by slowing them down.
+ * WHERE: src/components/hero/lamp-scene/* — the reel SVGs, Lamp.tsx and
+ *        LampScene.tsx. */
+@keyframes lamp-reel-bob {
+  to {
+    transform: translateY(-6px);
+  }
+}
+
+@keyframes lamp-reel-wave {
+  to {
+    transform: translateY(-5px);
+  }
+}
+
+@keyframes lamp-reel-sway {
+  from {
+    transform: rotate(-3deg);
+  }
+  to {
+    transform: rotate(3deg);
+  }
+}
+
+@layer components {
+  .reelBob {
+    animation: lamp-reel-bob 2.4s ease-in-out infinite alternate;
+  }
+
+  .reelWave {
+    animation: lamp-reel-wave 1.1s ease-in-out infinite alternate;
+  }
+
+  .reelSway {
+    /* fill-box, so the cat pivots about its own feet rather than about the
+       522px-tall viewBox's origin. */
+    transform-box: fill-box;
+    transform-origin: 50% 100%;
+    animation: lamp-reel-sway 3.2s ease-in-out infinite alternate;
+  }
+
+  /* Paused with the rest of the scene when it scrolls away or the tab is
+     hidden: the RAF loop stops itself, and these would otherwise keep
+     repainting the phone's screen for the whole page. */
+  .lampScene[data-paused="true"] .reelBob,
+  .lampScene[data-paused="true"] .reelWave,
+  .lampScene[data-paused="true"] .reelSway {
+    animation-play-state: paused;
+  }
+
+  .lampSwingBtn {
+    cursor: grab;
+    touch-action: none;
+  }
+
+  .lampSwingBtn:focus-visible {
+    outline: 2px solid #ffd9a0;
+    outline-offset: 4px;
+  }
+
+  /* The two invisible hit buttons: no pointer events, but a keyboard has to
+     be able to SEE where it is. */
+  .lampHitBtn:focus-visible {
+    outline: 2px solid #ffd9a0;
+    outline-offset: -6px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .reelBob,
+    .reelWave,
+    .reelSway {
+      animation: none;
+    }
+  }
+}
