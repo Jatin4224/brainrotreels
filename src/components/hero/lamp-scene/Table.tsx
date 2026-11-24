@@ -46,6 +46,30 @@ export function Table({ poolRef }: { poolRef: React.Ref<HTMLDivElement> }) {
             filter: "brightness(.58) saturate(1.08)",
           }}
         />
+
+        {/* PATINA_IS_ON_THE_PLANE. A mottled, cloudy layer over the grain, on
+            the SAME geometry as the walnut so it is foreshortened by the same
+            33° rather than floating flat over a surface that recedes — the
+            one detail that separates a texture ON the table from a texture in
+            front of it. `overlay` keeps the plank seams and the lamp's pool
+            reading through it while the blotches darken and warm the wood, so
+            the tabletop stops being a flat swatch of grain. */}
+        <div
+          aria-hidden="true"
+          className="absolute"
+          style={{
+            left: -520,
+            top: -700,
+            width: 1600,
+            height: 1900,
+            transformOrigin: "800px 1158px",
+            transform: "rotateX(33deg)",
+            background:
+              "url(/hero/table-patina.webp) 0 0/1600px 2000px no-repeat",
+            mixBlendMode: "overlay",
+            opacity: 0.75,
+          }}
+        />
       </div>
 
       {/* The pool of lamplight. `screen` so it ADDS to the wood instead of

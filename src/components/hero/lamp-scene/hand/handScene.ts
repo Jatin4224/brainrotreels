@@ -28,6 +28,7 @@
 
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+import { MeshoptDecoder } from "three/examples/jsm/libs/meshopt_decoder.module.js";
 
 import {
   GLASS_Z,
@@ -123,6 +124,73 @@ function blobTexture(): THREE.CanvasTexture {
   g.fillStyle = r;
   g.fillRect(0, 0, 128, 128);
   return new THREE.CanvasTexture(c);
+}
+
+/**
+ * The model's vertices → the canonical mesh space the posing code assumes
+ * (length axis +z, palm +y, thumb −x, roughly unit-scaled).
+ *
+ * The uncompressed model stores that space directly and hangs it under a
+ * chain of Sketchfab exporter rotations that are meant to be ignored. The
+ * COMPRESSED one cannot: `KHR_mesh_quantization` stores positions as
+ * normalized int16 and expresses the dequantization as a node scale, so the
+ * node transform is no longer decoration — drop it and the hand renders at
+ * a third of its size, in the wrong orientation, which is exactly the "only
+ * the sleeve is visible" failure this function fixes.
+ *
+ * So the node transform is baked in, into float positions (applying a matrix
+ * straight onto an int16 attribute would truncate it), and the net 90° of
+ * exporter rotation that baking drags along is taken back out. The result is
+ * byte-for-byte the same space for both files, so everything downstream —
+ * the fingertip search, scale 66, the +z finger axis — is unchanged.
+ */
+function bakeToMeshSpace(
+  mesh: THREE.Mesh,
+  root: THREE.Object3D,
+): THREE.BufferGeometry {
+  root.updateMatrixWorld(true);
+
+  const geo = mesh.geometry.clone();
+  const src = geo.attributes["position"];
+  if (!src) return geo;
+
+  const m = mesh.matrixWorld;
+  const v = new THREE.Vector3();
+  const out = new Float32Array(src.count * 3);
+  for (let i = 0; i < src.count; i++) {
+    /* fromBufferAttribute denormalizes an int16 attribute for us. */
+    v.fromBufferAttribute(src, i).applyMatrix4(m);
+    out[i * 3] = v.x;
+    out[i * 3 + 1] = v.y;
+    out[i * 3 + 2] = v.z;
+  }
+  geo.setAttribute("position", new THREE.BufferAttribute(out, 3));
+
+  /* Carry the authored normals across rather than recomputing them: the
+     model's smoothing is the artist's, and `computeVertexNormals` would
+     average it into something subtly flatter across the knuckles. */
+  const srcN = geo.attributes["normal"];
+  if (srcN) {
+    const nm = new THREE.Matrix3().getNormalMatrix(m);
+    const outN = new Float32Array(srcN.count * 3);
+    for (let i = 0; i < srcN.count; i++) {
+      v.fromBufferAttribute(srcN, i).applyMatrix3(nm).normalize();
+      outN[i * 3] = v.x;
+      outN[i * 3 + 1] = v.y;
+      outN[i * 3 + 2] = v.z;
+    }
+    geo.setAttribute("normal", new THREE.BufferAttribute(outN, 3));
+  }
+
+  /* Undo the exporter's rotation that matrixWorld just folded in. The source
+     file's chain is RotX(−90)·RotX(+90)·RotX(−90) = RotX(−90) net, so the
+     inverse is a quarter turn the other way. */
+  geo.rotateX(Math.PI / 2);
+
+  if (!geo.attributes["normal"]) geo.computeVertexNormals();
+  geo.computeBoundingBox();
+  geo.computeBoundingSphere();
+  return geo;
 }
 
 export function createHandScene(
@@ -223,7 +291,17 @@ export function createHandScene(
   let disposed = false;
   const owned: Array<{ dispose(): void }> = [];
 
-  new GLTFLoader().load(
+  /* THE_MODEL_IS_COMPRESSED. The shipped glb is run through glTF-Transform,
+     which takes it from 4.6MB to ~190KB — and leaves
+     `EXT_meshopt_compression` in `extensionsRequired`, so a loader without
+     this decoder does not degrade, it REFUSES the file outright and the
+     scene silently falls back to the drawn hand. The decoder is ~29KB and
+     rides in the same lazy chunk as three.js itself, so it costs the initial
+     bundle nothing. `KHR_mesh_quantization` and `EXT_texture_webp`, the other
+     two the optimizer adds, three.js already handles natively. */
+  const loader = new GLTFLoader();
+  loader.setMeshoptDecoder(MeshoptDecoder);
+  loader.load(
     url,
     (gltf) => {
       if (disposed) return;
@@ -237,7 +315,7 @@ export function createHandScene(
       }
 
       const found: THREE.Mesh = src;
-      const geo = found.geometry;
+      const geo = bakeToMeshSpace(found, gltf.scene);
       const mat = found.material as THREE.MeshStandardMaterial;
       mat.roughness = 0.62;
       if (mat.metalness !== undefined) mat.metalness = 0;

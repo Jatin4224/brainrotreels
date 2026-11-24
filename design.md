@@ -295,11 +295,27 @@ can play with.
   560/760` and `overflow: hidden`, so the box is reserved on the first paint
   (no layout shift) and the full-size layout box cannot push the grid column
   wider than its share.
-- **Loading.** three.js and the 4.6MB hand model are dynamically imported,
-  gated on an IntersectionObserver *and* idle time, so they are absent from the
-  landing route's initial JS entirely. A still poster
-  (`/hero/lamp-poster.png`) holds the frame until then, and a drawn 2D hand
-  stands in if WebGL is unavailable.
+- **The tabletop is two layers.** `walnut.webp` for the grain, and
+  `table-patina.webp` — a mottled cloud — over it in `overlay` at 0.75, on the
+  *same* 33° plane so it is foreshortened with the wood rather than floating
+  flat on top. The patina source is near-black (mean 25/255), so it is
+  re-centred on mid-grey and its variation amplified before shipping;
+  dropped in raw it crushes the whole table to black instead of mottling it.
+- **Loading.** three.js and the hand model are dynamically imported, gated on
+  an IntersectionObserver *and* idle time, so they are absent from the landing
+  route's initial JS entirely. A still poster (`/hero/lamp-poster.png`) holds
+  the frame until then, and a drawn 2D hand stands in if WebGL is unavailable.
+- **The shipped model is compressed, and that has two consequences.**
+  `hand-point.glb` is run through glTF-Transform (4.6MB → ~190KB; the kit's
+  uncompressed original is kept in `lamp-scene-kit/kit/assets/`). It therefore
+  declares `EXT_meshopt_compression` as *required*, so `handScene.ts`
+  registers `MeshoptDecoder` — without it GLTFLoader refuses the file outright
+  and the scene silently drops to the 2D hand. It also declares
+  `KHR_mesh_quantization`, which moves the geometry's real scale into a node
+  transform, so `bakeToMeshSpace()` bakes that transform into float positions
+  and takes the exporter's net 90° back out. **If you re-export this model,
+  check the hand still renders** — those two steps are what make a compressed
+  asset land in the same mesh space the posing code assumes.
 - **Motion.** One `requestAnimationFrame` loop owns the pendulum, the scroll
   timeline, the reactions and the renderer, writing to refs — **never
   `setState` per frame**. React state is two things: `glReady` and the speech

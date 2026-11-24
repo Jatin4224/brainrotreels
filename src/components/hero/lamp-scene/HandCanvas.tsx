@@ -95,10 +95,15 @@ export function useHandScene({
                 onReady: () => {
                   if (!cancelled) onReadyRef.current();
                 },
-                onError: () => {
+                onError: (err) => {
                   /* No WebGL, a lost context, or a model that would not
                      parse. The drawn hand is already on screen; leaving it
-                     there is the whole fallback. */
+                     there is the whole fallback — but a hero that silently
+                     downgrades is a hero nobody ever finds out is broken, so
+                     say so where a developer will see it. */
+                  if (process.env.NODE_ENV !== "production") {
+                    console.error("[lamp-scene] hand failed to load:", err);
+                  }
                   sceneRef.current?.dispose();
                   sceneRef.current = null;
                 },
