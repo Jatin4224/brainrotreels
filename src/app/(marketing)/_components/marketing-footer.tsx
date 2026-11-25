@@ -120,6 +120,33 @@ export function MarketingFooter() {
           </p>
           <p>Every frame generated, narrated, captioned and rendered here.</p>
         </div>
+
+        {/* ATTRIBUTION_IS_NOT_OPTIONAL. The hero's 3D hand ships under CC BY
+            4.0, whose one condition is this credit — so it is a term of use,
+            not a courtesy, and it belongs on every page the footer reaches
+            rather than buried on a legal route. See
+            components/hero/lamp-scene/ and DESIGN_1.md §12. */}
+        <p className="pt-3 text-[11px] text-muted-foreground/70">
+          3D hand:{" "}
+          <a
+            href="https://sketchfab.com/3d-models/hand-94b9ea65c31b421ba6e0daf7479f5013"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline underline-offset-2 hover:text-foreground"
+          >
+            &ldquo;Hand&rdquo; by dagtholander
+          </a>
+          ,{" "}
+          <a
+            href="https://creativecommons.org/licenses/by/4.0/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline underline-offset-2 hover:text-foreground"
+          >
+            CC BY 4.0
+          </a>
+          , modified.
+        </p>
       </div>
     </footer>
   );

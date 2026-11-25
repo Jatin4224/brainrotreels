@@ -1,0 +1,561 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<title>Lamp-lit Reels scene: reference</title>
+<!-- REFERENCE ONLY. Serve this folder over http (e.g. `npx serve kit`) and open /reference/Lamp.reference.html.
+     It is the working prototype the spec in DESIGN.md was written from. A tiny shim below stands in for the
+     original design-tool runtime: it calls renderVals() after setState and wires data-on* / data-ref attributes. -->
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Bricolage+Grotesque:opsz,wght@12..96,800&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#000}
+.feed{animation:feed 9s cubic-bezier(.77,0,.175,1) infinite}
+@keyframes feed{0%,30%{transform:translateY(0)}42%,72%{transform:translateY(-33.3333%)}84%,100%{transform:translateY(-66.6667%)}}
+.prog{transform-origin:0 50%;animation:prog 9s linear infinite}
+@keyframes prog{0%{transform:scaleX(.35)}30%{transform:scaleX(1)}30.01%,42%{transform:scaleX(0)}72%{transform:scaleX(1)}72.01%,84%{transform:scaleX(0)}100%{transform:scaleX(.35)}}
+.hand{animation:swipe 9s cubic-bezier(.77,0,.175,1) infinite}
+@keyframes swipe{0%,24%{transform:translate(0,0) scale(1)}29%{transform:translate(1px,2px) scale(.985)}42%{transform:translate(-9px,-97px) scale(.955)}50%{transform:translate(16px,-48px) scale(.995)}60%,66%{transform:translate(0,0) scale(1)}71%{transform:translate(1px,2px) scale(.985)}84%{transform:translate(-9px,-97px) scale(.955)}92%{transform:translate(16px,-48px) scale(.995)}100%{transform:translate(0,0) scale(1)}}
+.hshadow{animation:touch 9s cubic-bezier(.77,0,.175,1) infinite}
+@keyframes touch{0%,24%{opacity:.75}29%,42%{opacity:1}50%{opacity:.35}60%,66%{opacity:.75}71%,84%{opacity:1}92%{opacity:.35}100%{opacity:.75}}
+.bob{animation:bob 2.4s ease-in-out infinite alternate}@keyframes bob{to{transform:translateY(-6px)}}
+.wave{animation:wave 1.1s ease-in-out infinite alternate}@keyframes wave{to{transform:translateY(-5px)}}
+.sway{transform-box:fill-box;transform-origin:50% 100%;animation:sway2 3.2s ease-in-out infinite alternate}@keyframes sway2{from{transform:rotate(-3deg)}to{transform:rotate(3deg)}}
+.bubble{animation:pop 220ms cubic-bezier(.23,1,.32,1)}@keyframes pop{from{opacity:0;transform:translateY(6px) scale(.9)}}
+.hand-hit:focus-visible{outline:2px solid #ffd9a0;outline-offset:-6px}
+.walnut{background:url(../assets/walnut.webp) 0 0/1600px 2000px no-repeat;filter:brightness(.58) saturate(1.08)}
+.swing-btn{cursor:grab;touch-action:none}
+.swing-btn:focus-visible{outline:2px solid #ffd9a0;outline-offset:4px}
+@media (prefers-reduced-motion:reduce){.feed,.prog,.hand,.hshadow,.bob,.wave,.sway{animation:none}.bubble{animation:fadein 160ms ease}@keyframes fadein{from{opacity:0}}}
+</style>
+</head>
+<body style="margin:0;background:#000;display:grid;place-items:center;min-height:100vh">
+<div data-lamp-root="1" data-ref="setRoot" data-onpointerdown="onDown" data-onpointermove="onMove" data-onpointerleave="onLeave" style="position: relative; width: 560px; height: 760px; overflow: hidden; border-radius: 30px; background: #120c08; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08); isolation: isolate; font-family: Inter, system-ui, sans-serif; color: #fff">
+
+  <div aria-hidden="true" style="position: absolute; inset: 0; perspective: 1400px; perspective-origin: 280px 170px; background: #120c08"><div class="walnut" style="position: absolute; left: -520px; top: -700px; width: 1600px; height: 1900px; transform-origin: 800px 1158px; transform: rotateX(33deg)"></div></div>
+  <div aria-hidden="true" style="position: absolute; left: -120px; right: -120px; top: 40px; height: 700px; mix-blend-mode: screen; transform: translateX(0px)" data-bind="poolX">
+    <div style="position: absolute; inset: 0; background: radial-gradient(ellipse 40% 42% at 50% 50%, rgba(255,178,104,0.46) 0%, rgba(214,120,56,0.20) 40%, rgba(0,0,0,0) 74%)"></div>
+  </div>
+  <div aria-hidden="true" style="position: absolute; inset: 0; background: radial-gradient(ellipse 78% 66% at 50% 46%, rgba(0,0,0,0) 40%, rgba(0,0,0,0.8) 100%)"></div>
+
+  <div aria-hidden="true" style="position: absolute; inset: 0; perspective: 1400px; perspective-origin: 280px 170px">
+    <div style="position: absolute; left: 82px; top: 252px; width: 396px; height: 412px; transform: rotateX(33deg); transform-style: preserve-3d">
+      <div data-ref="setPhone" style="position: absolute; left: 100px; top: 0; width: 250px; height: 520px; transform: scale(0.78); transform-origin: 0 0; transform-style: preserve-3d">
+        <div style="position: absolute; inset: -14px -10px -40px -10px; border-radius: 60px; background: rgba(0,0,0,0.62); filter: blur(26px); transform: translate3d(0px, 30px, 0.4px)" data-bind="shadowX"></div>
+        <div style="position: absolute; inset: 2px; border-radius: 46px; background: rgba(0,0,0,0.92); filter: blur(5px); transform: translate3d(0, 6px, 0.5px)"></div>
+        <div style="position: absolute; inset: 0; border-radius: 46px; background: #0b0a09; transform: translateZ(2px)"></div>
+        <div style="position: absolute; inset: 0; border-radius: 46px; background: linear-gradient(90deg, #6a6156 0%, #2b2620 18%, #141210 50%, #2b2620 82%, #5e564c 100%); transform: translateZ(6px)"></div>
+        <div style="position: absolute; inset: 0; border-radius: 46px; padding: 6px; box-sizing: border-box; background: linear-gradient(180deg, #8a7e70 0%, #3a342e 6%, #1a1714 30%, #0f0e0c 70%, #24201c 100%); box-shadow: inset 0 0 0 1px rgba(255,230,195,0.35), inset 0 0 0 2.5px #000; transform: translateZ(9px)">
+          <div style="position: relative; width: 100%; height: 100%; border-radius: 40px; overflow: hidden; background: #000; color: #fff">
+            <div class="feedjs" data-ref="setFeed" style="position: absolute; left: 0; top: 0; width: 100%; height: 400%; will-change: transform">
+              <div style="position: relative; height: 25%; overflow: hidden">
+                <svg viewBox="0 0 252 522" preserveAspectRatio="xMidYMid slice" style="position: absolute; inset: 0; width: 100%; height: 100%">
+                  <defs><linearGradient id="sea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6fd3e6"></stop><stop offset="1" stop-color="#1f6f9a"></stop></linearGradient></defs>
+                  <rect width="252" height="522" fill="url(#sea)"></rect>
+                  <path d="M0 430 C60 400 120 450 180 420 S252 410 252 410 V522 H0Z" fill="#f2d39a"></path>
+                  <circle cx="40" cy="120" r="5" fill="#fff" opacity=".5"></circle><circle cx="58" cy="90" r="3" fill="#fff" opacity=".5"></circle><circle cx="210" cy="150" r="4" fill="#fff" opacity=".5"></circle>
+                  <g transform="translate(126 270)"><g class="bob">
+                    <path d="M-50 40 C-70 90 -90 100 -100 130 M-25 50 C-35 100 -40 120 -55 150 M0 55 C0 110 5 130 -5 160 M25 50 C35 100 40 120 55 150 M50 40 C70 90 90 100 100 130" stroke="#ef7fa7" stroke-width="18" stroke-linecap="round" fill="none"></path>
+                    <ellipse cx="0" cy="0" rx="66" ry="70" fill="#f48fb5"></ellipse>
+                    <ellipse cx="-20" cy="-30" rx="16" ry="10" fill="#fff" opacity=".35"></ellipse>
+                    <circle cx="-22" cy="10" r="13" fill="#fff"></circle><circle cx="22" cy="10" r="13" fill="#fff"></circle>
+                    <circle cx="-19" cy="13" r="7" fill="#1d1d2b"></circle><circle cx="25" cy="13" r="7" fill="#1d1d2b"></circle>
+                    <path d="M-12 38 Q0 48 12 38" stroke="#7a2846" stroke-width="4" fill="none" stroke-linecap="round"></path>
+                    <path d="M-60 -64 l8 10 M-48 -76 l4 12" stroke="#ff4f6d" stroke-width="5" stroke-linecap="round"></path>
+                  </g></g>
+                  <text x="126" y="122" text-anchor="middle" font-family="Bricolage Grotesque, sans-serif" font-weight="800" font-size="40" fill="#fff" stroke="#1a1410" stroke-width="7" paint-order="stroke">3 hearts?!</text>
+                </svg>
+                <div style="position: absolute; left: 0; right: 0; top: 0; height: 120px; background: linear-gradient(180deg, rgba(0,0,0,0.45), rgba(0,0,0,0))"></div>
+                <div style="position: absolute; left: 0; right: 0; bottom: 0; height: 230px; background: linear-gradient(0deg, rgba(0,0,0,0.66), rgba(0,0,0,0))"></div>
+                <div style="position: absolute; right: 9px; bottom: 74px; display: flex; flex-direction: column; align-items: center; gap: 16px; font-size: 11.5px; font-weight: 600">
+                  <div style="display: grid; justify-items: center; gap: 4px"><svg width="27" height="27" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linejoin="round"><path d="M12 20.5s-7.6-4.5-9.4-9.1C1.3 7.9 3.5 4.5 7 4.5c2 0 3.5 1.1 5 2.9 1.5-1.8 3-2.9 5-2.9 3.5 0 5.7 3.4 4.4 6.9-1.8 4.6-9.4 9.1-9.4 9.1z"></path></svg>48.2K</div>
+                  <div style="display: grid; justify-items: center; gap: 4px"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linejoin="round"><path d="M20.5 11.6a8.5 8.5 0 0 1-12.6 7.4L3.5 20.5l1.4-4.2a8.5 8.5 0 1 1 15.6-4.7z"></path></svg>1,203</div>
+                  <div style="display: grid; justify-items: center; gap: 4px"><svg width="25" height="25" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linejoin="round"><path d="M21.5 3 3 10.3l7.1 2.6M21.5 3l-6.6 18-4.8-8.1M21.5 3 10.1 12.9"></path></svg>9.8K</div>
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="#fff"><circle cx="12" cy="5" r="1.7"></circle><circle cx="12" cy="12" r="1.7"></circle><circle cx="12" cy="19" r="1.7"></circle></svg>
+                  <span style="width: 26px; height: 26px; border-radius: 7px; background: linear-gradient(135deg, #6fd3e6, #1f6f9a); box-shadow: 0 0 0 2px #fff"></span>
+                </div>
+                <div style="position: absolute; left: 13px; right: 56px; bottom: 64px">
+                  <div style="display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600">
+                    <span style="width: 30px; height: 30px; border-radius: 50%; padding: 2px; box-sizing: border-box; background: linear-gradient(45deg, #feda75, #fa7e1e, #d62976, #962fbf)"><span style="display: block; width: 100%; height: 100%; border-radius: 50%; background: #6fd3e6; box-shadow: 0 0 0 1.5px #000"></span></span>
+                    deepsea.facts
+                    <span style="padding: 3px 9px; border-radius: 8px; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.75); font-size: 11.5px; font-weight: 600">Follow</span>
+                  </div>
+                  <p style="margin: 8px 0 0; font-size: 12.5px; line-height: 1.35">why octopuses have three hearts 🐙 <span style="opacity: 0.8">#science</span> <span style="opacity: 0.65">… more</span></p>
+                  <p style="margin: 7px 0 0; display: flex; align-items: center; gap: 6px; font-size: 11.5px">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="#fff"><path d="M9 18.5a3 3 0 1 1-2-2.8V5l12-2v11.5a3 3 0 1 1-2-2.8V6.4L9 7.8z"></path></svg>
+                    <span style="opacity: 0.95">deepsea.facts · Original audio</span>
+                  </p>
+                </div>
+              </div>
+              <div style="position: relative; height: 25%; overflow: hidden">
+                <svg viewBox="0 0 252 522" preserveAspectRatio="xMidYMid slice" style="position: absolute; inset: 0; width: 100%; height: 100%">
+                  <defs><linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffd9a8"></stop><stop offset="1" stop-color="#ffefd6"></stop></linearGradient></defs>
+                  <rect width="252" height="522" fill="url(#sky)"></rect>
+                  <circle cx="196" cy="96" r="34" fill="#ff9a5a"></circle>
+                  <path d="M0 330 C70 300 150 320 252 296 V522 H0Z" fill="#8fc66b"></path>
+                  <path d="M0 380 C90 350 170 380 252 360 V522 H0Z" fill="#6aab4e"></path>
+                  <g fill="#fff" opacity=".9"><rect x="0" y="352" width="252" height="6"></rect><rect x="0" y="372" width="252" height="6"></rect><rect x="20" y="340" width="6" height="50"></rect><rect x="80" y="340" width="6" height="50"></rect><rect x="140" y="340" width="6" height="50"></rect><rect x="200" y="340" width="6" height="50"></rect></g>
+                  <g transform="translate(126 300)">
+                    <rect x="-34" y="20" width="68" height="84" rx="26" fill="#ffc83d"></rect>
+                    <circle cx="0" cy="-12" r="44" fill="#ffd9b8"></circle>
+                    <path d="M-46 -20 C-50 -64 30 -76 46 -30 C30 -40 0 -50 -46 -20Z" fill="#e0662c"></path>
+                    <circle cx="-15" cy="-6" r="7" fill="#24201c"></circle><circle cx="15" cy="-6" r="7" fill="#24201c"></circle>
+                    <circle cx="-13" cy="-9" r="2.4" fill="#fff"></circle><circle cx="17" cy="-9" r="2.4" fill="#fff"></circle>
+                    <path d="M-10 14 Q0 24 10 14" stroke="#9a3b20" stroke-width="4" fill="none" stroke-linecap="round"></path>
+                    <path class="wave" d="M-34 40 L-62 6 M34 40 L62 6" stroke="#ffd9b8" stroke-width="14" stroke-linecap="round"></path>
+                  </g>
+                  <text x="126" y="470" text-anchor="middle" font-family="Bricolage Grotesque, sans-serif" font-weight="800" font-size="40" fill="#fff" stroke="#1a1410" stroke-width="7" paint-order="stroke">great agent!</text>
+                </svg>
+                <div style="position: absolute; left: 0; right: 0; top: 0; height: 120px; background: linear-gradient(180deg, rgba(0,0,0,0.45), rgba(0,0,0,0))"></div>
+                <div style="position: absolute; left: 0; right: 0; bottom: 0; height: 230px; background: linear-gradient(0deg, rgba(0,0,0,0.66), rgba(0,0,0,0))"></div>
+                <div style="position: absolute; right: 9px; bottom: 74px; display: flex; flex-direction: column; align-items: center; gap: 16px; font-size: 11.5px; font-weight: 600">
+                  <div style="display: grid; justify-items: center; gap: 4px"><svg width="27" height="27" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linejoin="round"><path d="M12 20.5s-7.6-4.5-9.4-9.1C1.3 7.9 3.5 4.5 7 4.5c2 0 3.5 1.1 5 2.9 1.5-1.8 3-2.9 5-2.9 3.5 0 5.7 3.4 4.4 6.9-1.8 4.6-9.4 9.1-9.4 9.1z"></path></svg>12.1K</div>
+                  <div style="display: grid; justify-items: center; gap: 4px"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linejoin="round"><path d="M20.5 11.6a8.5 8.5 0 0 1-12.6 7.4L3.5 20.5l1.4-4.2a8.5 8.5 0 1 1 15.6-4.7z"></path></svg>1,874</div>
+                  <div style="display: grid; justify-items: center; gap: 4px"><svg width="25" height="25" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linejoin="round"><path d="M21.5 3 3 10.3l7.1 2.6M21.5 3l-6.6 18-4.8-8.1M21.5 3 10.1 12.9"></path></svg>92K</div>
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="#fff"><circle cx="12" cy="5" r="1.7"></circle><circle cx="12" cy="12" r="1.7"></circle><circle cx="12" cy="19" r="1.7"></circle></svg>
+                  <span style="width: 26px; height: 26px; border-radius: 7px; background: linear-gradient(135deg, #ffd15c, #f06a35); box-shadow: 0 0 0 2px #fff"></span>
+                </div>
+                <div style="position: absolute; left: 13px; right: 56px; bottom: 64px">
+                  <div style="display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600">
+                    <span style="width: 30px; height: 30px; border-radius: 50%; padding: 2px; box-sizing: border-box; background: linear-gradient(45deg, #feda75, #fa7e1e, #d62976, #962fbf)"><span style="display: block; width: 100%; height: 100%; border-radius: 50%; background: #ffd15c; box-shadow: 0 0 0 1.5px #000"></span></span>
+                    mindrot
+                    <span style="padding: 3px 9px; border-radius: 8px; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.75); font-size: 11.5px; font-weight: 600">Follow</span>
+                  </div>
+                  <p style="margin: 8px 0 0; font-size: 12.5px; line-height: 1.35">he finally built it 🤯 <span style="opacity: 0.8">#ai #agents</span> <span style="opacity: 0.65">… more</span></p>
+                  <p style="margin: 7px 0 0; display: flex; align-items: center; gap: 6px; font-size: 11.5px">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="#fff"><path d="M9 18.5a3 3 0 1 1-2-2.8V5l12-2v11.5a3 3 0 1 1-2-2.8V6.4L9 7.8z"></path></svg>
+                    <span style="opacity: 0.95">mindrot · Original audio</span>
+                  </p>
+                </div>
+              </div>
+              <div style="position: relative; height: 25%; overflow: hidden">
+                <svg viewBox="0 0 252 522" preserveAspectRatio="xMidYMid slice" style="position: absolute; inset: 0; width: 100%; height: 100%">
+                  <defs><linearGradient id="room" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7a5a48"></stop><stop offset=".6" stop-color="#4a3428"></stop><stop offset="1" stop-color="#2a1d16"></stop></linearGradient>
+                  <radialGradient id="lampglow" cx=".8" cy=".25" r=".6"><stop offset="0" stop-color="#ffcf8a" stop-opacity=".55"></stop><stop offset="1" stop-color="#ffcf8a" stop-opacity="0"></stop></radialGradient></defs>
+                  <rect width="252" height="522" fill="url(#room)"></rect>
+                  <rect width="252" height="522" fill="url(#lampglow)"></rect>
+                  <rect x="150" y="70" width="80" height="104" rx="6" fill="#1d2440"></rect><circle cx="200" cy="104" r="14" fill="#f6e7b8"></circle><path d="M150 122h80M190 70v104" stroke="#5a4033" stroke-width="5"></path>
+                  <rect x="26" y="96" width="56" height="70" rx="4" fill="#e6c36a"></rect><rect x="34" y="104" width="40" height="40" rx="3" fill="#a5543a"></rect>
+                  <path d="M24 330 q14 -50 30 -10 q10 -40 24 6 q6 -28 18 0 v40 h-72z" fill="#3f6b3a"></path><rect x="30" y="360" width="62" height="40" rx="6" fill="#8a5a3c"></rect>
+                  <rect x="0" y="430" width="252" height="92" fill="#3a2a22"></rect>
+                  <g class="sway">
+                    <ellipse cx="126" cy="392" rx="74" ry="78" fill="#ef9f55"></ellipse>
+                    <ellipse cx="126" cy="410" rx="40" ry="52" fill="#fbe1c4"></ellipse>
+                    <path d="M72 230 L80 176 L112 214 Z M180 230 L172 176 L140 214 Z" fill="#ef9f55"></path>
+                    <path d="M82 222 L86 192 L104 214 Z M170 222 L166 192 L148 214 Z" fill="#f7b7a3"></path>
+                    <circle cx="126" cy="268" r="60" fill="#f2a65a"></circle>
+                    <path d="M108 216 q18 -10 36 0 M112 228 q14 -8 28 0" stroke="#d9823c" stroke-width="6" fill="none" stroke-linecap="round"></path>
+                    <ellipse cx="126" cy="296" rx="32" ry="24" fill="#fde6cc"></ellipse>
+                    <path d="M96 268 q10 8 20 0 M136 268 q10 8 20 0" stroke="#4a2c1c" stroke-width="4" fill="none" stroke-linecap="round"></path>
+                    <path d="M121 286 h10 l-5 6z" fill="#e98a8a"></path><path d="M126 292 q-6 8 -12 4 M126 292 q6 8 12 4" stroke="#4a2c1c" stroke-width="2.5" fill="none" stroke-linecap="round"></path>
+                    <path d="M62 268 C 62 186, 190 186, 190 268" stroke="#ece6dd" stroke-width="12" fill="none" stroke-linecap="round"></path>
+                    <rect x="48" y="246" width="28" height="48" rx="12" fill="#f3eee7"></rect><rect x="176" y="246" width="28" height="48" rx="12" fill="#f3eee7"></rect>
+                    <rect x="54" y="252" width="10" height="36" rx="5" fill="#cfc7bc"></rect><rect x="188" y="252" width="10" height="36" rx="5" fill="#cfc7bc"></rect>
+                  </g>
+                  <text x="126" y="122" text-anchor="middle" font-family="Bricolage Grotesque, sans-serif" font-weight="800" font-size="34" fill="#fff" stroke="#1a1410" stroke-width="7" paint-order="stroke">vibes only</text>
+                </svg>
+                <div style="position: absolute; left: 0; right: 0; top: 0; height: 120px; background: linear-gradient(180deg, rgba(0,0,0,0.45), rgba(0,0,0,0))"></div>
+                <div style="position: absolute; left: 0; right: 0; bottom: 0; height: 230px; background: linear-gradient(0deg, rgba(0,0,0,0.66), rgba(0,0,0,0))"></div>
+                <div style="position: absolute; right: 9px; bottom: 74px; display: flex; flex-direction: column; align-items: center; gap: 16px; font-size: 11.5px; font-weight: 600">
+                  <div style="display: grid; justify-items: center; gap: 4px"><svg width="27" height="27" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linejoin="round"><path d="M12 20.5s-7.6-4.5-9.4-9.1C1.3 7.9 3.5 4.5 7 4.5c2 0 3.5 1.1 5 2.9 1.5-1.8 3-2.9 5-2.9 3.5 0 5.7 3.4 4.4 6.9-1.8 4.6-9.4 9.1-9.4 9.1z"></path></svg>284K</div>
+                  <div style="display: grid; justify-items: center; gap: 4px"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linejoin="round"><path d="M20.5 11.6a8.5 8.5 0 0 1-12.6 7.4L3.5 20.5l1.4-4.2a8.5 8.5 0 1 1 15.6-4.7z"></path></svg>4.2K</div>
+                  <div style="display: grid; justify-items: center; gap: 4px"><svg width="25" height="25" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linejoin="round"><path d="M21.5 3 3 10.3l7.1 2.6M21.5 3l-6.6 18-4.8-8.1M21.5 3 10.1 12.9"></path></svg>52K</div>
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="#fff"><circle cx="12" cy="5" r="1.7"></circle><circle cx="12" cy="12" r="1.7"></circle><circle cx="12" cy="19" r="1.7"></circle></svg>
+                  <span style="width: 26px; height: 26px; border-radius: 7px; background: linear-gradient(135deg, #f2a65a, #7a5a48); box-shadow: 0 0 0 2px #fff"></span>
+                </div>
+                <div style="position: absolute; left: 13px; right: 56px; bottom: 64px">
+                  <div style="display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600">
+                    <span style="width: 30px; height: 30px; border-radius: 50%; padding: 2px; box-sizing: border-box; background: linear-gradient(45deg, #feda75, #fa7e1e, #d62976, #962fbf)"><span style="display: block; width: 100%; height: 100%; border-radius: 50%; background: #f2a65a; box-shadow: 0 0 0 1.5px #000"></span></span>
+                    meme.kitten
+                    <span style="padding: 3px 9px; border-radius: 8px; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.75); font-size: 11.5px; font-weight: 600">Follow</span>
+                  </div>
+                  <p style="margin: 8px 0 0; font-size: 12.5px; line-height: 1.35">just a happy cat 🎧 <span style="opacity: 0.8">#lofi</span> <span style="opacity: 0.65">… more</span></p>
+                  <p style="margin: 7px 0 0; display: flex; align-items: center; gap: 6px; font-size: 11.5px">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="#fff"><path d="M9 18.5a3 3 0 1 1-2-2.8V5l12-2v11.5a3 3 0 1 1-2-2.8V6.4L9 7.8z"></path></svg>
+                    <span style="opacity: 0.95">lofi vibes · Original audio</span>
+                  </p>
+                </div>
+              </div>
+              <div style="position: relative; height: 25%; overflow: hidden">
+                <svg viewBox="0 0 252 522" preserveAspectRatio="xMidYMid slice" style="position: absolute; inset: 0; width: 100%; height: 100%">
+                  
+                  <rect width="252" height="522" fill="url(#sea)"></rect>
+                  <path d="M0 430 C60 400 120 450 180 420 S252 410 252 410 V522 H0Z" fill="#f2d39a"></path>
+                  <circle cx="40" cy="120" r="5" fill="#fff" opacity=".5"></circle><circle cx="58" cy="90" r="3" fill="#fff" opacity=".5"></circle><circle cx="210" cy="150" r="4" fill="#fff" opacity=".5"></circle>
+                  <g transform="translate(126 270)"><g class="bob">
+                    <path d="M-50 40 C-70 90 -90 100 -100 130 M-25 50 C-35 100 -40 120 -55 150 M0 55 C0 110 5 130 -5 160 M25 50 C35 100 40 120 55 150 M50 40 C70 90 90 100 100 130" stroke="#ef7fa7" stroke-width="18" stroke-linecap="round" fill="none"></path>
+                    <ellipse cx="0" cy="0" rx="66" ry="70" fill="#f48fb5"></ellipse>
+                    <ellipse cx="-20" cy="-30" rx="16" ry="10" fill="#fff" opacity=".35"></ellipse>
+                    <circle cx="-22" cy="10" r="13" fill="#fff"></circle><circle cx="22" cy="10" r="13" fill="#fff"></circle>
+                    <circle cx="-19" cy="13" r="7" fill="#1d1d2b"></circle><circle cx="25" cy="13" r="7" fill="#1d1d2b"></circle>
+                    <path d="M-12 38 Q0 48 12 38" stroke="#7a2846" stroke-width="4" fill="none" stroke-linecap="round"></path>
+                    <path d="M-60 -64 l8 10 M-48 -76 l4 12" stroke="#ff4f6d" stroke-width="5" stroke-linecap="round"></path>
+                  </g></g>
+                  <text x="126" y="122" text-anchor="middle" font-family="Bricolage Grotesque, sans-serif" font-weight="800" font-size="40" fill="#fff" stroke="#1a1410" stroke-width="7" paint-order="stroke">3 hearts?!</text>
+                </svg>
+                <div style="position: absolute; left: 0; right: 0; top: 0; height: 120px; background: linear-gradient(180deg, rgba(0,0,0,0.45), rgba(0,0,0,0))"></div>
+                <div style="position: absolute; left: 0; right: 0; bottom: 0; height: 230px; background: linear-gradient(0deg, rgba(0,0,0,0.66), rgba(0,0,0,0))"></div>
+                <div style="position: absolute; right: 9px; bottom: 74px; display: flex; flex-direction: column; align-items: center; gap: 16px; font-size: 11.5px; font-weight: 600">
+                  <div style="display: grid; justify-items: center; gap: 4px"><svg width="27" height="27" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linejoin="round"><path d="M12 20.5s-7.6-4.5-9.4-9.1C1.3 7.9 3.5 4.5 7 4.5c2 0 3.5 1.1 5 2.9 1.5-1.8 3-2.9 5-2.9 3.5 0 5.7 3.4 4.4 6.9-1.8 4.6-9.4 9.1-9.4 9.1z"></path></svg>48.2K</div>
+                  <div style="display: grid; justify-items: center; gap: 4px"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linejoin="round"><path d="M20.5 11.6a8.5 8.5 0 0 1-12.6 7.4L3.5 20.5l1.4-4.2a8.5 8.5 0 1 1 15.6-4.7z"></path></svg>1,203</div>
+                  <div style="display: grid; justify-items: center; gap: 4px"><svg width="25" height="25" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linejoin="round"><path d="M21.5 3 3 10.3l7.1 2.6M21.5 3l-6.6 18-4.8-8.1M21.5 3 10.1 12.9"></path></svg>9.8K</div>
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="#fff"><circle cx="12" cy="5" r="1.7"></circle><circle cx="12" cy="12" r="1.7"></circle><circle cx="12" cy="19" r="1.7"></circle></svg>
+                  <span style="width: 26px; height: 26px; border-radius: 7px; background: linear-gradient(135deg, #6fd3e6, #1f6f9a); box-shadow: 0 0 0 2px #fff"></span>
+                </div>
+                <div style="position: absolute; left: 13px; right: 56px; bottom: 64px">
+                  <div style="display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600">
+                    <span style="width: 30px; height: 30px; border-radius: 50%; padding: 2px; box-sizing: border-box; background: linear-gradient(45deg, #feda75, #fa7e1e, #d62976, #962fbf)"><span style="display: block; width: 100%; height: 100%; border-radius: 50%; background: #6fd3e6; box-shadow: 0 0 0 1.5px #000"></span></span>
+                    deepsea.facts
+                    <span style="padding: 3px 9px; border-radius: 8px; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.75); font-size: 11.5px; font-weight: 600">Follow</span>
+                  </div>
+                  <p style="margin: 8px 0 0; font-size: 12.5px; line-height: 1.35">why octopuses have three hearts 🐙 <span style="opacity: 0.8">#science</span> <span style="opacity: 0.65">… more</span></p>
+                  <p style="margin: 7px 0 0; display: flex; align-items: center; gap: 6px; font-size: 11.5px">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="#fff"><path d="M9 18.5a3 3 0 1 1-2-2.8V5l12-2v11.5a3 3 0 1 1-2-2.8V6.4L9 7.8z"></path></svg>
+                    <span style="opacity: 0.95">deepsea.facts · Original audio</span>
+                  </p>
+                </div>
+              </div>
+            </div>
+            <svg style="position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0.16; mix-blend-mode: overlay"><filter id="grainS"><feTurbulence type="fractalNoise" baseFrequency="1.1" numOctaves="2"></feTurbulence><feColorMatrix type="saturate" values="0"></feColorMatrix></filter><rect width="100%" height="100%" filter="url(#grainS)"></rect></svg>
+
+            <div style="position: absolute; left: 0; right: 0; top: 0; height: 40px; padding: 0 22px 0 26px; display: flex; align-items: center; justify-content: space-between; font-size: 13px; font-weight: 600; letter-spacing: -0.01em">
+              <span>9:41</span>
+              <span style="display: flex; align-items: center; gap: 5px">
+                <svg width="16" height="11" viewBox="0 0 16 11" fill="#fff"><rect x="0" y="7" width="3" height="4" rx="1"></rect><rect x="4.3" y="5" width="3" height="6" rx="1"></rect><rect x="8.6" y="2.5" width="3" height="8.5" rx="1"></rect><rect x="12.9" y="0" width="3" height="11" rx="1"></rect></svg>
+                <svg width="15" height="11" viewBox="0 0 15 11" fill="#fff"><path d="M7.5 2.3c2.1 0 4 .8 5.4 2.1l1.1-1.1A9.2 9.2 0 0 0 7.5.7 9.2 9.2 0 0 0 1 3.3l1.1 1.1a7.7 7.7 0 0 1 5.4-2.1zm0 3.1c1.3 0 2.5.5 3.3 1.3l1.1-1.1A6.3 6.3 0 0 0 7.5 3.8c-1.7 0-3.3.7-4.4 1.8l1.1 1.1c.8-.8 2-1.3 3.3-1.3zm0 3.1c.5 0 .9.2 1.2.5L7.5 10.2 6.3 9c.3-.3.7-.5 1.2-.5z"></path></svg>
+                <svg width="25" height="12" viewBox="0 0 25 12"><rect x="0.5" y="0.5" width="21" height="11" rx="3.5" fill="none" stroke="#fff" stroke-opacity=".45"></rect><rect x="2" y="2" width="15" height="8" rx="2" fill="#fff"></rect><path d="M23 4v4c.8-.3 1.4-1 1.4-2s-.6-1.7-1.4-2z" fill="#fff" fill-opacity=".5"></path></svg>
+              </span>
+            </div>
+            <div style="position: absolute; left: 50%; top: 9px; width: 84px; height: 24px; margin-left: -42px; border-radius: 20px; background: #000">
+              <span style="position: absolute; right: 10px; top: 7px; width: 10px; height: 10px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #2b3a55, #0a0d14 70%)"></span>
+            </div>
+
+            <div style="position: absolute; left: 16px; right: 16px; top: 46px; display: flex; justify-content: space-between; align-items: center">
+              <span style="display: flex; align-items: center; gap: 4px; font-size: 21px; font-weight: 700; letter-spacing: -0.02em">Reels
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg>
+              </span>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8.5A2.5 2.5 0 0 1 6.5 6h1.8l1.4-2h4.6l1.4 2h1.8A2.5 2.5 0 0 1 20 8.5v8A2.5 2.5 0 0 1 17.5 19h-11A2.5 2.5 0 0 1 4 16.5z"></path><circle cx="12" cy="12.5" r="3.6"></circle></svg>
+            </div>
+
+            <div style="position: absolute; left: 0; right: 0; bottom: 50px; height: 2px; background: rgba(255,255,255,0.25)">
+              <div data-ref="setProg" style="width: 100%; height: 100%; background: #fff; transform-origin: 0 50%; transform: scaleX(0)"></div>
+            </div>
+
+            <div style="position: absolute; left: 0; right: 0; bottom: 0; height: 50px; padding: 0 24px 12px; box-sizing: border-box; display: flex; justify-content: space-between; align-items: center; background: #000">
+              <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linejoin="round"><path d="M3.5 10.5 12 3.5l8.5 7V20a1 1 0 0 1-1 1H15v-6H9v6H4.5a1 1 0 0 1-1-1z"></path></svg>
+              <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"></circle><path d="m20 20-4.6-4.6"></path></svg>
+              <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="5"></rect><path d="M12 8v8M8 12h8"></path></svg>
+              <svg width="23" height="23" viewBox="0 0 24 24" fill="#fff"><path d="M7 2.5h10A4.5 4.5 0 0 1 21.5 7v10a4.5 4.5 0 0 1-4.5 4.5H7A4.5 4.5 0 0 1 2.5 17V7A4.5 4.5 0 0 1 7 2.5zm-2.6 6v8.5A2.6 2.6 0 0 0 7 19.6h10a2.6 2.6 0 0 0 2.6-2.6V8.5zm3.1-4.1L9.8 7h3.3L10.8 4.4zm5.3 0L15.1 7h4.4a2.6 2.6 0 0 0-2.5-2.6zM10 10.5v6.5l5.6-3.2z"></path></svg>
+              <span style="width: 24px; height: 24px; border-radius: 50%; background: #f06a35; box-shadow: 0 0 0 1.5px #fff"></span>
+              <span style="position: absolute; left: 50%; bottom: 6px; width: 96px; height: 4px; margin-left: -48px; border-radius: 4px; background: #fff"></span>
+            </div>
+
+            <span data-ref="setRipple" style="position: absolute; left: 0; top: 0; width: 44px; height: 44px; margin: -22px 0 0 -22px; border-radius: 50%; background: rgba(255,255,255,0.42); box-shadow: 0 0 0 1px rgba(255,255,255,0.6); opacity: 0; pointer-events: none"></span>
+            <div style="position: absolute; inset: 0; border-radius: 40px; background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0) 30%); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.05)"></div>
+            <div style="position: absolute; top: -40px; width: 200px; height: 160px; border-radius: 50%; background: radial-gradient(closest-side, rgba(255,236,206,0.40), rgba(255,220,170,0.10) 60%, transparent); mix-blend-mode: screen; left: 24px" data-bind="glareX"></div>
+          </div>
+        </div>
+        <span style="position: absolute; left: -3px; top: 104px; width: 3px; height: 30px; border-radius: 2px; background: linear-gradient(#5e554b, #2a2622); transform: translateZ(5px)"></span>
+        <span style="position: absolute; left: -3px; top: 150px; width: 3px; height: 50px; border-radius: 2px; background: linear-gradient(#5e554b, #2a2622); transform: translateZ(5px)"></span>
+        <span style="position: absolute; right: -3px; top: 160px; width: 3px; height: 74px; border-radius: 2px; background: linear-gradient(#5e554b, #2a2622); transform: translateZ(5px)"></span>
+      </div>
+    </div>
+  </div>
+
+  <canvas data-ref="setCanvas" width="560" height="760" aria-hidden="true" style="position: absolute; left: 0; top: 0; width: 560px; height: 760px; pointer-events: none"></canvas>
+  <div id="fallbackEl">
+    <div data-ref="setHand2d" aria-hidden="true" style="position: absolute; left: 314px; top: 505px; width: 0; height: 0; transform-origin: 0 0">
+        <div style="position: absolute; left: -8px; top: 8px; width: 150px; height: 34px; border-radius: 50%; background: rgba(0,0,0,0.55); filter: blur(9px); transform: rotate(24deg); transform-origin: 0 0"></div>
+        <svg width="360" height="380" viewBox="0 0 360 380" style="position: absolute; left: -14px; top: -63px; overflow: visible; transform: rotate(22deg) scale(0.85); transform-origin: 14px 63px">
+          <defs>
+            <radialGradient id="hk" cx="32%" cy="26%" r="85%"><stop offset="0" stop-color="#ffe4cb"></stop><stop offset=".45" stop-color="#f6c29a"></stop><stop offset="1" stop-color="#cf8660"></stop></radialGradient>
+            <linearGradient id="hf" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe2c6"></stop><stop offset=".5" stop-color="#f4bc93"></stop><stop offset="1" stop-color="#d18b64"></stop></linearGradient>
+            <radialGradient id="hs" cx="30%" cy="18%" r="90%"><stop offset="0" stop-color="#fdf6ec"></stop><stop offset=".5" stop-color="#ece0cf"></stop><stop offset="1" stop-color="#b8a690"></stop></radialGradient>
+          </defs>
+          <path d="M212 186 C 262 164, 332 196, 386 262 L 392 420 L 252 420 C 222 342, 196 262, 212 186 Z" fill="url(#hs)"></path>
+          <path d="M236 230 C 270 222, 310 240, 340 270 M246 270 C 280 262, 318 282, 346 310 M256 312 C 290 306, 324 324, 352 350" stroke="#cdbfac" stroke-width="2" fill="none" opacity=".55"></path>
+          <rect x="116" y="138" width="98" height="40" rx="20" fill="url(#hf)" transform="rotate(-8 165 158)"></rect>
+          <ellipse cx="214" cy="110" rx="80" ry="72" fill="url(#hk)"></ellipse>
+          <rect x="160" y="156" width="66" height="32" rx="16" fill="url(#hf)" stroke="#c47c58" stroke-opacity=".3"></rect>
+          <rect x="150" y="125" width="76" height="36" rx="18" fill="url(#hf)" stroke="#c47c58" stroke-opacity=".3"></rect>
+          <rect x="140" y="93" width="82" height="38" rx="19" fill="url(#hf)" stroke="#c47c58" stroke-opacity=".3"></rect>
+          <rect x="14" y="40" width="192" height="46" rx="23" fill="url(#hf)"></rect>
+          <ellipse cx="34" cy="66" rx="17" ry="17" fill="#e9a57c" opacity=".45"></ellipse>
+          <ellipse cx="32" cy="52" rx="12" ry="7.5" fill="#fff0e4" opacity=".85"></ellipse>
+          <path d="M92 50 q6 13 0 26 M138 50 q6 13 0 26" stroke="#c47c58" stroke-width="2.4" fill="none" stroke-linecap="round" opacity=".55"></path>
+          <ellipse cx="190" cy="78" rx="38" ry="13" fill="#fff" opacity=".28" transform="rotate(-12 190 78)"></ellipse>
+          <ellipse cx="80" cy="47" rx="40" ry="5" fill="#fff" opacity=".3"></ellipse>
+          <path d="M204 178 C 240 160, 302 174, 352 218" stroke="#f3ead9" stroke-width="30" fill="none" stroke-linecap="round"></path>
+          <path d="M214 170 l-4 18 M232 164 l-3 19 M250 162 l-2 19 M268 164 l0 19 M286 168 l2 19 M304 175 l3 18 M322 185 l4 17 M338 198 l5 15" stroke="#d6c9b5" stroke-width="2.4" stroke-linecap="round"></path>
+        </svg>
+      </div>
+  </div>
+  <button type="button" class="hand-hit" aria-label="Poke the hand" data-onclick="onPoke" style="position: absolute; left: 318px; top: 470px; width: 242px; height: 290px; border: 0; padding: 0; border-radius: 60px 0 0 0; background: transparent; pointer-events: none"></button>
+<button type="button" class="hand-hit" aria-label="Touch the phone screen" data-onclick="onScreenKey" style="position: absolute; left: 200px; top: 300px; width: 120px; height: 260px; border: 0; padding: 0; border-radius: 30px; background: transparent; pointer-events: none"></button>
+  <div id="bubbleEl" class="bubble" role="status" style="position: absolute; left: 368px; top: 408px; padding: 9px 13px; border-radius: 14px 14px 14px 4px; background: #f3eadb; color: #17120c; font: 600 14px Geist, Inter, system-ui, sans-serif; white-space: nowrap; box-shadow: 0 10px 28px rgba(0,0,0,0.5); transform-origin: 0 100%" hidden></div>
+  <div style="position: absolute; left: 0; right: 0; top: 0; height: 330px; transform-origin: 280px 0; transform: rotate(0deg)" data-bind="angle">
+    <div aria-hidden="true" style="position: absolute; left: 130px; top: 70px; width: 300px; height: 300px; border-radius: 50%; background: radial-gradient(closest-side, rgba(255,214,160,0.30), rgba(255,180,110,0.10) 55%, transparent)"></div>
+    <div aria-hidden="true" style="position: absolute; left: 279px; top: 0; width: 2px; height: 172px; background: #050505"></div>
+    <div aria-hidden="true" style="position: absolute; left: 271px; top: 164px; width: 18px; height: 24px; border-radius: 3px 3px 2px 2px; background: linear-gradient(90deg, #0a0a0a, #3b3835 40%, #111 70%, #050505); box-shadow: 0 2px 0 rgba(0,0,0,0.6)"></div>
+    <div aria-hidden="true" style="position: absolute; left: 273px; top: 160px; width: 14px; height: 8px; border-radius: 50%; background: #2b2926"></div>
+    <div aria-hidden="true" style="position: absolute; left: 236px; top: 170px; width: 88px; height: 88px; border-radius: 50%; background: radial-gradient(circle at 50% 60%, #fffcf4 0%, #fdf1dc 28%, #efd9b6 62%, #c9a983 100%); box-shadow: 0 0 34px 10px rgba(255,222,170,0.40), 0 0 120px 40px rgba(255,186,110,0.16)"></div>
+    <button type="button" class="swing-btn" aria-label="Swing the lamp" data-onpointerdown="onGrab" data-onclick="onPush" style="position: absolute; left: 226px; top: 150px; width: 108px; height: 118px; border: 0; padding: 0; border-radius: 54px; background: transparent"></button>
+  </div>
+</div>
+
+<script src="./hand-scene.bundle.js"></script>
+<script>
+class DCLogic {
+  constructor(props) { this.props = props || {}; }
+  setState(o) { Object.assign(this.state, o); this.__apply(); }
+}
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    // pendulum: angle in degrees, w in degrees per second
+    this.p = { a: 0, w: 0, target: 0, mode: 'free', last: 0, dir: 1 };
+    this.state = { gl: false, angle: 0 };
+  }
+  componentDidMount() {
+    this.reduce = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (!this.reduce) this.p.a = 7; // it swings into place when the page opens
+    // the 3D hand (three.js + the posed hand model); the drawn hand stays if WebGL isn't available
+    if (window.HandScene && this.canvas) {
+      try {
+        this.hand = window.HandScene.create(this.canvas, '../assets/hand-point.glb', {
+          still: this.reduce,
+          onReady: () => this.setState({ gl: true }),
+          onError: () => { this.hand = null; },
+        });
+      } catch (err) { this.hand = null; }
+    }
+    const tick = (t) => {
+      const p = this.p;
+      const dt = p.last ? Math.min((t - p.last) / 1000, 1 / 30) : 1 / 60;
+      p.last = t;
+      const k = p.mode === 'held' ? 140 : 15;
+      const c = p.mode === 'held' ? 20 : p.mode === 'hover' ? 2.4 : 0.42;
+      const damp = this.reduce ? Math.max(c, 9) : c;
+      const acc = -k * (p.a - p.target) - damp * p.w;
+      p.w += acc * dt;
+      p.a += p.w * dt;
+      if (Math.abs(p.a - this.state.angle) > 0.01) this.setState({ angle: p.a });
+      this.scroll(t);
+      this.raf = requestAnimationFrame(tick);
+    };
+    this.raf = requestAnimationFrame(tick);
+  }
+  scroll(t) {
+    // one Reel every 4s: rest, press, drag (the feed follows the finger 1:1), release (it flicks on to the next Reel)
+    const ease = (x) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
+    if (this.t0 == null) this.t0 = t;
+    // while the hand is reacting, scrolling pauses and then carries on where it stopped
+    let tt = t;
+    if (this.react) {
+      const el = t - this.react.t0;
+      if (el >= this.react.dur) { this.t0 += this.react.dur; this.react = null; this.setState({ bubbleText: '' }); }
+      else tt = this.react.t0;
+    }
+    const SEG = 4000, DRAG = 130, reelH = this.feed ? this.feed.offsetHeight / 4 : 508;
+    let idx = 0, k = 0, lift = 0, off = 0, prog = 0.4;
+    if (!this.reduce) {
+      const c = (tt - this.t0) % (SEG * 3);
+      idx = Math.floor(c / SEG);
+      const s = (c % SEG) / SEG;
+      if (s < 0.55) { lift = 1.2 * Math.sin(s * 12); }
+      else if (s < 0.6) { lift = -1.5 * ((s - 0.55) / 0.05); }
+      else if (s < 0.78) { const e = ease((s - 0.6) / 0.18); k = e; lift = -1.5; off = DRAG * e; }
+      else if (s < 0.88) { const e = (s - 0.78) / 0.1; off = DRAG + (reelH - DRAG) * (1 - Math.pow(1 - e, 3)); k = 1 - 0.45 * ease(e); lift = 34 * Math.sin((e * Math.PI) / 2); }
+      else { const e = ease((s - 0.88) / 0.12); off = reelH; k = 0.55 * (1 - e); lift = 34 * (1 - e); }
+      prog = s < 0.78 ? s / 0.78 : s < 0.88 ? 1 : 0;
+    }
+    const x2d = this.react ? this.reactPose((t - this.react.t0) / this.react.dur, this.react) : {};
+    if (this.feed) this.feed.style.transform = `translateY(${(-(idx * reelH + off)).toFixed(2)}px)`;
+    if (this.prog) this.prog.style.transform = `scaleX(${prog.toFixed(4)})`;
+    if (this.hand2d) this.hand2d.style.transform = `translate(${(-9 * k + lift * 0.35 + (x2d.lateral || 0) * -0.6).toFixed(2)}px, ${(-97 * k - lift * 0.5).toFixed(2)}px) scale(${(1 - 0.045 * k).toFixed(4)})`;
+    const x = this.react ? this.reactPose((t - this.react.t0) / this.react.dur, this.react) : {};
+    if (this.flinch) {
+      const e = (t - this.flinch) / 380;
+      if (e >= 1 || e < 0) this.flinch = null;
+      else { const w = Math.sin(e * Math.PI); x.lift = (x.lift || 0) + 14 * w; x.back = (x.back || 0) + 12 * w; x.roll = (x.roll || 0) + 7 * Math.sin(e * Math.PI * 3) * (1 - e); }
+    }
+    if (this.react && this.react.type === 'swat' && !this.react.shook && (t - this.react.t0) / this.react.dur > 0.28) {
+      this.react.shook = true;
+      if (!this.reduce && this.root && this.root.animate) this.root.animate([{ transform: 'translateX(0)' }, { transform: 'translateX(-5px)' }, { transform: 'translateX(4px)' }, { transform: 'translateX(-2px)' }, { transform: 'translateX(0)' }], { duration: 320, easing: 'ease-out' });
+    }
+    const ph = x.phone || { dx: 0, dy: 0, rot: 0 };
+    this.phoneNow = ph;
+    if (this.phoneEl) this.phoneEl.style.transform = `translate(${ph.dx.toFixed(2)}px, ${ph.dy.toFixed(2)}px) scale(0.78) translate(125px, 260px) rotate(${ph.rot.toFixed(3)}deg) translate(-125px, -260px)`;
+    if (this.hand) this.hand.update(0, { dx: 214 * Math.sin((this.p.a * Math.PI) / 180) }, { k, lift: lift + (x.lift || 0), back: x.back, yawOff: x.yawOff, pitchOff: x.pitchOff, lateral: x.lateral, roll: x.roll, phone: ph, aim: x.aim });
+  }
+  reactPose(e, R) {
+    const ease = (v) => (v < 0.5 ? 4 * v * v * v : 1 - Math.pow(-2 * v + 2, 3) / 2);
+    const seg = (a, b) => Math.min(Math.max((e - a) / (b - a), 0), 1);
+    const lerp = (a, b, v) => a + (b - a) * v;
+    const amp = this.reduce ? 0.35 : 1;
+    const F = R.from || { dx: 0, dy: 0, rot: 0 };
+    const mix = (A, B, v) => ({ dx: lerp(A.dx, B.dx, v), dy: lerp(A.dy, B.dy, v), rot: lerp(A.rot, B.rot, v) });
+    const ZERO = { dx: 0, dy: 0, rot: 0 };
+    const settle = mix(F, ZERO, ease(seg(0, 0.6)));
+    if (R.type === 'nudge') {
+      // stop, glance at your finger, brush it away, go back to scrolling
+      const a = ease(seg(0, 0.15)), b = ease(seg(0.15, 0.32)), c = ease(seg(0.32, 0.5)), d = ease(seg(0.5, 1));
+      let lift = 26 * a, w = 0, lat = 0, yaw = 8 * a;
+      if (e >= 0.15) { w = b; lift = lerp(26, 6, b); yaw = lerp(8, 18, b); }
+      if (e >= 0.32) { w = 1; lat = 70 * c; lift = lerp(6, 18, c); yaw = lerp(18, 34, c); }
+      if (e >= 0.5) { w = 1 - d; lat = 70 * (1 - d); lift = 18 * (1 - d); yaw = 34 * (1 - d); }
+      return { lift: lift * amp, aim: Object.assign({ w: w * amp }, R.aim), lateral: lat * amp, yawOff: yaw * amp, phone: settle };
+    }
+    if (R.type === 'pull') {
+      // finger down on its own spot, drag the whole phone away from you, hold it, slide it back
+      const P = { dx: 58 * amp, dy: 34 * amp, rot: 11 * amp };
+      const a = ease(seg(0, 0.12)), b = ease(seg(0.12, 0.32)), d = ease(seg(0.75, 1));
+      let phone = mix(F, P, b), lift = -2 * a, pitch = -5 * b;
+      if (e >= 0.32 && e < 0.75) { lift = -2 + 2.5 * Math.abs(Math.sin(seg(0.4, 0.6) * Math.PI * 2)); }
+      if (e >= 0.75) { phone = mix(P, ZERO, d); pitch = -5 * (1 - d); lift = -2 * (1 - d); }
+      return { lift, pitchOff: pitch, phone };
+    }
+    if (R.type === 'tap') {
+      // impatient double-taps on its own screen, then a frustrated little shake
+      const t1 = seg(0, 0.62), sh = seg(0.62, 0.85), d = ease(seg(0.85, 1));
+      const taps = e < 0.62 ? 16 * Math.abs(Math.sin(t1 * Math.PI * 6)) : 0;
+      const shake = e >= 0.62 && e < 0.85 ? 10 * Math.sin(sh * Math.PI * 8) * (1 - sh) : 0;
+      const raise = e >= 0.62 ? 18 * (1 - d) : 0;
+      return { lift: (taps + raise) * amp, yawOff: shake * amp, roll: shake * 0.6 * amp, phone: settle };
+    }
+    if (R.type === 'swat') {
+      // yank back, swing across fast, a little shake of the finger, then settle
+      const a = ease(seg(0, 0.15)), b = Math.pow(seg(0.15, 0.3), 3), c = seg(0.3, 0.55), d = ease(seg(0.55, 1));
+      let back = 70 * a, lift = 70 * a, yaw = -22 * a, pitch = 14 * a, lat = 0;
+      if (e >= 0.15) { back = lerp(70, 15, b); lift = lerp(70, 30, b); yaw = lerp(-22, 58, b); lat = lerp(0, -60, b); pitch = lerp(14, 4, b); }
+      if (e >= 0.3) { yaw = 58 + 6 * Math.sin(c * Math.PI * 4) * (1 - c); }
+      if (e >= 0.55) { back = 15 * (1 - d); lift = 30 * (1 - d); yaw = 58 * (1 - d); lat = -60 * (1 - d); pitch = 4 * (1 - d); }
+      return { back: back * amp, lift: lift * amp, yawOff: yaw * amp, lateral: lat * amp, pitchOff: pitch * amp, phone: settle };
+    }
+    // wag: lift the finger toward you and wag it "no, no"
+    const a = ease(seg(0, 0.18)), w = seg(0.18, 0.72), d = ease(seg(0.72, 1));
+    const up = a * (1 - d);
+    return { back: 8 * up * amp, lift: 95 * up * amp, lateral: -30 * up * amp, pitchOff: -42 * up * amp, yawOff: (6 + 20 * Math.sin(w * Math.PI * 6)) * up * amp, phone: settle };
+  }
+  startReact(r) {
+    const now = performance.now();
+    if (this.react) this.t0 += now - this.react.t0; // already paused: keep the paused time paused
+    this.react = Object.assign({ t0: now, from: this.phoneNow || { dx: 0, dy: 0, rot: 0 } }, r);
+    this.flinch = null;
+    this.setState({ bubbleText: r.say });
+  }
+  poke() {
+    if (this.react) return;
+    const type = this.nextType === 'wag' ? 'wag' : 'swat';
+    this.nextType = type === 'swat' ? 'wag' : 'swat';
+    this.startReact({ type, dur: type === 'swat' ? 1150 : 1400, say: type === 'swat' ? "hey! I'm scrolling" : 'uh-uh, my reel' });
+  }
+  touchScreen(p) {
+    // someone touches the phone while it's in use: each touch within a few seconds annoys it more
+    const now = performance.now();
+    if (!this.annoy || now - this.annoy.last > 6000) this.annoy = { n: 0, last: now };
+    this.annoy.n += 1; this.annoy.last = now;
+    this.ripple(p);
+    const n = this.annoy.n;
+    if (n === 1) this.startReact({ type: 'nudge', dur: 1500, aim: p, say: 'excuse me?' });
+    else if (n === 2) this.startReact({ type: 'pull', dur: 3600, aim: p, say: 'get your own phone' });
+    else this.startReact({ type: 'tap', dur: 1800, aim: p, say: n > 4 ? 'okay. STOP.' : 'seriously?!' });
+  }
+  ripple(p) {
+    const el = this.rippleEl; if (!el || !el.animate) return;
+    el.style.left = `${(p.px - 6).toFixed(1)}px`; el.style.top = `${(p.py - 6).toFixed(1)}px`;
+    el.animate(this.reduce ? [{ opacity: 0.5 }, { opacity: 0 }] : [{ transform: 'scale(0.35)', opacity: 0.6 }, { transform: 'scale(1.5)', opacity: 0 }], { duration: 520, easing: 'cubic-bezier(.23,1,.32,1)' });
+  }
+  componentWillUnmount() { cancelAnimationFrame(this.raf); this.hand && this.hand.dispose(); this.drop && this.drop(); }
+  aimAt(clientX, clientY, root) {
+    const r = root.getBoundingClientRect();
+    const sx = r.width / 560;
+    const x = (clientX - r.left) / sx - 280, y = Math.max((clientY - r.top) / sx, 60);
+    return (Math.atan2(x, y) * 180) / Math.PI;
+  }
+  renderVals() {
+    const a = this.state.angle;
+    const dx = Math.sin((a * Math.PI) / 180) * 214; // how far the globe has moved sideways
+    return {
+      noGL: !this.state.gl,
+      setCanvas: (el) => { this.canvas = el; },
+      setFeed: (el) => { this.feed = el; },
+      setRoot: (el) => { this.root = el; },
+      setPhone: (el) => { this.phoneEl = el; },
+      setRipple: (el) => { this.rippleEl = el; },
+      onDown: (e) => {
+        if (e.button > 0 || e.target.closest('.swing-btn')) return;
+        const r = e.currentTarget.getBoundingClientRect(), sx = r.width / 560;
+        const px = (e.clientX - r.left) / sx, py = (e.clientY - r.top) / sx;
+        if (this.hand && this.hand.hitTest && this.hand.hitTest(px, py)) { this.poke(); return; }
+        let p = null;
+        if (this.hand && this.hand.toPhone) p = this.hand.toPhone(px, py, this.phoneNow);
+        else if (px > 190 && px < 385 && py > 272 && py < 661) p = { px: ((px - 190) / 195) * 250, py: ((py - 272) / 389) * 520 };
+        if (p && p.px > 6 && p.px < 244 && p.py > 6 && p.py < 514) this.touchScreen(p);
+      },
+      onScreenKey: () => this.touchScreen({ px: 90, py: 260 }),
+      onPoke: () => this.poke(),
+      bubbleOn: !!this.state.bubbleText,
+      bubbleText: this.state.bubbleText || '',
+      setProg: (el) => { this.prog = el; },
+      setHand2d: (el) => { this.hand2d = el; },
+      angle: (-a).toFixed(3),
+      poolX: (dx * 2.1).toFixed(1),
+      shadowX: (-dx * 0.18).toFixed(1),
+      glareX: (24 + dx * 0.55).toFixed(1),
+      onMove: (e) => {
+        if (this.hand && this.hand.hitTest) {
+          const r = e.currentTarget.getBoundingClientRect(), sx = r.width / 560;
+          const over = this.hand.hitTest((e.clientX - r.left) / sx, (e.clientY - r.top) / sx);
+          if (over && !this.overHand && !this.react) this.flinch = performance.now(); // ticklish
+          this.overHand = over;
+        }
+        if (this.p.mode === 'held') return;
+        this.p.mode = 'hover';
+        this.p.target = Math.max(-7, Math.min(7, this.aimAt(e.clientX, e.clientY, e.currentTarget) * 0.35));
+      },
+      onLeave: () => { if (this.p.mode !== 'held') { this.p.mode = 'free'; this.p.target = 0; } },
+      onGrab: (e) => {
+        const root = e.currentTarget.closest('[data-lamp-root]') || e.currentTarget.parentElement.parentElement;
+        e.preventDefault();
+        this.p.mode = 'held';
+        this.moved = false;
+        const move = (ev) => { this.moved = true; this.p.target = Math.max(-24, Math.min(24, this.aimAt(ev.clientX, ev.clientY, root))); };
+        const up = () => { this.p.mode = 'free'; this.p.target = 0; this.drop(); };
+        this.drop = () => { removeEventListener('pointermove', move); removeEventListener('pointerup', up); removeEventListener('pointercancel', up); this.drop = null; };
+        addEventListener('pointermove', move); addEventListener('pointerup', up); addEventListener('pointercancel', up);
+      },
+      onPush: () => {
+        if (this.moved) { this.moved = false; return; } // a drag, not a tap
+        this.p.dir = -this.p.dir;
+        this.p.w += this.p.dir * (this.reduce ? 12 : 38);
+      },
+    };
+  }
+}
+
+// ---- shim: mount the component without a framework ----
+const root = document.querySelector('[data-lamp-root]');
+const c = new Component({});
+let vals = c.renderVals();
+c.__apply = () => {
+  vals = c.renderVals();
+  root.querySelectorAll('[data-bind]').forEach((el) => {
+    const k = el.dataset.bind, v = vals[k];
+    if (k === 'angle') el.style.transform = `rotate(${v}deg)`;
+    if (k === 'poolX') el.style.transform = `translateX(${v}px)`;
+    if (k === 'shadowX') el.style.transform = `translate3d(${v}px, 30px, 0.4px)`;
+    if (k === 'glareX') el.style.left = `${v}px`;
+  });
+  const b = document.getElementById('bubbleEl');
+  if (vals.bubbleOn) { if (b.hidden || b.textContent !== vals.bubbleText) { b.textContent = vals.bubbleText; b.hidden = false; b.style.animation = 'none'; b.offsetHeight; b.style.animation = ''; } } else b.hidden = true;
+  document.getElementById('fallbackEl').style.display = vals.noGL ? '' : 'none';
+};
+document.querySelectorAll('[data-ref]').forEach((el) => vals[el.dataset.ref](el));
+for (const ev of ['onclick', 'onpointerdown', 'onpointermove', 'onpointerleave']) {
+  document.querySelectorAll(`[data-${ev}]`).forEach((el) => {
+    const name = el.getAttribute(`data-${ev}`);
+    el.addEventListener(ev.slice(2), (e) => vals[name](e));
+  });
+}
+c.componentDidMount();
+c.__apply();
+</script>
+</body></html>

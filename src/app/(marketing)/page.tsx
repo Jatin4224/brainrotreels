@@ -83,12 +83,9 @@ import {
   type LandingData,
 } from "./_components/landing-fixtures";
 
-import {
-  HeroPromptCard,
-  LANDING_REELS,
-  ProofStrip,
-  ReelStage,
-} from "./_components";
+import { LampSceneMount } from "@/components/hero/lamp-scene/LampSceneMount";
+
+import { HeroPromptCard, ProofStrip } from "./_components";
 
 /* The primary CTA skin, written once and shared with the hero card's submit
  * button so the page has ONE loud orange action. It is a LINK here — see
@@ -216,12 +213,16 @@ export default function LandingPage({
               </div>
             </div>
 
-            <ReelStage
-              items={LANDING_REELS}
-              badge={data.hero.renderedBadge}
-              footnote={data.hero.showcaseFootnote}
-              className="hero-stage-enter"
-            />
+            {/* THE_STAGE_IS_A_ROOM. The fan of phones became one phone being
+                swiped; this is the same argument carried the rest of the way
+                — a phone on a table, under a lamp, in somebody's hands at
+                night, which is where the thing being sold is actually
+                watched. It is also the first object on the page a visitor
+                can PLAY with: the lamp swings, the hand flinches when it is
+                poked, and it gets annoyed if you touch its screen. The whole
+                scene is decorative and aria-hidden bar its three controls;
+                see components/hero/lamp-scene/LampScene.tsx. */}
+            <LampSceneMount className="hero-stage-enter" />
           </div>
 
           {/* proof-enter is the TAIL of the hero sequence, not a second one —
