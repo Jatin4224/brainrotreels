@@ -286,7 +286,7 @@ can play with.
 - **It is an ILLUSTRATION, so it does not use theme tokens.** This is the one
   deliberate exception to §2's "never hardcode theme colours": the scene is a
   picture of a dark room lit by a warm bulb, the way a photograph would be. It
-  does not invert with the theme, and every colour in it (the table surface,
+  does not invert with the theme, and every colour in it (the backdrop image,
   lamp `#ffcf96`, the phone's metal gradients) is a property of the depicted
   object, not of the UI. Nothing outside the 560×760 frame does this.
 - **Sizing.** The scene is laid out at 560×760 and `scale()`d to its column —
@@ -295,20 +295,30 @@ can play with.
   560/760` and `overflow: hidden`, so the box is reserved on the first paint
   (no layout shift) and the full-size layout box cannot push the grid column
   wider than its share.
-- **The card has no background of its own.** Its base is `var(--background)`,
-  the same colour as the page outside it, so the scene reads as a lit object
-  floating on the page rather than a photograph in a frame. The walnut planks
-  this replaces (`walnut.webp`, removed 2026-11-25) fought the black page and
-  made the card an obvious rectangle — **do not reintroduce a surround.**
-- **The tabletop is one layer:** `table-surface.webp`, a dark mottled image
-  rotated into the same 33° plane the phone lies on, so it is foreshortened
-  *with* the phone. It is deliberately dark (mean ~37/255) — the lamp's pool
-  and the warm haze are what find the mottling, so the surface reads as lit
-  rather than as a picture of a surface.
-- **Two `screen` layers do the lighting**: a soft warm haze centred on the
-  globe (in the card's flat plane — with the planks gone the bulb had nothing
-  above the table to light, and the top third went dead black), and the light
-  pool on the table itself, which tracks the lamp.
+- **The card's backdrop is one image, not CSS.** `.lampSceneBg` in
+  `globals.css` puts `/hero-bg.webp` on the scene root: a photographic dark
+  room with a warm glow ~30% down, `cover`, positioned `center 30%` so the
+  glow sits on the lamp's globe (~28% down the card). `--background` is under
+  it, and an `@supports` block upgrades it to `image-set()` with
+  `/hero-bg.jpg` as the typed fallback.
+  - It is in CSS rather than an inline style for a reason worth keeping:
+    inline styles are not processed by Lightning CSS, and Lightning CSS
+    **deletes a plain `url()` that sits directly in front of an
+    `image-set()`** in the same rule as redundant — which silently takes the
+    fallback with it. The `@supports` block is what makes the two coexist.
+  - This replaced two CSS fakes of a lit room, both removed 2026-11-26:
+    `table-surface.webp` (a dark mottled image rotated into the phone's 33°
+    plane) and a radial "warm haze" layer. Each had to be re-tuned against
+    the other whenever anything moved. **Do not rebuild the room in CSS** —
+    change the image.
+  - Before that it was walnut planks (`walnut.webp`, removed 2026-11-25),
+    which fought the black page and made the card an obvious rectangle.
+- **Only MOVING light is still drawn in CSS** (`Table.tsx`): the lamp's pool,
+  which tracks the globe at 2.1× its travel and therefore cannot be baked
+  into the backdrop, and the card's own falloff to black. The falloff is
+  lighter than it was (`0.72` at the edge, starting at 42%, down from `0.8` at 40%) because the
+  backdrop arrives with a vignette already in it and stacking the old one on
+  top crushed the corners flat.
 - **Loading — NOTHING_POPS_IN.** three.js and the hand model are dynamically
   imported behind an IntersectionObserver, so they are absent from the landing
   route's initial JS entirely. The scene then stays at `opacity: 0` behind the

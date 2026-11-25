@@ -594,15 +594,11 @@ export default function LampScene({ className }: LampSceneProps) {
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerLeave={onPointerLeave}
-          className="lampScene relative isolate overflow-hidden text-white"
+          className="lampScene lampSceneBg relative isolate overflow-hidden text-white"
           style={{
             width: SCENE_W,
             height: SCENE_H,
             borderRadius: 30,
-            /* The same colour as the page outside the card, so the card has
-               no background of its own — only the lamp, the surface it lights
-               and the phone on it. */
-            background: "var(--background)",
             boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.08)",
             transformOrigin: "top left",
           }}
