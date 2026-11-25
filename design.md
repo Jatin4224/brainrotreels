@@ -301,10 +301,23 @@ can play with.
   flat on top. The patina source is near-black (mean 25/255), so it is
   re-centred on mid-grey and its variation amplified before shipping;
   dropped in raw it crushes the whole table to black instead of mottling it.
-- **Loading.** three.js and the hand model are dynamically imported, gated on
-  an IntersectionObserver *and* idle time, so they are absent from the landing
-  route's initial JS entirely. A still poster (`/hero/lamp-poster.png`) holds
-  the frame until then, and a drawn 2D hand stands in if WebGL is unavailable.
+- **Loading — NOTHING_POPS_IN.** three.js and the hand model are dynamically
+  imported behind an IntersectionObserver, so they are absent from the landing
+  route's initial JS entirely. The scene then stays at `opacity: 0` behind the
+  still poster (`/hero/lamp-poster.png`) until the hand has actually been
+  **drawn** — `onReady` fires only after `renderer.compile()` and one real
+  frame at the rest pose, not merely when the glb has parsed — and the whole
+  scene then crossfades in together over 340ms. The poster is the same
+  composition, so the handover reads as one image settling rather than a scene
+  assembling in stages.
+  - There is deliberately **no 2D stand-in hand**. A flat cartoon hand used to
+    fill this window and it was the single worst thing on the page: the hero
+    showed a realistic poster, swapped to a cartoon, then swapped back. If the
+    hand cannot load (no WebGL, dead context, bad model) the scene reveals
+    *without a hand* — still lit, still scrolling, still interactive.
+  - Do **not** reintroduce an idle gate here. One used to defer the load by up
+    to 2s to protect first interaction from a 4.6MB model; the model is ~190KB
+    now and the reveal waits on it, so that delay was the visible pause.
 - **The shipped model is compressed, and that has two consequences.**
   `hand-point.glb` is run through glTF-Transform (4.6MB → ~190KB; the kit's
   uncompressed original is kept in `lamp-scene-kit/kit/assets/`). It therefore

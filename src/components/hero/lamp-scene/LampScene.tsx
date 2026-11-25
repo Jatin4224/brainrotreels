@@ -36,11 +36,11 @@
 "use client";
 
 import { useAnimate, useReducedMotion } from "framer-motion";
+import Image from "next/image";
 import * as React from "react";
 
 import { cn } from "@/lib/utils";
 
-import { FallbackHand } from "./FallbackHand";
 import { HandCanvas, useHandScene } from "./HandCanvas";
 import { Lamp } from "./Lamp";
 import { Phone } from "./Phone";
@@ -126,11 +126,24 @@ export default function LampScene({ className }: LampSceneProps) {
   const feedRef = React.useRef<HTMLDivElement | null>(null);
   const progressRef = React.useRef<HTMLDivElement | null>(null);
   const rippleRef = React.useRef<HTMLSpanElement | null>(null);
-  const hand2dRef = React.useRef<HTMLDivElement | null>(null);
 
-  /* The only two pieces of React state in the scene. */
-  const [glReady, setGlReady] = React.useState(false);
+  /* The only three pieces of React state in the scene, all of them rare.
+     `revealed` uncovers the scene once the hand has been DRAWN (not merely
+     downloaded); `posterGone` drops the still once the crossfade is over. */
+  const [revealed, setRevealed] = React.useState(false);
+  const [posterGone, setPosterGone] = React.useState(false);
   const [bubbleText, setBubbleText] = React.useState("");
+
+  /* Both paths end here: the hand is on screen, or it never will be (no
+     WebGL, a dead context, an unparseable model) and the scene shows without
+     one. Either way the viewer gets the live scene rather than a still. */
+  const reveal = React.useCallback(() => setRevealed(true), []);
+
+  React.useEffect(() => {
+    if (!revealed) return;
+    const t = window.setTimeout(() => setPosterGone(true), 420);
+    return () => window.clearTimeout(t);
+  }, [revealed]);
 
   /* Motion drives exactly one thing here: the panel shake on a swat. */
   const [shakeScope, animateShake] = useAnimate<HTMLDivElement>();
@@ -166,7 +179,8 @@ export default function LampScene({ className }: LampSceneProps) {
     rootRef,
     canvasRef,
     reduced,
-    onReady: React.useCallback(() => setGlReady(true), []),
+    onReady: reveal,
+    onFailed: reveal,
   });
 
   /* ── Scaling ──────────────────────────────────────────────────────────
@@ -426,17 +440,6 @@ export default function LampScene({ className }: LampSceneProps) {
         phone,
       };
 
-      /* The drawn hand, driven by the same timeline, so the handover to GL
-         is invisible beyond the change in fidelity. */
-      if (hand2dRef.current) {
-        const lat = (delta.lateral ?? 0) * -0.6;
-        const tx = -9 * pose.k + pose.lift * 0.35 + lat;
-        const ty = -97 * pose.k - pose.lift * 0.5;
-        hand2dRef.current.style.transform =
-          `translate(${tx.toFixed(2)}px, ${ty.toFixed(2)}px) ` +
-          `scale(${(1 - 0.045 * pose.k).toFixed(4)})`;
-      }
-
       handRef.current?.update(pose, { dx });
     };
 
@@ -568,7 +571,33 @@ export default function LampScene({ className }: LampSceneProps) {
             transformOrigin: "top left",
           }}
         >
-          <Table poolRef={poolRef} />
+          {/* NOTHING_POPS_IN. The still of the scene at rest holds the frame
+              until the 3D hand has actually been drawn once. It is the same
+              composition, so the handover is a crossfade between two images
+              of the same thing rather than a scene assembling itself in
+              stages. It unmounts when the fade is over. */}
+          {posterGone ? null : (
+            <Image
+              src="/hero/lamp-poster.png"
+              alt=""
+              aria-hidden="true"
+              priority
+              width={SCENE_W}
+              height={SCENE_H}
+              className="absolute inset-0 h-full w-full"
+            />
+          )}
+
+          <div
+            className="absolute inset-0"
+            style={{
+              opacity: revealed ? 1 : 0,
+              transition: reduced
+                ? "opacity 120ms linear"
+                : "opacity 340ms cubic-bezier(0.23, 1, 0.32, 1)",
+            }}
+          >
+            <Table poolRef={poolRef} />
           <Phone
             phoneRef={phoneElRef}
             shadowRef={shadowRef}
@@ -579,9 +608,6 @@ export default function LampScene({ className }: LampSceneProps) {
           />
 
           <HandCanvas ref={canvasRef} />
-          {/* The drawn hand stays mounted until the GL one is actually
-              drawing, then stops being rendered at all. */}
-          {glReady ? null : <FallbackHand ref={hand2dRef} />}
 
           {/* Keyboard routes to the two interactions a pointer gets by
               aiming. They take no pointer events — the root's own handler
@@ -607,9 +633,10 @@ export default function LampScene({ className }: LampSceneProps) {
             style={{ left: 200, top: 300, width: 120, height: 260, borderRadius: 30 }}
           />
 
-          <SpeechBubble text={bubbleText} />
+            <SpeechBubble text={bubbleText} />
 
-          <Lamp groupRef={lampRef} onGrab={onGrab} onPush={onPush} />
+            <Lamp groupRef={lampRef} onGrab={onGrab} onPush={onPush} />
+          </div>
         </div>
       </div>
     </div>

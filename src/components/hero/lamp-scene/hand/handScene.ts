@@ -376,6 +376,17 @@ export function createHandScene(
       owned.push(geo, mat, sleeveGeo, cuffGeo, knit, bump);
 
       ready = true;
+
+      /* READY_MEANS_DRAWN. `onReady` is what uncovers the scene, so it must
+         not fire until the very next thing a viewer sees is the FINISHED
+         hand. Parsing the glb is not enough: the standard material's shader
+         is still uncompiled and the textures are not on the GPU, so the
+         first rendered frame would otherwise land after the reveal and show
+         as a hitch. Compile, draw one real frame at the rest pose, and only
+         then say ready. */
+      renderer.compile(scene, camera);
+      update({ k: 0, lift: 0 }, { dx: 0 });
+
       opts.onReady?.();
     },
     undefined,
