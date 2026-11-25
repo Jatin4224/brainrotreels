@@ -167,7 +167,7 @@ export function Phone({
       className="absolute inset-0"
       style={{ perspective: "1400px", perspectiveOrigin: "280px 170px" }}
     >
-      {/* The tilted table plane the phone lies in — the SAME plane the walnut
+      {/* The tilted table plane the phone lies in — the SAME plane the table surface
           is drawn on, so the phone is on the table rather than over it. */}
       <div
         className="absolute"

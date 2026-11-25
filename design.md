@@ -271,7 +271,7 @@ On `sm` and up the textarea and button sit in a row (`sm:flex-row sm:items-end`)
 > 2026-11-25. Full spec: `DESIGN_1.md`. Code:
 > `src/components/hero/lamp-scene/`.
 
-A fixed **560 × 760** picture of a phone lying on a walnut table under a
+A fixed **560 × 760** picture of a phone lying on a dark table under a
 swinging pendant lamp, with a **3D hand** (three.js) scrolling an
 Instagram-style Reels feed on it. It is the first object on the page a visitor
 can play with.
@@ -286,7 +286,7 @@ can play with.
 - **It is an ILLUSTRATION, so it does not use theme tokens.** This is the one
   deliberate exception to §2's "never hardcode theme colours": the scene is a
   picture of a dark room lit by a warm bulb, the way a photograph would be. It
-  does not invert with the theme, and every colour in it (walnut `#120c08`,
+  does not invert with the theme, and every colour in it (the table surface,
   lamp `#ffcf96`, the phone's metal gradients) is a property of the depicted
   object, not of the UI. Nothing outside the 560×760 frame does this.
 - **Sizing.** The scene is laid out at 560×760 and `scale()`d to its column —
@@ -295,16 +295,24 @@ can play with.
   560/760` and `overflow: hidden`, so the box is reserved on the first paint
   (no layout shift) and the full-size layout box cannot push the grid column
   wider than its share.
-- **The tabletop is two layers.** `walnut.webp` for the grain, and
-  `table-patina.webp` — a mottled cloud — over it in `overlay` at 0.75, on the
-  *same* 33° plane so it is foreshortened with the wood rather than floating
-  flat on top. The patina source is near-black (mean 25/255), so it is
-  re-centred on mid-grey and its variation amplified before shipping;
-  dropped in raw it crushes the whole table to black instead of mottling it.
+- **The card has no background of its own.** Its base is `var(--background)`,
+  the same colour as the page outside it, so the scene reads as a lit object
+  floating on the page rather than a photograph in a frame. The walnut planks
+  this replaces (`walnut.webp`, removed 2026-11-25) fought the black page and
+  made the card an obvious rectangle — **do not reintroduce a surround.**
+- **The tabletop is one layer:** `table-surface.webp`, a dark mottled image
+  rotated into the same 33° plane the phone lies on, so it is foreshortened
+  *with* the phone. It is deliberately dark (mean ~37/255) — the lamp's pool
+  and the warm haze are what find the mottling, so the surface reads as lit
+  rather than as a picture of a surface.
+- **Two `screen` layers do the lighting**: a soft warm haze centred on the
+  globe (in the card's flat plane — with the planks gone the bulb had nothing
+  above the table to light, and the top third went dead black), and the light
+  pool on the table itself, which tracks the lamp.
 - **Loading — NOTHING_POPS_IN.** three.js and the hand model are dynamically
   imported behind an IntersectionObserver, so they are absent from the landing
   route's initial JS entirely. The scene then stays at `opacity: 0` behind the
-  still poster (`/hero/lamp-poster.png`) until the hand has actually been
+  still poster (`/hero/lamp-poster.webp`) until the hand has actually been
   **drawn** — `onReady` fires only after `renderer.compile()` and one real
   frame at the rest pose, not merely when the glb has parsed — and the whole
   scene then crossfades in together over 340ms. The poster is the same

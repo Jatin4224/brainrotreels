@@ -2,7 +2,7 @@
  * SOURCE OF TRUTH KEYWORDS: LampScene, ONE_RAF_LOOP, NEVER_SETSTATE_PER_FRAME,
  *   SCENE_IS_A_FIXED_COORDINATE_SPACE, PAUSE_WHEN_NOBODY_IS_WATCHING
  *
- * WHAT:  The lamp-lit Reels scene: a phone on a walnut table under a swinging
+ * WHAT:  The lamp-lit Reels scene: a phone on a dark table under a swinging
  *        pendant lamp, scrolled by a 3D hand that reacts when it is poked or
  *        when somebody touches the screen it is watching. This file owns the
  *        scaling wrapper, the single animation loop, and every pointer route.
@@ -566,7 +566,10 @@ export default function LampScene({ className }: LampSceneProps) {
             width: SCENE_W,
             height: SCENE_H,
             borderRadius: 30,
-            background: "#120c08",
+            /* The same colour as the page outside the card, so the card has
+               no background of its own — only the lamp, the surface it lights
+               and the phone on it. */
+            background: "var(--background)",
             boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.08)",
             transformOrigin: "top left",
           }}
@@ -578,7 +581,7 @@ export default function LampScene({ className }: LampSceneProps) {
               stages. It unmounts when the fade is over. */}
           {posterGone ? null : (
             <Image
-              src="/hero/lamp-poster.png"
+              src="/hero/lamp-poster.webp"
               alt=""
               aria-hidden="true"
               priority

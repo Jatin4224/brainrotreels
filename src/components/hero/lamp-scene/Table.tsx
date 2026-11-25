@@ -1,16 +1,22 @@
 /**
  * SOURCE OF TRUTH KEYWORDS: Table, ONE_PLANE_FOR_THE_WHOLE_SCENE
  *
- * WHAT:  The room the scene happens in: a walnut tabletop seen at a slant, the
- *        pool of warm light the lamp throws on it, and the vignette that
- *        closes the rest of the room down to black.
+ * WHAT:  The room the scene happens in: a dark mottled tabletop seen at a
+ *        slant, the pool of warm light the lamp throws on it, and the vignette
+ *        that closes the rest of the room down to black.
  *
- * WHY:   ONE_PLANE_FOR_THE_WHOLE_SCENE. The walnut is a flat image rotated
- *        33° in the SAME perspective context the phone uses, so the grain
- *        narrows toward the back on exactly the plane the phone is lying on.
- *        A tabletop faked with a gradient would have to be re-faked every time
- *        the phone moved; this one is simply the surface, and everything else
- *        in the scene is positioned against it.
+ * WHY:   ONE_PLANE_FOR_THE_WHOLE_SCENE. The surface is a flat image rotated
+ *        33° in the SAME perspective context the phone uses, so it recedes on
+ *        exactly the plane the phone is lying on. A tabletop faked with a
+ *        gradient would have to be re-faked every time the phone moved; this
+ *        one is simply the surface, and everything else in the scene is
+ *        positioned against it.
+ *
+ *        THE_CARD_IS_NOT_A_ROOM. It used to be walnut planks, which read as a
+ *        photograph of a table pasted behind the UI and fought the black page
+ *        around it. The base is now the page's own `--background`, so the card
+ *        has no edge of its own, and the only thing on it is the mottled
+ *        texture catching the lamp.
  *
  *        The light pool is a separate layer rather than part of the texture
  *        because it has to TRACK the lamp — it is the scene's largest cue
@@ -30,30 +36,15 @@ export function Table({ poolRef }: { poolRef: React.Ref<HTMLDivElement> }) {
         style={{
           perspective: "1400px",
           perspectiveOrigin: "280px 170px",
-          background: "#120c08",
+          background: "var(--background)",
         }}
       >
-        <div
-          className="absolute"
-          style={{
-            left: -520,
-            top: -700,
-            width: 1600,
-            height: 1900,
-            transformOrigin: "800px 1158px",
-            transform: "rotateX(33deg)",
-            background: "url(/hero/walnut.webp) 0 0/1600px 2000px no-repeat",
-            filter: "brightness(.58) saturate(1.08)",
-          }}
-        />
-
-        {/* PATINA_IS_ON_THE_PLANE. A mottled, cloudy layer over the grain, on
-            the SAME geometry as the walnut so it is foreshortened by the same
-            33° rather than floating flat over a surface that recedes — the
-            one detail that separates a texture ON the table from a texture in
-            front of it. `overlay` keeps the plank seams and the lamp's pool
-            reading through it while the blotches darken and warm the wood, so
-            the tabletop stops being a flat swatch of grain. */}
+        {/* TEXTURE_IS_ON_THE_PLANE. The tabletop itself — one mottled image
+            rotated into the same 33° plane the phone lies on, so it is
+            foreshortened WITH the phone rather than floating flat behind it.
+            It is dark by design: the lamp's pool below is what finds the
+            mottling, so the surface reads as lit rather than as a picture of
+            a surface. */}
         <div
           aria-hidden="true"
           className="absolute"
@@ -65,16 +56,29 @@ export function Table({ poolRef }: { poolRef: React.Ref<HTMLDivElement> }) {
             transformOrigin: "800px 1158px",
             transform: "rotateX(33deg)",
             background:
-              "url(/hero/table-patina.webp) 0 0/1600px 2000px no-repeat",
-            mixBlendMode: "overlay",
-            opacity: 0.75,
+              "url(/hero/table-surface.webp) 0 0/1600px 2000px no-repeat",
           }}
         />
       </div>
 
-      {/* The pool of lamplight. `screen` so it ADDS to the wood instead of
-          painting over it, which is the difference between a lit table and a
-          table with a bright shape on it. */}
+      {/* AIR_AROUND_THE_BULB. A soft warm haze centred on the globe, in the
+          card's own flat plane rather than the table's. With the planks gone
+          the bulb had nothing above the table to light, so the top third went
+          dead black and the lamp read as a sticker; this is the light in the
+          air around it. `screen`, so it only ever adds. */}
+      <div
+        aria-hidden="true"
+        className="absolute inset-0"
+        style={{
+          mixBlendMode: "screen",
+          background:
+            "radial-gradient(circle at 50% 27%, rgba(255,200,140,0.18), rgba(255,180,110,0.05) 38%, transparent 62%)",
+        }}
+      />
+
+      {/* The pool of lamplight on the table. `screen` so it ADDS to the
+          surface instead of painting over it, which is the difference between
+          a lit table and a table with a bright shape on it. */}
       <div
         ref={poolRef}
         aria-hidden="true"

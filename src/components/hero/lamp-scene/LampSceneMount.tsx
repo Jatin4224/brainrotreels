@@ -40,7 +40,7 @@ function LampPoster({ className }: { className?: string | undefined }) {
       style={{ aspectRatio: `${SCENE_W} / ${SCENE_H}`, borderRadius: 30 }}
     >
       <Image
-        src="/hero/lamp-poster.png"
+        src="/hero/lamp-poster.webp"
         alt=""
         aria-hidden="true"
         width={SCENE_W}
