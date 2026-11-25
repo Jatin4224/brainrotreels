@@ -932,6 +932,28 @@ html:has([data-app-banner]) {
   }
 }
 
+/* SOURCE OF TRUTH KEYWORDS: hero-enter-rise, LCP_IS_NEVER_FADED
+ *
+ * The headline's entrance, with the opacity leg removed — it travels the same
+ * 8px on the same curve and delay, but is PAINTED from the first frame.
+ *
+ * WHY: the <h1> is this page's LCP element, and a browser does not count an
+ * `opacity: 0` element as painted. Fading it in meant the largest text on the
+ * site was formally unpainted for its first ~370ms (0–50ms fully invisible,
+ * then fading), which is both a measurable LCP cost and, on a slow device, a
+ * hero that reads as blank. The entrance is worth having — it is seen once per
+ * visit — but the headline's first paint is not what it should be spent on.
+ * The rise alone still reads as a sequence, because the elements around it
+ * keep their fade and the eye follows the movement, not the alpha. */
+@keyframes hero-enter-rise {
+  from {
+    transform: translateY(8px);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
 @layer components {
   .hero-enter > * {
     animation: hero-enter 320ms var(--ease-settle) both;
@@ -939,6 +961,20 @@ html:has([data-app-banner]) {
 
   .hero-enter > *:nth-child(2) {
     animation-delay: 50ms;
+  }
+
+  /* The headline rises WITHOUT fading — see hero-enter-rise.
+     Written as an ADDITIVE rule under `no-preference` rather than as an
+     override inside the `reduce` block below, because Lightning CSS drops
+     the latter: it sees `animation-name: hero-enter-fade` already set by the
+     shorthand on `.hero-enter > *` in that block and discards the
+     `:nth-child(2)` repeat as redundant, without accounting for the
+     higher-specificity rule out here that it was there to beat. Stating the
+     rise only when motion is welcome needs no override at all. */
+  @media (prefers-reduced-motion: no-preference) {
+    .hero-enter > *:nth-child(2) {
+      animation-name: hero-enter-rise;
+    }
   }
 
   .hero-enter > *:nth-child(3) {

@@ -59,6 +59,7 @@ import {
 } from "./lib/geometry";
 import {
   createPendulum,
+  nudgePendulum,
   pushPendulum,
   releasePendulum,
   setGrabTarget,
@@ -106,6 +107,8 @@ interface SimState {
   annoyLast: number;
   /** Poking alternates between the two reactions. */
   nextPoke: ReactionType;
+  /** False until the scene is uncovered; the loop idles until then. */
+  started: boolean;
   /** Set while the globe is being dragged, so the release is not a click. */
   dragged: boolean;
   paused: boolean;
@@ -137,8 +140,7 @@ export default function LampScene({ className }: LampSceneProps) {
   /* Both paths end here: the hand is on screen, or it never will be (no
      WebGL, a dead context, an unparseable model) and the scene shows without
      one. Either way the viewer gets the live scene rather than a still. */
-  const reveal = React.useCallback(() => setRevealed(true), []);
-
+  /* The poster is dropped once the crossfade it is underneath has finished. */
   React.useEffect(() => {
     if (!revealed) return;
     const t = window.setTimeout(() => setPosterGone(true), 420);
@@ -154,7 +156,7 @@ export default function LampScene({ className }: LampSceneProps) {
   const reducedRef = React.useRef(reduced);
 
   const sim = React.useRef<SimState>({
-    pendulum: createPendulum(false),
+    pendulum: createPendulum(),
     last: 0,
     t0: 0,
     react: null,
@@ -164,16 +166,25 @@ export default function LampScene({ className }: LampSceneProps) {
     annoyCount: 0,
     annoyLast: 0,
     nextPoke: "swat",
+    started: false,
     dragged: false,
     paused: false,
   });
 
   React.useEffect(() => {
     reducedRef.current = reduced;
-    /* A fresh pendulum, because the starting swing is the one part of it the
-       setting changes rather than scales. */
-    sim.current.pendulum = createPendulum(reduced);
   }, [reduced]);
+
+  const reveal = React.useCallback(() => setRevealed(true), []);
+
+  /* The loop's own view of `revealed`. A plain ref written in its own effect,
+     because the RAF effect below is the one place allowed to touch `sim` —
+     reading the scene's start signal through here keeps every mutation of the
+     simulation inside that single effect. */
+  const revealedRef = React.useRef(false);
+  React.useEffect(() => {
+    revealedRef.current = revealed;
+  }, [revealed]);
 
   const handRef = useHandScene({
     rootRef,
@@ -346,6 +357,27 @@ export default function LampScene({ className }: LampSceneProps) {
       if (s.paused) return;
 
       const isReduced = reducedRef.current;
+
+      /* THE SCENE STARTS WHEN IT IS SEEN. Nothing advances while the poster
+         still covers the scene: motion spent behind it is motion nobody
+         watched, and the crossfade then had to blend a moving scene into a
+         still of a stationary one — the lamp was caught mid-arc at ~5°
+         against a poster showing it vertical, which read as a double image
+         of the cord.
+
+         Starting here, on the first frame after React has committed the
+         fade, means the swing and the fade begin together. `t0` is taken
+         from the RAF timestamp rather than performance.now(): the frame's
+         timestamp can predate a later now(), and a negative elapsed wraps
+         the timeline modulo to the END of the loop — which showed up as the
+         feed snapping to its last reel for a frame. */
+      if (!s.started) {
+        if (!revealedRef.current) return;
+        s.started = true;
+        s.last = 0;
+        s.t0 = t;
+        nudgePendulum(s.pendulum, isReduced);
+      }
       const p = s.pendulum;
 
       /* Lamp. dt is clamped: a dropped frame must not launch the globe. */
@@ -368,6 +400,7 @@ export default function LampScene({ className }: LampSceneProps) {
       }
 
       /* Scroll timeline, frozen for the duration of any live reaction. */
+      /* t0 is set at reveal; this only covers a resume after pausing. */
       if (s.t0 === 0) s.t0 = t;
       let clock = t;
       if (s.react) {
