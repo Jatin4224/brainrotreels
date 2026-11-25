@@ -214,7 +214,11 @@ export function createHandScene(
   renderer.toneMappingExposure = 1.05;
   renderer.setClearColor(0x000000, 0);
   renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  /* The spec asks for PCFSoft, which three deprecated in r186 — it now just
+     warns on every boot and falls back to this anyway. Naming the real
+     constant keeps the console clean; the softness the scene actually wants
+     comes from the key light's `shadow.radius` below, not from the type. */
+  renderer.shadowMap.type = THREE.PCFShadowMap;
 
   const scene = new THREE.Scene();
 
