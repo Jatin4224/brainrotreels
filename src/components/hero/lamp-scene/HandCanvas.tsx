@@ -25,21 +25,19 @@
 "use client";
 
 import * as React from "react";
+import ReactDOM from "react-dom";
 
 import type { HandScene } from "./hand/handScene";
 import { SCENE_H, SCENE_W } from "./lib/geometry";
 
 const MODEL_URL = "/hero/hand-point.glb";
 
-function whenIdle(fn: () => void): () => void {
-  if (typeof window === "undefined") return () => {};
-  const ric = window.requestIdleCallback;
-  if (typeof ric === "function") {
-    const id = ric(fn, { timeout: 2000 });
-    return () => window.cancelIdleCallback?.(id);
-  }
-  const id = window.setTimeout(fn, 300);
-  return () => window.clearTimeout(id);
+/* The scene is held back until the hand is drawn, so the model is on the
+   critical path for the hero's reveal — start fetching it the moment this
+   module is parsed, in parallel with the three.js chunk beside it, rather
+   than waiting for the effect to run. */
+if (typeof window !== "undefined") {
+  ReactDOM.preload(MODEL_URL, { as: "fetch", crossOrigin: "anonymous" });
 }
 
 export interface UseHandSceneArgs {
@@ -48,6 +46,8 @@ export interface UseHandSceneArgs {
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
   reduced: boolean;
   onReady: () => void;
+  /** Called when there will be no 3D hand, so the scene can show regardless. */
+  onFailed: () => void;
 }
 
 /**
@@ -61,6 +61,7 @@ export function useHandScene({
   canvasRef,
   reduced,
   onReady,
+  onFailed,
 }: UseHandSceneArgs): React.RefObject<HandScene | null> {
   const sceneRef = React.useRef<HandScene | null>(null);
   /* Held in refs so changing the callback, or the reduced-motion setting,
@@ -68,12 +69,14 @@ export function useHandScene({
      in an effect rather than during render: a ref written while rendering is
      a ref written twice under StrictMode and never under a bailout. */
   const onReadyRef = React.useRef(onReady);
+  const onFailedRef = React.useRef(onFailed);
   const reducedRef = React.useRef(reduced);
 
   React.useEffect(() => {
     onReadyRef.current = onReady;
+    onFailedRef.current = onFailed;
     reducedRef.current = reduced;
-  }, [onReady, reduced]);
+  }, [onReady, onFailed, reduced]);
 
   React.useEffect(() => {
     const root = rootRef.current;
@@ -81,41 +84,44 @@ export function useHandScene({
     if (!root || !canvas) return;
 
     let cancelled = false;
-    let cancelIdle: (() => void) | null = null;
 
+    const fail = (err?: unknown) => {
+      /* No WebGL, a lost context, or a model that would not parse. There is
+         no stand-in hand to fall back to any more — the scene simply shows
+         without one, which is better than the flat cartoon hand that used to
+         sit here. A hero that silently downgrades is one nobody finds out is
+         broken, so say so where a developer will see it. */
+      if (process.env.NODE_ENV !== "production" && err) {
+        console.error("[lamp-scene] hand failed to load:", err);
+      }
+      sceneRef.current?.dispose();
+      sceneRef.current = null;
+      if (!cancelled) onFailedRef.current();
+    };
+
+    /* No idle gate. It used to defer this by up to 2s so a 4.6MB model could
+       not compete with the page's first interaction; the model is ~190KB now
+       and the whole scene waits on it, so that delay is the visible pause,
+       not a saving. The IntersectionObserver stays: a visitor who never
+       reaches the hero still never pays for three.js. */
     const load = () => {
-      cancelIdle = whenIdle(() => {
-        if (cancelled) return;
-        void import("./hand/handScene")
-          .then(({ createHandScene }) => {
-            if (cancelled) return;
-            try {
-              sceneRef.current = createHandScene(canvas, MODEL_URL, {
-                still: reducedRef.current,
-                onReady: () => {
-                  if (!cancelled) onReadyRef.current();
-                },
-                onError: (err) => {
-                  /* No WebGL, a lost context, or a model that would not
-                     parse. The drawn hand is already on screen; leaving it
-                     there is the whole fallback — but a hero that silently
-                     downgrades is a hero nobody ever finds out is broken, so
-                     say so where a developer will see it. */
-                  if (process.env.NODE_ENV !== "production") {
-                    console.error("[lamp-scene] hand failed to load:", err);
-                  }
-                  sceneRef.current?.dispose();
-                  sceneRef.current = null;
-                },
-              });
-            } catch {
-              sceneRef.current = null;
-            }
-          })
-          .catch(() => {
-            sceneRef.current = null;
-          });
-      });
+      if (cancelled) return;
+      void import("./hand/handScene")
+        .then(({ createHandScene }) => {
+          if (cancelled) return;
+          try {
+            sceneRef.current = createHandScene(canvas, MODEL_URL, {
+              still: reducedRef.current,
+              onReady: () => {
+                if (!cancelled) onReadyRef.current();
+              },
+              onError: fail,
+            });
+          } catch (err) {
+            fail(err);
+          }
+        })
+        .catch(fail);
     };
 
     if (typeof IntersectionObserver !== "function") {
@@ -134,7 +140,6 @@ export function useHandScene({
       return () => {
         cancelled = true;
         io.disconnect();
-        cancelIdle?.();
         sceneRef.current?.dispose();
         sceneRef.current = null;
       };
@@ -142,7 +147,6 @@ export function useHandScene({
 
     return () => {
       cancelled = true;
-      cancelIdle?.();
       sceneRef.current?.dispose();
       sceneRef.current = null;
     };

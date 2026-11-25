@@ -41,17 +41,33 @@ export const HOVER_LIMIT = 7;
 /** The lean a DRAG is allowed to ask for — the hand is on it, so it goes further. */
 export const GRAB_LIMIT = 24;
 
-export function createPendulum(reduced: boolean): PendulumState {
+export function createPendulum(): PendulumState {
   return {
-    /* It swings into place when the page opens, which is the one piece of
-       motion that introduces the lamp as a physical object. Reduced motion
-       gets a lamp that is simply already still. */
-    a: reduced ? 0 : 7,
+    /* AT REST ON THE FIRST FRAME. The lamp used to start displaced (a = 7) so
+       it would fall into place, but the scene is hidden behind a still of the
+       rest pose until the hand is ready — so that swing was spent unseen, and
+       the crossfade caught the lamp mid-arc against a poster showing it
+       vertical, which read as a double image of the cord.
+       It now starts exactly where the poster has it and is KICKED at reveal
+       instead (see nudgePendulum), so the swing happens in front of someone
+       and the first visible frame matches what it is fading out of. */
+    a: 0,
     w: 0,
     target: 0,
     mode: "free",
     dir: 1,
   };
+}
+
+/**
+ * The entrance swing, applied when the scene is uncovered. A velocity impulse
+ * rather than a displacement: it starts from rest, so it can begin on the
+ * frame the crossfade begins without jumping.
+ */
+export function nudgePendulum(p: PendulumState, reduced: boolean): void {
+  /* Reduced motion gets a lamp that is simply already still. */
+  if (reduced) return;
+  p.w = -34;
 }
 
 /**

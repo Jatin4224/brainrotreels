@@ -932,6 +932,28 @@ html:has([data-app-banner]) {
   }
 }
 
+/* SOURCE OF TRUTH KEYWORDS: hero-enter-rise, LCP_IS_NEVER_FADED
+ *
+ * The headline's entrance, with the opacity leg removed — it travels the same
+ * 8px on the same curve and delay, but is PAINTED from the first frame.
+ *
+ * WHY: the <h1> is this page's LCP element, and a browser does not count an
+ * `opacity: 0` element as painted. Fading it in meant the largest text on the
+ * site was formally unpainted for its first ~370ms (0–50ms fully invisible,
+ * then fading), which is both a measurable LCP cost and, on a slow device, a
+ * hero that reads as blank. The entrance is worth having — it is seen once per
+ * visit — but the headline's first paint is not what it should be spent on.
+ * The rise alone still reads as a sequence, because the elements around it
+ * keep their fade and the eye follows the movement, not the alpha. */
+@keyframes hero-enter-rise {
+  from {
+    transform: translateY(8px);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
 @layer components {
   .hero-enter > * {
     animation: hero-enter 320ms var(--ease-settle) both;
@@ -939,6 +961,20 @@ html:has([data-app-banner]) {
 
   .hero-enter > *:nth-child(2) {
     animation-delay: 50ms;
+  }
+
+  /* The headline rises WITHOUT fading — see hero-enter-rise.
+     Written as an ADDITIVE rule under `no-preference` rather than as an
+     override inside the `reduce` block below, because Lightning CSS drops
+     the latter: it sees `animation-name: hero-enter-fade` already set by the
+     shorthand on `.hero-enter > *` in that block and discards the
+     `:nth-child(2)` repeat as redundant, without accounting for the
+     higher-specificity rule out here that it was there to beat. Stating the
+     rise only when motion is welcome needs no override at all. */
+  @media (prefers-reduced-motion: no-preference) {
+    .hero-enter > *:nth-child(2) {
+      animation-name: hero-enter-rise;
+    }
   }
 
   .hero-enter > *:nth-child(3) {
@@ -2860,6 +2896,52 @@ html:has([data-app-banner]) {
     .auth-inbox-pill {
       transition: opacity 200ms var(--ease-settle);
     }
+  }
+}
+
+/* SOURCE OF TRUTH KEYWORDS: lampSceneBg, hero-bg, HERO_BG_IS_ONE_IMAGE,
+ *   LampScene, Table, image-set, lamp scene backdrop
+ *
+ * WHAT:  The hero scene card's backdrop — one image of a warm glow in a dark
+ *        room, sized to cover the card.
+ *
+ * WHY:   HERO_BG_IS_ONE_IMAGE. The card used to build its room out of CSS: a
+ *        mottled texture rotated into the table's 33° plane, plus a radial
+ *        haze faking the air around the bulb. Two fakes that had to be
+ *        re-tuned against each other every time anything in the scene moved.
+ *        The image already IS a lit room, so the scene only has to sit in it.
+ *
+ *        It lives in CSS rather than an inline style because the fallback
+ *        chain below needs `@supports`, which a style prop cannot express.
+ *        The plain `url()` is what every browser gets; `image-set` only
+ *        overrides it where the browser can parse it; and `--background`
+ *        under both is what shows if neither image loads.
+ *
+ *        The glow sits ~30% down the image and the lamp's globe ~28% down
+ *        the card, so this lands the two on each other: the card reads as
+ *        lit BY the lamp rather than as a lamp pasted onto a picture.
+ * WHERE: The scene root in src/components/hero/lamp-scene/LampScene.tsx. */
+.lampSceneBg {
+  background-color: var(--background);
+  background-image: url("/hero-bg.webp");
+  background-position: center 30%;
+  background-size: cover;
+  background-repeat: no-repeat;
+}
+
+/* The negotiated form, behind '@supports' rather than stacked on the rule
+   above: Lightning CSS deletes a plain 'url()' sitting directly in front of
+   an 'image-set()' as redundant, which would take the fallback with it. In
+   its own rule the fallback survives, and only a browser that can parse
+   'image-set' ever overrides it — every one of which can also decode the
+   webp, so the jpg is there for completeness rather than for a browser we
+   expect to meet. */
+@supports (background-image: image-set(url("/hero-bg.webp") type("image/webp"))) {
+  .lampSceneBg {
+    background-image: image-set(
+      url("/hero-bg.webp") type("image/webp"),
+      url("/hero-bg.jpg") type("image/jpeg")
+    );
   }
 }
 

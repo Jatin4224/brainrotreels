@@ -271,7 +271,7 @@ On `sm` and up the textarea and button sit in a row (`sm:flex-row sm:items-end`)
 > 2026-11-25. Full spec: `DESIGN_1.md`. Code:
 > `src/components/hero/lamp-scene/`.
 
-A fixed **560 × 760** picture of a phone lying on a walnut table under a
+A fixed **560 × 760** picture of a phone lying on a dark table under a
 swinging pendant lamp, with a **3D hand** (three.js) scrolling an
 Instagram-style Reels feed on it. It is the first object on the page a visitor
 can play with.
@@ -286,7 +286,7 @@ can play with.
 - **It is an ILLUSTRATION, so it does not use theme tokens.** This is the one
   deliberate exception to §2's "never hardcode theme colours": the scene is a
   picture of a dark room lit by a warm bulb, the way a photograph would be. It
-  does not invert with the theme, and every colour in it (walnut `#120c08`,
+  does not invert with the theme, and every colour in it (the backdrop image,
   lamp `#ffcf96`, the phone's metal gradients) is a property of the depicted
   object, not of the UI. Nothing outside the 560×760 frame does this.
 - **Sizing.** The scene is laid out at 560×760 and `scale()`d to its column —
@@ -295,16 +295,47 @@ can play with.
   560/760` and `overflow: hidden`, so the box is reserved on the first paint
   (no layout shift) and the full-size layout box cannot push the grid column
   wider than its share.
-- **The tabletop is two layers.** `walnut.webp` for the grain, and
-  `table-patina.webp` — a mottled cloud — over it in `overlay` at 0.75, on the
-  *same* 33° plane so it is foreshortened with the wood rather than floating
-  flat on top. The patina source is near-black (mean 25/255), so it is
-  re-centred on mid-grey and its variation amplified before shipping;
-  dropped in raw it crushes the whole table to black instead of mottling it.
-- **Loading.** three.js and the hand model are dynamically imported, gated on
-  an IntersectionObserver *and* idle time, so they are absent from the landing
-  route's initial JS entirely. A still poster (`/hero/lamp-poster.png`) holds
-  the frame until then, and a drawn 2D hand stands in if WebGL is unavailable.
+- **The card's backdrop is one image, not CSS.** `.lampSceneBg` in
+  `globals.css` puts `/hero-bg.webp` on the scene root: a photographic dark
+  room with a warm glow ~30% down, `cover`, positioned `center 30%` so the
+  glow sits on the lamp's globe (~28% down the card). `--background` is under
+  it, and an `@supports` block upgrades it to `image-set()` with
+  `/hero-bg.jpg` as the typed fallback.
+  - It is in CSS rather than an inline style for a reason worth keeping:
+    inline styles are not processed by Lightning CSS, and Lightning CSS
+    **deletes a plain `url()` that sits directly in front of an
+    `image-set()`** in the same rule as redundant — which silently takes the
+    fallback with it. The `@supports` block is what makes the two coexist.
+  - This replaced two CSS fakes of a lit room, both removed 2026-11-26:
+    `table-surface.webp` (a dark mottled image rotated into the phone's 33°
+    plane) and a radial "warm haze" layer. Each had to be re-tuned against
+    the other whenever anything moved. **Do not rebuild the room in CSS** —
+    change the image.
+  - Before that it was walnut planks (`walnut.webp`, removed 2026-11-25),
+    which fought the black page and made the card an obvious rectangle.
+- **Only MOVING light is still drawn in CSS** (`Table.tsx`): the lamp's pool,
+  which tracks the globe at 2.1× its travel and therefore cannot be baked
+  into the backdrop, and the card's own falloff to black. The falloff is
+  lighter than it was (`0.72` at the edge, starting at 42%, down from `0.8` at 40%) because the
+  backdrop arrives with a vignette already in it and stacking the old one on
+  top crushed the corners flat.
+- **Loading — NOTHING_POPS_IN.** three.js and the hand model are dynamically
+  imported behind an IntersectionObserver, so they are absent from the landing
+  route's initial JS entirely. The scene then stays at `opacity: 0` behind the
+  still poster (`/hero/lamp-poster.webp`) until the hand has actually been
+  **drawn** — `onReady` fires only after `renderer.compile()` and one real
+  frame at the rest pose, not merely when the glb has parsed — and the whole
+  scene then crossfades in together over 340ms. The poster is the same
+  composition, so the handover reads as one image settling rather than a scene
+  assembling in stages.
+  - There is deliberately **no 2D stand-in hand**. A flat cartoon hand used to
+    fill this window and it was the single worst thing on the page: the hero
+    showed a realistic poster, swapped to a cartoon, then swapped back. If the
+    hand cannot load (no WebGL, dead context, bad model) the scene reveals
+    *without a hand* — still lit, still scrolling, still interactive.
+  - Do **not** reintroduce an idle gate here. One used to defer the load by up
+    to 2s to protect first interaction from a 4.6MB model; the model is ~190KB
+    now and the reveal waits on it, so that delay was the visible pause.
 - **The shipped model is compressed, and that has two consequences.**
   `hand-point.glb` is run through glTF-Transform (4.6MB → ~190KB; the kit's
   uncompressed original is kept in `lamp-scene-kit/kit/assets/`). It therefore

@@ -51,7 +51,7 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowRightIcon } from "lucide-react";
+import { ArrowRightIcon, Loader2Icon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -113,6 +113,16 @@ const HERO_MODE_TABS: Record<
    letters do not need to thicken as well. */
 const TAB_SHAPE = "h-9 shrink-0 rounded-lg px-4 text-sm font-semibold";
 
+/* SOURCE OF TRUTH KEYWORDS: HERO_SUBMIT_HREF, PREFETCH_ON_INTENT
+ *
+ * Where submitting goes, named once so the prefetch on focus and the push on
+ * submit cannot drift to two different URLs — a prefetch of the wrong route
+ * is worse than none, because it looks like it is working. */
+const HERO_SUBMIT_HREF = authRouteWithCallback(
+  AUTH_ROUTES.signUp,
+  ROUTES.dashboard,
+);
+
 export function HeroPromptCard({ className }: { className?: string }) {
   const router = useRouter();
 
@@ -168,10 +178,33 @@ export function HeroPromptCard({ className }: { className?: string }) {
   const activeTab = HERO_MODE_TABS[mode];
 
   /* Validation has already passed by the time this runs — see
-   * HONEST_ABOUT_THE_DRAFT for why the text itself stops here. */
+   * HONEST_ABOUT_THE_DRAFT for why the text itself stops here.
+   *
+   * THE_PRESS_IS_ANSWERED. Wrapped in a transition so `isPending` stays true
+   * for the whole navigation, not just the click: /sign-up is a dynamic
+   * route, so this is a real wait, and the 1px press ends long before it
+   * does. Without it the page's PRIMARY action looks untouched while it
+   * works, which reads as a dead button and earns a second click. */
+  const [isPending, startTransition] = React.useTransition();
+
   const onSubmit = () => {
-    router.push(authRouteWithCallback(AUTH_ROUTES.signUp, ROUTES.dashboard));
+    startTransition(() => {
+      router.push(HERO_SUBMIT_HREF);
+    });
   };
+
+  /* PREFETCH_ON_INTENT. The CTAs elsewhere on this page are <Link>s and warm
+   * themselves; this one is an imperative push and does not. Focusing the
+   * field is the earliest honest signal that someone means to submit, and it
+   * buys the whole time they spend typing — by the time they press Generate
+   * the route is usually already there. Latched, because focus fires every
+   * time they come back to the field. */
+  const prefetched = React.useRef(false);
+  const warmSubmitRoute = React.useCallback(() => {
+    if (prefetched.current) return;
+    prefetched.current = true;
+    router.prefetch(HERO_SUBMIT_HREF);
+  }, [router]);
 
   return (
     <Form {...form}>
@@ -274,6 +307,7 @@ export function HeroPromptCard({ className }: { className?: string }) {
                     rows={1}
                     aria-label={`${activeTab.label} input`}
                     placeholder={activeTab.placeholder}
+                    onFocus={warmSubmitRoute}
                     onKeyDown={(event) => {
                       if (event.key === "Enter" && !event.shiftKey) {
                         event.preventDefault();
@@ -284,16 +318,35 @@ export function HeroPromptCard({ className }: { className?: string }) {
                   />
                 </FormControl>
 
+                {/* The label does NOT change while pending: both icons are
+                    size-4, so swapping one for the other keeps the button
+                    exactly as wide. A word swap here would resize the button
+                    and nudge the field beside it — the same bug the tab row
+                    was fixed for (see TAB_SHAPE). */}
                 <Button
                   type="submit"
                   size="lg"
-                  className="brutal-shadow-brand group h-11 shrink-0 rounded-xl bg-brand px-5 text-sm font-bold text-brand-foreground hover:bg-brand/90"
+                  disabled={isPending}
+                  aria-busy={isPending}
+                  /* `disabled` is here to stop a second submit, not to say
+                     the control is unavailable — and pending is the ONLY
+                     state that disables this button. The house
+                     `disabled:opacity-50` would dim the one orange thing on
+                     the page to half strength at the exact moment it is
+                     working, which reads as "switched off" rather than
+                     "heard you"; the spinner is the signal, so the colour
+                     stays. */
+                  className="brutal-shadow-brand group h-11 shrink-0 rounded-xl bg-brand px-5 text-sm font-bold text-brand-foreground hover:bg-brand/90 disabled:opacity-100"
                 >
                   Generate
-                  <ArrowRightIcon
-                    className="size-4 transition-transform duration-150 ease-[var(--ease-settle)] pointer-fine:group-hover:translate-x-0.5 motion-reduce:transition-none motion-reduce:group-hover:translate-x-0"
-                    aria-hidden="true"
-                  />
+                  {isPending ? (
+                    <Loader2Icon className="size-4 animate-spin" aria-hidden="true" />
+                  ) : (
+                    <ArrowRightIcon
+                      className="size-4 transition-transform duration-150 ease-[var(--ease-settle)] pointer-fine:group-hover:translate-x-0.5 motion-reduce:transition-none motion-reduce:group-hover:translate-x-0"
+                      aria-hidden="true"
+                    />
+                  )}
                 </Button>
               </div>
               <FormMessage className="px-3 pb-1" />
