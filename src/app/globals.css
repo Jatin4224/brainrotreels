@@ -1082,49 +1082,57 @@ html:has([data-app-banner]) {
  *        ALREADY on screen as shown in the same task, so nothing that has
  *        been painted visible can blink back out at hydration.
  *
- *        `translate` rather than `transform`, deliberately: the format cards
- *        and plan cards wear `brutal-hover`, whose 1px lift IS a `transform`,
- *        and the featured plan card carries `lg:-translate-y-2`. Animating
- *        the separate property composes with both instead of clobbering
- *        them mid-flight.
+ *        The travel is `hero-enter`'s own `transform`, which composes with
+ *        the featured plan card's `lg:-translate-y-2` (Tailwind v4 compiles
+ *        that to the separate `translate` property) and hands `brutal-hover`
+ *        its 1px lift back the moment the 320ms is up — the same arrangement
+ *        `.proof-enter` has lived with on the cards above.
  *
  *        Reduced motion keeps the fade and drops the travel, like every other
- *        entrance here — fewer and gentler, not nothing.
+ *        entrance here — fewer and gentler, not nothing. The nth-child delays
+ *        SURVIVE it, out-specifying the override exactly as `.hero-enter`'s
+ *        do: the setting removes the 8px of movement, not the order.
  * WHERE: `.reveal-rise` + `data-reveal="pending"` on the three section lists
  *        in src/app/(marketing)/page.tsx; flipped by
  *        @/components/global/scroll-reveal, mounted in
  *        src/app/(marketing)/layout.tsx. */
 @layer components {
-  .reveal-rise > * {
-    transition:
-      opacity 320ms var(--ease-settle),
-      translate 320ms var(--ease-settle);
-  }
-
+  /* Held invisible until the section arrives — and only once the page is
+     armed, which is the whole no-JS guarantee. */
   html[data-reveal-armed] .reveal-rise[data-reveal="pending"] > * {
     opacity: 0;
-    translate: 0 8px;
+  }
+
+  /* The HERO'S OWN keyframes, not a second entrance: `hero-enter` is already
+     8px of rise and a fade on this curve, and `.app-enter` / `.dash-enter`
+     reuse it for the same reason. One product, one way of arriving.
+
+     An ANIMATION and not a transition, deliberately, and this is the one
+     place in the file where that is the right way round: the reveal fires
+     exactly once per container (the observer unobserves), so there is
+     nothing to retarget, and an animation ENDS — a transition's
+     `transition-delay` would stay on these children for the rest of the
+     visit and lead every later opacity or translate change on them with up
+     to 180ms of dead time. */
+  .reveal-rise[data-reveal="shown"] > * {
+    animation: hero-enter 320ms var(--ease-settle) both;
   }
 
   .reveal-rise[data-reveal="shown"] > *:nth-child(2) {
-    transition-delay: 60ms;
+    animation-delay: 60ms;
   }
 
   .reveal-rise[data-reveal="shown"] > *:nth-child(3) {
-    transition-delay: 120ms;
+    animation-delay: 120ms;
   }
 
   .reveal-rise[data-reveal="shown"] > *:nth-child(n + 4) {
-    transition-delay: 180ms;
+    animation-delay: 180ms;
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .reveal-rise > * {
-      transition: opacity 200ms var(--ease-settle);
-    }
-
-    html[data-reveal-armed] .reveal-rise[data-reveal="pending"] > * {
-      translate: none;
+    .reveal-rise[data-reveal="shown"] > * {
+      animation: hero-enter-fade 200ms both;
     }
   }
 }
@@ -1148,34 +1156,57 @@ html:has([data-app-banner]) {
  *        timeline. `linear` because the position maps straight to the
  *        appearance; a curve here would make the header lag the page.
  *
- *        Only `border-color` and `background-color` are animated.
- *        `backdrop-filter` stays permanently on: animating a blur radius on a
- *        sticky bar is the one ingredient here that can cost a frame on a
- *        cheap phone, and it buys nothing — the hero's own `pt-16` means
- *        there is 64px of empty canvas behind the bar at rest, so there is
- *        nothing for the blur to show.
+ *        ONE OPACITY, NOT TWO PAINT PROPERTIES. The first cut of this
+ *        animated `border-color` and `background-color` directly, which is a
+ *        REPAINT of a full-width sticky bar on every frame of the first 64px
+ *        of scroll — the same mistake as animating the blur, with a smaller
+ *        number on it. The line and the wash live on a `::before` instead and
+ *        the animation moves its `opacity`, which is composited. The layer is
+ *        `inset: 0 0 -1px 0` so its own bottom border lands exactly on the
+ *        header's (now transparent) 1px border rather than a pixel above it:
+ *        the bar keeps its height and the hairline keeps its position.
  *
- *        The `to` frame states exactly what the utilities on the element
- *        already say, which is also the fallback: a browser with no
- *        `animation-timeline` support runs this once on the document timeline
- *        and settles on the current design in 1ms. Reduced motion opts out
- *        the same way — the header simply wears its line, as it does today.
+ *        `backdrop-filter` stays permanently on, and on the HEADER rather
+ *        than the layer: animating a blur radius is the one ingredient here
+ *        that can cost a frame on a cheap phone, and it buys nothing — the
+ *        hero's own `pt-16` means there is 64px of empty canvas behind the bar
+ *        at rest, so there is nothing for the blur to show.
+ *
+ *        BASE STATE IS THE VISIBLE ONE, and the `from` frame is what
+ *        `animation-fill-mode: both` holds before the scroll range begins.
+ *        That is what makes every fallback land on today's design rather than
+ *        on a header with no line at all: reduced motion (no animation at
+ *        all), and a browser with no `animation-timeline` support (the
+ *        animation runs once on the document timeline and is over in 1ms).
+ *        The duration is ignored outright on a progress-based timeline, so
+ *        the 1ms exists ONLY to be that fallback.
  * WHERE: `.marketing-header-settle` on the <header> in
  *        src/app/(marketing)/_components/marketing-header.tsx. */
 @keyframes marketing-header-settle {
   from {
-    border-color: transparent;
-    background-color: transparent;
+    opacity: 0;
   }
   to {
-    border-color: color-mix(in oklab, var(--border) 60%, transparent);
-    background-color: color-mix(in oklab, var(--background) 70%, transparent);
+    opacity: 1;
   }
 }
 
 @layer components {
+  /* The line and the wash, as one composited layer. `z-index: -1` keeps it
+     behind the nav inside the header's own stacking context (the element is
+     already `sticky` with a `z-index`, so it has one). */
+  .marketing-header-settle::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 -1px 0;
+    z-index: -1;
+    pointer-events: none;
+    border-bottom: 1px solid color-mix(in oklab, var(--border) 60%, transparent);
+    background-color: color-mix(in oklab, var(--background) 70%, transparent);
+  }
+
   @media (prefers-reduced-motion: no-preference) {
-    .marketing-header-settle {
+    .marketing-header-settle::before {
       animation: marketing-header-settle 1ms linear both;
       animation-timeline: scroll(root block);
       animation-range: 0 64px;

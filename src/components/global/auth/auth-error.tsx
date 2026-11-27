@@ -62,11 +62,20 @@ export function AuthError({ error }: AuthErrorProps) {
           role="alert"
           initial={{ opacity: 0, height: 0, transform: offset }}
           animate={{ opacity: 1, height: "auto", transform: "translateY(0px)" }}
-          exit={{ opacity: 0, height: 0, transform: offset }}
+          /* Enter 200ms, leave 140ms — arriving is the part the reader has to
+             notice, leaving is the system getting out of the way. The exit
+             timing has to ride on the `exit` VARIANT: a single `transition`
+             prop is used for both directions, so stating it there once (as
+             this did) documented an asymmetry it did not have. */
+          exit={{
+            opacity: 0,
+            height: 0,
+            transform: offset,
+            transition: { duration: 0.14, ease: [0.3, 0.7, 0.2, 1] },
+          }}
           /* A full `transform` string, not the x/y shorthands: this repo is on
-             framer-motion 13, where the shorthands animate on the main thread.
-             Enter 200ms, leave 140ms — arriving is the part the reader has to
-             notice, leaving is the system getting out of the way. */
+             framer-motion 13, where the shorthands animate on the main
+             thread. */
           transition={{
             duration: 0.2,
             ease: [0.3, 0.7, 0.2, 1],

@@ -560,9 +560,10 @@ export default function LandingPage({
               capped at 2 from sm and at the plan count from xl, and the list
               is capped in width and centred so one plan is a card rather than
               a banner. */}
-            {/* SECTIONS_ASSEMBLE_TOO. `translate` and not `transform`, so the
-                featured card's own `lg:-translate-y-2` is the position this
-                settles INTO rather than something the entrance overwrites. */}
+            {/* SECTIONS_ASSEMBLE_TOO. The featured card's `lg:-translate-y-2`
+                compiles to the separate `translate` property, so the
+                entrance's `transform` composes with its lift rather than
+                flattening it for 320ms. */}
             <ul
               data-reveal="pending"
               className={cn(

@@ -175,8 +175,10 @@ one.
   a transform.
 - **Sections below the hero (`reveal-rise`):** the format cards, the feature
   rows and the plan cards rise 8px and fade in as their section reaches the
-  viewport — the SAME 320ms and `--ease-settle` as `hero-enter`, stepped 60ms
-  per child like `proof-enter`, capped at the fourth. ONE entrance per
+  viewport — the `hero-enter` keyframes themselves, 320ms `--ease-settle`,
+  stepped 60ms per child like `proof-enter`, capped at the fourth. An
+  animation rather than a transition, because it fires once and a
+  `transition-delay` would outlive it. ONE entrance per
   container, and it FIRES ONCE: an IntersectionObserver flips
   `data-reveal="pending"` → `"shown"` and unobserves, because
   `animation-timeline: view()` is bidirectional and would fade the cards out
@@ -184,17 +186,19 @@ one.
   `data-reveal="pending"`; `@/components/global/scroll-reveal` is mounted once
   in the group layout, so the pages stay Server Components. The hidden state is
   scoped to `html[data-reveal-armed]`, which only that component sets — a
-  marketing page must never hide its own content behind a script. Animates the
-  `translate` property, not `transform`, so `brutal-hover`'s lift and the
-  featured plan card's `lg:-translate-y-2` still compose.
+  marketing page must never hide its own content behind a script.
 - **Sticky header (`marketing-header-settle`):** the hairline and the
-  `bg-background/70` wash fade in over the first 64px of scroll via
-  `animation-timeline: scroll(root block)`, `linear`, so the bar only claims to
-  be covering content once it is. `backdrop-filter` stays permanently on —
-  animating a blur radius is the one ingredient here that can cost a frame, and
-  the hero's `pt-16` leaves nothing behind the bar to blur at rest. The
-  utilities on the element are the end state and the no-support fallback; the
-  rule sits under `prefers-reduced-motion: no-preference`.
+  `bg-background/70` wash live on a `::before` whose **opacity** fades in over
+  the first 64px of scroll via `animation-timeline: scroll(root block)`,
+  `linear`, so the bar only claims to be covering content once it is. Opacity
+  on a layer, never `border-color`/`background-color` directly — a sticky
+  full-width bar must not repaint on every scroll frame. `backdrop-filter`
+  stays permanently on and on the HEADER, not the layer: animating a blur
+  radius is the one ingredient here that can cost a frame, and the hero's
+  `pt-16` leaves nothing behind the bar to blur at rest. The header keeps a
+  TRANSPARENT `border-b` so its height is unchanged, and the layer's resting
+  state is the visible one — reduced motion and a browser without
+  `animation-timeline` both render today's header.
 - Proof strip: the play disc scales `0.9 → 1` alongside the overlay's fade,
   both 150ms `--ease-settle`, so it arrives rather than switching on. `scale`,
   not `transform` — the card is a `brutal-hover`.
