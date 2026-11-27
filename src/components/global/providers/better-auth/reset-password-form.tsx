@@ -17,7 +17,7 @@
  *        AUTH_SURFACE: wears the SAME skins as sign-in and sign-up, from
  *        @/components/global/auth/auth-styles, so a restyle of the auth flow
  *        cannot leave the last screen of it looking like the old product.
- * WHERE: Rendered by src/app/(auth)/reset-password/page.tsx (inside Suspense,
+ * WHERE: Rendered by src/app/(auth)/(flow)/reset-password/page.tsx (inside Suspense,
  *        since it reads searchParams) within AuthShell.
  */
 

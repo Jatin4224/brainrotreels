@@ -59,8 +59,15 @@
  * The one loud action on the screen. 56px tall, brand-filled, large bold
  * label — see CTA_IS_LARGE_TEXT before changing the type size.
  */
+/* `disabled:opacity-100` overrides the house `disabled:opacity-50` on
+   purpose, and for the same reason the hero prompt card's submit does
+   (THE_SPINNER_IS_THE_SIGNAL): the only state that disables this button is
+   "a request is in flight", and dimming the one brand-filled control on the
+   screen to half strength at the exact moment it is working reads as
+   "switched off" rather than "heard you". The spinner says it is working;
+   the colour has no reason to change. */
 export const AUTH_CTA_CLASS =
-  "brutal-shadow-brand h-14 w-full gap-3 rounded-2xl bg-brand text-[1.1875rem] font-bold text-brand-foreground hover:bg-brand/90";
+  "brutal-shadow-brand h-14 w-full gap-3 rounded-2xl bg-brand text-[1.1875rem] font-bold text-brand-foreground hover:bg-brand/90 disabled:opacity-100";
 
 /** A text, email or password field. 50px tall, 16px text. */
 export const AUTH_FIELD_CLASS =

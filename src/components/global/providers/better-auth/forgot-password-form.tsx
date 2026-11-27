@@ -20,7 +20,7 @@
  *        regression that keeps happening is this one being left behind by a
  *        restyle so the field under the same headline is suddenly a different
  *        height. The error banner is <AuthError> for the same reason.
- * WHERE: Rendered by src/app/(auth)/forgot-password/page.tsx inside AuthShell.
+ * WHERE: Rendered by src/app/(auth)/(flow)/forgot-password/page.tsx.
  */
 
 import * as React from "react";

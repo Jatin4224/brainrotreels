@@ -216,6 +216,7 @@ Rules: validate email format on blur, and password length (≥ 8) on sign-up. Ne
 - [ ] Decorative SVGs `aria-hidden="true"`; icon-only buttons have `aria-label`
 - [ ] Correct `autocomplete` values: `email`, `name`, `current-password`, `new-password`, `one-time-code`
 - [ ] Respect `prefers-reduced-motion` for any added transitions
+- [ ] The submit CTA keeps its full colour while working (`disabled:opacity-100`) and swaps the trailing arrow for the spinner **in place** — the label must not move on the press
 
 ---
 

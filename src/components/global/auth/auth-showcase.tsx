@@ -75,8 +75,12 @@
  *        pixels apart is how a layout ends up with a form that has moved and
  *        a panel that has not.
  *
- * WHERE: Passed as the `aside` of <AuthShell> by src/app/(auth)/sign-in and
- *        /sign-up. Content comes from ./auth-content.ts; the keyframes, the
+ * WHERE: Passed as the `aside` of <AuthShell> by
+ *        src/app/(auth)/(flow)/layout.tsx — ONE instance for the whole
+ *        credential flow, so it is not remounted (and its loop not restarted)
+ *        by a navigation between /sign-in, /sign-up, /forgot-password and
+ *        /reset-password. See THE_PANEL_OUTLIVES_THE_PAGE in that file.
+ *        Content comes from ./auth-content.ts; the keyframes, the
  *        fit-to-viewport scale and the pause class come from the
  *        `auth-doc-drop` block in src/app/globals.css.
  */

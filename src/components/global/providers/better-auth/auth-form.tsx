@@ -36,7 +36,7 @@
  * than being typed here, so the forgot-password and reset-password
  * screens cannot drift away from these two.
  *
- * WHERE: Mounted by src/app/(auth)/sign-in|sign-up/page.tsx inside AuthShell,
+ * WHERE: Mounted by src/app/(auth)/(flow)/sign-in|sign-up/page.tsx,
  * under <AuthHero>; talks to authClient
  * (src/lib/better-auth/auth-client.ts); schemas live in
  * src/lib/types/auth.ts.
@@ -470,16 +470,17 @@ function AuthSubmit({
          round trip with no other feedback. */
       aria-busy={isSubmitting}
     >
+      {/* THE LABEL DOES NOT MOVE. The spinner takes the arrow's slot — both
+          `size-5`, so the only thing that changes between the two states is
+          the glyph. It used to mount the spinner BEFORE the label and append
+          an ellipsis, which shifted the words across the button by an icon
+          and a gap at the moment of the press; the social row below has
+          always done it this way. */}
+      {label}
       {isSubmitting ? (
-        <>
-          <Loader2Icon className="size-5 animate-spin" aria-hidden="true" />
-          {`${label}…`}
-        </>
+        <Loader2Icon className="size-5 animate-spin" aria-hidden="true" />
       ) : (
-        <>
-          {label}
-          <ArrowRightIcon className="size-5" aria-hidden="true" />
-        </>
+        <ArrowRightIcon className="size-5" aria-hidden="true" />
       )}
     </Button>
   );

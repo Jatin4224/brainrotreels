@@ -1387,9 +1387,36 @@ html:has([data-app-banner]) {
     animation: hero-enter 220ms var(--ease-settle) backwards;
   }
 
+  /* SOURCE OF TRUTH KEYWORDS: block-enter-rise, LCP_IS_NEVER_FADED,
+   * hero-enter-rise, AUTH_FLOW_ARRIVES
+   *
+   * The same arrival with the opacity leg removed, for one element that is
+   * also a COLD-ENTRY page's largest paint — today the auth flow's form
+   * column, which a visitor reaches by typing a URL or following a link
+   * rather than by a client navigation inside the app.
+   *
+   * WHY: exactly the reason the marketing headline has its own variant (see
+   * hero-enter-rise). A browser does not count an `opacity: 0` element as
+   * painted, so fading in the thing that IS the page's LCP element pays for
+   * the entrance in the one metric a sign-in screen cannot afford it in. The
+   * rise alone still reads as arriving, because movement is what the eye
+   * follows, not alpha.
+   *
+   * Reduced motion removes it OUTRIGHT rather than falling back to a fade:
+   * the travel is the whole animation here, and "gentler" for an element
+   * that was never transparent means not moving it. Adding a fade back would
+   * be introducing motion the setting asked to be rid of. */
+  .block-enter-rise {
+    animation: hero-enter-rise 220ms var(--ease-settle) backwards;
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .block-enter {
       animation: hero-enter-fade 180ms backwards;
+    }
+
+    .block-enter-rise {
+      animation: none;
     }
   }
 }

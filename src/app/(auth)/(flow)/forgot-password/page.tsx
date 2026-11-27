@@ -11,12 +11,7 @@
 
 import type { Metadata } from "next";
 
-import {
-  AuthShell,
-  AuthShowcase,
-  AUTH_MOBILE_TAG,
-  ForgotPasswordForm,
-} from "@/components/global/auth";
+import { ForgotPasswordForm } from "@/components/global/auth";
 
 export const metadata: Metadata = {
   title: "Forgot password",
@@ -24,13 +19,15 @@ export const metadata: Metadata = {
 
 export default function ForgotPasswordPage() {
   return (
-    /* THE FLOW KEEPS ITS SHAPE. This was AuthShell with no aside, so
-       clicking "Forgot password?" from the split sign-in screen collapsed the
-       page into a centred single column and the product vanished — a
-       two-field detour changed what the site looked like. Same shell, same
-       panel, same mobile tag as /sign-in and /sign-up; only the form differs,
-       which is the one thing that should. */
-    <AuthShell headerTag={AUTH_MOBILE_TAG} aside={<AuthShowcase />}>
+    /* THE FLOW KEEPS ITS SHAPE, and the shell that keeps it is now the
+       group's layout — this page once mounted its own AuthShell with no
+       aside, so clicking "Forgot password?" from the split sign-in screen
+       collapsed the page into a centred single column and the product
+       vanished. Sharing one layout with /sign-in and /sign-up makes that
+       impossible to regress, and the panel's loop no longer restarts on the
+       way here (THE_PANEL_OUTLIVES_THE_PAGE). Only the form differs, which is
+       the one thing that should. */
+    <>
       {/* my-auto: the split shell top-aligns the form column below lg,
           which is right for sign-in and sign-up because their CTA is pinned
           to the bottom and fills the gap. These two have no pin — a single
@@ -40,6 +37,6 @@ export default function ForgotPasswordPage() {
       <div className="my-auto">
         <ForgotPasswordForm />
       </div>
-    </AuthShell>
+    </>
   );
 }
