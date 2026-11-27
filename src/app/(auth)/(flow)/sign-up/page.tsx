@@ -16,13 +16,7 @@
 
 import type { Metadata } from "next";
 
-import {
-  AuthForm,
-  AuthHero,
-  AuthShell,
-  AuthShowcase,
-  AUTH_MOBILE_TAG,
-} from "@/components/global/auth";
+import { AuthForm, AuthHero } from "@/components/global/auth";
 import { resolveAuthCallback } from "@/lib/config";
 
 export const metadata: Metadata = {
@@ -42,13 +36,16 @@ export default async function SignUpPage({
   const { callbackURL } = await searchParams;
   const destination = resolveAuthCallback(callbackURL);
 
+  /* The shell and the animated panel are ./../layout.tsx now, and the column's
+     entrance is ./../template.tsx — see THE_PANEL_OUTLIVES_THE_PAGE. Switching
+     to this page from /sign-in no longer restarts the panel's loop. */
   return (
-    <AuthShell headerTag={AUTH_MOBILE_TAG} aside={<AuthShowcase />}>
+    <>
       <AuthHero mode="sign-up" className="mb-7" />
       <AuthForm
         mode="sign-up"
         {...(destination ? { callbackURL: destination } : {})}
       />
-    </AuthShell>
+    </>
   );
 }

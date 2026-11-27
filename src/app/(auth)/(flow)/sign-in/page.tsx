@@ -23,13 +23,7 @@
 
 import type { Metadata } from "next";
 
-import {
-  AuthForm,
-  AuthHero,
-  AuthShell,
-  AuthShowcase,
-  AUTH_MOBILE_TAG,
-} from "@/components/global/auth";
+import { AuthForm, AuthHero } from "@/components/global/auth";
 import { resolveAuthCallback } from "@/lib/config";
 
 export const metadata: Metadata = {
@@ -49,13 +43,16 @@ export default async function SignInPage({
   const { callbackURL } = await searchParams;
   const destination = resolveAuthCallback(callbackURL);
 
+  /* The shell and the animated panel are ./../layout.tsx now, and the column's
+     entrance is ./../template.tsx — see THE_PANEL_OUTLIVES_THE_PAGE. This page
+     renders the two things that actually differ between the flow's screens. */
   return (
-    <AuthShell headerTag={AUTH_MOBILE_TAG} aside={<AuthShowcase />}>
+    <>
       <AuthHero mode="sign-in" className="mb-7" />
       <AuthForm
         mode="sign-in"
         {...(destination ? { callbackURL: destination } : {})}
       />
-    </AuthShell>
+    </>
   );
 }

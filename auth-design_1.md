@@ -171,6 +171,8 @@ These keyframes were measured frame by frame from the reference video, so use th
 - To slow the loop, set `--loop` on the stage (e.g. `--loop: 2.4s`). The shape of the motion stays the same.
 - **Reduced motion:** with animations off, each element shows its base state: the PDF at rest, the bar, and the full strip of five reels.
 - Pause the animation when the panel is off-screen or the tab is hidden: `animation-play-state: paused` via an IntersectionObserver and `visibilitychange`.
+- **The panel is mounted ONCE, by `src/app/(auth)/(flow)/layout.tsx`, and not by the pages.** A layout survives a navigation between sibling routes; a page does not. Mounted per page, switching the sign-in/sign-up tabs remounted the panel and restarted the loop from 0%, so it snapped from wherever it was in the story back to the PDF falling — on the one interaction these screens exist for. Shipping the loop at 3.4s so the three beats can be followed is wasted if the story restarts every time somebody changes their mind about which form they want.
+- **The form column gets the entrance, not the shell:** `block-enter-rise` (220ms `--ease-settle`, 8px rise, no fade) applied by `(flow)/template.tsx`, which is the file the framework DOES remount per navigation. Rise-only because these are cold-entry pages and that column carries the largest paint — a browser does not count an `opacity: 0` element as painted. Under `prefers-reduced-motion` it is removed outright: the travel is the whole animation, so "gentler" here means not moving.
 
 ---
 

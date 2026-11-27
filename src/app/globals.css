@@ -1041,6 +1041,179 @@ html:has([data-app-banner]) {
   }
 }
 
+/* SOURCE OF TRUTH KEYWORDS: reveal-rise, data-reveal, data-reveal-armed,
+ * ScrollRevealObserver, SECTIONS_ASSEMBLE_TOO, ENTRANCE_PER_CONTAINER,
+ * NOTHING_HIDES_WITHOUT_JS, hero-enter, proof-enter, --ease-settle
+ *
+ * WHAT:  The entrance the sections BELOW the hero run as they scroll into
+ *        view — the format cards, the feature rows and the plan cards rise
+ *        and fade in, one container at a time, once each.
+ *
+ * WHY:   SECTIONS_ASSEMBLE_TOO. The hero was fully choreographed
+ *        (`.hero-enter`, `.proof-enter`) and then the remaining five sections
+ *        of a 6,500px page were simply THERE — the page assembled for its
+ *        first screenful and then read as a static document for the rest of
+ *        the scroll. That asymmetry is the one motion gap this page had.
+ *
+ *        ENTRANCE_PER_CONTAINER, the rule `.dash-enter` already keeps: ONE
+ *        entrance per container, the SAME 320ms and `--ease-settle` as the
+ *        hero, and the same 60ms step `.proof-enter` uses — this is the
+ *        hero's motion arriving later, not a second entrance invented for
+ *        the lower page. Capped at the fourth child for the reason both of
+ *        those are capped: a section with eight rows must not push its last
+ *        one half a second after the first.
+ *
+ *        FIRES ONCE, which is why this is an IntersectionObserver and a
+ *        TRANSITION rather than `animation-timeline: view()`. A view-progress
+ *        timeline is bidirectional by construction, so every scroll back up
+ *        the page would fade the cards out again — an interface fighting its
+ *        reader. The motion itself is still CSS on the compositor; the only
+ *        thing JS does is flip one attribute (see MOTION_STAYS_IN_CSS in
+ *        design.md §2.7 — the ban is on a JS animation LIBRARY on the LCP
+ *        route, and the hero scene and auth showcase already observe
+ *        intersection the same way).
+ *
+ *        NOTHING_HIDES_WITHOUT_JS is why the hidden state is nested under
+ *        `html[data-reveal-armed]` instead of being the default. If the
+ *        bundle fails, is blocked, or is disabled, the attribute is never
+ *        set and every section renders exactly as it does today — a
+ *        marketing page must never be able to hide its own content behind a
+ *        script. The observer also arms the page and marks everything
+ *        ALREADY on screen as shown in the same task, so nothing that has
+ *        been painted visible can blink back out at hydration.
+ *
+ *        The travel is `hero-enter`'s own `transform`, which composes with
+ *        the featured plan card's `lg:-translate-y-2` (Tailwind v4 compiles
+ *        that to the separate `translate` property) and hands `brutal-hover`
+ *        its 1px lift back the moment the 320ms is up — the same arrangement
+ *        `.proof-enter` has lived with on the cards above.
+ *
+ *        Reduced motion keeps the fade and drops the travel, like every other
+ *        entrance here — fewer and gentler, not nothing. The nth-child delays
+ *        SURVIVE it, out-specifying the override exactly as `.hero-enter`'s
+ *        do: the setting removes the 8px of movement, not the order.
+ * WHERE: `.reveal-rise` + `data-reveal="pending"` on the three section lists
+ *        in src/app/(marketing)/page.tsx; flipped by
+ *        @/components/global/scroll-reveal, mounted in
+ *        src/app/(marketing)/layout.tsx. */
+@layer components {
+  /* Held invisible until the section arrives — and only once the page is
+     armed, which is the whole no-JS guarantee. */
+  html[data-reveal-armed] .reveal-rise[data-reveal="pending"] > * {
+    opacity: 0;
+  }
+
+  /* The HERO'S OWN keyframes, not a second entrance: `hero-enter` is already
+     8px of rise and a fade on this curve, and `.app-enter` / `.dash-enter`
+     reuse it for the same reason. One product, one way of arriving.
+
+     An ANIMATION and not a transition, deliberately, and this is the one
+     place in the file where that is the right way round: the reveal fires
+     exactly once per container (the observer unobserves), so there is
+     nothing to retarget, and an animation ENDS — a transition's
+     `transition-delay` would stay on these children for the rest of the
+     visit and lead every later opacity or translate change on them with up
+     to 180ms of dead time. */
+  .reveal-rise[data-reveal="shown"] > * {
+    animation: hero-enter 320ms var(--ease-settle) both;
+  }
+
+  .reveal-rise[data-reveal="shown"] > *:nth-child(2) {
+    animation-delay: 60ms;
+  }
+
+  .reveal-rise[data-reveal="shown"] > *:nth-child(3) {
+    animation-delay: 120ms;
+  }
+
+  .reveal-rise[data-reveal="shown"] > *:nth-child(n + 4) {
+    animation-delay: 180ms;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .reveal-rise[data-reveal="shown"] > * {
+      animation: hero-enter-fade 200ms both;
+    }
+  }
+}
+
+/* SOURCE OF TRUTH KEYWORDS: marketing-header-settle, HEADER_EARNS_ITS_LINE,
+ * scroll(root), animation-timeline, MarketingHeader, --background
+ *
+ * WHAT:  The sticky public header's hairline and wash fade IN over the first
+ *        64px of scroll, instead of being painted at rest.
+ *
+ * WHY:   HEADER_EARNS_ITS_LINE. `border-b` and `bg-background/70` were on at
+ *        scroll 0, so the bar announced it was covering content before any
+ *        content was under it — a seam across the top of the hero, separating
+ *        the wordmark from a page it is sitting ON rather than over. The line
+ *        is right the moment something has scrolled beneath it, and wrong
+ *        before that, so it is tied to the thing it reports: the scroll
+ *        position itself.
+ *
+ *        SCROLL-DRIVEN, so there is no duration to blow the 300ms UI budget
+ *        and no scroll listener on the LCP route — the progress IS the
+ *        timeline. `linear` because the position maps straight to the
+ *        appearance; a curve here would make the header lag the page.
+ *
+ *        ONE OPACITY, NOT TWO PAINT PROPERTIES. The first cut of this
+ *        animated `border-color` and `background-color` directly, which is a
+ *        REPAINT of a full-width sticky bar on every frame of the first 64px
+ *        of scroll — the same mistake as animating the blur, with a smaller
+ *        number on it. The line and the wash live on a `::before` instead and
+ *        the animation moves its `opacity`, which is composited. The layer is
+ *        `inset: 0 0 -1px 0` so its own bottom border lands exactly on the
+ *        header's (now transparent) 1px border rather than a pixel above it:
+ *        the bar keeps its height and the hairline keeps its position.
+ *
+ *        `backdrop-filter` stays permanently on, and on the HEADER rather
+ *        than the layer: animating a blur radius is the one ingredient here
+ *        that can cost a frame on a cheap phone, and it buys nothing — the
+ *        hero's own `pt-16` means there is 64px of empty canvas behind the bar
+ *        at rest, so there is nothing for the blur to show.
+ *
+ *        BASE STATE IS THE VISIBLE ONE, and the `from` frame is what
+ *        `animation-fill-mode: both` holds before the scroll range begins.
+ *        That is what makes every fallback land on today's design rather than
+ *        on a header with no line at all: reduced motion (no animation at
+ *        all), and a browser with no `animation-timeline` support (the
+ *        animation runs once on the document timeline and is over in 1ms).
+ *        The duration is ignored outright on a progress-based timeline, so
+ *        the 1ms exists ONLY to be that fallback.
+ * WHERE: `.marketing-header-settle` on the <header> in
+ *        src/app/(marketing)/_components/marketing-header.tsx. */
+@keyframes marketing-header-settle {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@layer components {
+  /* The line and the wash, as one composited layer. `z-index: -1` keeps it
+     behind the nav inside the header's own stacking context (the element is
+     already `sticky` with a `z-index`, so it has one). */
+  .marketing-header-settle::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 -1px 0;
+    z-index: -1;
+    pointer-events: none;
+    border-bottom: 1px solid color-mix(in oklab, var(--border) 60%, transparent);
+    background-color: color-mix(in oklab, var(--background) 70%, transparent);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .marketing-header-settle::before {
+      animation: marketing-header-settle 1ms linear both;
+      animation-timeline: scroll(root block);
+      animation-range: 0 64px;
+    }
+  }
+}
+
 /* SOURCE OF TRUTH KEYWORDS: app-enter, dash-enter, DASHBOARD_ASSEMBLES,
  * ENTRANCE_PER_CONTAINER, FILTER_IS_A_TRANSITION, hero-enter
  *
@@ -1214,9 +1387,36 @@ html:has([data-app-banner]) {
     animation: hero-enter 220ms var(--ease-settle) backwards;
   }
 
+  /* SOURCE OF TRUTH KEYWORDS: block-enter-rise, LCP_IS_NEVER_FADED,
+   * hero-enter-rise, AUTH_FLOW_ARRIVES
+   *
+   * The same arrival with the opacity leg removed, for one element that is
+   * also a COLD-ENTRY page's largest paint — today the auth flow's form
+   * column, which a visitor reaches by typing a URL or following a link
+   * rather than by a client navigation inside the app.
+   *
+   * WHY: exactly the reason the marketing headline has its own variant (see
+   * hero-enter-rise). A browser does not count an `opacity: 0` element as
+   * painted, so fading in the thing that IS the page's LCP element pays for
+   * the entrance in the one metric a sign-in screen cannot afford it in. The
+   * rise alone still reads as arriving, because movement is what the eye
+   * follows, not alpha.
+   *
+   * Reduced motion removes it OUTRIGHT rather than falling back to a fade:
+   * the travel is the whole animation here, and "gentler" for an element
+   * that was never transparent means not moving it. Adding a fade back would
+   * be introducing motion the setting asked to be rid of. */
+  .block-enter-rise {
+    animation: hero-enter-rise 220ms var(--ease-settle) backwards;
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .block-enter {
       animation: hero-enter-fade 180ms backwards;
+    }
+
+    .block-enter-rise {
+      animation: none;
     }
   }
 }

@@ -58,7 +58,24 @@ const MARKETING_NAV_LINKS: readonly MarketingLink[] = [
 
 export function MarketingHeader() {
   return (
-    <header className="sticky top-0 z-40 border-b border-border/60 bg-background/70 backdrop-blur-xl">
+    <header
+      className={cn(
+        "sticky top-0 z-40 border-b border-transparent backdrop-blur-xl",
+        /* HEADER_EARNS_ITS_LINE. The hairline and the `bg-background/70` wash
+           moved onto this class's `::before` and fade IN over the first 64px
+           of scroll, driven by the scroll position itself rather than by a
+           listener: at rest the bar is not covering anything yet, and the
+           border read as a seam across the top of the hero.
+
+           The border above is kept, TRANSPARENT, so the bar's height does not
+           change by the pixel the real hairline used to occupy — the layer
+           reaches down into it. Everything the layer draws is its resting
+           state, so reduced motion and a browser with no `animation-timeline`
+           support both render the header exactly as it was. See
+           marketing-header-settle in globals.css. */
+        "marketing-header-settle",
+      )}
+    >
       <nav className="safe-x mx-auto flex h-14 max-w-7xl items-center justify-between gap-4">
         <PlatformLogo href="/" size="md" />
 
