@@ -173,6 +173,31 @@ one.
 - Hero: one staggered entrance on page load (0/50/100/150/190ms, 320ms each),
   and the stage fades in with opacity ALONE because its wrapper already carries
   a transform.
+- **Sections below the hero (`reveal-rise`):** the format cards, the feature
+  rows and the plan cards rise 8px and fade in as their section reaches the
+  viewport — the SAME 320ms and `--ease-settle` as `hero-enter`, stepped 60ms
+  per child like `proof-enter`, capped at the fourth. ONE entrance per
+  container, and it FIRES ONCE: an IntersectionObserver flips
+  `data-reveal="pending"` → `"shown"` and unobserves, because
+  `animation-timeline: view()` is bidirectional and would fade the cards out
+  again on every scroll back up. A section opts in with `reveal-rise` +
+  `data-reveal="pending"`; `@/components/global/scroll-reveal` is mounted once
+  in the group layout, so the pages stay Server Components. The hidden state is
+  scoped to `html[data-reveal-armed]`, which only that component sets — a
+  marketing page must never hide its own content behind a script. Animates the
+  `translate` property, not `transform`, so `brutal-hover`'s lift and the
+  featured plan card's `lg:-translate-y-2` still compose.
+- **Sticky header (`marketing-header-settle`):** the hairline and the
+  `bg-background/70` wash fade in over the first 64px of scroll via
+  `animation-timeline: scroll(root block)`, `linear`, so the bar only claims to
+  be covering content once it is. `backdrop-filter` stays permanently on —
+  animating a blur radius is the one ingredient here that can cost a frame, and
+  the hero's `pt-16` leaves nothing behind the bar to blur at rest. The
+  utilities on the element are the end state and the no-support fallback; the
+  rule sits under `prefers-reduced-motion: no-preference`.
+- Proof strip: the play disc scales `0.9 → 1` alongside the overlay's fade,
+  both 150ms `--ease-settle`, so it arrives rather than switching on. `scale`,
+  not `transform` — the card is a `brutal-hover`.
 - Hero prompt tabs: the active pill SLIDES between tabs — a duplicate row
   carrying the active skin, clipped with `clip-path` to the active tab, 200ms.
 - In-page anchors scroll smoothly, scoped with `html:has(.marketing-canvas)` so
@@ -189,7 +214,9 @@ one.
 - Motion stays in CSS on this page. It runs on the compositor and survives
   hydration; a JS animation library on the LCP route does neither.
   framer-motion is used only where CSS structurally cannot help — an EXIT
-  animation (see `AuthError`).
+  animation (see `AuthError`). The ban is on an animation LIBRARY, not on JS
+  that flips a class or an attribute: `reveal-rise` and the hero scene's pause
+  both observe intersection and let CSS do the animating.
 
 ---
 

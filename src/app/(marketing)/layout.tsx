@@ -49,6 +49,8 @@
  *        src/app/(marketing)/docs.
  */
 
+import { ScrollRevealObserver } from "@/components/global/scroll-reveal";
+
 import { MarketingFooter, MarketingHeader } from "./_components";
 
 export default function MarketingLayout({
@@ -61,6 +63,13 @@ export default function MarketingLayout({
       <MarketingHeader />
       <main className="flex-1">{children}</main>
       <MarketingFooter />
+
+      {/* SECTIONS_ASSEMBLE_TOO. Renders nothing — it arms the document and
+          flips the `data-reveal` containers below the fold as they arrive.
+          Mounted HERE rather than wrapped around each section so the pages
+          themselves stay Server Components; see the component for why the
+          hidden state cannot exist until this has run. */}
+      <ScrollRevealObserver />
     </div>
   );
 }

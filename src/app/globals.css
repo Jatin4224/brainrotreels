@@ -1041,6 +1041,148 @@ html:has([data-app-banner]) {
   }
 }
 
+/* SOURCE OF TRUTH KEYWORDS: reveal-rise, data-reveal, data-reveal-armed,
+ * ScrollRevealObserver, SECTIONS_ASSEMBLE_TOO, ENTRANCE_PER_CONTAINER,
+ * NOTHING_HIDES_WITHOUT_JS, hero-enter, proof-enter, --ease-settle
+ *
+ * WHAT:  The entrance the sections BELOW the hero run as they scroll into
+ *        view — the format cards, the feature rows and the plan cards rise
+ *        and fade in, one container at a time, once each.
+ *
+ * WHY:   SECTIONS_ASSEMBLE_TOO. The hero was fully choreographed
+ *        (`.hero-enter`, `.proof-enter`) and then the remaining five sections
+ *        of a 6,500px page were simply THERE — the page assembled for its
+ *        first screenful and then read as a static document for the rest of
+ *        the scroll. That asymmetry is the one motion gap this page had.
+ *
+ *        ENTRANCE_PER_CONTAINER, the rule `.dash-enter` already keeps: ONE
+ *        entrance per container, the SAME 320ms and `--ease-settle` as the
+ *        hero, and the same 60ms step `.proof-enter` uses — this is the
+ *        hero's motion arriving later, not a second entrance invented for
+ *        the lower page. Capped at the fourth child for the reason both of
+ *        those are capped: a section with eight rows must not push its last
+ *        one half a second after the first.
+ *
+ *        FIRES ONCE, which is why this is an IntersectionObserver and a
+ *        TRANSITION rather than `animation-timeline: view()`. A view-progress
+ *        timeline is bidirectional by construction, so every scroll back up
+ *        the page would fade the cards out again — an interface fighting its
+ *        reader. The motion itself is still CSS on the compositor; the only
+ *        thing JS does is flip one attribute (see MOTION_STAYS_IN_CSS in
+ *        design.md §2.7 — the ban is on a JS animation LIBRARY on the LCP
+ *        route, and the hero scene and auth showcase already observe
+ *        intersection the same way).
+ *
+ *        NOTHING_HIDES_WITHOUT_JS is why the hidden state is nested under
+ *        `html[data-reveal-armed]` instead of being the default. If the
+ *        bundle fails, is blocked, or is disabled, the attribute is never
+ *        set and every section renders exactly as it does today — a
+ *        marketing page must never be able to hide its own content behind a
+ *        script. The observer also arms the page and marks everything
+ *        ALREADY on screen as shown in the same task, so nothing that has
+ *        been painted visible can blink back out at hydration.
+ *
+ *        `translate` rather than `transform`, deliberately: the format cards
+ *        and plan cards wear `brutal-hover`, whose 1px lift IS a `transform`,
+ *        and the featured plan card carries `lg:-translate-y-2`. Animating
+ *        the separate property composes with both instead of clobbering
+ *        them mid-flight.
+ *
+ *        Reduced motion keeps the fade and drops the travel, like every other
+ *        entrance here — fewer and gentler, not nothing.
+ * WHERE: `.reveal-rise` + `data-reveal="pending"` on the three section lists
+ *        in src/app/(marketing)/page.tsx; flipped by
+ *        @/components/global/scroll-reveal, mounted in
+ *        src/app/(marketing)/layout.tsx. */
+@layer components {
+  .reveal-rise > * {
+    transition:
+      opacity 320ms var(--ease-settle),
+      translate 320ms var(--ease-settle);
+  }
+
+  html[data-reveal-armed] .reveal-rise[data-reveal="pending"] > * {
+    opacity: 0;
+    translate: 0 8px;
+  }
+
+  .reveal-rise[data-reveal="shown"] > *:nth-child(2) {
+    transition-delay: 60ms;
+  }
+
+  .reveal-rise[data-reveal="shown"] > *:nth-child(3) {
+    transition-delay: 120ms;
+  }
+
+  .reveal-rise[data-reveal="shown"] > *:nth-child(n + 4) {
+    transition-delay: 180ms;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .reveal-rise > * {
+      transition: opacity 200ms var(--ease-settle);
+    }
+
+    html[data-reveal-armed] .reveal-rise[data-reveal="pending"] > * {
+      translate: none;
+    }
+  }
+}
+
+/* SOURCE OF TRUTH KEYWORDS: marketing-header-settle, HEADER_EARNS_ITS_LINE,
+ * scroll(root), animation-timeline, MarketingHeader, --background
+ *
+ * WHAT:  The sticky public header's hairline and wash fade IN over the first
+ *        64px of scroll, instead of being painted at rest.
+ *
+ * WHY:   HEADER_EARNS_ITS_LINE. `border-b` and `bg-background/70` were on at
+ *        scroll 0, so the bar announced it was covering content before any
+ *        content was under it — a seam across the top of the hero, separating
+ *        the wordmark from a page it is sitting ON rather than over. The line
+ *        is right the moment something has scrolled beneath it, and wrong
+ *        before that, so it is tied to the thing it reports: the scroll
+ *        position itself.
+ *
+ *        SCROLL-DRIVEN, so there is no duration to blow the 300ms UI budget
+ *        and no scroll listener on the LCP route — the progress IS the
+ *        timeline. `linear` because the position maps straight to the
+ *        appearance; a curve here would make the header lag the page.
+ *
+ *        Only `border-color` and `background-color` are animated.
+ *        `backdrop-filter` stays permanently on: animating a blur radius on a
+ *        sticky bar is the one ingredient here that can cost a frame on a
+ *        cheap phone, and it buys nothing — the hero's own `pt-16` means
+ *        there is 64px of empty canvas behind the bar at rest, so there is
+ *        nothing for the blur to show.
+ *
+ *        The `to` frame states exactly what the utilities on the element
+ *        already say, which is also the fallback: a browser with no
+ *        `animation-timeline` support runs this once on the document timeline
+ *        and settles on the current design in 1ms. Reduced motion opts out
+ *        the same way — the header simply wears its line, as it does today.
+ * WHERE: `.marketing-header-settle` on the <header> in
+ *        src/app/(marketing)/_components/marketing-header.tsx. */
+@keyframes marketing-header-settle {
+  from {
+    border-color: transparent;
+    background-color: transparent;
+  }
+  to {
+    border-color: color-mix(in oklab, var(--border) 60%, transparent);
+    background-color: color-mix(in oklab, var(--background) 70%, transparent);
+  }
+}
+
+@layer components {
+  @media (prefers-reduced-motion: no-preference) {
+    .marketing-header-settle {
+      animation: marketing-header-settle 1ms linear both;
+      animation-timeline: scroll(root block);
+      animation-range: 0 64px;
+    }
+  }
+}
+
 /* SOURCE OF TRUTH KEYWORDS: app-enter, dash-enter, DASHBOARD_ASSEMBLES,
  * ENTRANCE_PER_CONTAINER, FILTER_IS_A_TRANSITION, hero-enter
  *

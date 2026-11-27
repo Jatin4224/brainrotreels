@@ -255,9 +255,14 @@ export default function LandingPage({
 
             {/* Same reason as the plan grid: a fork that ships two formats
                 should get two columns, not two cards and two holes. */}
+            {/* SECTIONS_ASSEMBLE_TOO — the cards rise in as the section
+                arrives, once, on the hero's own curve and stagger. Two
+                attributes is the whole opt-in; see `reveal-rise` in
+                globals.css and @/components/global/scroll-reveal. */}
             <ul
+              data-reveal="pending"
               className={cn(
-                "mx-auto mt-12 grid gap-6",
+                "reveal-rise mx-auto mt-12 grid gap-6",
                 FORMAT_GRID_CLASS[Math.min(data.formats.length, 4)],
               )}
             >
@@ -469,7 +474,13 @@ export default function LandingPage({
                 </p>
               </div>
 
-              <ul className="divide-y divide-border border-t border-border">
+              {/* SECTIONS_ASSEMBLE_TOO. An entrance, not ongoing motion:
+                  these rows are a plan-gating table a visitor reads and
+                  compares, so they arrive and then hold still. */}
+              <ul
+                data-reveal="pending"
+                className="reveal-rise divide-y divide-border border-t border-border"
+              >
                 {data.features.map((definition) => {
                   /* COPY_IS_REGISTRY_DERIVED still — the registry read moved to
                    the fixture module so a fixture can state a row the
@@ -549,9 +560,13 @@ export default function LandingPage({
               capped at 2 from sm and at the plan count from xl, and the list
               is capped in width and centred so one plan is a card rather than
               a banner. */}
+            {/* SECTIONS_ASSEMBLE_TOO. `translate` and not `transform`, so the
+                featured card's own `lg:-translate-y-2` is the position this
+                settles INTO rather than something the entrance overwrites. */}
             <ul
+              data-reveal="pending"
               className={cn(
-                "mx-auto mt-12 grid items-stretch gap-6",
+                "reveal-rise mx-auto mt-12 grid items-stretch gap-6",
                 PLAN_GRID_CLASS[Math.min(teaserPlans.length, 4)],
               )}
             >

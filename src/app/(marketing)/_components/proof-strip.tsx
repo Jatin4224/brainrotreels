@@ -117,7 +117,16 @@ export function ProofStrip({ clips, className }: ProofStripProps) {
                  `(pointer: fine)` + `(hover: hover)` query. */
               className="absolute inset-0 flex items-center justify-center opacity-0 transition-opacity duration-150 ease-[var(--ease-settle)] pointer-fine:group-hover:opacity-100 motion-reduce:transition-none"
             >
-              <span className="brutal-border flex size-11 items-center justify-center rounded-full bg-brand-accent text-brand-accent-foreground">
+              {/* THE DISC ARRIVES. The overlay's opacity alone read as a
+                  layer switching on rather than as an affordance appearing
+                  under the pointer, so the disc grows the last 10% on the
+                  SAME 150ms and the same curve — one motion, not two.
+                  `scale`, not `transform`: the card around this is a
+                  `brutal-hover`, whose 1px lift IS the transform. The
+                  pointer-fine gate is the parent's, inherited through
+                  group-hover; motion-reduce lands it at full size so the
+                  fade still reads. */}
+              <span className="brutal-border flex size-11 scale-90 items-center justify-center rounded-full bg-brand-accent text-brand-accent-foreground transition-transform duration-150 ease-[var(--ease-settle)] pointer-fine:group-hover:scale-100 motion-reduce:scale-100 motion-reduce:transition-none">
                 <PlayIcon className="size-4" />
               </span>
             </span>
